@@ -1,0 +1,1333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModLab</title>
+<meta name="description" content="Game modding tutorials — Frida, Python, Animal Company memory hacking, DLL injection and more.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* ─── Tokens ─────────────────────────────────── */
+:root {
+  --bg:          #09090f;
+  --sf:          #0f1118;
+  --sf-up:       #151c28;
+  --border:      #1c2438;
+  --border-hi:   #2a3758;
+  --accent:      #00e5a0;
+  --accent-dim:  #00b07a;
+  --accent-glow: rgba(0,229,160,.10);
+  --amber:       #f5a623;
+  --amber-bg:    rgba(245,166,35,.08);
+  --red:         #ff5f72;
+  --blue:        #4a9eff;
+  --text:        #ccd4e3;
+  --muted:       #65778f;
+  --faint:       #232e45;
+  --fd:          'Barlow Condensed', sans-serif;
+  --fb:          'IBM Plex Sans', sans-serif;
+  --fm:          'JetBrains Mono', monospace;
+  --r:           6px;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg:          #f0f2f7;
+    --sf:          #ffffff;
+    --sf-up:       #f7f9fc;
+    --border:      #dde2ec;
+    --border-hi:   #c5cede;
+    --accent-glow: rgba(0,176,122,.10);
+    --text:        #1a2035;
+    --muted:       #5a6680;
+    --faint:       #e0e5f0;
+  }
+}
+:root[data-theme="light"] {
+  --bg:          #f0f2f7;
+  --sf:          #ffffff;
+  --sf-up:       #f7f9fc;
+  --border:      #dde2ec;
+  --border-hi:   #c5cede;
+  --accent-glow: rgba(0,176,122,.10);
+  --text:        #1a2035;
+  --muted:       #5a6680;
+  --faint:       #e0e5f0;
+}
+
+/* ─── Reset ───────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:15px;line-height:1.65;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+button{cursor:pointer;font-family:inherit}
+code{font-family:var(--fm)}
+img{max-width:100%}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ─── Nav ─────────────────────────────────────── */
+.nav{
+  position:sticky;top:0;z-index:200;
+  background:rgba(9,9,15,.82);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+}
+.nav-inner{
+  max-width:1200px;margin:0 auto;padding:0 24px;
+  display:flex;align-items:center;gap:32px;height:56px;
+}
+.nav-logo{
+  font-family:var(--fd);font-size:22px;font-weight:800;
+  letter-spacing:.5px;color:var(--text);
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.nav-logo span{color:var(--accent)}
+.nav-links{display:flex;align-items:center;gap:4px;flex:1}
+.nav-link{
+  font-family:var(--fb);font-size:13px;font-weight:500;
+  color:var(--muted);padding:6px 12px;border-radius:var(--r);
+  background:transparent;border:none;transition:color .15s,background .15s;
+  letter-spacing:.01em;
+}
+.nav-link:hover,.nav-link.active{color:var(--text);background:var(--sf-up)}
+.nav-link.active{color:var(--accent)}
+.nav-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.theme-btn{
+  width:32px;height:32px;border-radius:var(--r);border:1px solid var(--border);
+  background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;
+  font-size:14px;transition:color .15s,border-color .15s;
+}
+.theme-btn:hover{color:var(--text);border-color:var(--border-hi)}
+
+/* ─── Hero ────────────────────────────────────── */
+.hero{
+  padding:72px 24px 60px;
+  max-width:1200px;margin:0 auto;
+}
+.hero-eyebrow{
+  font-family:var(--fm);font-size:11px;font-weight:500;
+  color:var(--accent);letter-spacing:.12em;text-transform:uppercase;
+  margin-bottom:20px;display:flex;align-items:center;gap:8px;
+}
+.hero-eyebrow::before{
+  content:'';width:24px;height:1px;background:var(--accent);display:block;
+}
+.hero-title{
+  font-family:var(--fd);font-size:clamp(52px,7vw,88px);
+  font-weight:800;line-height:.95;letter-spacing:-1px;
+  text-wrap:balance;
+  margin-bottom:24px;
+}
+.hero-title em{
+  font-style:normal;color:var(--accent);
+}
+.hero-sub{
+  font-size:16px;color:var(--muted);max-width:540px;
+  line-height:1.7;margin-bottom:40px;
+}
+.hero-layout{
+  display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;
+}
+@media(max-width:760px){.hero-layout{grid-template-columns:1fr}}
+
+/* Terminal */
+.terminal{
+  background:var(--sf);border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;font-family:var(--fm);font-size:13px;
+}
+.terminal-bar{
+  background:var(--sf-up);border-bottom:1px solid var(--border);
+  padding:10px 14px;display:flex;align-items:center;gap:6px;
+}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot-r{background:#ff5f5f}.dot-y{background:#ffbd2e}.dot-g{background:#27c93f}
+.terminal-bar-label{font-family:var(--fb);font-size:11px;color:var(--muted);margin-left:8px}
+.terminal-body{padding:16px;min-height:220px;line-height:1.7}
+.t-line{display:flex;gap:8px;margin-bottom:2px}
+.t-prompt{color:var(--accent-dim);flex-shrink:0}
+.t-cmd{color:var(--text)}
+.t-out{color:var(--muted);padding-left:16px;margin-bottom:2px}
+.t-ok{color:var(--accent)}
+.t-err{color:var(--red)}
+.t-cursor{
+  display:inline-block;width:8px;height:14px;background:var(--accent);
+  vertical-align:middle;margin-left:2px;
+  animation:blink .9s step-end infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* Hero CTA */
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 20px;border-radius:var(--r);font-size:13px;
+  font-weight:600;border:none;transition:all .15s;letter-spacing:.01em;
+}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{background:var(--accent-dim);text-decoration:none}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--border-hi);background:var(--sf);text-decoration:none}
+
+/* ─── Stats row ───────────────────────────────── */
+.stats{
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  padding:20px 24px;display:flex;gap:0;
+  max-width:1200px;margin:0 auto;
+}
+.stat{
+  flex:1;padding:0 24px;border-right:1px solid var(--border);
+  display:flex;flex-direction:column;gap:2px;
+}
+.stat:first-child{padding-left:0}
+.stat:last-child{border-right:none}
+.stat-val{font-family:var(--fd);font-size:32px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.stat-val span{color:var(--accent)}
+.stat-label{font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.08em}
+@media(max-width:600px){.stats{flex-wrap:wrap}.stat{flex-basis:50%;border-right:none;border-bottom:1px solid var(--border);padding:12px 0}}
+
+/* ─── Section ─────────────────────────────────── */
+.section{padding:64px 24px;max-width:1200px;margin:0 auto}
+.section-head{margin-bottom:40px}
+.section-label{
+  font-family:var(--fm);font-size:11px;color:var(--accent);
+  text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;
+}
+.section-title{
+  font-family:var(--fd);font-size:clamp(32px,5vw,48px);font-weight:800;
+  line-height:1;letter-spacing:-.5px;text-wrap:balance;
+}
+.section-sub{font-size:15px;color:var(--muted);margin-top:10px;max-width:480px;line-height:1.6}
+
+/* ─── Tutorial grid ───────────────────────────── */
+.tut-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:2px;
+}
+/* No border, no shadow — accent stripe on hover only */
+.tut-card{
+  padding:28px 28px 24px;
+  border-left:2px solid transparent;
+  background:var(--sf);
+  cursor:pointer;
+  transition:border-color .15s, background .15s;
+  position:relative;
+}
+.tut-card:hover{border-left-color:var(--accent);background:var(--sf-up)}
+.tut-card-tags{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tag{
+  font-family:var(--fb);font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.08em;
+  padding:2px 8px;border-radius:3px;
+}
+.tag-beginner{background:rgba(0,229,160,.12);color:var(--accent)}
+.tag-intermediate{background:rgba(74,158,255,.12);color:var(--blue)}
+.tag-advanced{background:rgba(255,95,114,.12);color:var(--red)}
+.tag-tool{background:rgba(245,166,35,.12);color:var(--amber)}
+.tag-game{background:rgba(138,80,255,.12);color:#a07fff}
+.tut-card-title{
+  font-family:var(--fd);font-size:22px;font-weight:700;
+  line-height:1.1;margin-bottom:10px;text-wrap:balance;
+}
+.tut-card-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px}
+.tut-card-meta{
+  display:flex;align-items:center;gap:12px;
+  font-size:11px;color:var(--faint);
+  border-top:1px solid var(--border);padding-top:14px;margin-top:auto;
+}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]) .tut-card-meta{color:var(--muted)}}
+:root[data-theme="light"] .tut-card-meta{color:var(--muted)}
+.tut-card-arrow{
+  margin-left:auto;color:var(--muted);font-size:16px;
+  transition:transform .15s,color .15s;
+}
+.tut-card:hover .tut-card-arrow{transform:translateX(3px);color:var(--accent)}
+
+/* ─── Tutorial view ───────────────────────────── */
+.tut-view{display:none;padding:40px 24px 80px;max-width:1200px;margin:0 auto}
+.tut-view.visible{display:grid;grid-template-columns:1fr 240px;gap:48px}
+@media(max-width:900px){.tut-view.visible{grid-template-columns:1fr}}
+
+.tut-back{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:13px;color:var(--muted);margin-bottom:32px;
+  background:transparent;border:none;padding:0;
+  transition:color .15s;
+}
+.tut-back:hover{color:var(--accent)}
+
+.tut-content h1{
+  font-family:var(--fd);font-size:clamp(36px,5vw,56px);
+  font-weight:800;line-height:.97;letter-spacing:-.5px;
+  text-wrap:balance;margin-bottom:16px;
+}
+.tut-content .tut-meta-row{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--border);
+}
+.tut-content h2{
+  font-family:var(--fd);font-size:28px;font-weight:700;
+  margin:40px 0 14px;letter-spacing:-.3px;
+}
+.tut-content h3{
+  font-family:var(--fd);font-size:20px;font-weight:600;
+  margin:28px 0 10px;color:var(--text);
+}
+.tut-content p{margin-bottom:16px;max-width:680px;color:var(--text)}
+.tut-content ul,.tut-content ol{
+  padding-left:20px;margin-bottom:16px;max-width:660px;
+}
+.tut-content li{margin-bottom:6px;color:var(--text)}
+.tut-content a{color:var(--accent)}
+
+/* Code blocks */
+.code-wrap{
+  margin:20px 0;border-radius:var(--r);overflow:hidden;
+  border:1px solid var(--border);
+}
+.code-header{
+  background:var(--sf-up);border-bottom:1px solid var(--border);
+  padding:8px 14px;display:flex;align-items:center;justify-content:space-between;
+}
+.code-lang{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.code-copy{
+  font-family:var(--fb);font-size:11px;color:var(--muted);
+  background:transparent;border:none;padding:2px 8px;border-radius:3px;
+  transition:color .15s,background .15s;
+}
+.code-copy:hover{color:var(--accent);background:var(--accent-glow)}
+.code-copy.copied{color:var(--accent)}
+pre{
+  background:var(--sf);padding:16px;overflow-x:auto;
+  font-family:var(--fm);font-size:13px;line-height:1.65;
+  tab-size:2;
+}
+pre code{background:none;padding:0}
+.inline-code{
+  font-family:var(--fm);font-size:12.5px;
+  background:var(--sf-up);padding:1px 6px;border-radius:3px;
+  border:1px solid var(--border);color:var(--accent);
+}
+
+/* Callout boxes */
+.callout{
+  border-left:3px solid;padding:14px 18px;border-radius:0 var(--r) var(--r) 0;
+  margin:20px 0;max-width:680px;
+}
+.callout-info{border-color:var(--blue);background:rgba(74,158,255,.07)}
+.callout-warn{border-color:var(--amber);background:var(--amber-bg)}
+.callout-tip{border-color:var(--accent);background:var(--accent-glow)}
+.callout-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.callout-info .callout-title{color:var(--blue)}
+.callout-warn .callout-title{color:var(--amber)}
+.callout-tip .callout-title{color:var(--accent)}
+.callout p{margin:0;font-size:13px;color:var(--muted);max-width:100%}
+
+/* Steps */
+.steps{margin:24px 0;max-width:680px}
+.step{display:flex;gap:16px;margin-bottom:20px;position:relative}
+.step::before{
+  content:'';position:absolute;left:15px;top:32px;
+  width:1px;height:calc(100% + 4px);background:var(--border);
+}
+.step:last-child::before{display:none}
+.step-num{
+  width:32px;height:32px;border-radius:50%;border:1px solid var(--border);
+  background:var(--sf);flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--fm);font-size:12px;color:var(--accent);position:relative;z-index:1;
+}
+.step-body{padding-top:4px}
+.step-title{font-weight:600;font-size:14px;margin-bottom:6px}
+.step-body p{font-size:13px;color:var(--muted);margin-bottom:8px;max-width:100%}
+
+/* TOC sidebar */
+.tut-sidebar{position:sticky;top:72px;height:fit-content}
+.toc{border-left:1px solid var(--border);padding-left:20px}
+.toc-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px}
+.toc-link{
+  display:block;font-size:12px;color:var(--muted);padding:4px 0;
+  border-left:2px solid transparent;margin-left:-21px;padding-left:19px;
+  transition:color .12s,border-color .12s;
+}
+.toc-link:hover{color:var(--text);border-color:var(--border-hi);text-decoration:none}
+.toc-link.active-toc{color:var(--accent);border-color:var(--accent)}
+@media(max-width:900px){.tut-sidebar{display:none}}
+
+/* ─── Tools section ───────────────────────────── */
+.tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.tool-card{
+  background:var(--sf);border:1px solid var(--border);
+  border-radius:var(--r);padding:20px;
+  transition:border-color .15s,background .15s;
+}
+.tool-card:hover{border-color:var(--border-hi);background:var(--sf-up)}
+.tool-icon{font-size:24px;margin-bottom:12px}
+.tool-name{font-family:var(--fd);font-size:18px;font-weight:700;margin-bottom:6px}
+.tool-desc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.tool-link{font-size:12px;font-weight:500;color:var(--accent)}
+
+/* ─── Footer ──────────────────────────────────── */
+.footer{
+  border-top:1px solid var(--border);padding:32px 24px;
+  max-width:1200px;margin:0 auto;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;
+}
+.footer-logo{font-family:var(--fd);font-size:18px;font-weight:800;color:var(--muted)}
+.footer-logo span{color:var(--accent)}
+.footer-note{font-size:12px;color:var(--muted)}
+
+/* ─── Page system ─────────────────────────────── */
+.page{display:none}
+.page.active{display:block}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <div class="nav-logo">Mod<span>Lab</span></div>
+    <div class="nav-links">
+      <button class="nav-link active" onclick="showPage('home')">Home</button>
+      <button class="nav-link" onclick="showPage('tutorials')">Tutorials</button>
+      <button class="nav-link" onclick="showPage('tools')">Tools</button>
+    </div>
+    <div class="nav-right">
+      <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">☀</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════ HOME PAGE -->
+<div class="page active" id="page-home">
+
+  <div class="hero">
+    <div class="hero-layout">
+      <div>
+        <div class="hero-eyebrow">Game Modding Tutorials</div>
+        <h1 class="hero-title">
+          Hack the<br><em>game.</em><br>Own the code.
+        </h1>
+        <p class="hero-sub">Deep-dive tutorials on Frida, Python scripting, memory analysis, and game-specific mod guides. Built for people who want to understand how games work from the inside.</p>
+        <div class="hero-cta">
+          <button class="btn btn-primary" onclick="showPage('tutorials')">Browse Tutorials →</button>
+          <button class="btn btn-ghost" onclick="openTutorial('frida-start')">Get Started with Frida</button>
+        </div>
+      </div>
+      <div class="terminal" role="region" aria-label="Live terminal demo">
+        <div class="terminal-bar">
+          <span class="dot dot-r"></span>
+          <span class="dot dot-y"></span>
+          <span class="dot dot-g"></span>
+          <span class="terminal-bar-label">bash — modlab</span>
+        </div>
+        <div class="terminal-body" id="terminal-body">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-val">6<span>+</span></div>
+      <div class="stat-label">Tutorials</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">2</div>
+      <div class="stat-label">Game Guides</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">8<span>+</span></div>
+      <div class="stat-label">Code Examples</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">0</div>
+      <div class="stat-label">Paywalls</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-label">Start here</div>
+      <h2 class="section-title">Featured Tutorials</h2>
+      <p class="section-sub">Everything you need to go from zero to writing your first game mod.</p>
+    </div>
+    <div class="tut-grid" id="home-tut-grid">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════ TUTORIALS PAGE -->
+<div class="page" id="page-tutorials">
+  <div class="section">
+    <div class="section-head">
+      <div class="section-label">All Tutorials</div>
+      <h2 class="section-title">The Full Library</h2>
+      <p class="section-sub">Pick a tutorial or work through them in order — each one builds on the last.</p>
+    </div>
+    <div class="tut-grid" id="all-tut-grid">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ TUTORIAL VIEW -->
+<div class="page" id="page-tutorial">
+  <div class="tut-view" id="tut-view-inner">
+    <div>
+      <button class="tut-back" onclick="goBack()">← Back to tutorials</button>
+      <div class="tut-content" id="tut-content">
+        <!-- filled by JS -->
+      </div>
+    </div>
+    <aside class="tut-sidebar">
+      <nav class="toc" aria-label="Table of contents">
+        <div class="toc-label">On this page</div>
+        <div id="toc-links"></div>
+      </nav>
+    </aside>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ TOOLS PAGE -->
+<div class="page" id="page-tools">
+  <div class="section">
+    <div class="section-head">
+      <div class="section-label">Toolkit</div>
+      <h2 class="section-title">Essential Tools</h2>
+      <p class="section-sub">Every tool used across the tutorials — what each one does and where to get it.</p>
+    </div>
+    <div class="tools-grid">
+      <div class="tool-card">
+        <div class="tool-icon">🐍</div>
+        <div class="tool-name">Python</div>
+        <div class="tool-desc">Runtime for Frida scripts and automation. Install 3.11+ from python.org — always check "Add to PATH" on Windows.</div>
+        <a class="tool-link" href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org →</a>
+      </div>
+      <div class="tool-card">
+        <div class="tool-icon">⚡</div>
+        <div class="tool-name">Frida</div>
+        <div class="tool-desc">Dynamic instrumentation toolkit. Hook functions, intercept calls, read/write process memory — all from JavaScript or Python.</div>
+        <a class="tool-link" href="https://frida.re" target="_blank" rel="noopener">frida.re →</a>
+      </div>
+      <div class="tool-card">
+        <div class="tool-icon">🔍</div>
+        <div class="tool-name">Cheat Engine</div>
+        <div class="tool-desc">Memory scanner and debugger. Find addresses for values like health, speed, and ammo. Works alongside Frida scripts.</div>
+        <a class="tool-link" href="https://www.cheatengine.org" target="_blank" rel="noopener">cheatengine.org →</a>
+      </div>
+      <div class="tool-card">
+        <div class="tool-icon">🔬</div>
+        <div class="tool-name">x64dbg</div>
+        <div class="tool-desc">Open-source x64/x32 debugger for Windows. Essential for understanding game code flow and finding hooks.</div>
+        <a class="tool-link" href="https://x64dbg.com" target="_blank" rel="noopener">x64dbg.com →</a>
+      </div>
+      <div class="tool-card">
+        <div class="tool-icon">📦</div>
+        <div class="tool-name">dnSpy</div>
+        <div class="tool-desc">Decompiler and debugger for .NET games (Unity C#). Lets you read and modify compiled game assemblies.</div>
+        <a class="tool-link" href="https://github.com/dnSpy/dnSpy" target="_blank" rel="noopener">GitHub →</a>
+      </div>
+      <div class="tool-card">
+        <div class="tool-icon">🎮</div>
+        <div class="tool-name">BepInEx</div>
+        <div class="tool-desc">Unity game patcher and plugin framework. The standard way to load mods into Unity-based games like Animal Company.</div>
+        <a class="tool-link" href="https://github.com/BepInEx/BepInEx" target="_blank" rel="noopener">GitHub →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="footer-logo">Mod<span>Lab</span></div>
+  <div class="footer-note">Tutorials are for educational purposes. Mod responsibly — only on games you own.</div>
+</footer>
+
+<script>
+/* ─── Tutorial data ───────────────────────────── */
+const TUTORIALS = [
+  {
+    id: 'python-install',
+    title: 'Installing Python',
+    desc: 'Set up the Python runtime on Windows, macOS, and Linux. Required before installing Frida or writing mod scripts.',
+    tags: ['beginner'],
+    mins: '5 min',
+    featured: true,
+    content: `
+<div class="tut-meta-row">
+  <span class="tag tag-beginner">Beginner</span>
+  <span style="font-size:12px;color:var(--muted)">5 min read</span>
+</div>
+<p>Python is the runtime that powers Frida's command-line tools and your automation scripts. You need Python 3.10 or newer — ideally 3.11 or 3.12.</p>
+
+<h2 id="windows">Installing on Windows</h2>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="step-title">Download the installer</div>
+      <p>Go to <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org/downloads</a> and click the big yellow "Download Python 3.x.x" button. This gives you the 64-bit Windows installer.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="step-title">Run the installer — critical step</div>
+      <p>Before clicking Install Now, check the box at the bottom that says <strong>"Add Python to PATH"</strong>. If you skip this, nothing will work from the terminal.</p>
+      <div class="callout callout-warn">
+        <div class="callout-title">Warning</div>
+        <p>If you already installed Python without checking that box, uninstall it and reinstall with the option enabled.</p>
+      </div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="step-title">Verify the install</div>
+      <p>Open a new terminal (Win+R → cmd, or Windows Terminal) and run:</p>
+      <div class="code-wrap">
+        <div class="code-header"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        <pre><code>python --version</code></pre>
+      </div>
+      <p>You should see something like <span class="inline-code">Python 3.12.4</span>. If it says "not recognized", the PATH step was missed — reinstall.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <div class="step-title">Confirm pip is available</div>
+      <p>pip is Python's package manager — you'll use it to install Frida. Check it's there:</p>
+      <div class="code-wrap">
+        <div class="code-header"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+        <pre><code>pip --version</code></pre>
+      </div>
+      <p>Expected output: <span class="inline-code">pip 24.x.x from C:\\...\\site-packages\\pip (python 3.12)</span></p>
+    </div>
+  </div>
+</div>
+
+<h2 id="macos">Installing on macOS</h2>
+<p>macOS ships with Python 2 or an old Python 3 — install a fresh one from python.org or via Homebrew.</p>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code># Option A — Homebrew (recommended if you have it)
+brew install python@3.12
+
+# Option B — python.org installer
+# Download from python.org, run the .pkg, done</code></pre>
+</div>
+
+<h2 id="linux">Installing on Linux</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code># Debian / Ubuntu
+sudo apt update && sudo apt install python3 python3-pip
+
+# Arch
+sudo pacman -S python python-pip
+
+# Fedora
+sudo dnf install python3 python3-pip</code></pre>
+</div>
+
+<h2 id="troubleshoot">Common Problems</h2>
+<div class="callout callout-info">
+  <div class="callout-title">Multiple Python versions</div>
+  <p>If you have Python 2 and Python 3 installed, use <span class="inline-code">python3</span> and <span class="inline-code">pip3</span> explicitly, especially on macOS and Linux.</p>
+</div>
+<div class="callout callout-tip">
+  <div class="callout-title">Tip — use a venv</div>
+  <p>For modding work, create a virtual environment so your packages stay isolated: <span class="inline-code">python -m venv modenv</span>, then activate it with <span class="inline-code">modenv\\Scripts\\activate</span> (Windows) or <span class="inline-code">source modenv/bin/activate</span> (Mac/Linux).</p>
+</div>
+    `
+  },
+  {
+    id: 'frida-install',
+    title: 'Installing Frida',
+    desc: 'Install frida-tools via pip, verify the setup, and attach to your first process.',
+    tags: ['beginner'],
+    mins: '8 min',
+    featured: true,
+    content: `
+<div class="tut-meta-row">
+  <span class="tag tag-beginner">Beginner</span>
+  <span style="font-size:12px;color:var(--muted)">8 min read</span>
+</div>
+<p>Frida is a dynamic instrumentation toolkit. It lets you inject JavaScript into a running process, hook functions, intercept calls, and read/write memory — all without touching source code.</p>
+
+<div class="callout callout-warn">
+  <div class="callout-title">Prerequisite</div>
+  <p>You need Python 3.10+ and pip installed first. See the Python installation tutorial if you haven't done that yet.</p>
+</div>
+
+<h2 id="install">Installing frida-tools</h2>
+<p>One command installs everything — the Frida core library and all command-line tools:</p>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>pip install frida-tools</code></pre>
+</div>
+<p>This installs: <span class="inline-code">frida</span> (the CLI), <span class="inline-code">frida-ps</span> (list processes), <span class="inline-code">frida-trace</span> (function tracer), and the Python bindings.</p>
+
+<h2 id="verify">Verify the install</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>frida --version
+# Expected: 16.x.x
+
+frida-ps
+# Lists running processes on your machine</code></pre>
+</div>
+
+<h2 id="attach">Attaching to a process</h2>
+<p>With the target game running, find its process name or PID:</p>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code># List all running processes
+frida-ps
+
+# Filter for your game (Windows example)
+frida-ps | findstr "Animal"
+
+# Attach to the process by name
+frida -n "Animal Company"</code></pre>
+</div>
+<p>You'll land in a Frida REPL where you can run JavaScript live against the process. Type <span class="inline-code">Process.id</span> to confirm you're attached.</p>
+
+<h2 id="windows-issues">Windows-specific issues</h2>
+<div class="callout callout-warn">
+  <div class="callout-title">Access denied errors</div>
+  <p>Run your terminal as Administrator when attaching to game processes. Right-click cmd/PowerShell → "Run as administrator".</p>
+</div>
+<div class="callout callout-info">
+  <div class="callout-title">Anti-cheat detection</div>
+  <p>Games with kernel-level anti-cheat (EAC, BattlEye) will detect Frida or crash the game. Offline-only or single-player games are safe. Animal Company is a cooperative horror game — test offline first.</p>
+</div>
+
+<h2 id="python-api">Using the Python API</h2>
+<p>Instead of the CLI REPL, you can write Python scripts that drive Frida:</p>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">python</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>import frida, sys
+
+def on_message(message, data):
+    if message['type'] == 'send':
+        print('[script]', message['payload'])
+    elif message['type'] == 'error':
+        print('[error]', message['stack'])
+
+# Attach to a running process by name
+session = frida.attach("Animal Company")
+
+script = session.create_script("""
+    console.log("Attached! PID:", Process.id);
+    console.log("Platform:", Process.platform);
+    console.log("Arch:", Process.arch);
+""")
+
+script.on('message', on_message)
+script.load()
+sys.stdin.read()  # keep running</code></pre>
+</div>
+<p>Save as <span class="inline-code">attach.py</span> and run with <span class="inline-code">python attach.py</span> while the game is open.</p>
+    `
+  },
+  {
+    id: 'frida-start',
+    title: 'Frida Scripting Basics',
+    desc: 'Write your first Frida script — interceptors, memory reads, module enumeration, and hooking exported functions.',
+    tags: ['intermediate'],
+    mins: '15 min',
+    featured: true,
+    content: `
+<div class="tut-meta-row">
+  <span class="tag tag-intermediate">Intermediate</span>
+  <span style="font-size:12px;color:var(--muted)">15 min read</span>
+</div>
+<p>Frida scripts run JavaScript inside the target process. They have access to Frida's runtime API — a rich set of tools for inspecting memory, hooking functions, and intercepting calls in real time.</p>
+
+<h2 id="modules">Listing modules</h2>
+<p>A module is a loaded executable or DLL. Enumerate all loaded modules to find what the game uses:</p>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// List all loaded modules
+Process.enumerateModules().forEach(m => {
+    console.log(m.name, m.base, m.size);
+});
+
+// Get a specific module
+const unity = Process.getModuleByName("UnityPlayer.dll");
+console.log("UnityPlayer base:", unity.base);
+console.log("UnityPlayer size:", unity.size);</code></pre>
+</div>
+
+<h2 id="memory">Reading and writing memory</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// Read a 4-byte integer from an address
+const addr = ptr("0x14A2B3C0");  // absolute address
+const value = addr.readInt();
+console.log("Value at address:", value);
+
+// Read a float
+const floatVal = addr.readFloat();
+
+// Read a UTF-8 string
+const str = addr.readUtf8String();
+
+// Write a new value
+addr.writeInt(9999);
+addr.writeFloat(1.0);</code></pre>
+</div>
+
+<div class="callout callout-warn">
+  <div class="callout-title">ASLR — addresses change every launch</div>
+  <p>Most games use ASLR. The base address of a module shifts each time the game starts. Always calculate addresses as <em>module base + offset</em>, never hardcode the full address.</p>
+</div>
+
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// Correct: base + offset
+const base = Process.getModuleByName("GameAssembly.dll").base;
+const healthOffset = 0x2B3C40;
+const healthAddr = base.add(healthOffset);
+console.log("Health:", healthAddr.readFloat());</code></pre>
+</div>
+
+<h2 id="interceptor">Hooking functions with Interceptor</h2>
+<p><span class="inline-code">Interceptor.attach()</span> lets you run code before and after any function call. This is the core of what makes Frida powerful.</p>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// Hook a function by its export name
+const targetFn = Module.findExportByName("GameAssembly.dll", "PlayerTakeDamage");
+
+if (targetFn) {
+    Interceptor.attach(targetFn, {
+        onEnter(args) {
+            // args[0] is 'this' (the player object pointer)
+            // args[1] is the damage amount (first actual parameter)
+            const damage = args[1].toInt32();
+            console.log("Damage incoming:", damage);
+
+            // Set damage to 0 — godmode
+            args[1] = ptr(0);
+        },
+        onLeave(retval) {
+            console.log("Return value:", retval.toInt32());
+        }
+    });
+} else {
+    console.log("Function not found — check the export name");
+}</code></pre>
+</div>
+
+<h2 id="replace">Replacing a function entirely</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// Replace a function so it always returns 1 (true)
+const isDeadFn = Module.findExportByName(null, "Player_IsDead");
+
+Interceptor.replace(isDeadFn, new NativeCallback(function(thisPtr) {
+    return 0;  // never dead
+}, 'int', ['pointer']));</code></pre>
+</div>
+
+<h2 id="send">Sending data back to Python</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// In the JS script — send data to the Python side
+send({ type: 'health', value: healthAddr.readFloat() });
+
+// In Python — receive it
+def on_message(message, data):
+    if message['type'] == 'send':
+        payload = message['payload']
+        if payload['type'] == 'health':
+            print(f"Player health: {payload['value']}")</code></pre>
+</div>
+
+<div class="callout callout-tip">
+  <div class="callout-title">Tip — use rpc.exports for two-way communication</div>
+  <p>Define <span class="inline-code">rpc.exports</span> in your JS to let Python call functions inside the script. Cleaner than message passing for interactive tools.</p>
+</div>
+    `
+  },
+  {
+    id: 'animal-company',
+    title: 'Animal Company — Getting Started',
+    desc: 'Mod Animal Company: find the game process, enumerate Unity modules, and write a basic Frida script targeting player values.',
+    tags: ['intermediate', 'game'],
+    mins: '20 min',
+    featured: true,
+    content: `
+<div class="tut-meta-row">
+  <span class="tag tag-intermediate">Intermediate</span>
+  <span class="tag tag-game">Animal Company</span>
+  <span style="font-size:12px;color:var(--muted)">20 min read</span>
+</div>
+<p>Animal Company is a Unity-based cooperative horror game. Because it runs on Unity's IL2CPP backend, the game logic is compiled to native code in <span class="inline-code">GameAssembly.dll</span> — which means Frida can hook it directly without needing a .NET decompiler.</p>
+
+<div class="callout callout-warn">
+  <div class="callout-title">Before you start</div>
+  <p>Run mods offline or in private lobbies only. Never use these techniques in public multiplayer — it ruins the experience for others and may result in a ban.</p>
+</div>
+
+<h2 id="find-process">Finding the process</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code># With Animal Company running, list processes
+frida-ps | findstr -i "animal"
+
+# You should see something like:
+# 14832  Animal Company.exe</code></pre>
+</div>
+
+<h2 id="unity-modules">Enumerating Unity modules</h2>
+<p>All IL2CPP Unity games use the same module structure. Start by mapping what's loaded:</p>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// Run this in the Frida REPL or as a script
+// Attach: frida -n "Animal Company" -l enum_modules.js
+
+Process.enumerateModules().filter(m =>
+    m.name.includes("Animal") ||
+    m.name.includes("Unity") ||
+    m.name === "GameAssembly.dll"
+).forEach(m => {
+    console.log(`[${m.name}] base=${m.base} size=${m.size}`);
+});</code></pre>
+</div>
+<p>The key modules you'll see:</p>
+<ul>
+  <li><span class="inline-code">Animal Company.exe</span> — main executable, the bootstrapper</li>
+  <li><span class="inline-code">GameAssembly.dll</span> — all game logic compiled by IL2CPP</li>
+  <li><span class="inline-code">UnityPlayer.dll</span> — Unity engine runtime</li>
+</ul>
+
+<h2 id="find-exports">Finding exported functions</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// Dump exports from GameAssembly and filter by keyword
+const ga = Process.getModuleByName("GameAssembly.dll");
+ga.enumerateExports()
+  .filter(e => e.name.toLowerCase().includes("player"))
+  .slice(0, 30)
+  .forEach(e => console.log(e.name, e.address));</code></pre>
+</div>
+<p>This will print up to 30 player-related function exports. IL2CPP preserves method names in exports, so you'll see things like <span class="inline-code">PlayerController_Update</span>, <span class="inline-code">PlayerController_TakeDamage</span>, etc.</p>
+
+<h2 id="godmode">Basic godmode script</h2>
+<p>Once you've identified <span class="inline-code">TakeDamage</span> (or equivalent), intercept it and zero the damage:</p>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// godmode.js — attach with: frida -n "Animal Company" -l godmode.js
+
+const takeDamage = Module.findExportByName("GameAssembly.dll",
+    "PlayerController_TakeDamage_m123456"); // adjust name from your dump
+
+if (!takeDamage) {
+    console.error("TakeDamage not found — update the export name");
+} else {
+    Interceptor.attach(takeDamage, {
+        onEnter(args) {
+            // IL2CPP: args[0] = 'this', args[1] = damage amount
+            const origDamage = args[1].toFloat ? args[1].toFloat() : args[1].toInt32();
+            console.log("Blocked damage:", origDamage);
+            args[1] = ptr(0);  // zero the damage
+        }
+    });
+    console.log("[+] Godmode active — damage nulled");
+}</code></pre>
+</div>
+
+<div class="callout callout-info">
+  <div class="callout-title">IL2CPP method name format</div>
+  <p>IL2CPP exports append a numeric hash to the end of each method name: <span class="inline-code">ClassName_MethodName_mHEX</span>. Run the export dump above and look for the right one — the base name is always readable.</p>
+</div>
+
+<h2 id="speed-hack">Speed and stamina script</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">python</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code"># speed.py — find and patch speed float in PlayerController
+import frida, sys
+
+JS = """
+const base = Process.getModuleByName("GameAssembly.dll").base;
+
+// These offsets need to be found via Cheat Engine for your game version
+// This is an example structure — scan for the actual offsets
+const MOVE_SPEED_OFFSET = 0x1A2B3C;  // placeholder
+
+// Hook the update loop to continuously patch speed
+const updateFn = Module.findExportByName("GameAssembly.dll",
+    "PlayerController_Update_m000000");
+
+if (updateFn) {
+    Interceptor.attach(updateFn, {
+        onEnter(args) {
+            const self = args[0];  // 'this' pointer
+            // Read speed from object field (offset from object base)
+            const speedField = self.add(0x68);  // example offset
+            speedField.writeFloat(12.0);  // default is ~4.0
+        }
+    });
+    send({ status: "Speed hook active" });
+}
+"""
+
+session = frida.attach("Animal Company")
+script = session.create_script(JS)
+script.on('message', lambda m, _: print(m.get('payload', m)))
+script.load()
+print("Script loaded — press Ctrl+C to stop")
+sys.stdin.read()</code></pre>
+</div>
+
+<h2 id="next">Next steps</h2>
+<p>From here, the workflow is: find values with Cheat Engine → confirm offsets → write a Frida script that automates the patch. The Cheat Engine tutorial covers the address-finding step in detail.</p>
+    `
+  },
+  {
+    id: 'cheat-engine',
+    title: 'Cheat Engine + Frida Workflow',
+    desc: 'Use Cheat Engine to find memory addresses, then automate the patch with a Frida script. The two tools together beat either alone.',
+    tags: ['intermediate'],
+    mins: '18 min',
+    featured: false,
+    content: `
+<div class="tut-meta-row">
+  <span class="tag tag-intermediate">Intermediate</span>
+  <span style="font-size:12px;color:var(--muted)">18 min read</span>
+</div>
+<p>Cheat Engine excels at scanning for values — it can find the memory address of a health bar, a timer, or a resource counter in minutes. Frida excels at automating and hooking at the function level. Together: find the address with CE, lock or modify it with Frida.</p>
+
+<h2 id="ce-scan">Finding an address with Cheat Engine</h2>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="step-title">Open Cheat Engine and attach to the game</div>
+      <p>Launch CE, click the blinking computer icon top-left, and select your game process from the list.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="step-title">First scan</div>
+      <p>Set the scan type to "Exact Value", value type to "Float" (for health/speed) or "4 Bytes" (for integers). Enter the current value (e.g. your current health is 100 → type 100). Click "First Scan".</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="step-title">Change the value in-game, then next scan</div>
+      <p>Take some damage (health drops to e.g. 75). Back in CE, type 75, click "Next Scan". This filters down the results to addresses that changed from 100 to 75.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <div class="step-title">Narrow down and find the pointer</div>
+      <p>Repeat until you have 1-5 results. Right-click the address and choose "Find out what writes to this address" to see exactly which instructions modify the value.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <div class="step-title">Get the module-relative offset</div>
+      <p>Note the absolute address. Find the module base (CE shows it in its module list). Subtract: <span class="inline-code">offset = absolute_address - module_base</span>. This offset is stable across launches (ASLR shifts the base but not the offset).</p>
+    </div>
+  </div>
+</div>
+
+<h2 id="frida-patch">Patching the found address with Frida</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// patch_health.js
+// Replace HEALTH_OFFSET with the value you found in CE
+
+const BASE = Process.getModuleByName("GameAssembly.dll").base;
+const HEALTH_OFFSET = 0x2B3C40;  // your CE-found offset here
+
+const healthPtr = BASE.add(HEALTH_OFFSET);
+
+// Read current value
+console.log("Current health:", healthPtr.readFloat());
+
+// Lock it at 100 — poll every 100ms
+const handle = setInterval(() => {
+    healthPtr.writeFloat(100.0);
+}, 100);
+
+// To stop: clearInterval(handle)</code></pre>
+</div>
+
+<div class="callout callout-tip">
+  <div class="callout-title">Pointer chains</div>
+  <p>Many game values are behind pointer chains — the value's address changes each load, but there's a static pointer → pointer chain → value path. CE's pointer scanner finds these chains. Frida can follow them too using <span class="inline-code">.readPointer()</span> chained calls.</p>
+</div>
+
+<h2 id="pointer-chain">Following a pointer chain in Frida</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">javascript</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>// Example: GameBase → +0x30 → +0x18 → +0x68 → healthFloat
+// These offsets come from CE's pointer scanner
+const base = Process.getModuleByName("GameAssembly.dll").base;
+const staticPtr = base.add(0x5A1234);  // static pointer in module
+
+try {
+    const p1 = staticPtr.readPointer();
+    const p2 = p1.add(0x30).readPointer();
+    const p3 = p2.add(0x18).readPointer();
+    const health = p3.add(0x68).readFloat();
+    console.log("Health via pointer chain:", health);
+} catch(e) {
+    console.error("Null pointer in chain:", e.message);
+}</code></pre>
+</div>
+    `
+  },
+  {
+    id: 'bepinex-mods',
+    title: 'Unity Mods with BepInEx',
+    desc: 'Install BepInEx into a Unity game and write a C# plugin that patches game behavior at runtime — no source code needed.',
+    tags: ['advanced'],
+    mins: '25 min',
+    featured: false,
+    content: `
+<div class="tut-meta-row">
+  <span class="tag tag-advanced">Advanced</span>
+  <span style="font-size:12px;color:var(--muted)">25 min read</span>
+</div>
+<p>BepInEx is the standard modding framework for Unity games. It injects into the game on startup and loads plugin DLLs. Plugins are written in C# and can patch any game method using Harmony — a runtime patcher.</p>
+
+<h2 id="install-bep">Installing BepInEx</h2>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="step-title">Download BepInEx</div>
+      <p>Go to the <a href="https://github.com/BepInEx/BepInEx/releases" target="_blank" rel="noopener">BepInEx releases page</a> and download the x64 build for Windows Unity games. You want the zip, not the installer.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="step-title">Extract into the game folder</div>
+      <p>Extract the zip directly into the game's root directory — the folder containing the game's <span class="inline-code">.exe</span>. You should now have a <span class="inline-code">BepInEx/</span> folder and a <span class="inline-code">winhttp.dll</span> alongside the exe.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="step-title">Run the game once</div>
+      <p>Launch the game normally. BepInEx generates its config files on first run. Check the <span class="inline-code">BepInEx/plugins/</span> folder exists. Close the game.</p>
+    </div>
+  </div>
+</div>
+
+<h2 id="write-plugin">Writing a plugin</h2>
+<p>You'll need .NET SDK and Visual Studio (or VS Code with C# extension). Create a class library project targeting the same .NET version as the game.</p>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">csharp</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code>using BepInEx;
+using HarmonyLib;
+using UnityEngine;
+
+[BepInPlugin("com.modlab.exampleplugin", "Example Plugin", "1.0.0")]
+public class ExamplePlugin : BaseUnityPlugin
+{
+    void Awake()
+    {
+        Logger.LogInfo("ExamplePlugin loaded!");
+        var harmony = new Harmony("com.modlab.exampleplugin");
+        harmony.PatchAll();
+    }
+}
+
+// Patch the PlayerController.TakeDamage method
+[HarmonyPatch(typeof(PlayerController), "TakeDamage")]
+public static class GodmodePatch
+{
+    // Prefix runs BEFORE the original method
+    // Return false to skip the original entirely
+    static bool Prefix(ref float damage)
+    {
+        damage = 0f;  // null the damage
+        return false; // skip original
+    }
+}</code></pre>
+</div>
+
+<div class="callout callout-info">
+  <div class="callout-title">Finding class names</div>
+  <p>Use dnSpy to open <span class="inline-code">GameAssembly.dll</span> and browse the class tree. For IL2CPP games, open the game's <span class="inline-code">il2cpp_data/Metadata/global-metadata.dat</span> with Il2CppInspector to get all class and method names.</p>
+</div>
+
+<h2 id="build-deploy">Build and deploy</h2>
+<div class="code-wrap">
+  <div class="code-header"><span class="code-lang">bash</span><button class="code-copy" onclick="copyCode(this)">Copy</button></div>
+  <pre><code"># Build the project
+dotnet build -c Release
+
+# Copy the output DLL to BepInEx plugins
+copy bin\\Release\\net472\\ExamplePlugin.dll "C:\\Games\\AnimalCompany\\BepInEx\\plugins\\"
+
+# Launch the game — check BepInEx/LogOutput.log for your log lines</code></pre>
+</div>
+    `
+  }
+];
+
+/* ─── State ───────────────────────────────────── */
+let currentPage = 'home';
+let previousPage = 'tutorials';
+let currentTutorialId = null;
+
+/* ─── Navigation ──────────────────────────────── */
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`[onclick="showPage('${page}')"]`)?.classList.add('active');
+  currentPage = page;
+  window.scrollTo(0,0);
+}
+
+function openTutorial(id) {
+  previousPage = currentPage;
+  currentTutorialId = id;
+  const tut = TUTORIALS.find(t => t.id === id);
+  if (!tut) return;
+
+  document.getElementById('tut-content').innerHTML = `
+    <h1>${tut.title}</h1>
+    ${tut.content}
+  `;
+  buildTOC();
+  document.querySelectorAll('.code-wrap').forEach(wrap => {
+    const pre = wrap.querySelector('pre code');
+    if (pre) {
+      const btn = wrap.querySelector('.code-copy');
+      if (btn) btn._code = pre.textContent;
+    }
+  });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-tutorial').classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function goBack() {
+  showPage(previousPage || 'tutorials');
+}
+
+/* ─── TOC ─────────────────────────────────────── */
+function buildTOC() {
+  const headings = document.getElementById('tut-content').querySelectorAll('h2');
+  const toc = document.getElementById('toc-links');
+  toc.innerHTML = '';
+  headings.forEach(h => {
+    if (!h.id) h.id = h.textContent.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+    const a = document.createElement('a');
+    a.className = 'toc-link';
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+    a.onclick = e => {
+      e.preventDefault();
+      document.getElementById(h.id)?.scrollIntoView({behavior:'smooth'});
+    };
+    toc.appendChild(a);
+  });
+}
+
+/* ─── Tutorial cards ──────────────────────────── */
+function renderCards(containerId, tutorials) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = tutorials.map(t => `
+    <div class="tut-card" onclick="openTutorial('${t.id}')" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter')openTutorial('${t.id}')">
+      <div class="tut-card-tags">
+        ${t.tags.map(tag => `<span class="tag tag-${tag}">${tag}</span>`).join('')}
+      </div>
+      <div class="tut-card-title">${t.title}</div>
+      <div class="tut-card-desc">${t.desc}</div>
+      <div class="tut-card-meta">
+        <span>${t.mins}</span>
+        <span class="tut-card-arrow">→</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ─── Copy code ───────────────────────────────── */
+function copyCode(btn) {
+  const wrap = btn.closest('.code-wrap');
+  const code = wrap.querySelector('pre code')?.textContent || '';
+  navigator.clipboard.writeText(code.trim()).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+
+/* ─── Terminal animation ──────────────────────── */
+const TERM_SEQUENCE = [
+  { type:'cmd', prompt:'$', text:'pip install frida-tools', delay:0 },
+  { type:'out', text:'Successfully installed frida-16.5.0', delay:900, cls:'t-ok' },
+  { type:'out', text:'frida-tools-12.5.0', delay:1100 },
+  { type:'cmd', prompt:'$', text:'frida-ps | findstr "Animal"', delay:1800 },
+  { type:'out', text:'14832  Animal Company.exe', delay:2500, cls:'t-ok' },
+  { type:'cmd', prompt:'$', text:'frida -n "Animal Company" -l godmode.js', delay:3200 },
+  { type:'out', text:'     ____', delay:3800 },
+  { type:'out', text:'    / _  |   Frida 16.5.0 - A world-class dynamic', delay:3900 },
+  { type:'out', text:'   | (_| |         instrumentation toolkit', delay:4000 },
+  { type:'out', text:'    > _  |   Commands:', delay:4100 },
+  { type:'out', text:'[+] Attached to PID 14832', delay:4600, cls:'t-ok' },
+  { type:'out', text:'[+] Godmode active — damage nulled', delay:4900, cls:'t-ok' },
+];
+
+function runTerminal() {
+  const body = document.getElementById('terminal-body');
+  if (!body) return;
+  body.innerHTML = '<span class="t-cursor"></span>';
+  TERM_SEQUENCE.forEach(item => {
+    setTimeout(() => {
+      const cursor = body.querySelector('.t-cursor');
+      if (cursor) cursor.remove();
+      const el = document.createElement('div');
+      if (item.type === 'cmd') {
+        el.className = 't-line';
+        el.innerHTML = `<span class="t-prompt">${item.prompt}</span><span class="t-cmd">${item.text}</span>`;
+      } else {
+        el.className = `t-out${item.cls ? ' ' + item.cls : ''}`;
+        el.textContent = item.text;
+      }
+      body.appendChild(el);
+      body.insertAdjacentHTML('beforeend', '<span class="t-cursor"></span>');
+      body.scrollTop = body.scrollHeight;
+    }, item.delay);
+  });
+}
+
+/* ─── Theme ───────────────────────────────────── */
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const isDark = current === 'dark' || (!current && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-btn').textContent = isDark ? '☾' : '☀';
+}
+
+/* ─── Init ────────────────────────────────────── */
+renderCards('home-tut-grid', TUTORIALS.filter(t => t.featured));
+renderCards('all-tut-grid', TUTORIALS);
+runTerminal();
+// Loop terminal
+setInterval(runTerminal, 12000);
+</script>
+</body>
+</html>
