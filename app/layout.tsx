@@ -22,9 +22,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ModLab",
+  title: "nosignal",
   description:
-    "A super clean, modern site built with 21st.dev-style components on shadcn/ui, Tailwind, and TypeScript.",
+    "Learn game modding the right way — Frida internals, Python tooling, and reverse-engineering fundamentals for your own projects.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

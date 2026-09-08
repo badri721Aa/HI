@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 export default function PrismHeroDemo() {
   return (
     <PrismHero
-      eyebrow="ModLab"
-      headline="ModLab"
+      eyebrow="nosignal"
+      headline="nosignal"
       description="Learn game modding the right way: Frida internals, Python tooling, and reverse-engineering fundamentals — built for your own projects, not someone else's live server."
       meta={["Frida + Python", "Reverse engineering", "Zero fluff"]}
       action={

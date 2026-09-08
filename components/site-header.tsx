@@ -16,7 +16,7 @@ export function SiteHeader() {
         href="#"
         className="pointer-events-auto font-[family-name:var(--font-mono)] text-xs font-medium uppercase tracking-[0.3em] text-[#EDE8DF]"
       >
-        ModLab
+        nosignal
       </Link>
 
       <nav className="pointer-events-auto hidden items-center gap-8 sm:flex">
