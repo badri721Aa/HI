@@ -16,7 +16,7 @@ export default function PrismHeroDemo() {
         <Button asChild size="lg" className="rounded-full px-7">
           <a href="#tutorials">
             Start learning
-            <ArrowRight className="size-4" />
+            <ArrowRight className="size-4 group-hover/button:translate-x-1" />
           </a>
         </Button>
       }

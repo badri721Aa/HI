@@ -1,7 +1,11 @@
+"use client"
+
+import * as React from "react"
 import Link from "next/link"
 import { ExternalLink } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 const NAV = [
   { label: "Tutorials", href: "#tutorials" },
@@ -10,8 +14,23 @@ const NAV = [
 ]
 
 export function SiteHeader() {
+  const [scrolled, setScrolled] = React.useState(false)
+
+  React.useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24)
+    onScroll()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
   return (
-    <header className="pointer-events-none fixed inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-5 sm:px-10 sm:py-7">
+    <header
+      className={cn(
+        "pointer-events-none fixed inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-5 transition-[background-color,border-color,backdrop-filter] duration-300 sm:px-10 sm:py-6",
+        scrolled &&
+          "border-b border-white/10 bg-[#08080B]/60 backdrop-blur-md sm:py-4"
+      )}
+    >
       <Link
         href="#"
         className="pointer-events-auto font-[family-name:var(--font-mono)] text-xs font-medium uppercase tracking-[0.3em] text-[#EDE8DF]"
@@ -24,9 +43,10 @@ export function SiteHeader() {
           <a
             key={item.href}
             href={item.href}
-            className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.2em] text-[#EDE8DF]/60 transition-colors hover:text-[#EDE8DF]"
+            className="group/nav relative font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.2em] text-[#EDE8DF]/60 transition-colors hover:text-[#EDE8DF]"
           >
             {item.label}
+            <span className="absolute -bottom-1 left-0 h-px w-0 bg-[#C9A961] transition-all duration-300 group-hover/nav:w-full" />
           </a>
         ))}
       </nav>

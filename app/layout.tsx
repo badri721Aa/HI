@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bodoni_Moda, JetBrains_Mono, Inter } from "next/font/google";
+import { CustomCursor } from "@/components/custom-cursor";
 import "./globals.css";
 
 const bodoni = Bodoni_Moda({
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${bodoni.variable} ${jetbrainsMono.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <CustomCursor />
         {children}
       </body>
     </html>
