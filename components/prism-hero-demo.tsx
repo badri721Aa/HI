@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { ArrowRight, BookOpen } from "lucide-react"
 
 import { PrismHero } from "@/components/ui/prism-hero"
@@ -14,10 +15,10 @@ export default function PrismHeroDemo() {
       meta={["Frida + Python", "Reverse engineering", "Zero fluff"]}
       action={
         <Button asChild size="lg" className="rounded-full px-7">
-          <a href="#tutorials">
+          <Link href="/tutorials">
             Start learning
             <ArrowRight className="size-4 group-hover/button:translate-x-1" />
-          </a>
+          </Link>
         </Button>
       }
       secondaryAction={
@@ -27,10 +28,10 @@ export default function PrismHeroDemo() {
           size="lg"
           className="rounded-full border-white/25 bg-transparent px-7 text-[#EDE8DF] hover:bg-white/5 hover:text-[#EDE8DF]"
         >
-          <a href="#docs">
+          <Link href="/tutorials/frida-install">
             <BookOpen className="size-4" />
-            Documentation
-          </a>
+            Start with Frida
+          </Link>
         </Button>
       }
       topInset

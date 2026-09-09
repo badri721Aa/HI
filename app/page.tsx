@@ -1,15 +1,13 @@
-import { SiteHeader } from "@/components/site-header"
 import PrismHeroDemo from "@/components/prism-hero-demo"
+import { QuickStart } from "@/components/quick-start"
 import { FeaturesSection } from "@/components/features-section"
-import { SiteFooter } from "@/components/site-footer"
 
 export default function Home() {
   return (
     <>
-      <SiteHeader />
       <PrismHeroDemo />
+      <QuickStart />
       <FeaturesSection />
-      <SiteFooter />
     </>
   )
 }

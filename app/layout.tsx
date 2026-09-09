@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Bodoni_Moda, JetBrains_Mono, Inter } from "next/font/google";
 import { CustomCursor } from "@/components/custom-cursor";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
 const bodoni = Bodoni_Moda({
@@ -59,7 +61,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <CustomCursor />
-        {children}
+        <SiteHeader />
+        <main className="flex-1">{children}</main>
+        <SiteFooter />
       </body>
     </html>
   );

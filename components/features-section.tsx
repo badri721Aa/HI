@@ -20,10 +20,7 @@ const FEATURES = [
 
 export function FeaturesSection() {
   return (
-    <section
-      id="tutorials"
-      className="border-t border-border bg-background px-5 py-20 sm:px-10 sm:py-28"
-    >
+    <section className="border-t border-border bg-background px-5 py-20 sm:px-10 sm:py-28">
       <div className="mx-auto max-w-5xl">
         <p className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
           What you&apos;ll learn
