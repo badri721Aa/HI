@@ -5,23 +5,23 @@
 
 :root {
   --radius: 0.625rem;
-  --background: #f6f5fa;
-  --foreground: #14131a;
-  --card: #ffffff;
-  --card-foreground: #14131a;
-  --popover: #ffffff;
-  --popover-foreground: #14131a;
-  --primary: #14131a;
-  --primary-foreground: #f6f5fa;
-  --secondary: #eeecf5;
-  --secondary-foreground: #14131a;
-  --muted: #eeecf5;
-  --muted-foreground: #6b6878;
-  --accent: #eeecf5;
-  --accent-foreground: #14131a;
+  --background: #eae6ef;
+  --foreground: #17151d;
+  --card: #f5f2ec;
+  --card-foreground: #17151d;
+  --popover: #f5f2ec;
+  --popover-foreground: #17151d;
+  --primary: #17151d;
+  --primary-foreground: #eae6ef;
+  --secondary: #e0dae6;
+  --secondary-foreground: #17151d;
+  --muted: #e0dae6;
+  --muted-foreground: #625d70;
+  --accent: #e0dae6;
+  --accent-foreground: #17151d;
   --destructive: #d64545;
-  --border: #e2dfec;
-  --input: #e2dfec;
+  --border: #d6cfdf;
+  --input: #d6cfdf;
   --ring: #8a6dff;
 }
 
@@ -109,11 +109,11 @@ section {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.7;
+  opacity: 0.5;
   transition: background 0.6s ease, opacity 0.6s ease;
   background:
-    radial-gradient(55% 50% at 15% 0%, rgba(255, 175, 90, 0.18) 0%, transparent 62%),
-    radial-gradient(45% 40% at 88% 100%, rgba(255, 200, 130, 0.09) 0%, transparent 60%);
+    radial-gradient(55% 50% at 15% 0%, rgba(255, 175, 90, 0.12) 0%, transparent 62%),
+    radial-gradient(45% 40% at 88% 100%, rgba(255, 200, 130, 0.06) 0%, transparent 60%);
 }
 
 .dark .nebula-glow {

@@ -31,7 +31,7 @@ export function Hero() {
         style={{
           textShadow: isDark
             ? "0 0 50px rgba(180,195,225,0.3), 0 0 110px rgba(150,165,205,0.15)"
-            : "0 0 60px rgba(255,190,90,0.4), 0 0 120px rgba(255,170,60,0.18)",
+            : "0 0 40px rgba(255,190,90,0.26), 0 0 90px rgba(255,170,60,0.1)",
         }}
       >
         nosignal

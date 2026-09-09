@@ -13,13 +13,14 @@ interface Star {
   twinklePhase: number
   drift: number
   hue: "warm" | "cool" | "neutral"
+  bright: boolean
 }
 
-const STAR_COUNT_PER_MEGAPIXEL = 140
+const STAR_COUNT_PER_MEGAPIXEL = 260
 
 function makeStars(width: number, height: number, seedOffset: number): Star[] {
   const area = (width * height) / 1_000_000
-  const count = Math.max(60, Math.min(320, Math.round(area * STAR_COUNT_PER_MEGAPIXEL)))
+  const count = Math.max(90, Math.min(560, Math.round(area * STAR_COUNT_PER_MEGAPIXEL)))
   const stars: Star[] = []
   // mulberry32 — deterministic so server/client agree on the first paint.
   let seed = 1337 + seedOffset
@@ -32,15 +33,17 @@ function makeStars(width: number, height: number, seedOffset: number): Star[] {
   }
   for (let i = 0; i < count; i++) {
     const hueRoll = rand()
+    const bright = rand() < 0.06
     stars.push({
       x: rand() * width,
       y: rand() * height,
-      r: 0.4 + rand() * 1.3,
-      baseAlpha: 0.25 + rand() * 0.55,
+      r: bright ? 1.6 + rand() * 1.4 : 0.5 + rand() * 1.3,
+      baseAlpha: bright ? 0.75 + rand() * 0.25 : 0.35 + rand() * 0.5,
       twinkleSpeed: 0.4 + rand() * 1.1,
       twinklePhase: rand() * Math.PI * 2,
       drift: 0.4 + rand() * 1.2,
-      hue: hueRoll < 0.12 ? "warm" : hueRoll < 0.22 ? "cool" : "neutral",
+      hue: hueRoll < 0.14 ? "warm" : hueRoll < 0.26 ? "cool" : "neutral",
+      bright,
     })
   }
   return stars
@@ -49,7 +52,7 @@ function makeStars(width: number, height: number, seedOffset: number): Star[] {
 // Dark mode: bright specks on near-black. Light mode: soft ink-violet dots
 // on off-white — same hue split, tuned so both read as "stars", not noise.
 const STAR_COLOR = {
-  dark: { warm: "201,169,97", cool: "138,163,255", neutral: "237,232,223" },
+  dark: { warm: "201,169,97", cool: "150,175,255", neutral: "240,236,230" },
   light: { warm: "180,140,60", cool: "90,110,200", neutral: "70,65,90" },
 } as const
 
@@ -109,8 +112,22 @@ export function Starfield() {
           if (s.y > height + 2) s.y = -2
         }
         const twinkle = reduceMotion ? 1 : 0.55 + 0.45 * Math.sin(s.twinklePhase)
+        const alpha = s.baseAlpha * twinkle * alphaScale
+
+        if (s.bright) {
+          // Soft halo behind the brighter stars so they read as actual
+          // light sources instead of just bigger dots.
+          const halo = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 5)
+          halo.addColorStop(0, `rgba(${colors[s.hue]},${alpha * 0.35})`)
+          halo.addColorStop(1, `rgba(${colors[s.hue]},0)`)
+          ctx.beginPath()
+          ctx.fillStyle = halo
+          ctx.arc(s.x, s.y, s.r * 5, 0, Math.PI * 2)
+          ctx.fill()
+        }
+
         ctx.beginPath()
-        ctx.fillStyle = `rgba(${colors[s.hue]},${s.baseAlpha * twinkle * alphaScale})`
+        ctx.fillStyle = `rgba(${colors[s.hue]},${alpha})`
         ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
         ctx.fill()
       }
@@ -136,7 +153,7 @@ export function Starfield() {
         style={{
           background:
             theme === "dark"
-              ? "radial-gradient(120% 60% at 15% -10%, rgba(138,163,255,0.10) 0%, transparent 55%), radial-gradient(100% 55% at 85% 110%, rgba(201,169,97,0.09) 0%, transparent 55%)"
+              ? "radial-gradient(130% 70% at 20% -10%, rgba(140,165,255,0.16) 0%, transparent 58%), radial-gradient(110% 60% at 85% 105%, rgba(201,169,97,0.13) 0%, transparent 58%), radial-gradient(160% 90% at 50% 50%, rgba(30,25,50,0.35) 0%, transparent 75%)"
               : "radial-gradient(120% 60% at 15% -10%, rgba(138,109,255,0.10) 0%, transparent 55%), radial-gradient(100% 55% at 85% 110%, rgba(201,169,97,0.10) 0%, transparent 55%)",
         }}
       />
