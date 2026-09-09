@@ -78,7 +78,7 @@ export default function ToolsPage() {
           return (
             <div
               key={tool.name}
-              className="flex flex-col rounded-lg border border-border bg-card p-6 transition-colors duration-150 hover:border-white/25"
+              className="glass flex flex-col rounded-lg p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/25"
             >
               <Icon className="mb-3.5 size-5 text-[#00e5a0]" />
               <h2 className="mb-1.5 font-[family-name:var(--font-display)] text-lg font-semibold text-foreground">

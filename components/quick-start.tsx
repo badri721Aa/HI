@@ -24,7 +24,7 @@ const STEPS = [
 
 export function QuickStart() {
   return (
-    <section className="border-t border-border bg-card/85 backdrop-blur-sm">
+    <section className="glass border-t">
       <div className="mx-auto grid max-w-5xl sm:grid-cols-3">
         {STEPS.map((step, i) => (
           <Link

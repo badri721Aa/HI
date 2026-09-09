@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { ExternalLink } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
 
 const NAV = [
@@ -29,13 +30,12 @@ export function SiteHeader() {
     <header
       className={cn(
         "pointer-events-none fixed inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-5 transition-[background-color,border-color,backdrop-filter] duration-300 sm:px-10 sm:py-6",
-        scrolled &&
-          "border-b border-white/10 bg-[#08080B]/60 backdrop-blur-md sm:py-4"
+        scrolled && "glass border-b sm:py-4"
       )}
     >
       <Link
         href="/"
-        className="pointer-events-auto font-[family-name:var(--font-mono)] text-xs font-medium uppercase tracking-[0.3em] text-[#EDE8DF]"
+        className="pointer-events-auto font-[family-name:var(--font-mono)] text-xs font-medium uppercase tracking-[0.3em] text-foreground"
       >
         nosignal
       </Link>
@@ -51,7 +51,7 @@ export function SiteHeader() {
               aria-current={active ? "page" : undefined}
               className={cn(
                 "group/nav relative font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.2em] transition-colors",
-                active ? "text-[#EDE8DF]" : "text-[#EDE8DF]/60 hover:text-[#EDE8DF]"
+                active ? "text-foreground" : "text-foreground/60 hover:text-foreground"
               )}
             >
               {item.label}
@@ -66,21 +66,24 @@ export function SiteHeader() {
         })}
       </nav>
 
-      <Button
-        asChild
-        variant="outline"
-        size="icon"
-        className="pointer-events-auto rounded-full border-white/20 bg-transparent text-[#EDE8DF] hover:bg-white/5 hover:text-[#EDE8DF]"
-      >
-        <a
-          href="https://github.com/badri721aa/hi"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Source on GitHub"
+      <div className="pointer-events-auto flex items-center gap-2">
+        <ThemeToggle />
+        <Button
+          asChild
+          variant="outline"
+          size="icon"
+          className="rounded-full border-border bg-transparent text-foreground hover:bg-card"
         >
-          <ExternalLink className="size-4" />
-        </a>
-      </Button>
+          <a
+            href="https://github.com/badri721aa/hi"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Source on GitHub"
+          >
+            <ExternalLink className="size-4" />
+          </a>
+        </Button>
+      </div>
     </header>
   )
 }

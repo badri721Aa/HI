@@ -5,45 +5,45 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: #f6f5fa;
+  --foreground: #14131a;
+  --card: #ffffff;
+  --card-foreground: #14131a;
+  --popover: #ffffff;
+  --popover-foreground: #14131a;
+  --primary: #14131a;
+  --primary-foreground: #f6f5fa;
+  --secondary: #eeecf5;
+  --secondary-foreground: #14131a;
+  --muted: #eeecf5;
+  --muted-foreground: #6b6878;
+  --accent: #eeecf5;
+  --accent-foreground: #14131a;
+  --destructive: #d64545;
+  --border: #e2dfec;
+  --input: #e2dfec;
+  --ring: #8a6dff;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --background: #08080b;
+  --foreground: #ede8df;
+  --card: #0d0f18;
+  --card-foreground: #ede8df;
+  --popover: #0d0f18;
+  --popover-foreground: #ede8df;
+  --primary: #ede8df;
+  --primary-foreground: #08080b;
+  --secondary: #181d2a;
+  --secondary-foreground: #ede8df;
+  --muted: #181d2a;
+  --muted-foreground: #9aa3b8;
+  --accent: #181d2a;
+  --accent-foreground: #ede8df;
+  --destructive: #ff5f72;
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: #8a6dff;
 }
 
 @theme inline {
@@ -82,13 +82,13 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Cosmic accents — layered over the Starfield background for page headers,
-   dividers, and glow effects. Kept out of @theme since these are one-off
-   decorative colors, not part of the shadcn token system. */
+/* Cosmic accents — brand constants that stay the same across light/dark,
+   used for badges, glows, and the cursor. Kept out of @theme since these
+   are one-off decorative colors, not part of the shadcn token system. */
 :root {
   --cosmic-gold: #c9a961;
   --cosmic-violet: #8a6dff;
-  --cosmic-blue: #5b9eff;
+  --cosmic-mint: #00e5a0;
 }
 
 .nebula-glow {
@@ -98,6 +98,23 @@ body {
   background:
     radial-gradient(60% 50% at 20% 0%, rgba(138, 109, 255, 0.14) 0%, transparent 60%),
     radial-gradient(50% 45% at 85% 100%, rgba(201, 169, 97, 0.12) 0%, transparent 60%);
+}
+
+.dark .nebula-glow {
+  opacity: 1;
+}
+.nebula-glow {
+  opacity: 0.6;
+}
+
+/* Frosted-glass surface — translucent card with a blurred backdrop and a
+   faint inset highlight along the top edge, the way light catches glass. */
+.glass {
+  background: color-mix(in oklab, var(--card) 68%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 0 color-mix(in oklab, var(--foreground) 8%, transparent);
 }
 
 /* Real cursor is hidden only once the JS cursor has actually mounted, so a

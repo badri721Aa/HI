@@ -25,7 +25,9 @@ export function CustomCursor() {
   const fine = useFinePointer()
   const dotRef = React.useRef<HTMLDivElement>(null)
   const ringRef = React.useRef<HTMLDivElement>(null)
+  const glowRef = React.useRef<HTMLDivElement>(null)
   const [hovering, setHovering] = React.useState(false)
+  const [pressed, setPressed] = React.useState(false)
   const [visible, setVisible] = React.useState(false)
 
   React.useEffect(() => {
@@ -33,8 +35,9 @@ export function CustomCursor() {
 
     document.documentElement.classList.add("custom-cursor-active")
 
-    // Dot snaps to the pointer immediately; the ring eases toward it, which
-    // is what reads as "cursor with weight" instead of a second pointer.
+    // Dot snaps to the pointer immediately; the ring and glow ease toward
+    // it at different rates, which is what reads as "cursor with weight"
+    // instead of a second pointer.
     const dot = { x: 0, y: 0 }
     const ring = { x: 0, y: 0 }
     let raf = 0
@@ -48,6 +51,8 @@ export function CustomCursor() {
     }
 
     const onLeave = () => setVisible(false)
+    const onDown = () => setPressed(true)
+    const onUp = () => setPressed(false)
 
     const tick = () => {
       ring.x += (dot.x - ring.x) * 0.22
@@ -58,22 +63,31 @@ export function CustomCursor() {
       if (ringRef.current) {
         ringRef.current.style.transform = `translate3d(${ring.x}px, ${ring.y}px, 0) translate(-50%, -50%)`
       }
+      if (glowRef.current) {
+        glowRef.current.style.transform = `translate3d(${ring.x}px, ${ring.y}px, 0) translate(-50%, -50%)`
+      }
       raf = requestAnimationFrame(tick)
     }
 
     window.addEventListener("pointermove", onMove, { passive: true })
     document.addEventListener("mouseleave", onLeave)
+    window.addEventListener("pointerdown", onDown)
+    window.addEventListener("pointerup", onUp)
     raf = requestAnimationFrame(tick)
 
     return () => {
       document.documentElement.classList.remove("custom-cursor-active")
       window.removeEventListener("pointermove", onMove)
       document.removeEventListener("mouseleave", onLeave)
+      window.removeEventListener("pointerdown", onDown)
+      window.removeEventListener("pointerup", onUp)
       cancelAnimationFrame(raf)
     }
   }, [fine])
 
   if (!fine) return null
+
+  const ringSize = hovering ? 52 : pressed ? 22 : 28
 
   return (
     <div
@@ -81,6 +95,19 @@ export function CustomCursor() {
       className="pointer-events-none fixed inset-0 z-[100]"
       style={{ opacity: visible ? 1 : 0, transition: "opacity 200ms ease" }}
     >
+      {/* Soft accent glow, only on hover — gives interactive elements a
+          "charged" feel without adding noise everywhere else. */}
+      <div
+        ref={glowRef}
+        className="fixed left-0 top-0 rounded-full blur-xl transition-[width,height,opacity] duration-300 ease-out"
+        style={{
+          width: hovering ? 96 : 0,
+          height: hovering ? 96 : 0,
+          opacity: hovering ? 0.35 : 0,
+          background:
+            "radial-gradient(circle, var(--cosmic-violet) 0%, var(--cosmic-gold) 60%, transparent 75%)",
+        }}
+      />
       <div
         ref={dotRef}
         className="fixed left-0 top-0 size-1.5 rounded-full bg-[#EDE8DF] mix-blend-difference"
@@ -88,10 +115,7 @@ export function CustomCursor() {
       <div
         ref={ringRef}
         className="fixed left-0 top-0 rounded-full border border-[#EDE8DF] mix-blend-difference transition-[width,height] duration-200 ease-out"
-        style={{
-          width: hovering ? 52 : 28,
-          height: hovering ? 52 : 28,
-        }}
+        style={{ width: ringSize, height: ringSize }}
       />
     </div>
   )

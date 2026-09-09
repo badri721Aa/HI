@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Bodoni_Moda, JetBrains_Mono, Inter } from "next/font/google";
 import { CustomCursor } from "@/components/custom-cursor";
 import { Starfield } from "@/components/starfield";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/theme-provider";
 import "./globals.css";
 
 const bodoni = Bodoni_Moda({
@@ -51,21 +53,32 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#08080B",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f5fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#08080b" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${bodoni.variable} ${jetbrainsMono.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col text-foreground">
-        <Starfield />
-        <CustomCursor />
-        <SiteHeader />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
+      <head>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {THEME_INIT_SCRIPT}
+        </Script>
+      </head>
+      <body className="min-h-full flex flex-col text-foreground" suppressHydrationWarning>
+        <ThemeProvider>
+          <Starfield />
+          <CustomCursor />
+          <SiteHeader />
+          <main className="flex-1">{children}</main>
+          <SiteFooter />
+        </ThemeProvider>
       </body>
     </html>
   );
