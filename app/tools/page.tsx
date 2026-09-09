@@ -59,7 +59,8 @@ const TOOLS = [
 
 export default function ToolsPage() {
   return (
-    <div className="mx-auto max-w-5xl px-5 pb-24 pt-32 sm:px-10 sm:pt-40">
+    <div className="relative mx-auto max-w-5xl px-5 pb-24 pt-32 sm:px-10 sm:pt-40">
+      <div className="nebula-glow -z-10" />
       <p className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
         Toolkit
       </p>

@@ -77,9 +77,27 @@
 }
 
 body {
-  background: var(--background);
+  background: transparent;
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* Cosmic accents — layered over the Starfield background for page headers,
+   dividers, and glow effects. Kept out of @theme since these are one-off
+   decorative colors, not part of the shadcn token system. */
+:root {
+  --cosmic-gold: #c9a961;
+  --cosmic-violet: #8a6dff;
+  --cosmic-blue: #5b9eff;
+}
+
+.nebula-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 20% 0%, rgba(138, 109, 255, 0.14) 0%, transparent 60%),
+    radial-gradient(50% 45% at 85% 100%, rgba(201, 169, 97, 0.12) 0%, transparent 60%);
 }
 
 /* Real cursor is hidden only once the JS cursor has actually mounted, so a

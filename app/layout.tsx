@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bodoni_Moda, JetBrains_Mono, Inter } from "next/font/google";
 import { CustomCursor } from "@/components/custom-cursor";
+import { Starfield } from "@/components/starfield";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
@@ -59,7 +60,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${bodoni.variable} ${jetbrainsMono.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body className="min-h-full flex flex-col text-foreground">
+        <Starfield />
         <CustomCursor />
         <SiteHeader />
         <main className="flex-1">{children}</main>

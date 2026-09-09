@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 const NAV = [
   { label: "Tutorials", href: "/tutorials" },
   { label: "Tools", href: "/tools" },
+  { label: "Glossary", href: "/glossary" },
 ]
 
 export function SiteHeader() {

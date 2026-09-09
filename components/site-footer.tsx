@@ -3,12 +3,13 @@ import Link from "next/link"
 const LINKS = [
   { label: "Tutorials", href: "/tutorials" },
   { label: "Tools", href: "/tools" },
+  { label: "Glossary", href: "/glossary" },
   { label: "GitHub", href: "https://github.com/badri721aa/hi" },
 ]
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border bg-background px-5 py-10 sm:px-10">
+    <footer className="border-t border-border px-5 py-10 sm:px-10">
       <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col items-center gap-3 sm:items-start">
           <Link

@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Clock } from "lucide-react"
 
 import { LEVEL_LABEL, type Level, getAdjacentTutorials } from "@/lib/tutorials"
 import { cn } from "@/lib/utils"
+import { ReadingProgress } from "@/components/reading-progress"
 
 const LEVEL_STYLE: Record<Level, string> = {
   beginner: "bg-[#00e5a0]/10 text-[#00e5a0]",
@@ -37,7 +38,9 @@ export function TutorialLayout({
   const { prev, next } = getAdjacentTutorials(slug)
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-14 px-5 pb-24 pt-32 sm:px-10 sm:pt-40 md:grid-cols-[1fr_200px]">
+    <div className="relative mx-auto grid max-w-5xl gap-14 px-5 pb-24 pt-32 sm:px-10 sm:pt-40 md:grid-cols-[1fr_200px]">
+      <ReadingProgress />
+      <div className="nebula-glow -z-10" />
       <div className="min-w-0">
         <Link
           href="/tutorials"
