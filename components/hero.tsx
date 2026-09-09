@@ -4,7 +4,6 @@ import Link from "next/link"
 import { ArrowRight, BookOpen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Celestial } from "@/components/celestial"
 import { useTheme } from "@/components/theme-provider"
 
 const META = ["Frida + Python", "Reverse engineering", "Zero fluff"]
@@ -16,8 +15,6 @@ export function Hero() {
   return (
     <section className="relative flex min-h-[92vh] flex-col items-center justify-center overflow-hidden px-5 pb-16 pt-24 text-center sm:px-10">
       <div className="nebula-glow opacity-40" />
-
-      <Celestial size={140} />
 
       <div className="relative mt-6 flex items-center gap-3">
         <span aria-hidden className="h-px w-8 bg-[#c9a961] opacity-70" />
