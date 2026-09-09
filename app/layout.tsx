@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Bodoni_Moda, JetBrains_Mono, Inter } from "next/font/google";
 import { CustomCursor } from "@/components/custom-cursor";
 import { Starfield } from "@/components/starfield";
+import { Grain } from "@/components/grain";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/theme-provider";
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col text-foreground" suppressHydrationWarning>
         <ThemeProvider>
           <Starfield />
+          <Grain />
           <CustomCursor />
           <SiteHeader />
           <main className="flex-1">{children}</main>

@@ -5,7 +5,7 @@ import Link from "next/link"
 import { ArrowRight, Clock } from "lucide-react"
 
 import { LEVEL_LABEL, TUTORIALS, type Level } from "@/lib/tutorials"
-import { cn } from "@/lib/utils"
+import { cn, trackSpot } from "@/lib/utils"
 
 const LEVEL_STYLE: Record<Level, string> = {
   beginner: "bg-[#00e5a0]/10 text-[#00e5a0]",
@@ -58,7 +58,8 @@ export function TutorialGrid() {
       {featured && (
         <Link
           href={`/tutorials/${featured.slug}`}
-          className="glass group mt-8 flex flex-col gap-6 rounded-xl p-8 transition-all duration-200 hover:border-[#00e5a0]/50 hover:shadow-[0_0_0_1px_rgba(0,229,160,0.5),0_8px_40px_rgba(0,229,160,0.08)] sm:flex-row sm:items-center sm:justify-between"
+          onMouseMove={trackSpot}
+          className="glass spot-card group mt-8 flex flex-col gap-6 rounded-xl p-8 transition-all duration-200 hover:border-[#00e5a0]/50 hover:shadow-[0_0_0_1px_rgba(0,229,160,0.5),0_8px_40px_rgba(0,229,160,0.08)] sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
             <div className="mb-4 flex gap-2">
@@ -100,7 +101,8 @@ export function TutorialGrid() {
               <Link
                 key={t.slug}
                 href={`/tutorials/${t.slug}`}
-                className="glass group flex flex-col rounded-lg p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/25 hover:shadow-lg"
+                onMouseMove={trackSpot}
+                className="glass spot-card group flex flex-col rounded-lg p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/25 hover:shadow-lg"
               >
                 <div className="mb-4 flex items-center justify-between">
                   <span className="font-[family-name:var(--font-mono)] text-[11px] text-muted-foreground/60">

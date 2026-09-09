@@ -105,7 +105,7 @@ export function CustomCursor() {
           height: hovering ? 96 : 0,
           opacity: hovering ? 0.35 : 0,
           background:
-            "radial-gradient(circle, var(--cosmic-violet) 0%, var(--cosmic-gold) 60%, transparent 75%)",
+            "radial-gradient(circle, var(--cosmic-gold) 0%, rgba(201,169,97,0.4) 55%, transparent 75%)",
         }}
       />
       <div

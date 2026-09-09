@@ -20,7 +20,7 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         glow:
-          "border border-[#c9a961]/40 bg-[linear-gradient(135deg,#c9a961,#8a6dff)] text-[#08080b] shadow-[0_0_0_1px_rgba(201,169,97,0.25),0_8px_30px_-8px_rgba(138,109,255,0.55)] hover:-translate-y-0.5 hover:shadow-[0_0_0_1px_rgba(201,169,97,0.4),0_12px_40px_-8px_rgba(138,109,255,0.7)]",
+          "relative overflow-hidden border border-[#c9a961]/50 bg-[linear-gradient(135deg,#f2dca6,#c9a961_50%,#9c7a3f)] text-[#08080b] shadow-[0_0_0_1px_rgba(201,169,97,0.3),0_10px_34px_-10px_rgba(201,169,97,0.65)] hover:-translate-y-0.5 hover:shadow-[0_0_0_1px_rgba(201,169,97,0.5),0_16px_44px_-10px_rgba(201,169,97,0.85)] after:absolute after:inset-0 after:-translate-x-full after:bg-[linear-gradient(120deg,transparent_35%,rgba(255,255,255,0.6)_50%,transparent_65%)] after:transition-transform after:duration-700 after:ease-out hover:after:translate-x-full",
         glass:
           "glass text-foreground hover:bg-card hover:-translate-y-0.5",
       },

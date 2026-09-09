@@ -96,8 +96,8 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(60% 50% at 20% 0%, rgba(138, 109, 255, 0.14) 0%, transparent 60%),
-    radial-gradient(50% 45% at 85% 100%, rgba(201, 169, 97, 0.12) 0%, transparent 60%);
+    radial-gradient(55% 50% at 15% 0%, rgba(201, 169, 97, 0.16) 0%, transparent 62%),
+    radial-gradient(45% 40% at 88% 100%, rgba(138, 109, 255, 0.07) 0%, transparent 60%);
 }
 
 .dark .nebula-glow {
@@ -107,14 +107,51 @@ body {
   opacity: 0.6;
 }
 
-/* Frosted-glass surface — translucent card with a blurred backdrop and a
-   faint inset highlight along the top edge, the way light catches glass. */
+/* Frosted-glass surface — translucent card with a blurred backdrop, a
+   faint inset highlight along the top edge (the way light catches glass),
+   and a soft ambient shadow underneath for real depth instead of a flat cut-out. */
 .glass {
   background: color-mix(in oklab, var(--card) 68%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
-  box-shadow: inset 0 1px 0 0 color-mix(in oklab, var(--foreground) 8%, transparent);
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in oklab, var(--foreground) 8%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 12px 32px -12px rgba(0, 0, 0, 0.18);
+}
+
+.dark .glass {
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in oklab, var(--foreground) 8%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 16px 40px -12px rgba(0, 0, 0, 0.55);
+}
+
+/* Cursor-tracking spotlight — a small radial highlight that follows the
+   pointer inside the card, the way a real light source would catch a
+   surface as you move around it. --mx/--my are set from JS on mousemove. */
+.spot-card {
+  position: relative;
+  --mx: 50%;
+  --my: 50%;
+}
+.spot-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    260px circle at var(--mx) var(--my),
+    rgba(201, 169, 97, 0.16),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.spot-card:hover::before {
+  opacity: 1;
 }
 
 /* Real cursor is hidden only once the JS cursor has actually mounted, so a
