@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { Terminal, Zap, Code2, PawPrint, Crosshair, Puzzle } from "lucide-react"
+import { Terminal, Zap, Code2, PawPrint, Crosshair, Puzzle, Gamepad2 } from "lucide-react"
 
 export type Level = "beginner" | "intermediate" | "advanced"
 
@@ -81,6 +81,16 @@ export const TUTORIALS: TutorialMeta[] = [
     minutes: 25,
     tags: ["bepinex", "unity", "csharp"],
     icon: Puzzle,
+  },
+  {
+    slug: "animal-company-mod-menu",
+    title: "Building a Mod Menu",
+    description:
+      "Wrap your Frida hooks in a Python GUI — toggles instead of one-off scripts, driving the game live over Frida's RPC bridge.",
+    level: "advanced",
+    minutes: 22,
+    tags: ["frida", "animal-company", "python", "mod-menu"],
+    icon: Gamepad2,
   },
 ]
 
