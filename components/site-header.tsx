@@ -7,7 +7,10 @@ import { ExternalLink } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { DiscordIcon } from "@/components/discord-icon"
 import { cn } from "@/lib/utils"
+
+const DISCORD_URL = "https://discord.gg/wMG8vsYdgU"
 
 const NAV = [
   { label: "Tutorials", href: "/tutorials" },
@@ -68,6 +71,27 @@ export function SiteHeader() {
 
       <div className="pointer-events-auto flex items-center gap-2">
         <ThemeToggle />
+        <Button
+          asChild
+          variant="glow"
+          size="sm"
+          className="hidden rounded-full px-4 sm:inline-flex"
+        >
+          <a href={DISCORD_URL} target="_blank" rel="noreferrer">
+            <DiscordIcon className="size-3.5" />
+            Discord
+          </a>
+        </Button>
+        <Button
+          asChild
+          variant="outline"
+          size="icon"
+          className="rounded-full border-border bg-transparent text-foreground hover:bg-card sm:hidden"
+        >
+          <a href={DISCORD_URL} target="_blank" rel="noreferrer" aria-label="Join the Discord">
+            <DiscordIcon className="size-4" />
+          </a>
+        </Button>
         <Button
           asChild
           variant="outline"
