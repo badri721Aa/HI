@@ -6,7 +6,7 @@ import { ArrowRight, CheckCircle2, Clock } from "lucide-react"
 
 import { Reveal } from "@/components/reveal"
 import { LEVEL_LABEL, TUTORIALS, type Level } from "@/lib/tutorials"
-import { useCompletedTutorials } from "@/lib/progress"
+import { useProgress } from "@/lib/progress"
 import { cn, trackSpot } from "@/lib/utils"
 
 const LEVEL_STYLE: Record<Level, string> = {
@@ -24,7 +24,7 @@ const FILTERS: Array<{ label: string; value: Level | "all" }> = [
 
 export function TutorialGrid() {
   const [filter, setFilter] = React.useState<Level | "all">("all")
-  const completed = useCompletedTutorials()
+  const { completed } = useProgress()
 
   const filtered = React.useMemo(
     () => (filter === "all" ? TUTORIALS : TUTORIALS.filter((t) => t.level === filter)),

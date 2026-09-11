@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { DiscordIcon } from "@/components/discord-icon"
 import { CommandSearch } from "@/components/command-search"
+import { UserMenu } from "@/components/user-menu"
 import { cn } from "@/lib/utils"
 
 const DISCORD_URL = "https://discord.gg/wMG8vsYdgU"
@@ -73,6 +74,7 @@ export function SiteHeader() {
       <div className="pointer-events-auto flex items-center gap-2">
         <CommandSearch />
         <ThemeToggle />
+        <UserMenu />
         <Button
           asChild
           variant="glow"

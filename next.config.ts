@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gvxnzgogfaifmsdkingq.supabase.co";
 
-// Static site, no external scripts/analytics/remote images — so this can
+// No external scripts/analytics/remote images — the only cross-origin
+// traffic this page ever makes is auth calls to Supabase, so this can
 // stay tight without a per-request nonce (which would force every page
 // into dynamic rendering just for a marketing/tutorial site).
 const cspHeader = `
@@ -11,7 +13,7 @@ const cspHeader = `
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: blob:;
   font-src 'self';
-  connect-src 'self';
+  connect-src 'self' ${supabaseUrl};
   object-src 'none';
   base-uri 'self';
   form-action 'self';
