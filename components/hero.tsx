@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ArrowRight, BookOpen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { LiquidButton } from "@/components/ui/liquid-button"
 import { useTheme } from "@/components/theme-provider"
 import { TUTORIALS } from "@/lib/tutorials"
 
@@ -55,12 +56,12 @@ export function Hero() {
             <ArrowRight className="size-4 transition-transform duration-200 group-hover/button:translate-x-1" />
           </Link>
         </Button>
-        <Button asChild variant="glass" size="lg" className="rounded-full px-7">
+        <LiquidButton asChild size="lg" className="px-7">
           <Link href="/tutorials/frida-install">
             <BookOpen className="size-4" />
             Start with Frida
           </Link>
-        </Button>
+        </LiquidButton>
       </div>
 
       <div className="relative mt-14 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">

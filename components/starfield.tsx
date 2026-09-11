@@ -4,6 +4,15 @@ import * as React from "react"
 
 import { useTheme } from "@/components/theme-provider"
 
+interface ShootingStar {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  life: number
+  maxLife: number
+}
+
 interface Star {
   x: number
   y: number
@@ -100,6 +109,10 @@ export function Starfield() {
     let raf = 0
     let last = performance.now()
 
+    // Rare shooting star — dark mode only, and never when motion is reduced.
+    let shootingStar: ShootingStar | null = null
+    let nextShootingStarAt = last + 3000 + Math.random() * 6000
+
     const draw = (t: number) => {
       const dt = Math.min((t - last) / 1000, 0.05)
       last = t
@@ -132,6 +145,43 @@ export function Starfield() {
         ctx.fill()
       }
 
+      if (theme === "dark" && !reduceMotion) {
+        if (!shootingStar && t > nextShootingStarAt) {
+          shootingStar = {
+            x: width * 0.2 + Math.random() * width * 0.6,
+            y: -20,
+            vx: -220 - Math.random() * 120,
+            vy: 260 + Math.random() * 140,
+            life: 0,
+            maxLife: 0.9 + Math.random() * 0.4,
+          }
+        }
+        if (shootingStar) {
+          shootingStar.life += dt
+          shootingStar.x += shootingStar.vx * dt
+          shootingStar.y += shootingStar.vy * dt
+          const p = shootingStar.life / shootingStar.maxLife
+          if (p >= 1 || shootingStar.y > height + 50 || shootingStar.x < -50) {
+            shootingStar = null
+            nextShootingStarAt = t + 7000 + Math.random() * 11000
+          } else {
+            const fade = Math.sin(p * Math.PI)
+            const tailX = shootingStar.x - shootingStar.vx * 0.12
+            const tailY = shootingStar.y - shootingStar.vy * 0.12
+            const trail = ctx.createLinearGradient(tailX, tailY, shootingStar.x, shootingStar.y)
+            trail.addColorStop(0, "rgba(255,255,255,0)")
+            trail.addColorStop(1, `rgba(255,255,255,${fade})`)
+            ctx.strokeStyle = trail
+            ctx.lineWidth = 1.6
+            ctx.lineCap = "round"
+            ctx.beginPath()
+            ctx.moveTo(tailX, tailY)
+            ctx.lineTo(shootingStar.x, shootingStar.y)
+            ctx.stroke()
+          }
+        }
+      }
+
       raf = requestAnimationFrame(draw)
     }
 
@@ -153,7 +203,7 @@ export function Starfield() {
         style={{
           background:
             theme === "dark"
-              ? "radial-gradient(130% 70% at 20% -10%, rgba(140,165,255,0.16) 0%, transparent 58%), radial-gradient(110% 60% at 85% 105%, rgba(201,169,97,0.13) 0%, transparent 58%), radial-gradient(160% 90% at 50% 50%, rgba(30,25,50,0.35) 0%, transparent 75%)"
+              ? "radial-gradient(90% 50% at 78% 12%, rgba(0,229,160,0.05) 0%, transparent 55%), radial-gradient(85% 65% at 8% 65%, rgba(120,60,200,0.09) 0%, transparent 60%), radial-gradient(130% 70% at 20% -10%, rgba(140,165,255,0.16) 0%, transparent 58%), radial-gradient(110% 60% at 85% 105%, rgba(201,169,97,0.13) 0%, transparent 58%), radial-gradient(160% 90% at 50% 50%, rgba(30,25,50,0.4) 0%, transparent 75%)"
               : "radial-gradient(120% 60% at 15% -10%, rgba(138,109,255,0.10) 0%, transparent 55%), radial-gradient(100% 55% at 85% 110%, rgba(201,169,97,0.10) 0%, transparent 55%)",
         }}
       />

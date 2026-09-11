@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { LiquidButton } from "@/components/ui/liquid-button"
 import { GoogleIcon } from "@/components/google-icon"
 import { GithubIcon } from "@/components/github-icon"
 import { createClient } from "@/lib/supabase/client"
@@ -107,24 +108,22 @@ export default function LoginPage() {
         {mode !== "forgot" && (
           <>
             <div className="mb-6 grid grid-cols-2 gap-2">
-              <Button
+              <LiquidButton
                 type="button"
-                variant="glass"
                 onClick={() => onOAuth("google")}
-                className="gap-2"
+                className="gap-2 rounded-md"
               >
                 <GoogleIcon className="size-4" />
                 Google
-              </Button>
-              <Button
+              </LiquidButton>
+              <LiquidButton
                 type="button"
-                variant="glass"
                 onClick={() => onOAuth("github")}
-                className="gap-2"
+                className="gap-2 rounded-md"
               >
                 <GithubIcon className="size-4" />
                 GitHub
-              </Button>
+              </LiquidButton>
             </div>
 
             <div className="mb-6 flex items-center gap-3 text-[11px] uppercase tracking-[0.1em] text-muted-foreground">

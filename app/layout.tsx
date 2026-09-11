@@ -7,6 +7,7 @@ import { Grain } from "@/components/grain";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { AiChat } from "@/components/ai-chat";
+import { LiquidGlassFilter } from "@/components/liquid-glass-filter";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -75,6 +76,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full flex flex-col text-foreground" suppressHydrationWarning>
         <ThemeProvider>
+          <LiquidGlassFilter />
           <Starfield />
           <Grain />
           <CustomCursor />
