@@ -6,6 +6,7 @@ import { BookOpen, Search, Sparkles, Wrench } from "lucide-react"
 
 import { TUTORIALS } from "@/lib/tutorials"
 import { TOOLS } from "@/lib/tools"
+import { BROWSER_TOOLS } from "@/lib/browser-tools"
 import { TERMS } from "@/lib/glossary"
 import { cn, slugify } from "@/lib/utils"
 
@@ -28,6 +29,12 @@ const ALL_RESULTS: Result[] = [
     title: t.name,
     subtitle: t.desc,
     href: t.tutorial ?? "/tools",
+  })),
+  ...BROWSER_TOOLS.map((t) => ({
+    type: "Tool" as const,
+    title: t.name,
+    subtitle: t.desc,
+    href: t.href,
   })),
   ...TERMS.map((t) => ({
     type: "Glossary" as const,
