@@ -11,11 +11,13 @@ import { GoogleIcon } from "@/components/google-icon"
 import { GithubIcon } from "@/components/github-icon"
 import { createClient } from "@/lib/supabase/client"
 import { downgradeAuthCookiesToSession } from "@/lib/supabase/remember"
+import { validateUsername } from "@/lib/username"
 
 type Mode = "signin" | "signup" | "forgot"
 
 export default function LoginPage() {
   const [mode, setMode] = React.useState<Mode>("signin")
+  const [username, setUsername] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [rememberMe, setRememberMe] = React.useState(true)
@@ -58,10 +60,16 @@ export default function LoginPage() {
       }
 
       if (mode === "signup") {
+        const usernameError = validateUsername(username)
+        if (usernameError) throw new Error(usernameError)
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: { username: username.trim() },
+          },
         })
         if (error) throw error
         if (data.session) {
@@ -135,6 +143,23 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={onSubmit} className="flex flex-col gap-3">
+          {mode === "signup" && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+                Username
+              </span>
+              <input
+                type="text"
+                required
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="h-10 rounded-md border border-border bg-transparent px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring"
+                placeholder="no spaces, letters/numbers/_/- only"
+              />
+            </label>
+          )}
+
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
               Email

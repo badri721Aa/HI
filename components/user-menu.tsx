@@ -60,7 +60,8 @@ export function UserMenu() {
     )
   }
 
-  const initial = (user.email ?? "?").charAt(0).toUpperCase()
+  const username = typeof user.user_metadata?.username === "string" ? user.user_metadata.username : null
+  const initial = (username ?? user.email ?? "?").charAt(0).toUpperCase()
 
   return (
     <div ref={menuRef} className="relative">
@@ -82,7 +83,10 @@ export function UserMenu() {
             : "pointer-events-none scale-95 opacity-0"
         )}
       >
-        <p className="truncate px-2.5 py-2 text-[12px] text-muted-foreground">{user.email}</p>
+        <div className="px-2.5 py-2">
+          {username && <p className="truncate text-[13px] font-medium text-foreground">{username}</p>}
+          <p className="truncate text-[12px] text-muted-foreground">{user.email}</p>
+        </div>
         <div className="my-1 h-px bg-border" />
         <button
           type="button"

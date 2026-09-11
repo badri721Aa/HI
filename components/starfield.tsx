@@ -62,10 +62,10 @@ function makeStars(width: number, height: number, seedOffset: number): Star[] {
 // on off-white — same hue split, tuned so both read as "stars", not noise.
 const STAR_COLOR = {
   dark: { warm: "201,169,97", cool: "150,175,255", neutral: "240,236,230" },
-  light: { warm: "180,140,60", cool: "90,110,200", neutral: "70,65,90" },
+  light: { warm: "170,120,40", cool: "70,90,190", neutral: "45,40,65" },
 } as const
 
-const ALPHA_SCALE = { dark: 1, light: 0.55 } as const
+const ALPHA_SCALE = { dark: 1, light: 0.72 } as const
 
 /**
  * Fixed full-viewport canvas starfield. Sits behind every page via the root
@@ -204,7 +204,7 @@ export function Starfield() {
           background:
             theme === "dark"
               ? "radial-gradient(90% 50% at 78% 12%, rgba(0,229,160,0.05) 0%, transparent 55%), radial-gradient(85% 65% at 8% 65%, rgba(120,60,200,0.09) 0%, transparent 60%), radial-gradient(130% 70% at 20% -10%, rgba(140,165,255,0.16) 0%, transparent 58%), radial-gradient(110% 60% at 85% 105%, rgba(201,169,97,0.13) 0%, transparent 58%), radial-gradient(160% 90% at 50% 50%, rgba(30,25,50,0.4) 0%, transparent 75%)"
-              : "radial-gradient(120% 60% at 15% -10%, rgba(138,109,255,0.10) 0%, transparent 55%), radial-gradient(100% 55% at 85% 110%, rgba(201,169,97,0.10) 0%, transparent 55%)",
+              : "radial-gradient(120% 60% at 12% -10%, rgba(138,109,255,0.17) 0%, transparent 55%), radial-gradient(90% 70% at 50% 105%, rgba(255,196,140,0.16) 0%, transparent 62%), radial-gradient(100% 55% at 90% 15%, rgba(255,175,110,0.13) 0%, transparent 55%)",
         }}
       />
       <canvas ref={canvasRef} className="absolute inset-0" />

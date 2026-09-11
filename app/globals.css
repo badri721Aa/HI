@@ -109,11 +109,11 @@ section {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.6;
   transition: background 0.6s ease, opacity 0.6s ease;
   background:
-    radial-gradient(55% 50% at 15% 0%, rgba(255, 175, 90, 0.12) 0%, transparent 62%),
-    radial-gradient(45% 40% at 88% 100%, rgba(255, 200, 130, 0.06) 0%, transparent 60%);
+    radial-gradient(55% 50% at 15% 0%, rgba(255, 175, 90, 0.16) 0%, transparent 62%),
+    radial-gradient(45% 40% at 88% 100%, rgba(255, 200, 130, 0.1) 0%, transparent 60%);
 }
 
 .dark .nebula-glow {
