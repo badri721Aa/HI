@@ -2,10 +2,11 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowRight, Clock } from "lucide-react"
+import { ArrowRight, CheckCircle2, Clock } from "lucide-react"
 
 import { Reveal } from "@/components/reveal"
 import { LEVEL_LABEL, TUTORIALS, type Level } from "@/lib/tutorials"
+import { useCompletedTutorials } from "@/lib/progress"
 import { cn, trackSpot } from "@/lib/utils"
 
 const LEVEL_STYLE: Record<Level, string> = {
@@ -23,6 +24,7 @@ const FILTERS: Array<{ label: string; value: Level | "all" }> = [
 
 export function TutorialGrid() {
   const [filter, setFilter] = React.useState<Level | "all">("all")
+  const completed = useCompletedTutorials()
 
   const filtered = React.useMemo(
     () => (filter === "all" ? TUTORIALS : TUTORIALS.filter((t) => t.level === filter)),
@@ -37,23 +39,31 @@ export function TutorialGrid() {
 
   return (
     <>
-      <div className="mt-10 flex flex-wrap gap-2" role="group" aria-label="Filter by level">
-        {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            onClick={() => setFilter(f.value)}
-            aria-pressed={filter === f.value}
-            className={cn(
-              "cursor-pointer rounded-full border px-3.5 py-1.5 text-[11px] font-medium tracking-[0.04em] uppercase transition-colors duration-150",
-              filter === f.value
-                ? "border-[#00e5a0]/60 bg-[#00e5a0]/10 text-[#00e5a0]"
-                : "border-border text-muted-foreground hover:border-white/25 hover:text-foreground"
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by level">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => setFilter(f.value)}
+              aria-pressed={filter === f.value}
+              className={cn(
+                "cursor-pointer rounded-full border px-3.5 py-1.5 text-[11px] font-medium tracking-[0.04em] uppercase transition-colors duration-150",
+                filter === f.value
+                  ? "border-[#00e5a0]/60 bg-[#00e5a0]/10 text-[#00e5a0]"
+                  : "border-border text-muted-foreground hover:border-white/25 hover:text-foreground"
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {completed.size > 0 && (
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <CheckCircle2 className="size-3.5 text-[#00e5a0]" />
+            {completed.size} / {TUTORIALS.length} complete
+          </span>
+        )}
       </div>
 
       {featured && (
@@ -84,7 +94,8 @@ export function TutorialGrid() {
                 {featured.description}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-2 font-[family-name:var(--font-mono)] text-sm text-[#00e5a0]">
+            <div className="flex shrink-0 items-center gap-3 font-[family-name:var(--font-mono)] text-sm text-[#00e5a0]">
+              {completed.has(featured.slug) && <CheckCircle2 className="size-4" />}
               {featured.minutes} min
               <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" />
             </div>
@@ -111,7 +122,11 @@ export function TutorialGrid() {
                     <span className="font-[family-name:var(--font-mono)] text-[11px] text-muted-foreground/60">
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <Icon className="size-4 text-muted-foreground transition-colors duration-200 group-hover:text-[#00e5a0]" />
+                    {completed.has(t.slug) ? (
+                      <CheckCircle2 className="size-4 text-[#00e5a0]" />
+                    ) : (
+                      <Icon className="size-4 text-muted-foreground transition-colors duration-200 group-hover:text-[#00e5a0]" />
+                    )}
                   </div>
                   <span
                     className={cn(

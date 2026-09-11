@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Clock } from "lucide-react"
 import { LEVEL_LABEL, type Level, getAdjacentTutorials } from "@/lib/tutorials"
 import { cn } from "@/lib/utils"
 import { ReadingProgress } from "@/components/reading-progress"
+import { CompleteToggle } from "@/components/complete-toggle"
 
 const LEVEL_STYLE: Record<Level, string> = {
   beginner: "bg-[#00e5a0]/10 text-[#00e5a0]",
@@ -71,9 +72,12 @@ export function TutorialLayout({
               {tag}
             </span>
           ))}
-          <span className="ml-auto inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
-            <Clock className="size-3.5" />
-            {minutes} min read
+          <span className="ml-auto flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
+              <Clock className="size-3.5" />
+              {minutes} min read
+            </span>
+            <CompleteToggle slug={slug} />
           </span>
         </div>
 

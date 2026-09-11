@@ -1,5 +1,16 @@
 import type { LucideIcon } from "lucide-react"
-import { Terminal, Zap, Code2, PawPrint, Crosshair, Puzzle, Gamepad2 } from "lucide-react"
+import {
+  Terminal,
+  Zap,
+  Code2,
+  PawPrint,
+  Crosshair,
+  Puzzle,
+  Gamepad2,
+  Binary,
+  FileCode2,
+  Save,
+} from "lucide-react"
 
 export type Level = "beginner" | "intermediate" | "advanced"
 
@@ -42,6 +53,16 @@ export const TUTORIALS: TutorialMeta[] = [
     icon: Zap,
   },
   {
+    slug: "save-file-editing",
+    title: "Editing Save Files",
+    description:
+      "No process attach, no memory scanning — just find, back up, and edit a game's save data directly. The safest first mod you can make.",
+    level: "beginner",
+    minutes: 10,
+    tags: ["saves", "beginner"],
+    icon: Save,
+  },
+  {
     slug: "frida-scripting-basics",
     title: "Frida Scripting Basics",
     description:
@@ -63,6 +84,16 @@ export const TUTORIALS: TutorialMeta[] = [
     icon: PawPrint,
   },
   {
+    slug: "il2cpp-dumping",
+    title: "Dumping IL2CPP Metadata",
+    description:
+      "Pair GameAssembly.dll with global-metadata.dat to recover real class, method, and field names — no more guessing at export hex suffixes.",
+    level: "intermediate",
+    minutes: 16,
+    tags: ["il2cpp", "unity", "reverse-engineering"],
+    icon: Binary,
+  },
+  {
     slug: "cheat-engine-frida",
     title: "Cheat Engine + Frida Workflow",
     description:
@@ -71,6 +102,16 @@ export const TUTORIALS: TutorialMeta[] = [
     minutes: 18,
     tags: ["frida", "cheat-engine"],
     icon: Crosshair,
+  },
+  {
+    slug: "dnspy-decompiling",
+    title: "Decompiling with dnSpy",
+    description:
+      "For Mono-backend Unity games: open real C# in dnSpy, set breakpoints, edit method bodies, and save a patched assembly — no Frida required.",
+    level: "intermediate",
+    minutes: 14,
+    tags: ["dnspy", "unity", "csharp"],
+    icon: FileCode2,
   },
   {
     slug: "bepinex-unity-mods",

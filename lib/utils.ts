@@ -13,3 +13,12 @@ export function trackSpot(e: React.MouseEvent<HTMLElement>) {
   e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`)
   e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`)
 }
+
+/** Turns a display string into a URL-safe anchor id, e.g. for glossary
+ * terms linked to from search results. */
+export function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
