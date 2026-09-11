@@ -18,6 +18,20 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Environment variables
+
+The "Ask nosignal" chat widget (bottom-right of every page) calls a Claude
+API through `app/api/chat/route.ts`. Set these in `.env.local` for dev, and
+in the Vercel project's Environment Variables settings for production:
+
+- `ANTHROPIC_API_KEY` — required. Without it, the widget shows "AI assistant
+  isn't configured yet" instead of erroring.
+- `ANTHROPIC_MODEL` — optional, defaults to `claude-haiku-4-5-20251001`.
+
+This is a real, metered API — each message costs a small amount. The route
+does basic per-IP rate limiting and caps response length, but that's not a
+substitute for keeping an eye on usage if the site gets real traffic.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

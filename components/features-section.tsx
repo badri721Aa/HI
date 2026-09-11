@@ -1,5 +1,7 @@
 import { Code2, Search, ShieldCheck } from "lucide-react"
 
+import { Reveal } from "@/components/reveal"
+
 const FEATURES = [
   {
     icon: Code2,
@@ -31,19 +33,18 @@ export function FeaturesSection() {
         </h2>
 
         <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
-          {FEATURES.map(({ icon: Icon, title, body }) => (
-            <div
-              key={title}
-              className="group flex flex-col gap-4 rounded-xl border border-transparent p-4 -m-4 transition-all duration-300 hover:-translate-y-1 hover:border-border hover:shadow-sm"
-            >
-              <div className="flex size-10 items-center justify-center rounded-full border border-border transition-colors duration-300 group-hover:border-foreground/40 group-hover:bg-foreground/5">
-                <Icon className="size-4 text-foreground" />
+          {FEATURES.map(({ icon: Icon, title, body }, i) => (
+            <Reveal key={title} delay={i * 100}>
+              <div className="group flex flex-col gap-4 rounded-xl border border-transparent p-4 -m-4 transition-all duration-300 hover:-translate-y-1 hover:border-border hover:shadow-sm">
+                <div className="flex size-10 items-center justify-center rounded-full border border-border transition-colors duration-300 group-hover:border-foreground/40 group-hover:bg-foreground/5">
+                  <Icon className="size-4 text-foreground" />
+                </div>
+                <h3 className="text-sm font-medium text-foreground">{title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {body}
+                </p>
               </div>
-              <h3 className="text-sm font-medium text-foreground">{title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {body}
-              </p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>

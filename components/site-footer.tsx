@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { DiscordIcon } from "@/components/discord-icon"
+import { Reveal } from "@/components/reveal"
 
 const LINKS = [
   { label: "Tutorials", href: "/tutorials" },
@@ -16,26 +17,28 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-border px-5 py-10 sm:px-10">
       <div className="mx-auto max-w-5xl">
-        <div className="glass mb-10 flex flex-col items-center gap-5 rounded-xl p-6 text-center sm:flex-row sm:justify-between sm:text-left">
-          <div className="flex items-center gap-4">
-            <DiscordIcon className="size-9 shrink-0 text-[#5865F2]" />
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                Join the community
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Built by <span className="font-medium text-foreground">ATVR_OLD</span>{" "}
-                — come hang out, ask questions, share what you&apos;re modding.
-              </p>
+        <Reveal>
+          <div className="glass mb-10 flex flex-col items-center gap-5 rounded-xl p-6 text-center sm:flex-row sm:justify-between sm:text-left">
+            <div className="flex items-center gap-4">
+              <DiscordIcon className="size-9 shrink-0 text-[#5865F2]" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Join the community
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Built by <span className="font-medium text-foreground">ATVR_OLD</span>{" "}
+                  — come hang out, ask questions, share what you&apos;re modding.
+                </p>
+              </div>
             </div>
+            <Button asChild variant="glow" size="lg" className="shrink-0 rounded-full px-6">
+              <a href={DISCORD_URL} target="_blank" rel="noreferrer">
+                <DiscordIcon className="size-4" />
+                Join the Discord
+              </a>
+            </Button>
           </div>
-          <Button asChild variant="glow" size="lg" className="shrink-0 rounded-full px-6">
-            <a href={DISCORD_URL} target="_blank" rel="noreferrer">
-              <DiscordIcon className="size-4" />
-              Join the Discord
-            </a>
-          </Button>
-        </div>
+        </Reveal>
 
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-col items-center gap-3 sm:items-start">

@@ -5,8 +5,16 @@ import { ArrowRight, BookOpen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { useTheme } from "@/components/theme-provider"
+import { TUTORIALS } from "@/lib/tutorials"
 
-const META = ["Frida + Python", "Reverse engineering", "Zero fluff"]
+const TOTAL_MINUTES = TUTORIALS.reduce((sum, t) => sum + t.minutes, 0)
+
+const META = [
+  "Frida + Python",
+  "Reverse engineering",
+  `${TUTORIALS.length} tutorials · ~${TOTAL_MINUTES} min`,
+  "Zero fluff",
+]
 
 export function Hero() {
   const { theme } = useTheme()
