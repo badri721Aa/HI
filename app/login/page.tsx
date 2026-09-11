@@ -10,6 +10,7 @@ import { LiquidButton } from "@/components/ui/liquid-button"
 import { GoogleIcon } from "@/components/google-icon"
 import { GithubIcon } from "@/components/github-icon"
 import { createClient } from "@/lib/supabase/client"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { downgradeAuthCookiesToSession } from "@/lib/supabase/remember"
 import { validateUsername } from "@/lib/username"
 
@@ -93,6 +94,34 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="relative mx-auto flex min-h-[80vh] max-w-sm flex-col justify-center px-5 pt-28 pb-16 text-center sm:px-0">
+        <div className="nebula-glow -z-10" />
+        <div className="glass rounded-2xl border border-border p-7">
+          <p className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+            nosignal
+          </p>
+          <h1 className="mt-3 font-[family-name:var(--font-display)] text-2xl text-foreground">
+            Accounts aren&apos;t set up yet
+          </h1>
+          <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+            This deployment is missing its Supabase environment
+            variables. Tutorial progress still works via this browser —
+            signing in just isn&apos;t available until that&apos;s
+            configured.
+          </p>
+          <Link
+            href="/"
+            className="mt-6 inline-block text-[12px] text-foreground underline underline-offset-2"
+          >
+            ← Back to nosignal
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (

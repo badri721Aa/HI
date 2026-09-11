@@ -8,6 +8,7 @@ import { LogOut, User as UserIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { cn } from "@/lib/utils"
 
 export function UserMenu() {
@@ -17,9 +18,13 @@ export function UserMenu() {
   const router = useRouter()
 
   React.useEffect(() => {
+    if (!isSupabaseConfigured) return
     const supabase = createClient()
 
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    supabase.auth
+      .getUser()
+      .then(({ data }) => setUser(data.user))
+      .catch(() => setUser(null))
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
