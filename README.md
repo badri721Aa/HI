@@ -20,17 +20,31 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 ## Environment variables
 
-The "Ask nosignal" chat widget (bottom-right of every page) calls a Claude
-API through `app/api/chat/route.ts`. Set these in `.env.local` for dev, and
-in the Vercel project's Environment Variables settings for production:
+The "Ask nosignal" chat widget (bottom-right of every page) calls an AI
+API through `app/api/chat/route.ts` (provider logic in `lib/ai-provider.ts`).
+Set these in `.env.local` for dev, and in the Vercel project's Environment
+Variables settings for production. You only need **one** provider's key —
+set whichever you have, and the route auto-detects it in this priority
+order:
 
-- `ANTHROPIC_API_KEY` — required. Without it, the widget shows "AI assistant
-  isn't configured yet" instead of erroring.
-- `ANTHROPIC_MODEL` — optional, defaults to `claude-haiku-4-5-20251001`.
+1. `ANTHROPIC_API_KEY` (+ optional `ANTHROPIC_MODEL`, defaults to
+   `claude-haiku-4-5-20251001`)
+2. `OPENAI_API_KEY` (+ optional `OPENAI_MODEL`, defaults to `gpt-4o-mini`)
+3. `GEMINI_API_KEY` (+ optional `GEMINI_MODEL`, defaults to
+   `gemini-2.0-flash`)
 
-This is a real, metered API — each message costs a small amount. The route
-does basic per-IP rate limiting and caps response length, but that's not a
-substitute for keeping an eye on usage if the site gets real traffic.
+Without any of them set, the widget shows "AI assistant isn't configured
+yet" instead of erroring.
+
+**Getting a free key:** Google AI Studio issues `GEMINI_API_KEY` for free
+with just a Google account, no card required — https://aistudio.google.com/apikey,
+"Create API key". OpenAI and Anthropic both require a billing method on the
+account before their API keys work.
+
+This is a real, metered API — each message costs a small amount (or draws
+down a free quota). The route does basic per-IP rate limiting and caps
+response length, but that's not a substitute for keeping an eye on usage if
+the site gets real traffic.
 
 ### Supabase (accounts + tutorial progress sync)
 

@@ -1,9 +1,8 @@
 import { CHAT_SYSTEM_PROMPT } from "@/lib/chat-context"
+import { getConfiguredProvider, streamChatReply } from "@/lib/ai-provider"
 
 export const runtime = "nodejs"
 
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001"
 const MAX_HISTORY = 12
 const MAX_MESSAGE_CHARS = 4000
 const MAX_OUTPUT_TOKENS = 1024
@@ -34,10 +33,13 @@ interface ChatMessage {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
+  const provider = getConfiguredProvider()
+  if (!provider) {
     return Response.json(
-      { error: "The AI assistant isn't configured yet — missing ANTHROPIC_API_KEY." },
+      {
+        error:
+          "The AI assistant isn't configured yet — set one of ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.",
+      },
       { status: 503 }
     )
   }
@@ -64,8 +66,9 @@ export async function POST(request: Request) {
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_CHARS) }))
 
-  // The API requires the transcript to open on a user turn — slicing to the
-  // last N messages can leave an assistant message first, so drop it.
+  // The upstream APIs require the transcript to open on a user turn —
+  // slicing to the last N messages can leave an assistant message first,
+  // so drop it.
   while (trimmed.length > 0 && trimmed[0].role !== "user") {
     trimmed = trimmed.slice(1)
   }
@@ -74,66 +77,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "No valid messages provided." }, { status: 400 })
   }
 
-  const upstream = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system: CHAT_SYSTEM_PROMPT,
-      messages: trimmed,
-      stream: true,
-    }),
-  })
-
-  if (!upstream.ok || !upstream.body) {
-    const detail = await upstream.text().catch(() => "")
+  try {
+    const stream = await streamChatReply(provider, CHAT_SYSTEM_PROMPT, trimmed, MAX_OUTPUT_TOKENS)
+    return new Response(stream, {
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    })
+  } catch (e) {
     return Response.json(
-      { error: `AI request failed (${upstream.status}).`, detail: detail.slice(0, 500) },
+      { error: e instanceof Error ? e.message : "AI request failed." },
       { status: 502 }
     )
   }
-
-  const encoder = new TextEncoder()
-  const decoder = new TextDecoder()
-
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const reader = upstream.body!.getReader()
-      let buffer = ""
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-
-          const events = buffer.split("\n\n")
-          buffer = events.pop() ?? ""
-
-          for (const event of events) {
-            const dataLine = event.split("\n").find((l) => l.startsWith("data: "))
-            if (!dataLine) continue
-            try {
-              const parsed = JSON.parse(dataLine.slice(6))
-              if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
-                controller.enqueue(encoder.encode(parsed.delta.text as string))
-              }
-            } catch {
-              // Skip malformed SSE frames rather than failing the whole stream.
-            }
-          }
-        }
-      } finally {
-        controller.close()
-      }
-    },
-  })
-
-  return new Response(stream, {
-    headers: { "content-type": "text/plain; charset=utf-8" },
-  })
 }

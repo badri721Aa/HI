@@ -18,10 +18,11 @@ const SUGGESTIONS = [
 ]
 
 /** Floating "Ask nosignal" assistant — streams from /api/chat, which
- * proxies to the Anthropic API server-side so no key ever reaches the
- * client. General-purpose, not limited to site topics — see
- * lib/chat-context.ts for the one modding-specific rule it keeps
- * (offline/solo only, no live-cheat or anti-detection help). */
+ * proxies to whichever of Anthropic/OpenAI/Gemini has a key configured
+ * (see lib/ai-provider.ts) server-side so no key ever reaches the client.
+ * General-purpose, not limited to site topics — see lib/chat-context.ts
+ * for the one modding-specific rule it keeps (offline/solo only, no
+ * live-cheat or anti-detection help). */
 export function AiChat() {
   const [open, setOpen] = React.useState(false)
   const [messages, setMessages] = React.useState<ChatMessage[]>([])
