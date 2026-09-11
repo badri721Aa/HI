@@ -14,13 +14,14 @@ interface ChatMessage {
 const SUGGESTIONS = [
   "How do I find a function's export name?",
   "Frida vs BepInEx — when do I use which?",
-  "Is modding my own singleplayer game legal?",
+  "Explain something unrelated to modding",
 ]
 
 /** Floating "Ask nosignal" assistant — streams from /api/chat, which
  * proxies to the Anthropic API server-side so no key ever reaches the
- * client. Scoped by its system prompt to the site's own offline/solo
- * modding framing; see lib/chat-context.ts. */
+ * client. General-purpose, not limited to site topics — see
+ * lib/chat-context.ts for the one modding-specific rule it keeps
+ * (offline/solo only, no live-cheat or anti-detection help). */
 export function AiChat() {
   const [open, setOpen] = React.useState(false)
   const [messages, setMessages] = React.useState<ChatMessage[]>([])
@@ -101,7 +102,7 @@ export function AiChat() {
               Ask nosignal
             </p>
             <p className="text-[11px] text-muted-foreground">
-              Frida, Python, IL2CPP — offline/solo only
+              Ask about anything — modding or not
             </p>
           </div>
 
@@ -109,8 +110,8 @@ export function AiChat() {
             {messages.length === 0 && (
               <div className="space-y-3">
                 <p className="text-[13px] leading-relaxed text-muted-foreground">
-                  Ask about Frida, Python, memory hooking, or anything else
-                  taught on this site.
+                  A general assistant — ask about Frida, Python, memory
+                  hooking, or anything else entirely.
                 </p>
                 <div className="flex flex-col gap-2">
                   {SUGGESTIONS.map((s) => (

@@ -6,7 +6,7 @@ const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001"
 const MAX_HISTORY = 12
 const MAX_MESSAGE_CHARS = 4000
-const MAX_OUTPUT_TOKENS = 600
+const MAX_OUTPUT_TOKENS = 1024
 
 // Small in-memory rate limiter — resets whenever the serverless instance
 // recycles. Good enough to blunt casual abuse of a public, paid-per-message
