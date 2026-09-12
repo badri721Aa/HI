@@ -1,11 +1,11 @@
 const extensions = [
   {
-    name: 'Auto Typer',
+    name: 'Write It — Auto Typer',
     id: 'auto-typer',
-    desc: 'Paste any text and it types it out at human speed. Undetectable — uses real keyboard events with jitter.',
-    features: ['Adjustable WPM (20–300)', 'Random timing jitter', 'Start/stop hotkey', 'Paste-and-go'],
-    size: '12 KB',
-    badge: 'Stable',
+    desc: 'Paste text and it types character-by-character with natural speed, realistic pauses, variable timing, and optional typos that get self-corrected. Works in Google Docs, Slides, Word, and any text field.',
+    features: ['Natural pauses & variable timing', 'Typos + self-correction', 'Pause / Resume mid-session', 'Google Docs & Word support', 'Adjustable WPM (20–300)', 'Accuracy control'],
+    size: '6 KB',
+    badge: 'Hot',
   },
   {
     name: 'AI Autofill',
