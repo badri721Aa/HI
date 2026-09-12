@@ -1,66 +1,24 @@
-import type { Metadata, Viewport } from "next";
-import { Bodoni_Moda, JetBrains_Mono, Inter } from "next/font/google";
-import { CustomCursor } from "@/components/custom-cursor";
-import "./globals.css";
-
-const bodoni = Bodoni_Moda({
-  variable: "--font-bodoni",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  style: ["normal", "italic"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-
-const siteUrl = "https://nosignal.solar";
-const siteDescription =
-  "Learn game modding the right way — Frida internals, Python tooling, and reverse-engineering fundamentals for your own projects.";
+import type { Metadata } from 'next'
+import './globals.css'
+import { Nav } from '@/components/nav'
+import { PanicHide } from '@/components/panic-hide'
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: {
-    default: "nosignal",
-    template: "%s · nosignal",
-  },
-  description: siteDescription,
-  openGraph: {
-    title: "nosignal",
-    description: siteDescription,
-    url: siteUrl,
-    siteName: "nosignal",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "nosignal",
-    description: siteDescription,
-  },
-};
+  title: 'No Signal',
+  description: '',
+  icons: { icon: '/favicon.ico' },
+}
 
-export const viewport: Viewport = {
-  themeColor: "#08080B",
-};
-
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`${bodoni.variable} ${jetbrainsMono.variable} ${inter.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        <CustomCursor />
-        {children}
+    <html lang="en">
+      <body>
+        <PanicHide />
+        <Nav />
+        <main className="min-h-screen">
+          {children}
+        </main>
       </body>
     </html>
-  );
+  )
 }
