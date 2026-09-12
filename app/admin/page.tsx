@@ -65,7 +65,7 @@ export default function AdminPage() {
 
   async function addAdmin() {
     if (!newAdmin.trim()) return
-    await sb.from('admins').insert({ email: newAdmin.trim().toLowerCase() })
+    await sb.from('admins').insert({ email: newAdmin.trim().toLowerCase(), added_by: user?.email ?? 'owner' })
     setNewAdmin('')
     fetchData()
   }
