@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 300px;
+  background: #000;
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+  padding: 16px;
+  font-size: 12px;
+}
+.logo {
+  color: #ff2d2d;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  font-size: 13px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #1e1e1e;
+  padding-bottom: 10px;
+}
+.lbl {
+  font-size: 10px;
+  color: #555;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  display: block;
+}
+textarea, input[type=number] {
+  width: 100%;
+  background: #0a0a0a;
+  border: 1px solid #1e1e1e;
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  padding: 8px;
+}
+textarea { resize: vertical; }
+.row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+button {
+  flex: 1;
+  padding: 8px 0;
+  background: transparent;
+  border: 1px solid #ff2d2d;
+  color: #ff2d2d;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+button:hover { background: #ff2d2d; color: #000; }
+button.stop { border-color: #555; color: #555; }
+button.stop:hover { background: #555; color: #000; }
+#status {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #555;
+  letter-spacing: 1px;
+}
+#status.running { color: #ff2d2d; }
+#status.done { color: #00ff41; }
+</style>
+</head>
+<body>
+<div class="logo">AlhekmaTyper</div>
+
+<span class="lbl">Text to type</span>
+<textarea id="txt" rows="5" placeholder="Paste your text here..."></textarea>
+
+<span class="lbl">Speed (WPM)</span>
+<input type="number" id="wpm" value="55" min="10" max="120">
+
+<span class="lbl">Typo chance (0-10%)</span>
+<input type="number" id="tc" value="3" min="0" max="10">
+
+<span class="lbl">Pause frequency (0-10)</span>
+<input type="number" id="pc" value="4" min="0" max="10">
+
+<div class="row">
+  <button id="startBtn" onclick="startTyping()">START</button>
+  <button class="stop" onclick="stopTyping()">STOP</button>
+</div>
+
+<div id="status">ready.</div>
+
+<script>
+function startTyping() {
+  const txt = document.getElementById('txt').value;
+  if (!txt) return;
+  const wpm = parseInt(document.getElementById('wpm').value) || 55;
+  const tc = parseInt(document.getElementById('tc').value) / 100;
+  const pc = parseInt(document.getElementById('pc').value) / 100;
+  chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+    chrome.tabs.sendMessage(tabs[0].id, {
+      action: 'startTyping',
+      text: txt,
+      wpm: wpm,
+      typoChance: tc,
+      pauseFreq: pc
+    });
+    setStatus('typing...', 'running');
+  });
+}
+
+function stopTyping() {
+  chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'stopTyping' });
+    setStatus('stopped.', '');
+  });
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = cls;
+}
+
+chrome.runtime.onMessage.addListener(function(msg) {
+  if (msg.action === 'done') setStatus('done.', 'done');
+});
+</script>
+</body>
+</html>
