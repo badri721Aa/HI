@@ -3,15 +3,14 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import PageIllustration from '@/components/page-illustration'
 
 const modules = [
-  { href: '/tricks', icon: '◈', label: 'Exam Tricks', desc: 'MC patterns, essay shortcuts, time exploits' },
-  { href: '/hacks', icon: '◉', label: 'Game Hacks', desc: 'Memory, overlays, trainers — concepts & code' },
-  { href: '/extensions', icon: '◫', label: 'Extensions', desc: 'Auto-typer, AI fill, humanizer, stealth tab' },
-  { href: '/chat', icon: '◌', label: 'Live Chat', desc: 'Real-time room with owner broadcasts' },
-  { href: '/ai', icon: '◎', label: 'AI Tools', desc: 'Essay gen, answer writer, AI→human converter' },
-  { href: '/news', icon: '◷', label: 'News Feed', desc: 'Pinned drops, announcements, live updates' },
+  { href: '/tricks', label: 'Exam Tricks', desc: 'MC patterns, essay shortcuts, time exploits', tag: 'Strategy' },
+  { href: '/hacks', label: 'Game Hacks', desc: 'Memory, overlays, trainers — concepts & code', tag: 'Engineering' },
+  { href: '/extensions', label: 'Extensions', desc: 'Auto-typer, AI fill, humanizer, stealth tab', tag: 'Chrome' },
+  { href: '/chat', label: 'Live Chat', desc: 'Real-time room with owner broadcasts', tag: 'Live' },
+  { href: '/ai', label: 'AI Tools', desc: 'Essay gen, answer writer, humanizer', tag: 'AI' },
+  { href: '/news', label: 'News Feed', desc: 'Pinned drops, announcements, updates', tag: 'Feed' },
 ]
 
 export default function Home() {
@@ -27,141 +26,127 @@ export default function Home() {
   }, [])
 
   return (
-    <>
+    <div className="relative">
+      {/* Ambient background */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-[radial-gradient(ellipse,rgba(99,59,218,0.06)_0%,transparent_70%)]" />
+        <div className="absolute top-1/2 -right-40 w-[500px] h-[500px] rounded-full bg-[radial-gradient(ellipse,rgba(59,130,246,0.03)_0%,transparent_70%)]" />
+      </div>
+
       {/* Hero */}
-      <section className="relative">
-        <PageIllustration />
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="pb-12 pt-32 md:pb-20 md:pt-44">
-            <div className="pb-12 text-center md:pb-16">
-              {/* Badge */}
-              <div
-                className="mb-6 inline-flex items-center gap-3 before:h-px before:w-8 before:bg-linear-to-r before:from-transparent before:to-indigo-200/50 after:h-px after:w-8 after:bg-linear-to-l after:from-transparent after:to-indigo-200/50"
-                data-aos="fade-down"
-              >
-                <span className="inline-flex bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text text-transparent text-xs font-medium tracking-widest uppercase">
-                  school-only · covert · encrypted
-                </span>
-              </div>
-
-              <h1
-                className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-5 font-nacelle text-5xl font-semibold text-transparent md:text-6xl"
-                data-aos="fade-up"
-              >
-                Alhekma Cheating
-              </h1>
-
-              <div className="mx-auto max-w-3xl">
-                <p
-                  className="mb-8 text-xl text-indigo-200/65"
-                  data-aos="fade-up"
-                  data-aos-delay={200}
-                >
-                  Tools, tricks, and live comms — built for school. No traces, no logs.
-                </p>
-                <div className="mx-auto max-w-xs sm:flex sm:max-w-none sm:justify-center gap-3" data-aos="fade-up" data-aos-delay={400}>
-                  {user ? (
-                    <>
-                      <Link
-                        href="/chat"
-                        className="btn group mb-4 w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] sm:mb-0 sm:w-auto"
-                      >
-                        <span className="relative inline-flex items-center">
-                          Open Chat
-                          <span className="ml-1 tracking-normal text-white/50 transition-transform group-hover:translate-x-0.5">→</span>
-                        </span>
-                      </Link>
-                      <Link
-                        href="/extensions"
-                        className="btn relative w-full bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%] sm:w-auto"
-                      >
-                        Extensions
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <Link
-                        href="/auth/login"
-                        className="btn group mb-4 w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] sm:mb-0 sm:w-auto"
-                      >
-                        <span className="relative inline-flex items-center">
-                          Sign in with email
-                          <span className="ml-1 tracking-normal text-white/50 transition-transform group-hover:translate-x-0.5">→</span>
-                        </span>
-                      </Link>
-                      <Link
-                        href="/chat"
-                        className="btn relative w-full bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%] sm:w-auto"
-                      >
-                        Live Chat →
-                      </Link>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Status bar */}
-              <div className="mt-10 flex items-center justify-center gap-6 text-xs text-gray-600 uppercase tracking-widest font-nacelle">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 animate-pulse" />
-                  System live
-                </span>
-                <span>·</span>
-                <span>Shift+Tab — panic hide</span>
-                <span>·</span>
-                <span>No logs kept</span>
-              </div>
-            </div>
+      <section className="relative mx-auto max-w-5xl px-6 pt-40 pb-24">
+        <div className="max-w-2xl">
+          {/* Eyebrow */}
+          <div className="mb-5 flex items-center gap-2">
+            <span className="h-px w-5 bg-zinc-700" />
+            <span className="mono text-[10px] tracking-[0.2em] text-zinc-500 uppercase">Alhekma · Covert · Encrypted</span>
           </div>
-        </div>
-      </section>
 
-      {/* Modules grid */}
-      <section className="relative">
-        <div
-          className="pointer-events-none absolute left-1/2 top-0 -z-10 -translate-x-1/2"
-          aria-hidden="true"
-        >
-          <img src="/images/blurred-shape-gray.svg" className="max-w-none opacity-40" width={760} height={668} alt="" />
-        </div>
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="border-t py-12 [border-image:linear-gradient(to_right,transparent,--theme(--color-slate-400/.25),transparent)_1] md:py-20">
-            <div className="mx-auto max-w-3xl pb-4 text-center md:pb-12">
-              <div className="inline-flex items-center gap-3 pb-3 before:h-px before:w-8 before:bg-linear-to-r before:from-transparent before:to-indigo-200/50 after:h-px after:w-8 after:bg-linear-to-l after:from-transparent after:to-indigo-200/50">
-                <span className="inline-flex bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text text-transparent text-xs">
-                  All Tools
-                </span>
-              </div>
-              <h2 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-4 font-nacelle text-3xl font-semibold text-transparent md:text-4xl">
-                Everything you need to pass
-              </h2>
-            </div>
+          <h1 className="mb-5 font-nacelle text-5xl font-semibold tracking-tight text-zinc-100 md:text-6xl">
+            The tools you<br className="hidden sm:block" /> actually need.
+          </h1>
 
-            <div className="mx-auto grid max-w-sm gap-4 sm:max-w-none sm:grid-cols-2 lg:grid-cols-3">
-              {modules.map((m, i) => (
+          <p className="mb-10 max-w-md text-lg text-zinc-400 leading-relaxed">
+            Exam tricks, live chat, game hacks, AI writing tools, and covert Chrome extensions. School-only. No traces.
+          </p>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {user ? (
+              <>
                 <Link
-                  key={m.href}
-                  href={m.href}
-                  className="group relative flex flex-col rounded-2xl border border-gray-800 bg-gray-900/50 p-6 transition-all duration-300 hover:border-gray-700 hover:bg-gray-900"
-                  data-aos="fade-up"
-                  data-aos-delay={i * 100}
+                  href="/chat"
+                  className="inline-flex items-center gap-2 rounded-xl bg-white text-zinc-950 px-5 py-2.5 text-sm font-semibold transition-all duration-200 ease-out hover:bg-zinc-100 active:scale-[0.98] shadow-[0_0_0_1px_rgba(255,255,255,0.1)]"
                 >
-                  <div className="mb-4 font-nacelle text-xl text-indigo-500 transition-colors duration-300 group-hover:text-indigo-400">
-                    {m.icon}
-                  </div>
-                  <div className="mb-1.5 font-nacelle text-[1rem] font-semibold text-gray-200 group-hover:text-white transition-colors duration-300">
-                    {m.label}
-                  </div>
-                  <div className="text-sm text-indigo-200/65 leading-relaxed">
-                    {m.desc}
-                  </div>
-                  <div className="pointer-events-none absolute inset-0 rounded-2xl border border-indigo-500/0 transition-all duration-300 group-hover:border-indigo-500/20" />
+                  Open Chat
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                  </svg>
                 </Link>
-              ))}
-            </div>
+                <Link
+                  href="/extensions"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-zinc-300 transition-all duration-200 ease-out hover:bg-white/[0.08] hover:border-white/15 active:scale-[0.98]"
+                >
+                  Extensions
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  className="inline-flex items-center gap-2 rounded-xl bg-white text-zinc-950 px-5 py-2.5 text-sm font-semibold transition-all duration-200 ease-out hover:bg-zinc-100 active:scale-[0.98] shadow-[0_0_0_1px_rgba(255,255,255,0.1)]"
+                >
+                  Sign in
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                  </svg>
+                </Link>
+                <Link
+                  href="/chat"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-zinc-300 transition-all duration-200 ease-out hover:bg-white/[0.08] hover:border-white/15 active:scale-[0.98]"
+                >
+                  Live chat
+                </Link>
+              </>
+            )}
+          </div>
+
+          {/* Status */}
+          <div className="mt-10 flex items-center gap-5 mono text-[10px] text-zinc-600 uppercase tracking-widest">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-[pulse-slow_3s_ease-in-out_infinite]" />
+              System live
+            </span>
+            <span className="text-zinc-800">·</span>
+            <span>Shift+Tab — panic hide</span>
+            <span className="text-zinc-800">·</span>
+            <span>No logs kept</span>
           </div>
         </div>
       </section>
-    </>
+
+      {/* Divider */}
+      <div className="mx-auto max-w-5xl px-6">
+        <div className="h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent" />
+      </div>
+
+      {/* Modules */}
+      <section className="mx-auto max-w-5xl px-6 py-20">
+        <div className="mb-10 flex items-center gap-3">
+          <span className="mono text-[10px] tracking-[0.2em] text-zinc-500 uppercase">Modules</span>
+          <div className="h-px flex-1 bg-zinc-800/60" />
+        </div>
+
+        <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3">
+          {modules.map((m, i) => (
+            <Link
+              key={m.href}
+              href={m.href}
+              className="group relative flex flex-col p-6 transition-all duration-200 ease-out hover:bg-white/[0.025] rounded-2xl"
+            >
+              {/* Corner accent on hover */}
+              <div className="absolute inset-0 rounded-2xl border border-white/0 transition-all duration-200 group-hover:border-white/[0.08]" />
+
+              <div className="mb-3 flex items-start justify-between">
+                <span className="mono text-[10px] tracking-widest text-zinc-600 uppercase">{m.tag}</span>
+                <svg
+                  width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5"
+                  viewBox="0 0 24 24"
+                  className="text-zinc-700 transition-all duration-200 group-hover:text-zinc-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/>
+                </svg>
+              </div>
+
+              <h3 className="mb-2 font-nacelle text-base font-semibold text-zinc-200 tracking-tight group-hover:text-zinc-100 transition-colors duration-200">
+                {m.label}
+              </h3>
+              <p className="text-sm text-zinc-500 leading-relaxed group-hover:text-zinc-400 transition-colors duration-200">
+                {m.desc}
+              </p>
+            </Link>
+          ))}
+        </div>
+      </section>
+    </div>
   )
 }

@@ -4,7 +4,7 @@ const hacks = [
     tag: 'BR',
     items: [
       { name: 'ESP / Wallhack', desc: 'Entity list walker → world-to-screen projection. Draw boxes over player mesh bounds. Requires offset dumper after each update.' },
-      { name: 'Aimbot', desc: 'Bone-based targeting. Scan entity list for closest bone (usually head or neck), calculate angle delta, apply smooth factor via SetCursorPos or WriteProcessMemory to camera angles.' },
+      { name: 'Aimbot', desc: 'Bone-based targeting. Scan entity list for closest bone (head or neck), calculate angle delta, apply smooth factor via SetCursorPos or WriteProcessMemory to camera angles.' },
       { name: 'No Recoil', desc: 'Read recoil pattern from memory, apply inverse offset to aim angles. Per-weapon tables.' },
     ],
   },
@@ -39,25 +39,37 @@ const hacks = [
 
 export default function HacksPage() {
   return (
-    <div className="min-h-screen pt-14 max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <div className="mono text-[10px] tracking-widest text-white/20 uppercase mb-1">game engineering</div>
-        <h1 className="text-2xl font-light text-white">Hacks & Trainers</h1>
-        <p className="text-xs text-white/30 mt-1">Memory reading, overlays, script injection. Concepts only.</p>
+    <div className="mx-auto max-w-5xl px-6 pt-28 pb-20">
+      <div className="mb-12">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="h-px w-4 bg-zinc-800" />
+          <span className="mono text-[10px] tracking-[0.15em] text-zinc-600 uppercase">Game Engineering</span>
+        </div>
+        <h1 className="font-nacelle text-3xl font-semibold text-zinc-100 tracking-tight">Hacks & Trainers</h1>
+        <p className="mt-2 text-sm text-zinc-500">Memory reading, overlays, script injection. Concepts only.</p>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-12">
         {hacks.map(g => (
           <div key={g.game}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="mono text-[10px] tracking-widest text-white/25 uppercase">{g.game}</div>
-              <div className="mono text-[9px] text-white/20 border border-white/10 rounded px-1.5 py-0.5">{g.tag}</div>
+            <div className="mb-5 flex items-center gap-3">
+              <span className="font-nacelle text-sm font-semibold text-zinc-300">{g.game}</span>
+              <span className="mono text-[9px] border border-zinc-800 text-zinc-600 rounded-md px-2 py-0.5">{g.tag}</span>
+              <div className="h-px flex-1 bg-zinc-900" />
             </div>
+
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {g.items.map(item => (
-                <div key={item.name} className="glass rounded-2xl p-5 border border-white/8 hover:border-white/15 transition-all duration-300 hover:bg-white/6">
-                  <div className="text-sm font-medium text-white/85 mb-2 mono">{item.name}</div>
-                  <div className="text-xs text-white/40 leading-relaxed">{item.desc}</div>
+                <div
+                  key={item.name}
+                  className="group glass-card rounded-2xl p-5 transition-all duration-200 ease-out hover:bg-zinc-800/60 hover:border-white/[0.1]"
+                >
+                  <h3 className="mb-2.5 mono text-sm font-semibold text-zinc-200 tracking-tight group-hover:text-zinc-100 transition-colors duration-200">
+                    {item.name}
+                  </h3>
+                  <p className="text-xs text-zinc-500 leading-relaxed group-hover:text-zinc-400 transition-colors duration-200">
+                    {item.desc}
+                  </p>
                 </div>
               ))}
             </div>

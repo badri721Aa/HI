@@ -1,5 +1,3 @@
-import Link from 'next/link'
-
 const tricks = [
   {
     category: 'Multiple Choice',
@@ -36,22 +34,38 @@ const tricks = [
 
 export default function TricksPage() {
   return (
-    <div className="min-h-screen pt-14 max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <div className="mono text-[10px] tracking-widest text-white/20 uppercase mb-1">knowledge base</div>
-        <h1 className="text-2xl font-light text-white">Exam Tricks</h1>
-        <p className="text-xs text-white/30 mt-1">Tested strategies. Real results.</p>
+    <div className="mx-auto max-w-5xl px-6 pt-28 pb-20">
+      {/* Header */}
+      <div className="mb-12">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="h-px w-4 bg-zinc-800" />
+          <span className="mono text-[10px] tracking-[0.15em] text-zinc-600 uppercase">Knowledge Base</span>
+        </div>
+        <h1 className="font-nacelle text-3xl font-semibold text-zinc-100 tracking-tight">Exam Tricks</h1>
+        <p className="mt-2 text-sm text-zinc-500">Tested strategies. Real results.</p>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-12">
         {tricks.map(cat => (
           <div key={cat.category}>
-            <div className="mono text-[10px] tracking-widest text-white/25 uppercase mb-3">{cat.category}</div>
+            {/* Category label */}
+            <div className="mb-5 flex items-center gap-3">
+              <span className="mono text-[10px] tracking-[0.15em] text-zinc-600 uppercase">{cat.category}</span>
+              <div className="h-px flex-1 bg-zinc-900" />
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {cat.items.map(item => (
-                <div key={item.title} className="glass rounded-2xl p-5 border border-white/8 hover:border-white/15 transition-all duration-300 hover:bg-white/6">
-                  <div className="text-sm font-medium text-white/85 mb-2">{item.title}</div>
-                  <div className="text-xs text-white/45 leading-relaxed">{item.desc}</div>
+                <div
+                  key={item.title}
+                  className="group glass-card rounded-2xl p-5 transition-all duration-200 ease-out hover:bg-zinc-800/60 hover:border-white/[0.1]"
+                >
+                  <h3 className="mb-2.5 text-sm font-semibold text-zinc-200 tracking-tight group-hover:text-zinc-100 transition-colors duration-200">
+                    {item.title}
+                  </h3>
+                  <p className="text-xs text-zinc-500 leading-relaxed group-hover:text-zinc-400 transition-colors duration-200">
+                    {item.desc}
+                  </p>
                 </div>
               ))}
             </div>

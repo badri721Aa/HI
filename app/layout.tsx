@@ -31,12 +31,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${nacelle.variable} bg-gray-950 font-inter text-base text-gray-200 antialiased`}>
-        <div className="flex min-h-screen flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
+    <html lang="en" className="dark">
+      <body className={`${inter.variable} ${nacelle.variable} bg-zinc-950 text-zinc-300 antialiased font-inter`}>
+        <div className="relative min-h-screen">
+          {/* Subtle ambient top glow */}
+          <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-50" />
           <PanicHide />
           <Nav />
-          <main className="flex-1">
+          <main className="min-h-screen">
             {children}
           </main>
         </div>

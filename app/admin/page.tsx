@@ -46,10 +46,7 @@ export default function AdminPage() {
         admin = !!ad
       }
       setIsAdmin(admin)
-
-      if (admin) {
-        fetchData()
-      }
+      if (admin) fetchData()
       setLoading(false)
     })
   }, [])
@@ -81,10 +78,6 @@ export default function AdminPage() {
     setBanTarget('')
   }
 
-  async function unbanUser(name: string) {
-    await sb.from('banned_users').delete().eq('name', name)
-  }
-
   async function sendBroadcast() {
     if (!broadcast.trim()) return
     await sb.from('news').insert({ message: broadcast.trim(), pinned: true })
@@ -94,21 +87,31 @@ export default function AdminPage() {
   }
 
   async function deleteUserMessages(userId: string) {
-    // Delete by user lookup — this is a troll action
     const profile = users.find(u => u.id === userId)
     if (!profile) return
     await sb.from('chat_messages').delete().eq('user_name', profile.display_name)
     alert('Messages deleted.')
   }
 
-  if (loading) return <div className="min-h-screen pt-14 flex items-center justify-center"><div className="mono text-xs text-white/30">Loading...</div></div>
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center pt-14">
+        <p className="mono text-xs text-zinc-600">Loading...</p>
+      </div>
+    )
+  }
 
   if (!user) {
     return (
-      <div className="min-h-screen pt-14 flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="mono text-xs text-white/30">Not signed in</div>
-          <a href="/auth/login" className="glass px-4 py-2 rounded-xl text-sm text-white/60 hover:text-white">Sign in →</a>
+      <div className="flex min-h-screen items-center justify-center pt-14">
+        <div className="space-y-3 text-center">
+          <p className="mono text-xs text-zinc-600">Not signed in</p>
+          <a
+            href="/auth/login"
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 text-sm text-zinc-400 transition-all duration-200 hover:bg-white/[0.07] hover:text-zinc-200"
+          >
+            Sign in →
+          </a>
         </div>
       </div>
     )
@@ -116,10 +119,10 @@ export default function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen pt-14 flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <div className="mono text-3xl text-white/10">403</div>
-          <div className="text-sm text-white/30">Admins only.</div>
+      <div className="flex min-h-screen items-center justify-center pt-14">
+        <div className="space-y-2 text-center">
+          <p className="font-nacelle text-5xl font-semibold text-zinc-800">403</p>
+          <p className="text-sm text-zinc-600">Admins only.</p>
         </div>
       </div>
     )
@@ -134,66 +137,73 @@ export default function AdminPage() {
   ] as const
 
   return (
-    <div className="min-h-screen pt-14 max-w-4xl mx-auto px-4 py-8">
+    <div className="mx-auto max-w-4xl px-6 pt-28 pb-20">
       {/* Header */}
-      <div className="mb-8">
-        <div className="mono text-[10px] tracking-widest text-white/20 uppercase mb-1">control panel</div>
-        <h1 className="text-2xl font-light text-white flex items-center gap-3">
-          Admin Panel
+      <div className="mb-10">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="h-px w-4 bg-zinc-800" />
+          <span className="mono text-[10px] tracking-[0.15em] text-zinc-600 uppercase">Control Panel</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <h1 className="font-nacelle text-3xl font-semibold text-zinc-100 tracking-tight">Admin Panel</h1>
           {isOwner(user.email ?? '') && (
-            <span className="mono text-xs text-amber-400/70 border border-amber-500/20 rounded-full px-2 py-0.5">Owner</span>
+            <span className="mono text-[10px] border border-amber-500/25 bg-amber-500/[0.08] text-amber-400 rounded-full px-2 py-0.5">
+              Owner
+            </span>
           )}
-        </h1>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 mb-6 p-1 glass rounded-xl w-fit">
+      {/* Tab bar */}
+      <div className="mb-8 flex items-center gap-1 rounded-xl glass-card p-1 w-fit">
         {tabs.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id as typeof tab)}
-            className={'px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ' +
+            className={
+              'rounded-lg px-4 py-1.5 text-xs font-medium transition-all duration-200 ease-out active:scale-[0.98] ' +
               (tab === t.id
-                ? 'bg-white/12 text-white border border-white/15'
-                : 'text-white/40 hover:text-white/70')}
+                ? 'bg-zinc-700/60 border border-white/[0.1] text-zinc-100'
+                : 'text-zinc-500 hover:text-zinc-300')
+            }
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* Users tab */}
+      {/* Users */}
       {tab === 'users' && (
         <div className="space-y-4">
-          <div className="mono text-xs text-white/30">{users.length} registered users</div>
+          <p className="mono text-xs text-zinc-600">{users.length} registered users</p>
           <div className="space-y-2">
             {users.map(u => (
-              <div key={u.id} className="glass rounded-xl px-4 py-3 flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-white/8 border border-white/10 flex items-center justify-center text-[10px] font-semibold text-white/50 flex-shrink-0">
+              <div key={u.id} className="glass-card flex items-center gap-3 rounded-xl px-4 py-3">
+                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-white/[0.07] bg-zinc-800/60 text-[10px] font-semibold text-zinc-500">
                   {(u.display_name || u.email || 'A')[0].toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-white/80 truncate">{u.display_name || 'Unnamed'}</div>
-                  <div className="mono text-[10px] text-white/30 truncate">{u.email}</div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-zinc-200 truncate">{u.display_name || 'Unnamed'}</p>
+                  <p className="mono text-[10px] text-zinc-600 truncate">{u.email}</p>
                 </div>
-                <div className="mono text-[9px] text-white/20">
+                <span className="mono text-[9px] text-zinc-700">
                   {new Date(u.created_at).toLocaleDateString()}
-                </div>
+                </span>
               </div>
             ))}
             {users.length === 0 && (
-              <div className="mono text-xs text-white/20 text-center py-8">No users yet</div>
+              <p className="py-8 text-center mono text-xs text-zinc-700">No users yet</p>
             )}
           </div>
         </div>
       )}
 
-      {/* Admins tab — owner only */}
+      {/* Admins */}
       {tab === 'admins' && (
         <div className="space-y-6">
           {isOwner(user.email ?? '') && (
-            <div className="glass rounded-2xl p-5 space-y-3">
-              <div className="text-sm font-medium text-white/80">Add admin by email</div>
+            <div className="glass-card rounded-2xl p-5 space-y-3">
+              <p className="text-sm font-semibold text-zinc-200 tracking-tight">Add admin by email</p>
               <div className="flex gap-2">
                 <Input
                   placeholder="user@alhekma.com"
@@ -201,57 +211,59 @@ export default function AdminPage() {
                   onChange={e => setNewAdmin(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addAdmin()}
                 />
-                <Button onClick={addAdmin} className="flex-shrink-0">Add</Button>
+                <Button variant="solid" onClick={addAdmin} className="flex-shrink-0">Add</Button>
               </div>
             </div>
           )}
           <div className="space-y-2">
             {admins.map(a => (
-              <div key={a.id} className="glass rounded-xl px-4 py-3 flex items-center gap-3">
-                <div className="flex-1 mono text-sm text-white/70">{a.email}</div>
-                <div className="mono text-[9px] text-white/20">{new Date(a.created_at).toLocaleDateString()}</div>
+              <div key={a.id} className="glass-card flex items-center gap-3 rounded-xl px-4 py-3">
+                <p className="mono flex-1 text-sm text-zinc-300">{a.email}</p>
+                <span className="mono text-[9px] text-zinc-700">{new Date(a.created_at).toLocaleDateString()}</span>
                 {isOwner(user.email ?? '') && (
                   <button
                     onClick={() => removeAdmin(a.email)}
-                    className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
+                    className="text-xs text-rose-500/60 hover:text-rose-400 transition-colors duration-200"
                   >
                     Remove
                   </button>
                 )}
               </div>
             ))}
-            {admins.length === 0 && <div className="mono text-xs text-white/20 text-center py-8">No admins added</div>}
+            {admins.length === 0 && (
+              <p className="py-8 text-center mono text-xs text-zinc-700">No admins added</p>
+            )}
           </div>
         </div>
       )}
 
-      {/* Broadcast tab */}
+      {/* Broadcast */}
       {tab === 'broadcast' && (
-        <div className="glass rounded-2xl p-5 space-y-4">
+        <div className="glass-card rounded-2xl p-5 space-y-4">
           <div>
-            <div className="text-sm font-medium text-white/80 mb-1">Broadcast to everyone</div>
-            <div className="text-xs text-white/30">Posted as pinned news — visible to all users in real-time</div>
+            <p className="text-sm font-semibold text-zinc-200 tracking-tight">Broadcast to everyone</p>
+            <p className="mt-1 text-xs text-zinc-600">Posted as pinned news — visible to all users in real-time</p>
           </div>
           <textarea
-            className="w-full h-32 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 backdrop-blur-sm transition-all duration-200 focus:border-white/30 focus:bg-white/10 focus:outline-none resize-none"
+            className="w-full h-32 resize-none rounded-xl border border-white/[0.08] bg-zinc-900/60 px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all duration-200 focus:border-white/[0.18] focus:outline-none shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]"
             placeholder="Your message to everyone..."
             value={broadcast}
             onChange={e => setBroadcast(e.target.value)}
             maxLength={500}
           />
           <div className="flex items-center gap-3">
-            <Button onClick={sendBroadcast} variant="gold" disabled={!broadcast.trim()}>
+            <Button variant="gold" onClick={sendBroadcast} disabled={!broadcast.trim()}>
               Broadcast
             </Button>
-            {broadcastSent && <span className="text-xs text-emerald-400 mono">Sent!</span>}
+            {broadcastSent && <span className="mono text-xs text-emerald-400">Sent!</span>}
           </div>
         </div>
       )}
 
-      {/* Ban tab */}
+      {/* Ban */}
       {tab === 'ban' && (
-        <div className="glass rounded-2xl p-5 space-y-4">
-          <div className="text-sm font-medium text-white/80">Ban a user by email</div>
+        <div className="glass-card rounded-2xl p-5 space-y-4">
+          <p className="text-sm font-semibold text-zinc-200 tracking-tight">Ban a user by email</p>
           <div className="flex gap-2">
             <Input
               placeholder="user@alhekma.com"
@@ -259,21 +271,21 @@ export default function AdminPage() {
               onChange={e => setBanTarget(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && banUser()}
             />
-            <Button onClick={banUser} variant="danger" className="flex-shrink-0">Ban</Button>
+            <Button variant="danger" onClick={banUser} className="flex-shrink-0">Ban</Button>
           </div>
-          <div className="mono text-xs text-white/20">Banned users cannot send chat messages.</div>
+          <p className="mono text-xs text-zinc-700">Banned users cannot send chat messages.</p>
         </div>
       )}
 
-      {/* Troll tab — owner only */}
+      {/* Troll — owner only */}
       {tab === 'troll' && isOwner(user.email ?? '') && (
         <div className="space-y-4">
-          <div className="mono text-[10px] text-white/20 uppercase tracking-widest mb-2">Owner tools</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="glass rounded-2xl p-5 space-y-3">
-              <div className="text-sm font-medium text-white/80">Delete user chat history</div>
+          <p className="mono text-[10px] tracking-[0.15em] text-zinc-600 uppercase mb-2">Owner tools</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="glass-card rounded-2xl p-5 space-y-3">
+              <p className="text-sm font-semibold text-zinc-200 tracking-tight">Delete user chat history</p>
               <select
-                className="w-full h-10 rounded-xl border border-white/15 bg-white/5 px-3 text-sm text-white/70 focus:outline-none"
+                className="w-full h-10 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-3 text-sm text-zinc-300 focus:outline-none focus:border-white/[0.18] transition-all duration-200"
                 onChange={e => e.target.value && deleteUserMessages(e.target.value)}
                 defaultValue=""
               >
@@ -283,9 +295,9 @@ export default function AdminPage() {
                 ))}
               </select>
             </div>
-            <div className="glass rounded-2xl p-5 space-y-3">
-              <div className="text-sm font-medium text-white/80">Clear all chat</div>
-              <div className="text-xs text-white/30">Wipes every message in the public chat</div>
+            <div className="glass-card rounded-2xl p-5 space-y-3">
+              <p className="text-sm font-semibold text-zinc-200 tracking-tight">Clear all chat</p>
+              <p className="text-xs text-zinc-600">Wipes every message in the public chat</p>
               <Button
                 variant="danger"
                 onClick={async () => {
@@ -297,9 +309,9 @@ export default function AdminPage() {
                 Clear chat
               </Button>
             </div>
-            <div className="glass rounded-2xl p-5 space-y-3">
-              <div className="text-sm font-medium text-white/80">Broadcast fake announcement</div>
-              <div className="text-xs text-white/30">Post a mystery message to news feed</div>
+            <div className="glass-card rounded-2xl p-5 space-y-3">
+              <p className="text-sm font-semibold text-zinc-200 tracking-tight">Broadcast fake announcement</p>
+              <p className="text-xs text-zinc-600">Post a mystery message to news feed</p>
               <Button
                 variant="gold"
                 onClick={async () => {
@@ -316,11 +328,11 @@ export default function AdminPage() {
                 Random troll drop
               </Button>
             </div>
-            <div className="glass rounded-2xl p-5 space-y-3">
-              <div className="text-sm font-medium text-white/80">Database stats</div>
-              <div className="space-y-1">
-                <div className="mono text-xs text-white/40">{users.length} users registered</div>
-                <div className="mono text-xs text-white/40">{admins.length} admins assigned</div>
+            <div className="glass-card rounded-2xl p-5 space-y-3">
+              <p className="text-sm font-semibold text-zinc-200 tracking-tight">Database stats</p>
+              <div className="space-y-1.5">
+                <p className="mono text-xs text-zinc-500">{users.length} users registered</p>
+                <p className="mono text-xs text-zinc-500">{admins.length} admins assigned</p>
               </div>
             </div>
           </div>

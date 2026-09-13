@@ -4,20 +4,42 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 ease-out disabled:pointer-events-none disabled:opacity-40 active:scale-[0.98] select-none',
   {
     variants: {
       variant: {
-        default: 'bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:border-white/30',
-        ghost: 'text-white/70 hover:text-white hover:bg-white/10',
-        danger: 'bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30',
-        gold: 'bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30',
-        solid: 'bg-white text-black hover:bg-white/90',
+        default: [
+          'border border-white/[0.09] bg-white/[0.05]',
+          'text-zinc-200',
+          'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]',
+          'hover:bg-white/[0.09] hover:border-white/[0.14] hover:text-zinc-100',
+        ].join(' '),
+        solid: [
+          'bg-zinc-100 text-zinc-950 font-semibold',
+          'shadow-[0_1px_2px_rgba(0,0,0,0.4)]',
+          'hover:bg-white',
+        ].join(' '),
+        ghost: 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05]',
+        danger: [
+          'border border-rose-500/20 bg-rose-500/[0.07]',
+          'text-rose-400',
+          'hover:bg-rose-500/[0.12] hover:border-rose-500/30 hover:text-rose-300',
+        ].join(' '),
+        gold: [
+          'border border-amber-500/25 bg-amber-500/[0.08]',
+          'text-amber-400',
+          'hover:bg-amber-500/[0.14] hover:border-amber-500/35 hover:text-amber-300',
+        ].join(' '),
+        emerald: [
+          'border border-emerald-500/25 bg-emerald-500/[0.08]',
+          'text-emerald-400',
+          'hover:bg-emerald-500/[0.14] hover:border-emerald-500/35 hover:text-emerald-300',
+        ].join(' '),
       },
       size: {
-        default: 'h-10 px-5 py-2',
-        sm: 'h-8 px-3 text-xs',
-        lg: 'h-12 px-8 text-base',
+        default: 'h-9 px-4 py-2',
+        sm: 'h-7 px-3 text-xs rounded-lg',
+        lg: 'h-11 px-6 text-base',
         icon: 'h-9 w-9',
       },
     },

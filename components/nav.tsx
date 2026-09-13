@@ -48,61 +48,75 @@ export function Nav() {
   }
 
   return (
-    <header className="z-30 mt-2 w-full md:mt-5 fixed top-0 left-0 right-0">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="relative flex h-14 items-center justify-between gap-3 rounded-2xl bg-gray-900/90 px-3 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] after:absolute after:inset-0 after:-z-10 after:backdrop-blur-xs">
-
+    <header className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4 px-4">
+      <nav className="w-full max-w-5xl">
+        {/* Main bar */}
+        <div className="glass-hi flex h-12 items-center gap-1 rounded-2xl px-2">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="font-nacelle text-sm font-semibold text-gray-200 tracking-wide">
-                Alhekma<span className="text-indigo-400"> Cheating</span>
-              </span>
-            </Link>
-          </div>
+          <Link
+            href="/"
+            className="mr-2 flex items-center gap-2 rounded-xl px-3 py-2 transition-all duration-200 hover:bg-white/[0.05]"
+          >
+            <div className="h-5 w-5 rounded-md bg-gradient-to-br from-zinc-300 to-zinc-500 flex items-center justify-center">
+              <span className="text-[8px] font-bold text-zinc-950">AC</span>
+            </div>
+            <span className="font-nacelle text-sm font-semibold text-zinc-200 tracking-tight">
+              Alhekma
+            </span>
+          </Link>
 
-          {/* Desktop nav links */}
-          <nav className="hidden md:flex items-center gap-1">
-            {links.map(l => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                  path === l.href
-                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
-                }`}
-              >
-                {l.label}
-              </Link>
-            ))}
+          {/* Separator */}
+          <div className="h-4 w-px bg-zinc-800 mx-1" />
+
+          {/* Nav links */}
+          <div className="hidden md:flex items-center gap-0.5 flex-1">
+            {links.map(l => {
+              const active = path === l.href
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                    active
+                      ? 'text-zinc-100 bg-white/[0.07]'
+                      : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
+                  }`}
+                >
+                  {l.label}
+                </Link>
+              )
+            })}
             {(isAdmin || isOwner(user?.email ?? '')) && (
               <Link
                 href="/admin"
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
                   path === '/admin'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                    : 'text-amber-400/60 hover:text-amber-300 hover:bg-amber-500/10'
+                    ? 'text-amber-300 bg-amber-500/10'
+                    : 'text-amber-500/50 hover:text-amber-300 hover:bg-amber-500/[0.06]'
                 }`}
               >
                 Admin
               </Link>
             )}
-          </nav>
+          </div>
 
-          {/* Auth */}
-          <div className="flex items-center gap-3">
+          <div className="flex-1 md:hidden" />
+
+          {/* Right side */}
+          <div className="flex items-center gap-2 ml-1">
             {user ? (
               <>
-                <span className="hidden sm:block font-nacelle text-[10px] text-gray-500 truncate max-w-[140px]">
-                  {isOwner(user.email ?? '') && (
-                    <span className="text-amber-400 font-semibold">[Owner] </span>
-                  )}
+                {isOwner(user.email ?? '') && (
+                  <span className="hidden sm:flex items-center gap-1 mono text-[10px] text-amber-500/70 border border-amber-500/20 rounded-full px-2 py-0.5">
+                    Owner
+                  </span>
+                )}
+                <span className="hidden sm:block mono text-[11px] text-zinc-600 truncate max-w-[120px]">
                   {user.email}
                 </span>
                 <button
                   onClick={signOut}
-                  className="btn-sm relative bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] py-[5px] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]"
+                  className="rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-xs text-zinc-500 transition-all duration-200 hover:bg-white/[0.07] hover:text-zinc-300 active:scale-[0.97]"
                 >
                   Sign out
                 </button>
@@ -110,35 +124,41 @@ export function Nav() {
             ) : (
               <Link
                 href="/auth/login"
-                className="btn-sm bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] py-[5px] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%]"
+                className="rounded-lg border border-white/[0.09] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-300 transition-all duration-200 hover:bg-white/[0.08] hover:border-white/15 active:scale-[0.97]"
               >
-                Sign In
+                Sign in
               </Link>
             )}
 
-            {/* Mobile menu toggle */}
+            {/* Mobile toggle */}
             <button
-              className="md:hidden text-gray-400 hover:text-gray-200 transition-colors"
+              className="md:hidden rounded-lg p-1.5 text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05] transition-all duration-150"
               onClick={() => setMenuOpen(o => !o)}
-              aria-label="Menu"
+              aria-label="Toggle menu"
             >
-              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" d="M3 6h18M3 12h18M3 18h18"/>
-              </svg>
+              {menuOpen ? (
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" d="M3 6h18M3 12h18M3 18h18"/>
+                </svg>
+              )}
             </button>
           </div>
         </div>
 
         {/* Mobile menu */}
         {menuOpen && (
-          <div className="mt-1 rounded-2xl bg-gray-900/95 border border-gray-800 p-4 flex flex-col gap-1 md:hidden backdrop-blur-sm">
+          <div className="glass-card mt-1.5 rounded-2xl p-2 flex flex-col gap-0.5 md:hidden animate-[fade-in_0.15s_ease-out]">
             {links.map(l => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setMenuOpen(false)}
-                className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                  path === l.href ? 'bg-indigo-500/20 text-indigo-300' : 'text-gray-400 hover:text-gray-200'
+                className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                  path === l.href ? 'bg-white/[0.07] text-zinc-100' : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
                 }`}
               >
                 {l.label}
@@ -148,14 +168,14 @@ export function Nav() {
               <Link
                 href="/admin"
                 onClick={() => setMenuOpen(false)}
-                className="px-3 py-2 rounded-lg text-sm text-amber-400/70 hover:text-amber-300"
+                className="px-3 py-2.5 rounded-xl text-sm font-medium text-amber-500/60 hover:text-amber-300 hover:bg-amber-500/[0.06] transition-all duration-150"
               >
                 Admin Panel
               </Link>
             )}
           </div>
         )}
-      </div>
+      </nav>
     </header>
   )
 }
