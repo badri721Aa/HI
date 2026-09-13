@@ -19,7 +19,7 @@ export async function GET() {
   try {
     const t = Date.now()
     const res = await fetch('https://gvxnzgogfaifmsdkingq.supabase.co/rest/v1/', {
-      headers: { apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2eG56Z29nZmFpZm1zZGtpbmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwNDkwODAsImV4cCI6MjA2NDYyNTA4MH0.M5YDcMHXOsxvuBFaKRAfkJ1sV_MmKubCL7SZXwZIdJA' },
+      headers: { apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2eG56Z29nZmFpZm1zZGtpbmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMTk4NjUsImV4cCI6MjEwNDY5NTg2NX0.JMCzgtIH3pRpApjgCTiK1t7CSdsK8G10gaU__p5kktw' },
       signal: AbortSignal.timeout(5000),
     })
     checks.rest = { ok: res.ok, latencyMs: Date.now() - t }

@@ -1,7 +1,7 @@
 // Service worker — polls Supabase REST for live data, manages badge + notifications
 
 const SUPABASE_URL = 'https://gvxnzgogfaifmsdkingq.supabase.co'
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2eG56Z29nZmFpZm1zZGtpbmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwNDkwODAsImV4cCI6MjA2NDYyNTA4MH0.M5YDcMHXOsxvuBFaKRAfkJ1sV_MmKubCL7SZXwZIdJA'
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2eG56Z29nZmFpZm1zZGtpbmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMTk4NjUsImV4cCI6MjEwNDY5NTg2NX0.JMCzgtIH3pRpApjgCTiK1t7CSdsK8G10gaU__p5kktw'
 
 // Poll every 60 seconds
 chrome.alarms.create('poll', { periodInMinutes: 1 })
