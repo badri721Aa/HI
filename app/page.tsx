@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import PageIllustration from '@/components/page-illustration'
 
 const modules = [
   { href: '/tricks', icon: '◈', label: 'Exam Tricks', desc: 'MC patterns, essay shortcuts, time exploits' },
@@ -26,96 +27,141 @@ export default function Home() {
   }, [])
 
   return (
-    <div className="relative min-h-screen flex flex-col">
+    <>
       {/* Hero */}
-      <div
-        className="relative flex flex-col items-center justify-center text-center px-6 pt-14"
-        style={{
-          minHeight: '100vh',
-          background: 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(40,0,80,0.95) 0%, #000 70%)',
-        }}
-      >
-        {/* Subtle grid */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-        }} />
+      <section className="relative">
+        <PageIllustration />
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="pb-12 pt-32 md:pb-20 md:pt-44">
+            <div className="pb-12 text-center md:pb-16">
+              {/* Badge */}
+              <div
+                className="mb-6 inline-flex items-center gap-3 before:h-px before:w-8 before:bg-linear-to-r before:from-transparent before:to-indigo-200/50 after:h-px after:w-8 after:bg-linear-to-l after:from-transparent after:to-indigo-200/50"
+                data-aos="fade-down"
+              >
+                <span className="inline-flex bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text text-transparent text-xs font-medium tracking-widest uppercase">
+                  school-only · covert · encrypted
+                </span>
+              </div>
 
-        <div className="relative z-10 max-w-xl">
-          <div className="mono text-[9px] tracking-[0.5em] text-white/20 uppercase mb-8">
-            alhekma · covert · encrypted
-          </div>
+              <h1
+                className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-5 font-nacelle text-5xl font-semibold text-transparent md:text-6xl"
+                data-aos="fade-up"
+              >
+                Alhekma Cheating
+              </h1>
 
-          <h1 className="text-6xl md:text-8xl font-light text-white mb-5 tracking-tight leading-none">
-            NO_SIGNAL
-          </h1>
-
-          <p className="text-white/35 text-sm max-w-xs mx-auto leading-relaxed mb-10">
-            Tools, tricks, and live comms.<br/>
-            School-only access. No traces.
-          </p>
-
-          <div className="flex items-center gap-3 justify-center mb-16">
-            {user ? (
-              <>
-                <Link
-                  href="/chat"
-                  className="glass-hi px-6 py-2.5 rounded-xl text-sm text-white hover:bg-white/10 transition-all duration-200 font-medium"
+              <div className="mx-auto max-w-3xl">
+                <p
+                  className="mb-8 text-xl text-indigo-200/65"
+                  data-aos="fade-up"
+                  data-aos-delay={200}
                 >
-                  Open Chat →
-                </Link>
-                <Link href="/extensions" className="text-sm text-white/30 hover:text-white/60 transition-colors">
-                  Extensions
-                </Link>
-              </>
-            ) : (
-              <>
+                  Tools, tricks, and live comms — built for school. No traces, no logs.
+                </p>
+                <div className="mx-auto max-w-xs sm:flex sm:max-w-none sm:justify-center gap-3" data-aos="fade-up" data-aos-delay={400}>
+                  {user ? (
+                    <>
+                      <Link
+                        href="/chat"
+                        className="btn group mb-4 w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] sm:mb-0 sm:w-auto"
+                      >
+                        <span className="relative inline-flex items-center">
+                          Open Chat
+                          <span className="ml-1 tracking-normal text-white/50 transition-transform group-hover:translate-x-0.5">→</span>
+                        </span>
+                      </Link>
+                      <Link
+                        href="/extensions"
+                        className="btn relative w-full bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%] sm:w-auto"
+                      >
+                        Extensions
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/auth/login"
+                        className="btn group mb-4 w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] sm:mb-0 sm:w-auto"
+                      >
+                        <span className="relative inline-flex items-center">
+                          Sign in with email
+                          <span className="ml-1 tracking-normal text-white/50 transition-transform group-hover:translate-x-0.5">→</span>
+                        </span>
+                      </Link>
+                      <Link
+                        href="/chat"
+                        className="btn relative w-full bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%] sm:w-auto"
+                      >
+                        Live Chat →
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Status bar */}
+              <div className="mt-10 flex items-center justify-center gap-6 text-xs text-gray-600 uppercase tracking-widest font-nacelle">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 animate-pulse" />
+                  System live
+                </span>
+                <span>·</span>
+                <span>Shift+Tab — panic hide</span>
+                <span>·</span>
+                <span>No logs kept</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Modules grid */}
+      <section className="relative">
+        <div
+          className="pointer-events-none absolute left-1/2 top-0 -z-10 -translate-x-1/2"
+          aria-hidden="true"
+        >
+          <img src="/images/blurred-shape-gray.svg" className="max-w-none opacity-40" width={760} height={668} alt="" />
+        </div>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="border-t py-12 [border-image:linear-gradient(to_right,transparent,--theme(--color-slate-400/.25),transparent)_1] md:py-20">
+            <div className="mx-auto max-w-3xl pb-4 text-center md:pb-12">
+              <div className="inline-flex items-center gap-3 pb-3 before:h-px before:w-8 before:bg-linear-to-r before:from-transparent before:to-indigo-200/50 after:h-px after:w-8 after:bg-linear-to-l after:from-transparent after:to-indigo-200/50">
+                <span className="inline-flex bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text text-transparent text-xs">
+                  All Tools
+                </span>
+              </div>
+              <h2 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-4 font-nacelle text-3xl font-semibold text-transparent md:text-4xl">
+                Everything you need to pass
+              </h2>
+            </div>
+
+            <div className="mx-auto grid max-w-sm gap-4 sm:max-w-none sm:grid-cols-2 lg:grid-cols-3">
+              {modules.map((m, i) => (
                 <Link
-                  href="/auth/login"
-                  className="glass-hi px-6 py-2.5 rounded-xl text-sm text-white hover:bg-white/10 transition-all duration-200 font-medium"
+                  key={m.href}
+                  href={m.href}
+                  className="group relative flex flex-col rounded-2xl border border-gray-800 bg-gray-900/50 p-6 transition-all duration-300 hover:border-gray-700 hover:bg-gray-900"
+                  data-aos="fade-up"
+                  data-aos-delay={i * 100}
                 >
-                  Sign in with email
+                  <div className="mb-4 font-nacelle text-xl text-indigo-500 transition-colors duration-300 group-hover:text-indigo-400">
+                    {m.icon}
+                  </div>
+                  <div className="mb-1.5 font-nacelle text-[1rem] font-semibold text-gray-200 group-hover:text-white transition-colors duration-300">
+                    {m.label}
+                  </div>
+                  <div className="text-sm text-indigo-200/65 leading-relaxed">
+                    {m.desc}
+                  </div>
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl border border-indigo-500/0 transition-all duration-300 group-hover:border-indigo-500/20" />
                 </Link>
-                <Link href="/chat" className="text-sm text-white/30 hover:text-white/60 transition-colors">
-                  Live chat →
-                </Link>
-              </>
-            )}
-          </div>
-
-          {/* Status bar */}
-          <div className="flex items-center justify-center gap-6 mono text-[9px] text-white/15 uppercase tracking-widest">
-            <span className="flex items-center gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-emerald-500/60 animate-pulse" />
-              System live
-            </span>
-            <span>·</span>
-            <span>Shift+Tab — panic hide</span>
-            <span>·</span>
-            <span>No logs kept</span>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Modules */}
-      <div className="relative z-10 px-4 md:px-8 py-20 max-w-5xl mx-auto w-full">
-        <div className="mono text-[9px] tracking-[0.5em] text-white/15 uppercase mb-10 text-center">
-          modules
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {modules.map(m => (
-            <Link
-              key={m.href}
-              href={m.href}
-              className="glass rounded-2xl p-6 hover:bg-white/8 transition-all duration-300 group border border-white/6 hover:border-white/15"
-            >
-              <div className="text-xl text-white/25 group-hover:text-white/50 transition-colors duration-300 mb-4 mono">{m.icon}</div>
-              <div className="text-sm font-medium text-white/75 group-hover:text-white transition-colors duration-300 mb-1.5">{m.label}</div>
-              <div className="text-xs text-white/25 group-hover:text-white/45 transition-colors duration-300 leading-relaxed">{m.desc}</div>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </div>
+      </section>
+    </>
   )
 }
