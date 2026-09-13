@@ -8,8 +8,15 @@ import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
-interface Profile { id: string; email: string; display_name: string; created_at: string; role: string }
+interface Profile { id: string; email: string; display_name: string; created_at: string; role: string; muted_until: string | null }
 interface AuditLog { id: string; actor_email: string; action: string; target_email: string | null; payload: Record<string, unknown> | null; created_at: string }
+interface ChatMessage { id: string; user_id: string; content: string; created_at: string; profiles?: { email: string; display_name: string } | null }
+
+const TOXIC_PATTERNS = [
+  /\bfuck\b/i, /\bshit\b/i, /\bbitch\b/i, /\bkill yourself\b/i, /\bkys\b/i,
+  /\bnigger\b/i, /\bnigga\b/i, /\bretard\b/i, /\bfaggot\b/i, /\bcunt\b/i,
+]
+function isToxic(text: string) { return TOXIC_PATTERNS.some(p => p.test(text)) }
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -20,7 +27,9 @@ export default function AdminPage() {
   const [banTarget, setBanTarget] = useState('')
   const [broadcast, setBroadcast] = useState('')
   const [broadcastSent, setBroadcastSent] = useState(false)
-  const [tab, setTab] = useState<'overview' | 'users' | 'broadcast' | 'ban' | 'logs'>('overview')
+  const [tab, setTab] = useState<'overview' | 'users' | 'broadcast' | 'ban' | 'moderation' | 'logs'>('overview')
+  const [chatMsgs, setChatMsgs] = useState<ChatMessage[]>([])
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const sb = createClient()
 
   useEffect(() => {
@@ -37,12 +46,38 @@ export default function AdminPage() {
   }, [])
 
   async function fetchData() {
-    const [{ data: u }, { data: l }] = await Promise.all([
+    const [{ data: u }, { data: l }, { data: c }] = await Promise.all([
       sb.from('profiles').select('*').order('created_at', { ascending: false }),
       sb.from('admin_audit_logs').select('*').order('created_at', { ascending: false }).limit(30),
+      sb.from('chat_messages').select('id, user_id, content, created_at, profiles(email, display_name)').order('created_at', { ascending: false }).limit(100),
     ])
     if (u) setUsers(u)
     if (l) setLogs(l)
+    if (c) setChatMsgs(c as ChatMessage[])
+  }
+
+  async function quickBan(email: string) {
+    if (!email) return
+    setActionLoading('ban-' + email)
+    await sb.from('banned_users').insert({ name: email.toLowerCase() })
+    await sb.rpc('log_admin_action', { p_action: 'ban', p_target_email: email.toLowerCase(), p_payload: {} })
+    setActionLoading(null)
+    fetchData()
+  }
+
+  async function quickMute(email: string, minutes: number) {
+    setActionLoading('mute-' + email)
+    await sb.rpc('mute_user_by_email', { p_email: email, p_minutes: minutes })
+    await sb.rpc('log_admin_action', { p_action: 'mute', p_target_email: email, p_payload: { minutes } })
+    setActionLoading(null)
+    fetchData()
+  }
+
+  async function deleteMessage(msgId: string) {
+    setActionLoading('del-' + msgId)
+    await sb.from('chat_messages').delete().eq('id', msgId)
+    setActionLoading(null)
+    setChatMsgs(prev => prev.filter(m => m.id !== msgId))
   }
 
   async function banUser() {
@@ -77,11 +112,14 @@ export default function AdminPage() {
     </div>
   )
 
-  const tabs: { id: typeof tab; label: string }[] = [
+  const flaggedMsgs = chatMsgs.filter(m => isToxic(m.content))
+
+  const tabs: { id: typeof tab; label: string; badge?: number }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: 'Users' },
     { id: 'broadcast', label: 'Broadcast' },
     { id: 'ban', label: 'Ban' },
+    { id: 'moderation', label: 'Moderation', badge: flaggedMsgs.length },
     { id: 'logs', label: 'Audit Log' },
   ]
 
@@ -118,13 +156,20 @@ export default function AdminPage() {
       </div>
 
       {/* Tab bar */}
-      <div className="mb-8 flex items-center gap-1 rounded-xl glass-card p-1 w-fit">
+      <div className="mb-8 flex items-center gap-1 rounded-xl glass-card p-1 w-fit flex-wrap">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-all duration-200 ease-out active:scale-[0.98] ${
+            className={`relative rounded-lg px-4 py-1.5 text-xs font-medium transition-all duration-200 ease-out active:scale-[0.98] ${
               tab === t.id ? 'bg-zinc-700/60 border border-white/[0.1] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
             }`}
-          >{t.label}</button>
+          >
+            {t.label}
+            {t.badge ? (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-mono text-white">
+                {t.badge > 9 ? '9+' : t.badge}
+              </span>
+            ) : null}
+          </button>
         ))}
       </div>
 
@@ -149,23 +194,115 @@ export default function AdminPage() {
         <div className="space-y-4">
           <p className="mono text-xs text-zinc-600">{users.length} registered users</p>
           <div className="space-y-2">
-            {users.map(u => (
-              <div key={u.id} className="glass-card flex items-center gap-3 rounded-xl px-4 py-3">
-                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-white/[0.07] bg-zinc-800/60 text-[10px] font-semibold text-zinc-500">
-                  {(u.display_name || u.email || 'A')[0].toUpperCase()}
+            {users.map(u => {
+              const isMuted = u.muted_until && new Date(u.muted_until) > new Date()
+              const canAct = u.role === 'user' && u.email !== user.email
+              return (
+                <div key={u.id} className="glass-card flex items-center gap-3 rounded-xl px-4 py-3">
+                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-white/[0.07] bg-zinc-800/60 text-[10px] font-semibold text-zinc-500">
+                    {(u.display_name || u.email || 'A')[0].toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-zinc-200 truncate">{u.display_name || 'Unnamed'}</p>
+                    <p className="mono text-[10px] text-zinc-600 truncate">{u.email}</p>
+                    {isMuted && (
+                      <p className="mono text-[9px] text-amber-500/70">
+                        Muted until {new Date(u.muted_until!).toLocaleTimeString()}
+                      </p>
+                    )}
+                  </div>
+                  <span className={`mono text-[9px] border rounded-full px-1.5 py-0.5 ${
+                    u.role === 'owner' ? 'border-amber-500/25 text-amber-400' :
+                    u.role === 'admin' ? 'border-zinc-600 text-zinc-400' :
+                    'border-zinc-800 text-zinc-700'
+                  }`}>{u.role}</span>
+                  {canAct && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => quickMute(u.email, 30)}
+                        disabled={actionLoading === 'mute-' + u.email}
+                        className="mono text-[9px] px-2 py-1 rounded-lg border border-amber-500/20 text-amber-500/70 hover:bg-amber-500/10 transition-colors disabled:opacity-40"
+                      >
+                        {actionLoading === 'mute-' + u.email ? '…' : 'Mute 30m'}
+                      </button>
+                      <button
+                        onClick={() => quickBan(u.email)}
+                        disabled={actionLoading === 'ban-' + u.email}
+                        className="mono text-[9px] px-2 py-1 rounded-lg border border-red-500/20 text-red-500/70 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                      >
+                        {actionLoading === 'ban-' + u.email ? '…' : 'Ban'}
+                      </button>
+                    </div>
+                  )}
+                  <span className="mono text-[9px] text-zinc-700 hidden sm:block">{new Date(u.created_at).toLocaleDateString()}</span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-zinc-200 truncate">{u.display_name || 'Unnamed'}</p>
-                  <p className="mono text-[10px] text-zinc-600 truncate">{u.email}</p>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Moderation */}
+      {tab === 'moderation' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <p className="mono text-xs text-zinc-600">{chatMsgs.length} recent messages</p>
+            {flaggedMsgs.length > 0 && (
+              <span className="mono text-[10px] border border-red-500/25 bg-red-500/[0.06] text-red-400 rounded-full px-2 py-0.5">
+                {flaggedMsgs.length} flagged
+              </span>
+            )}
+            <button onClick={fetchData} className="mono text-[10px] text-zinc-700 hover:text-zinc-400 transition-colors ml-auto">Refresh</button>
+          </div>
+
+          {chatMsgs.length === 0 && (
+            <p className="mono text-xs text-zinc-700 py-8 text-center">No messages yet.</p>
+          )}
+
+          <div className="space-y-2">
+            {chatMsgs.map(m => {
+              const flagged = isToxic(m.content)
+              const senderEmail = m.profiles?.email ?? 'Unknown'
+              const senderName = m.profiles?.display_name ?? 'Unknown'
+              return (
+                <div
+                  key={m.id}
+                  className={`glass-card rounded-xl px-4 py-3 flex items-start gap-3 ${
+                    flagged ? 'border-red-500/20 bg-red-500/[0.04]' : ''
+                  }`}
+                >
+                  {flagged && (
+                    <span className="flex-shrink-0 mt-0.5 text-red-400" title="Auto-flagged as toxic">⚑</span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="mono text-[10px] text-zinc-400">{senderName}</span>
+                      <span className="mono text-[10px] text-zinc-700">{senderEmail}</span>
+                      <span className="mono text-[9px] text-zinc-800 ml-auto">{new Date(m.created_at).toLocaleTimeString()}</span>
+                    </div>
+                    <p className={`text-sm ${flagged ? 'text-red-300' : 'text-zinc-400'} break-words`}>{m.content}</p>
+                  </div>
+                  <div className="flex flex-col gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => deleteMessage(m.id)}
+                      disabled={actionLoading === 'del-' + m.id}
+                      className="mono text-[9px] px-2 py-1 rounded-lg border border-red-500/20 text-red-500/60 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                    >
+                      {actionLoading === 'del-' + m.id ? '…' : 'Delete'}
+                    </button>
+                    {senderEmail !== 'Unknown' && (
+                      <button
+                        onClick={() => quickBan(senderEmail)}
+                        disabled={actionLoading === 'ban-' + senderEmail}
+                        className="mono text-[9px] px-2 py-1 rounded-lg border border-red-800/20 text-red-700 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                      >
+                        {actionLoading === 'ban-' + senderEmail ? '…' : 'Ban'}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span className={`mono text-[9px] border rounded-full px-1.5 py-0.5 ${
-                  u.role === 'owner' ? 'border-amber-500/25 text-amber-400' :
-                  u.role === 'admin' ? 'border-zinc-600 text-zinc-400' :
-                  'border-zinc-800 text-zinc-700'
-                }`}>{u.role}</span>
-                <span className="mono text-[9px] text-zinc-700">{new Date(u.created_at).toLocaleDateString()}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
