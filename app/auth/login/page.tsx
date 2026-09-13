@@ -40,17 +40,28 @@ function Spinner() {
   )
 }
 
+const inputStyle = {
+  background: 'rgba(9,9,11,0.5)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)',
+}
+const inputClass = 'flex h-10 w-full rounded-xl px-4 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none transition-all duration-150'
+function focusBorder(e: React.FocusEvent<HTMLInputElement>) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.22)' }
+function blurBorder(e: React.FocusEvent<HTMLInputElement>) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }
+
 export default function LoginPage() {
   const [tab, setTab] = useState<Tab>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
-  const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [info, setInfo] = useState('')
+  const [needsConfirm, setNeedsConfirm] = useState(false)
+  const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
   const sb = createClient()
@@ -62,12 +73,20 @@ export default function LoginPage() {
     sb.auth.getUser().then(({ data }) => {
       if (data.user) router.replace('/')
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function resetForm() {
+  function resetState() {
     setError('')
-    setSuccess('')
+    setInfo('')
+    setNeedsConfirm(false)
     setLoading(false)
+  }
+
+  function switchTab(t: Tab) {
+    setTab(t)
+    resetState()
+    setSent(false)
   }
 
   async function handleGoogle() {
@@ -90,7 +109,7 @@ export default function LoginPage() {
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
-    resetForm()
+    resetState()
     setLoading(true)
     const trimmedEmail = email.trim().toLowerCase()
     if (!trimmedEmail || !password) {
@@ -99,14 +118,22 @@ export default function LoginPage() {
       return
     }
     try {
-      const { error: err } = await sb.auth.signInWithPassword({
-        email: trimmedEmail,
-        password,
-      })
-      if (err) throw err
+      const { error: err } = await sb.auth.signInWithPassword({ email: trimmedEmail, password })
+      if (err) {
+        const msg = err.message.toLowerCase()
+        if (msg.includes('email not confirmed') || msg.includes('not confirmed')) {
+          setNeedsConfirm(true)
+          setError('Your email address is not confirmed yet. Check your inbox or resend the confirmation link.')
+        } else if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
+          setError('Wrong email or password.')
+        } else {
+          setError(err.message)
+        }
+        return
+      }
       router.replace('/')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sign in failed. Check your credentials.')
+      setError(e instanceof Error ? e.message : 'Sign in failed.')
     } finally {
       setLoading(false)
     }
@@ -114,7 +141,7 @@ export default function LoginPage() {
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault()
-    resetForm()
+    resetState()
     const trimmedEmail = email.trim().toLowerCase()
     if (!trimmedEmail || !password) { setError('Email and password required.'); return }
     if (password !== confirmPassword) { setError('Passwords do not match.'); return }
@@ -126,8 +153,25 @@ export default function LoginPage() {
         password,
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       })
-      if (err) throw err
-      setSuccess('Account created — check your email for a confirmation link.')
+      if (err) {
+        if (err.message.toLowerCase().includes('already registered') || err.message.toLowerCase().includes('already exists')) {
+          setError('An account with this email already exists. Try signing in.')
+        } else {
+          setError(err.message)
+        }
+        return
+      }
+
+      // Try immediate sign-in (works when email confirmation is disabled)
+      const { error: signInErr } = await sb.auth.signInWithPassword({ email: trimmedEmail, password })
+      if (!signInErr) {
+        router.replace('/')
+        return
+      }
+
+      // Email confirmation required
+      setNeedsConfirm(true)
+      setInfo(`We sent a confirmation link to ${trimmedEmail}. Click it to activate your account, then come back to sign in.`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sign up failed.')
     } finally {
@@ -135,9 +179,23 @@ export default function LoginPage() {
     }
   }
 
+  async function handleResendConfirmation() {
+    const trimmedEmail = email.trim().toLowerCase()
+    if (!trimmedEmail) return
+    setResendLoading(true)
+    try {
+      await sb.auth.resend({ type: 'signup', email: trimmedEmail })
+      setInfo('Confirmation email resent. Check your inbox (and spam folder).')
+    } catch {
+      setError('Failed to resend. Try the Magic Link tab instead.')
+    } finally {
+      setResendLoading(false)
+    }
+  }
+
   async function handleMagicLink(e: React.FormEvent) {
     e.preventDefault()
-    resetForm()
+    resetState()
     const trimmedEmail = email.trim().toLowerCase()
     if (!trimmedEmail) { setError('Enter an email address.'); return }
     setLoading(true)
@@ -158,21 +216,21 @@ export default function LoginPage() {
     }
   }
 
+  // Magic link sent confirmation screen
   if (sent) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
-        {/* Background */}
         <div className="pointer-events-none fixed inset-0">
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black_80%)]" />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full bg-[radial-gradient(ellipse,rgba(99,59,218,0.08)_0%,transparent_70%)]" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[radial-gradient(ellipse,rgba(99,59,218,0.08)_0%,transparent_70%)]" />
         </div>
-        <div className="w-full max-w-sm">
+        <div className="relative w-full max-w-sm">
           <div
             className="rounded-2xl p-8 text-center"
             style={{
-              background: 'rgba(9,9,11,0.7)',
+              background: 'rgba(9,9,11,0.72)',
               backdropFilter: 'blur(24px)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.06)',
               borderTopColor: 'rgba(255,255,255,0.14)',
               boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.07), 0 32px 64px -16px rgba(0,0,0,0.7)',
             }}
@@ -184,11 +242,11 @@ export default function LoginPage() {
             </div>
             <h2 className="mb-2 font-nacelle text-xl font-semibold text-zinc-100 tracking-tight">Check your inbox</h2>
             <p className="text-sm text-zinc-500 leading-relaxed">
-              Link sent to<br/>
+              Sign-in link sent to<br/>
               <span className="font-mono text-zinc-300 text-xs">{email}</span>
             </p>
             <div className="mt-5 border-t border-white/[0.05] pt-5 text-xs text-zinc-600">
-              Click the link to sign in — no password needed.<br/>Check spam if it doesn&apos;t arrive within 2 minutes.
+              Click the link in the email — it signs you in instantly.<br/>Check spam if it doesn&apos;t arrive within 2 minutes.
             </div>
           </div>
           <button
@@ -204,64 +262,60 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 pb-12 pt-20">
-      {/* Background layers */}
+      {/* Background */}
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black_80%)]" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full bg-[radial-gradient(ellipse,rgba(99,59,218,0.07)_0%,transparent_70%)]" />
-        <div className="absolute bottom-0 right-0 w-[400px] h-[300px] rounded-full bg-[radial-gradient(ellipse,rgba(59,130,246,0.04)_0%,transparent_70%)]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-[radial-gradient(ellipse,rgba(99,59,218,0.07)_0%,transparent_70%)]" />
+        <div className="absolute bottom-0 right-0 w-[400px] h-[300px] bg-[radial-gradient(ellipse,rgba(59,130,246,0.04)_0%,transparent_70%)]" />
       </div>
 
       <div className="relative w-full max-w-sm">
-        {/* Logo + header */}
+        {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04]"
-            style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.07)' }}>
+          <div
+            className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04]"
+            style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.07)' }}
+          >
             <span className="font-nacelle font-semibold text-sm text-zinc-200">AL</span>
           </div>
-          <h1 className="font-nacelle text-2xl font-semibold text-zinc-100 tracking-tight">Alhekma Platform</h1>
-          <p className="mt-1.5 text-xs text-zinc-600 font-mono tracking-widest uppercase">Authorized access only</p>
+          <h1 className="font-nacelle text-2xl font-semibold text-zinc-100 tracking-tight">Alhekma</h1>
+          <p className="mt-1 text-xs text-zinc-600 font-mono tracking-widest uppercase">alhekmacheating.solar</p>
         </div>
 
-        {/* Glass card */}
+        {/* Card */}
         <div
           className="rounded-2xl overflow-hidden"
           style={{
-            background: 'rgba(9,9,11,0.7)',
+            background: 'rgba(9,9,11,0.72)',
             backdropFilter: 'blur(28px) saturate(1.6)',
             border: '1px solid rgba(255,255,255,0.06)',
             borderTopColor: 'rgba(255,255,255,0.13)',
             boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.07), 0 40px 80px -20px rgba(0,0,0,0.8)',
           }}
         >
-          {/* Tab switcher */}
+          {/* Tabs */}
           <div className="flex border-b border-white/[0.05] p-1.5 gap-1">
             {(['signin', 'signup', 'magic'] as Tab[]).map(t => (
               <button
                 key={t}
-                onClick={() => { setTab(t); resetForm() }}
+                onClick={() => switchTab(t)}
                 className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all duration-150 ${
-                  tab === t
-                    ? 'bg-white/[0.07] text-zinc-200 shadow-inner'
-                    : 'text-zinc-600 hover:text-zinc-400'
+                  tab === t ? 'bg-white/[0.07] text-zinc-200' : 'text-zinc-600 hover:text-zinc-400'
                 }`}
                 style={tab === t ? { boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.06)' } : {}}
               >
-                {t === 'signin' ? 'Sign In' : t === 'signup' ? 'Create Account' : 'Magic Link'}
+                {t === 'signin' ? 'Sign In' : t === 'signup' ? 'Sign Up' : 'Magic Link'}
               </button>
             ))}
           </div>
 
           <div className="p-5 space-y-4">
-            {/* Google OAuth */}
+            {/* Google */}
             <button
               onClick={handleGoogle}
               disabled={googleLoading}
-              className="flex h-10 w-full items-center justify-center gap-2.5 rounded-xl text-sm font-medium text-zinc-200 transition-all duration-150 ease-out hover:bg-white/[0.07] hover:border-white/[0.16] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                border: '1px solid rgba(255,255,255,0.09)',
-                background: 'rgba(255,255,255,0.03)',
-                boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.05)',
-              }}
+              className="flex h-10 w-full items-center justify-center gap-2.5 rounded-xl text-sm font-medium text-zinc-200 transition-all duration-150 hover:bg-white/[0.07] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.05)' }}
             >
               {googleLoading ? <Spinner /> : (
                 <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden>
@@ -280,47 +334,27 @@ export default function LoginPage() {
               <div className="h-px flex-1 bg-zinc-800/80" />
             </div>
 
-            {/* Sign In */}
+            {/* ── SIGN IN ── */}
             {tab === 'signin' && (
               <form onSubmit={handleSignIn} className="space-y-3">
                 <div>
                   <label className="mb-1.5 block font-mono text-[10px] tracking-widest text-zinc-600 uppercase">Email</label>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="you@school.com"
-                    autoComplete="email"
-                    autoFocus
-                    required
-                    className="flex h-10 w-full rounded-xl px-4 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none transition-all duration-150"
-                    style={{
-                      background: 'rgba(9,9,11,0.5)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)',
-                    }}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                    type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com" autoComplete="email" autoFocus required
+                    className={inputClass} style={inputStyle}
+                    onFocus={focusBorder} onBlur={blurBorder}
                   />
                 </div>
                 <div>
                   <label className="mb-1.5 block font-mono text-[10px] tracking-widest text-zinc-600 uppercase">Password</label>
                   <div className="relative">
                     <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
+                      type={showPassword ? 'text' : 'password'} value={password}
                       onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      required
-                      className="flex h-10 w-full rounded-xl px-4 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none transition-all duration-150"
-                      style={{
-                        background: 'rgba(9,9,11,0.5)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)',
-                      }}
-                      onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)')}
-                      onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                      placeholder="••••••••" autoComplete="current-password" required
+                      className={`${inputClass} pr-10`} style={inputStyle}
+                      onFocus={focusBorder} onBlur={blurBorder}
                     />
                     <button type="button" onClick={() => setShowPassword(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition-colors">
@@ -332,11 +366,10 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Remember me */}
                 <label className="flex items-center gap-2.5 cursor-pointer group">
                   <div
                     onClick={() => setRememberMe(v => !v)}
-                    className={`w-4 h-4 rounded flex items-center justify-center transition-all duration-150 ${rememberMe ? 'bg-violet-500 border-violet-400' : 'bg-zinc-900 border-zinc-700'} border`}
+                    className={`w-4 h-4 rounded flex items-center justify-center transition-all duration-150 border ${rememberMe ? 'bg-violet-500 border-violet-400' : 'bg-zinc-900 border-zinc-700'}`}
                   >
                     {rememberMe && (
                       <svg width="9" height="9" fill="none" stroke="white" strokeWidth="2.5" viewBox="0 0 12 12">
@@ -344,125 +377,133 @@ export default function LoginPage() {
                       </svg>
                     )}
                   </div>
-                  <span className="text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors select-none">
-                    Remember me for 30 days
-                  </span>
+                  <span className="text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors select-none">Remember me</span>
                 </label>
 
-                {error && <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.07] px-4 py-3 text-xs text-rose-400">{error}</div>}
+                {error && (
+                  <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.07] px-4 py-3 text-xs text-rose-400 space-y-2">
+                    <div>{error}</div>
+                    {needsConfirm && (
+                      <button type="button" onClick={handleResendConfirmation} disabled={resendLoading}
+                        className="flex items-center gap-1.5 text-rose-300 hover:text-rose-200 transition-colors font-medium disabled:opacity-50">
+                        {resendLoading ? <><Spinner /> Sending…</> : '↺ Resend confirmation email'}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {info && <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.07] px-4 py-3 text-xs text-emerald-400">{info}</div>}
 
-                <button
-                  type="submit"
-                  disabled={loading || !email.trim() || !password}
-                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-zinc-950 transition-all duration-150 ease-out hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                <button type="submit" disabled={loading || !email.trim() || !password}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-zinc-950 transition-all duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: '#e4e4e7', boxShadow: '0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 0 rgba(255,255,255,0.2)' }}
                 >
                   {loading ? <><Spinner /> Signing in…</> : 'Sign in'}
                 </button>
 
-                <div className="text-center">
-                  <button type="button" onClick={() => setTab('magic')}
+                <div className="flex items-center justify-between">
+                  <button type="button" onClick={() => switchTab('signup')}
                     className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors font-mono">
-                    Use magic link instead →
+                    Create account →
+                  </button>
+                  <button type="button" onClick={() => switchTab('magic')}
+                    className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors font-mono">
+                    Magic link →
                   </button>
                 </div>
               </form>
             )}
 
-            {/* Sign Up */}
+            {/* ── SIGN UP ── */}
             {tab === 'signup' && (
               <form onSubmit={handleSignUp} className="space-y-3">
                 <div>
                   <label className="mb-1.5 block font-mono text-[10px] tracking-widest text-zinc-600 uppercase">Email</label>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="you@school.com"
-                    autoComplete="email"
-                    autoFocus
-                    required
-                    className="flex h-10 w-full rounded-xl px-4 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none transition-all duration-150"
-                    style={{ background: 'rgba(9,9,11,0.5)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                    type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com" autoComplete="email" autoFocus required
+                    className={inputClass} style={inputStyle}
+                    onFocus={focusBorder} onBlur={blurBorder}
                   />
                 </div>
                 <div>
                   <label className="mb-1.5 block font-mono text-[10px] tracking-widest text-zinc-600 uppercase">Password</label>
                   <input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Min 8 characters"
-                    autoComplete="new-password"
-                    required
-                    className="flex h-10 w-full rounded-xl px-4 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none transition-all duration-150"
-                    style={{ background: 'rgba(9,9,11,0.5)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                    type="password" value={password} onChange={e => setPassword(e.target.value)}
+                    placeholder="Min 8 characters" autoComplete="new-password" required
+                    className={inputClass} style={inputStyle}
+                    onFocus={focusBorder} onBlur={blurBorder}
                   />
                   <div className="mt-2"><PasswordStrength password={password} /></div>
                 </div>
                 <div>
                   <label className="mb-1.5 block font-mono text-[10px] tracking-widest text-zinc-600 uppercase">Confirm Password</label>
                   <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                    required
-                    className="flex h-10 w-full rounded-xl px-4 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none transition-all duration-150"
-                    style={{ background: 'rgba(9,9,11,0.5)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                    type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••" autoComplete="new-password" required
+                    className={inputClass} style={inputStyle}
+                    onFocus={focusBorder} onBlur={blurBorder}
                   />
                 </div>
 
-                {error && <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.07] px-4 py-3 text-xs text-rose-400">{error}</div>}
-                {success && <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.07] px-4 py-3 text-xs text-emerald-400">{success}</div>}
+                {error && (
+                  <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.07] px-4 py-3 text-xs text-rose-400 space-y-2">
+                    <div>{error}</div>
+                    {needsConfirm && (
+                      <button type="button" onClick={handleResendConfirmation} disabled={resendLoading}
+                        className="flex items-center gap-1.5 text-rose-300 hover:text-rose-200 transition-colors font-medium disabled:opacity-50">
+                        {resendLoading ? <><Spinner /> Sending…</> : '↺ Resend confirmation email'}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {info && (
+                  <div className="rounded-xl border border-violet-500/25 bg-violet-500/[0.07] px-4 py-3 text-xs text-violet-300 space-y-2">
+                    <div>{info}</div>
+                    {needsConfirm && (
+                      <button type="button" onClick={handleResendConfirmation} disabled={resendLoading}
+                        className="flex items-center gap-1.5 text-violet-200 hover:text-white transition-colors font-medium disabled:opacity-50">
+                        {resendLoading ? <><Spinner /> Sending…</> : '↺ Resend confirmation email'}
+                      </button>
+                    )}
+                  </div>
+                )}
 
-                <button
-                  type="submit"
-                  disabled={loading || !email.trim() || !password}
-                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-zinc-950 transition-all duration-150 ease-out hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                <button type="submit" disabled={loading || !email.trim() || !password || !!info}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-zinc-950 transition-all duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: '#e4e4e7', boxShadow: '0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 0 rgba(255,255,255,0.2)' }}
                 >
                   {loading ? <><Spinner /> Creating account…</> : 'Create account'}
                 </button>
+
+                <div className="text-center">
+                  <button type="button" onClick={() => switchTab('signin')}
+                    className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors font-mono">
+                    Already have an account? Sign in →
+                  </button>
+                </div>
               </form>
             )}
 
-            {/* Magic Link */}
+            {/* ── MAGIC LINK ── */}
             {tab === 'magic' && (
               <form onSubmit={handleMagicLink} className="space-y-3">
                 <div>
                   <label className="mb-1.5 block font-mono text-[10px] tracking-widest text-zinc-600 uppercase">Email</label>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="you@school.com"
-                    autoComplete="email"
-                    autoFocus
-                    required
-                    className="flex h-10 w-full rounded-xl px-4 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none transition-all duration-150"
-                    style={{ background: 'rgba(9,9,11,0.5)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                    type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com" autoComplete="email" autoFocus required
+                    className={inputClass} style={inputStyle}
+                    onFocus={focusBorder} onBlur={blurBorder}
                   />
                 </div>
                 <p className="text-xs text-zinc-600 leading-relaxed">
-                  We&apos;ll send a one-time sign-in link to this address. No password needed.
+                  Works for both new and existing accounts — we&apos;ll email you a one-click sign-in link. No password needed.
                 </p>
 
                 {error && <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.07] px-4 py-3 text-xs text-rose-400">{error}</div>}
 
-                <button
-                  type="submit"
-                  disabled={loading || !email.trim()}
-                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-zinc-950 transition-all duration-150 ease-out hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                <button type="submit" disabled={loading || !email.trim()}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-zinc-950 transition-all duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: '#e4e4e7', boxShadow: '0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 0 rgba(255,255,255,0.2)' }}
                 >
                   {loading ? <><Spinner /> Sending…</> : 'Send sign-in link'}
@@ -471,10 +512,6 @@ export default function LoginPage() {
             )}
           </div>
         </div>
-
-        <p className="mt-5 text-center font-mono text-[10px] text-zinc-700">
-          Platform access is restricted · <button onClick={() => setTab('magic')} className="underline underline-offset-2 hover:text-zinc-500 transition-colors">Need access?</button>
-        </p>
       </div>
     </div>
   )

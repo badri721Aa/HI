@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
               `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
               `font-src 'self' https://fonts.gstatic.com`,
               `img-src 'self' data: blob: https://lh3.googleusercontent.com https://cdn.discordapp.com`,
-              `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST} https://accounts.google.com`,
+              `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST} https://accounts.google.com https://fonts.googleapis.com`,
               `frame-src 'none'`,
               `object-src 'none'`,
               `base-uri 'self'`,

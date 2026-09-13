@@ -29,7 +29,7 @@ const nacelle = localFont({
 export const metadata: Metadata = {
   title: 'Alhekma Platform',
   description: 'Real-time communication, developer tools, and platform administration.',
-  metadataBase: new URL('https://alhekma.vercel.app'),
+  metadataBase: new URL('https://alhekmacheating.solar'),
   icons: { icon: '/favicon.ico' },
 }
 
