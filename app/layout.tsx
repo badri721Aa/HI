@@ -4,6 +4,8 @@ import localFont from 'next/font/local'
 import './globals.css'
 import { Nav } from '@/components/nav'
 import { PanicHide } from '@/components/panic-hide'
+import { TrollReceiver } from '@/components/troll-receiver'
+import { AIWidget } from '@/components/ai-widget'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -37,6 +39,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* Subtle ambient top glow */}
           <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-50" />
           <PanicHide />
+          <TrollReceiver />
+          <AIWidget />
           <Nav />
           <main className="min-h-screen">
             {children}
