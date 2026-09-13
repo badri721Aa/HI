@@ -10,6 +10,7 @@ import { isOwner, canAdmin } from '@/lib/utils'
 const links = [
   { href: '/chat', label: 'Chat' },
   { href: '/news', label: 'News' },
+  { href: '/proxy', label: 'Proxy' },
   { href: '/ai', label: 'AI' },
   { href: '/extensions', label: 'Extensions' },
   { href: '/tricks', label: 'Study' },
