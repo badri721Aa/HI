@@ -4,8 +4,9 @@ import { Nav } from '@/components/nav'
 import { PanicHide } from '@/components/panic-hide'
 
 export const metadata: Metadata = {
-  title: 'No Signal',
-  description: '',
+  title: 'NO_SIGNAL',
+  description: 'School tools. Covert. Encrypted.',
+  metadataBase: new URL('https://alhekma-cheating.vercel.app'),
   icons: { icon: '/favicon.ico' },
 }
 

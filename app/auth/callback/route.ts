@@ -8,8 +8,12 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    if (!error && data.user) {
+      const hasName = data.user.user_metadata?.display_name
+      if (!hasName) {
+        return NextResponse.redirect(origin + '/auth/setup')
+      }
       return NextResponse.redirect(origin + next)
     }
   }
