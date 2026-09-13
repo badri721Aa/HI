@@ -34,8 +34,8 @@ export default function ProxyPage() {
         finalUrl = `https://${finalUrl}`
       }
     }
-    setLoadedUrl(finalUrl)
     setUrl(finalUrl)
+    setLoadedUrl(`/api/proxy?url=${encodeURIComponent(finalUrl)}`)
   }
 
   function activateStealth(preset: typeof STEALTH_PRESETS[0]) {
@@ -113,7 +113,7 @@ export default function ProxyPage() {
               className="flex-1 bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 outline-none"
             />
             {url && (
-              <button type="button" onClick={() => { setUrl(''); setLoadedUrl('') }} className="text-zinc-700 hover:text-zinc-400 transition-colors">
+              <button type="button" onClick={() => { setUrl(''); setLoadedUrl(''); }} className="text-zinc-700 hover:text-zinc-400 transition-colors">
                 <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -134,7 +134,7 @@ export default function ProxyPage() {
           {loadedUrl && (
             <button
               type="button"
-              onClick={() => { setLoadedUrl(''); setUrl('') }}
+              onClick={() => { setLoadedUrl(''); setUrl(''); }}
               className="flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs text-zinc-600 hover:text-zinc-300 transition-all duration-150 border border-transparent hover:border-white/[0.06]"
             >
               ← Home
