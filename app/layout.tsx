@@ -25,8 +25,8 @@ const nacelle = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'Alhekma Cheating',
-  description: 'School tools. Covert. Encrypted.',
+  title: 'Alhekma Platform',
+  description: 'Real-time communication, developer tools, and platform administration.',
   metadataBase: new URL('https://alhekma-cheating.vercel.app'),
   icons: { icon: '/favicon.ico' },
 }
@@ -36,7 +36,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark">
       <body className={`${inter.variable} ${nacelle.variable} bg-zinc-950 text-zinc-300 antialiased font-inter`}>
         <div className="relative min-h-screen">
-          {/* Subtle ambient top glow */}
           <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-50" />
           <PanicHide />
           <TrollReceiver />

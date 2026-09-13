@@ -1,59 +1,36 @@
-// AlhekmaTyper — content.js
-// Runs in Google Docs context, receives messages from popup.html
+// Content script — runs on the platform site
+// Syncs Supabase session tokens to the extension background worker
 
-let isTyping = false;
-let tid = null;
+(function () {
+  'use strict'
 
-chrome.runtime.onMessage.addListener((msg, sender, respond) => {
-  if (msg.action === 'startTyping') {
-    isTyping = true;
-    typeSeq(msg.text, 0, msg.wpm, msg.typoChance, msg.pauseFreq);
-    respond({ ok: true });
-  }
-  if (msg.action === 'stopTyping') {
-    isTyping = false;
-    clearTimeout(tid);
-    respond({ ok: true });
-  }
-  return true;
-});
-
-function getDoc() {
-  const f = document.querySelector('.docs-texteventtarget-iframe');
-  return f ? f.contentDocument : document;
-}
-
-function insert(doc, char) {
-  doc.execCommand('insertText', false, char);
-}
-
-function typeSeq(text, i, wpm, tc, pc) {
-  if (!isTyping || i >= text.length) {
-    isTyping = false;
-    chrome.runtime.sendMessage({ action: 'done' });
-    return;
+  function extractSession() {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (!key || !key.startsWith('sb-') || !key.endsWith('-auth-token')) continue
+        const raw = localStorage.getItem(key)
+        if (!raw) continue
+        const parsed = JSON.parse(raw)
+        const session = parsed?.session ?? parsed
+        if (session?.access_token && session?.user) return session
+      }
+    } catch { /* storage not accessible */ }
+    return null
   }
 
-  const base = 60000 / (wpm * 5);
-  const doc = getDoc();
-
-  // Occasional typo + correction
-  if (Math.random() < tc && i > 2) {
-    const wrong = String.fromCharCode(97 + Math.floor(Math.random() * 26));
-    insert(doc, wrong);
-    tid = setTimeout(() => {
-      doc.execCommand('delete');
-      tid = setTimeout(() => typeSeq(text, i, wpm, tc, pc), base * 0.5);
-    }, base * 3);
-    return;
+  function sync() {
+    const session = extractSession()
+    if (session) {
+      chrome.runtime.sendMessage({ type: 'SET_AUTH', payload: session }).catch(() => {})
+    } else {
+      chrome.runtime.sendMessage({ type: 'CLEAR_AUTH' }).catch(() => {})
+    }
   }
 
-  insert(doc, text[i]);
-
-  let delay = base * (0.5 + Math.random());
-  if (Math.random() < pc) {
-    delay = base * (8 + Math.random() * 10);
-  }
-
-  tid = setTimeout(() => typeSeq(text, i + 1, wpm, tc, pc), delay);
-}
+  // Sync on load and on any storage change (login/logout)
+  sync()
+  window.addEventListener('storage', (e) => {
+    if (e.key?.startsWith('sb-')) sync()
+  })
+})()
