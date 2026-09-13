@@ -16,6 +16,7 @@ const NAV_ITEMS: Item[] = [
   { label: 'Troll Panel', desc: 'Broadcast effects to online users', href: '/admin/troll-panel', tag: 'Admin', icon: '🎭' },
   { label: 'Dev Tools', desc: 'Platform developer utilities', href: '/admin/devtools', tag: 'Admin', icon: '🛠️' },
   { label: 'Role Manager', desc: 'Grant and revoke user roles', href: '/admin/roles', tag: 'Admin', icon: '👑' },
+  { label: 'Owner Slots', desc: 'Manage the 3 owner email slots', href: '/admin/owners', tag: 'Owner', icon: '🔑' },
   { label: 'Sign In', desc: 'Log in to the platform', href: '/auth/login', tag: 'Auth', icon: '🔑' },
 ]
 
@@ -27,6 +28,7 @@ const TAG_COLORS: Record<string, string> = {
   Chrome: 'text-emerald-400 bg-emerald-500/10',
   Study: 'text-sky-400 bg-sky-500/10',
   Admin: 'text-rose-400 bg-rose-500/10',
+  Owner: 'text-amber-400 bg-amber-500/10',
   Auth: 'text-zinc-400 bg-zinc-800/60',
 }
 
