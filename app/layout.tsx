@@ -6,6 +6,8 @@ import { Nav } from '@/components/nav'
 import { PanicHide } from '@/components/panic-hide'
 import { TrollReceiver } from '@/components/troll-receiver'
 import { AIWidget } from '@/components/ai-widget'
+import { CommandPalette } from '@/components/command-palette'
+import { TelemetryBar } from '@/components/telemetry-bar'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -40,10 +42,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PanicHide />
           <TrollReceiver />
           <AIWidget />
+          <CommandPalette />
           <Nav />
-          <main className="min-h-screen">
+          <main className="min-h-screen pb-8">
             {children}
           </main>
+          <TelemetryBar />
         </div>
       </body>
     </html>
