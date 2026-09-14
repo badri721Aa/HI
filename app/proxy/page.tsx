@@ -23,9 +23,10 @@ const STEALTH_PRESETS = [
 export default function ProxyPage() {
   const [url, setUrl] = useState('')
   const [loadedUrl, setLoadedUrl] = useState('')
+  const [currentSiteUrl, setCurrentSiteUrl] = useState('') // tracks actual URL inside iframe
+  const [loading, setLoading] = useState(false)
   const [stealth, setStealth] = useState<string | null>(null)
   const [base64Mode, setBase64Mode] = useState(false)
-  const [showUrlBar, setShowUrlBar] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -47,20 +48,31 @@ export default function ProxyPage() {
         finalUrl = `https://${finalUrl}`
       }
     }
-    // Show encoded URL in bar if base64 mode
     setUrl(base64Mode ? btoa(finalUrl) : finalUrl)
+    setCurrentSiteUrl(finalUrl)
+    setLoading(true)
     setLoadedUrl(`/api/proxy?url=${encodeURIComponent(finalUrl)}`)
   }
 
+  function reload() {
+    if (!currentSiteUrl) return
+    setLoading(true)
+    // Force iframe reload by briefly clearing src
+    const iframe = iframeRef.current
+    if (iframe) {
+      iframe.src = `/api/proxy?url=${encodeURIComponent(currentSiteUrl)}&_=${Date.now()}`
+    }
+  }
+
   function openAboutBlank() {
-    if (!loadedUrl) return
-    const rawUrl = new URL(loadedUrl, window.location.origin).searchParams.get('url') ?? ''
+    const rawUrl = currentSiteUrl || (loadedUrl ? new URL(loadedUrl, window.location.origin).searchParams.get('url') ?? '' : '')
+    if (!rawUrl) return
     const popup = window.open('about:blank', '_blank', 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no')
     if (!popup) return
     popup.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>New Tab</title>
 <style>*{margin:0;padding:0}html,body,iframe{width:100%;height:100%;border:none;background:#000}</style>
 </head><body><iframe src="/api/proxy?url=${encodeURIComponent(rawUrl)}"
-  sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-pointer-lock allow-downloads allow-modals"
+  sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-pointer-lock allow-downloads allow-modals allow-top-navigation-by-user-activation"
   allow="accelerometer;autoplay;fullscreen;gamepad;gyroscope"
   style="width:100%;height:100%;border:none"></iframe></body></html>`)
     popup.document.close()
@@ -84,6 +96,20 @@ export default function ProxyPage() {
     const link = document.querySelector<HTMLLinkElement>("link[rel*='icon']")
     if (link) link.href = '/favicon.ico'
   }
+
+  // Listen for navigation events from inside the iframe
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.data?.type === 'proxy-nav' && typeof e.data.url === 'string') {
+        const navUrl = e.data.url
+        setCurrentSiteUrl(navUrl)
+        setUrl(prev => base64Mode ? btoa(navUrl) : navUrl)
+        setLoading(false)
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [base64Mode])
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -122,6 +148,13 @@ export default function ProxyPage() {
 
         {/* Extra controls */}
         <div className="hidden sm:flex items-center gap-1 ml-1">
+          {loadedUrl && (
+            <button
+              onClick={reload}
+              title="Reload"
+              className="px-2 py-1 rounded-lg text-[10px] font-mono text-zinc-600 hover:text-zinc-300 border border-transparent hover:border-white/[0.06] hover:bg-white/[0.04] transition-all"
+            >↺</button>
+          )}
           <button
             onClick={openAboutBlank}
             title="Open in about:blank popup (bypasses tracking)"
@@ -146,20 +179,24 @@ export default function ProxyPage() {
               border: '1px solid rgba(255,255,255,0.07)',
               boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.02)',
             }}
-            onFocus={() => {}}
           >
-            <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-zinc-600 flex-shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/>
-            </svg>
+            {loading && loadedUrl ? (
+              <span className="h-2 w-2 rounded-full bg-violet-400 animate-pulse flex-shrink-0" />
+            ) : (
+              <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-zinc-600 flex-shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/>
+              </svg>
+            )}
             <input
               ref={inputRef}
               value={url}
               onChange={e => setUrl(e.target.value)}
+              onFocus={e => e.target.select()}
               placeholder="Enter URL or search Google…"
               className="flex-1 bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 outline-none"
             />
             {url && (
-              <button type="button" onClick={() => { setUrl(''); setLoadedUrl(''); }} className="text-zinc-700 hover:text-zinc-400 transition-colors">
+              <button type="button" onClick={() => { setUrl(''); setLoadedUrl(''); setCurrentSiteUrl(''); setLoading(false) }} className="text-zinc-700 hover:text-zinc-400 transition-colors">
                 <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -180,7 +217,7 @@ export default function ProxyPage() {
           {loadedUrl && (
             <button
               type="button"
-              onClick={() => { setLoadedUrl(''); setUrl(''); }}
+              onClick={() => { setLoadedUrl(''); setUrl(''); setCurrentSiteUrl(''); setLoading(false) }}
               className="flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs text-zinc-600 hover:text-zinc-300 transition-all duration-150 border border-transparent hover:border-white/[0.06]"
             >
               ← Home
@@ -243,9 +280,10 @@ export default function ProxyPage() {
           ref={iframeRef}
           src={loadedUrl}
           className="flex-1 w-full border-0"
-          sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals"
+          sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-top-navigation-by-user-activation allow-pointer-lock"
           title="Proxy Browser"
           referrerPolicy="no-referrer"
+          onLoad={() => setLoading(false)}
         />
       )}
     </div>
