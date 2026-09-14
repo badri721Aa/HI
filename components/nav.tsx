@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import { isOwner, canAdmin } from '@/lib/utils'
+import { isOwner, isRootOwner, canAdmin } from '@/lib/utils'
 
 const links = [
   { href: '/chat', label: 'Chat' },
@@ -89,12 +89,25 @@ export function Nav() {
               <Link
                 href="/admin"
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                  path.startsWith('/admin')
+                  path.startsWith('/admin') && !path.startsWith('/admin/owner-suite')
                     ? 'text-amber-300 bg-amber-500/10'
                     : 'text-amber-500/50 hover:text-amber-300 hover:bg-amber-500/[0.06]'
                 }`}
               >
                 Admin
+              </Link>
+            )}
+            {isRootOwner(user?.email) && (
+              <Link
+                href="/admin/owner-suite"
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 flex items-center gap-1 ${
+                  path.startsWith('/admin/owner-suite')
+                    ? 'text-amber-300 bg-amber-500/15 border border-amber-500/30'
+                    : 'text-amber-600/60 hover:text-amber-300 hover:bg-amber-500/[0.08] border border-transparent hover:border-amber-500/20'
+                }`}
+                style={{ boxShadow: path.startsWith('/admin/owner-suite') ? '0 0 12px rgba(251,191,36,0.15)' : undefined }}
+              >
+                <span className="text-[10px]">👑</span> Suite
               </Link>
             )}
           </div>
@@ -171,6 +184,15 @@ export function Nav() {
                 className="px-3 py-2.5 rounded-xl text-sm font-medium text-amber-500/60 hover:text-amber-300 hover:bg-amber-500/[0.06] transition-all duration-150"
               >
                 Admin Panel
+              </Link>
+            )}
+            {isRootOwner(user?.email) && (
+              <Link
+                href="/admin/owner-suite"
+                onClick={() => setMenuOpen(false)}
+                className="px-3 py-2.5 rounded-xl text-sm font-medium text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/[0.06] transition-all duration-150 flex items-center gap-2 border border-amber-500/15"
+              >
+                <span>👑</span> Owner Suite
               </Link>
             )}
           </div>

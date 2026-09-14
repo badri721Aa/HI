@@ -20,6 +20,7 @@ const NAV_ITEMS: ActionItem[] = [
   { label: 'Dev Tools', desc: 'Platform developer utilities', href: '/admin/devtools', tag: 'Admin', icon: '🛠️' },
   { label: 'Role Manager', desc: 'Grant and revoke user roles', href: '/admin/roles', tag: 'Admin', icon: '👑' },
   { label: 'Owner Slots', desc: 'Manage the 3 owner email slots', href: '/admin/owners', tag: 'Owner', icon: '🔑' },
+  { label: 'Owner Suite', desc: 'Root controls — roles, bans, flags, danger zone', href: '/admin/owner-suite', tag: 'Owner', icon: '👑' },
   { label: 'Sign In', desc: 'Log in to the platform', href: '/auth/login', tag: 'Auth', icon: '🔑' },
   { label: 'Stealth Settings', desc: 'Configure panic hotkey and redirect', tag: 'Stealth', icon: '🥷',
     action: () => { if (typeof window !== 'undefined') (window as any).__panicSettings?.() } },
