@@ -315,20 +315,49 @@ export default function Home() {
             transition={{ delay: 0.22, duration: 0.45 }}
             className="flex items-center gap-3 flex-wrap"
           >
+            {/* Gradient border keyframes */}
+            <style>{`
+              @keyframes grad-rotate { from { --angle: 0deg } to { --angle: 360deg } }
+              @property --angle { syntax: '<angle>'; initial-value: 0deg; inherits: false }
+              .grad-border {
+                background: conic-gradient(from var(--angle), #7c3aed, #3b82f6, #06b6d4, #7c3aed);
+                animation: grad-rotate 3s linear infinite;
+                padding: 1.5px; border-radius: 14px;
+              }
+              .grad-border-inner {
+                background: #09090b; border-radius: 12px;
+              }
+              .glass-btn {
+                backdrop-filter: blur(12px);
+                background: rgba(255,255,255,0.04);
+                border: 1px solid rgba(255,255,255,0.1);
+                transition: background 0.15s, transform 0.1s;
+              }
+              .glass-btn:hover { background: rgba(255,255,255,0.08); }
+              .glass-btn:active { transform: scale(0.97); }
+            `}</style>
+
             {user ? (
               <>
-                <Link href="/chat"
-                  className="inline-flex items-center gap-2 rounded-xl bg-white text-zinc-950 px-5 py-2.5 text-sm font-semibold transition-all duration-150 hover:bg-zinc-100 active:scale-[0.97]"
-                  style={{ boxShadow: '0 0 0 1px rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.35)' }}
-                >
-                  Open Chat
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                </Link>
+                {/* Primary CTA — animated gradient border */}
+                <div className="grad-border">
+                  <Link href="/chat"
+                    className="grad-border-inner inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-zinc-100 hover:text-white transition-colors"
+                    style={{ boxShadow: '0 0 24px rgba(124,58,237,0.25)' }}
+                  >
+                    Open Chat
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                  </Link>
+                </div>
                 <Link href="/news"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-zinc-300 transition-all duration-150 hover:bg-white/[0.08] hover:border-white/[0.15] active:scale-[0.97]"
-                  style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.05)' }}
+                  className="glass-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-zinc-300 active:scale-[0.97]"
                 >
                   News Feed
+                </Link>
+                <Link href="/tricks"
+                  className="glass-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-zinc-400"
+                >
+                  Study Hub
                 </Link>
                 {owner && (
                   <Link href="/admin/troll-panel"
@@ -340,14 +369,15 @@ export default function Home() {
               </>
             ) : (
               <>
-                <Link href="/auth/login"
-                  className="inline-flex items-center gap-2 rounded-xl bg-white text-zinc-950 px-5 py-2.5 text-sm font-semibold transition-all duration-150 hover:bg-zinc-100 active:scale-[0.97]"
-                  style={{ boxShadow: '0 0 0 1px rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.35)' }}
-                >
-                  Sign in →
-                </Link>
+                <div className="grad-border">
+                  <Link href="/auth/login"
+                    className="grad-border-inner inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-zinc-100 hover:text-white transition-colors"
+                  >
+                    Sign in →
+                  </Link>
+                </div>
                 <Link href="/chat"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-zinc-300 transition-all duration-150 hover:bg-white/[0.08] active:scale-[0.97]"
+                  className="glass-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-zinc-300 active:scale-[0.97]"
                 >
                   Live chat
                 </Link>
