@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { isRootOwner } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
 // ── Particle canvas ──────────────────────────────────────────
@@ -175,7 +176,7 @@ function CountUp({ to, suffix = '' }: { to: number; suffix?: string }) {
 // ── Modules ───────────────────────────────────────────────────
 const MODULES = [
   {
-    href: '/chat', label: 'Live Chat', desc: 'Real-time messaging, emoji reactions, P2P video calls and presence tracking.',
+    href: '/chat', label: 'Live Chat', desc: 'Real-time messaging, emoji reactions, presence tracking and broadcast announcements.',
     tag: 'Realtime', glow: 'rgba(59,130,246,0.12)', dot: 'bg-blue-500',
   },
   {
@@ -191,30 +192,43 @@ const MODULES = [
     tag: 'Study', glow: 'rgba(14,165,233,0.10)', dot: 'bg-sky-500',
   },
   {
-    href: '/proxy', label: 'Proxy Browser', desc: 'Bypass content filters and browse any site without leaving the platform.',
+    href: '/proxy', label: 'Proxy Browser', desc: 'Dynamic mirror domains, WSS obfuscation, and service-worker routing — bypass any filter.',
     tag: 'Proxy', glow: 'rgba(139,92,246,0.10)', dot: 'bg-violet-400',
   },
   {
-    href: '/extensions', label: 'Extensions', desc: 'Chrome companion extension with live platform data and hotkeys.',
-    tag: 'Chrome', glow: 'rgba(34,197,94,0.10)', dot: 'bg-emerald-500',
+    href: '/meet', label: 'Random Chat', desc: 'Anonymous WebRTC video/text pairing — Omegle-style matchmaking with live WebGL filters.',
+    tag: 'WebRTC', glow: 'rgba(236,72,153,0.10)', dot: 'bg-pink-500',
   },
   {
+    href: '/friends', label: 'Friends & DMs', desc: 'Friend lists, online presence, 1-on-1 audio/video calls, push notifications and custom statuses.',
+    tag: 'Social', glow: 'rgba(34,197,94,0.10)', dot: 'bg-emerald-500',
+  },
+  {
+    href: '/themes', label: 'Themes', desc: 'Neon Cyberpunk, OLED Glassmorphism, Retro CRT — live CSS variable engine with custom backgrounds.',
+    tag: 'UI', glow: 'rgba(251,191,36,0.10)', dot: 'bg-yellow-400',
+  },
+  {
+    href: '/extensions', label: 'Extensions', desc: 'Chrome companion extension with live platform data and hotkeys.',
+    tag: 'Chrome', glow: 'rgba(59,130,246,0.08)', dot: 'bg-blue-400',
+  },
+  // Owner-only
+  {
     href: '/admin', label: 'Admin Panel', desc: 'Roles, users, broadcasts, audit log and ban management.',
-    tag: 'Admin', glow: 'rgba(239,68,68,0.08)', dot: 'bg-rose-500',
+    tag: 'Admin', glow: 'rgba(239,68,68,0.08)', dot: 'bg-rose-500', ownerOnly: true,
   },
   {
     href: '/admin/devtools', label: 'Dev Tools', desc: 'REST tester, JWT decoder, hash generator, regex inspector, JS sandbox and more.',
-    tag: 'Dev', glow: 'rgba(20,184,166,0.10)', dot: 'bg-teal-500',
+    tag: 'Dev', glow: 'rgba(20,184,166,0.10)', dot: 'bg-teal-500', ownerOnly: true,
   },
   {
     href: '/admin/troll-panel', label: 'Troll Engine', desc: 'Broadcast 10+ visual effects, soundboard, fake UI overlays to any online user.',
-    tag: 'Fun', glow: 'rgba(239,68,68,0.10)', dot: 'bg-rose-400',
+    tag: 'Fun', glow: 'rgba(239,68,68,0.10)', dot: 'bg-rose-400', ownerOnly: true,
   },
 ]
 
 const STATS = [
-  { label: 'Platform features', value: 600, suffix: '+' },
-  { label: 'Dev tools', value: 9, suffix: '' },
+  { label: 'Platform features', value: 1000, suffix: '+' },
+  { label: 'Modules', value: 12, suffix: '' },
   { label: 'Troll effects', value: 21, suffix: '+' },
   { label: 'Uptime', value: 100, suffix: '%' },
 ]
@@ -230,13 +244,26 @@ const cardVariants = {
 
 export default function Home() {
   const [user, setUser] = useState<{ email?: string | null } | null>(null)
+  const [owner, setOwner] = useState(false)
   const sb = createClient()
 
   useEffect(() => {
-    sb.auth.getUser().then(({ data }) => setUser(data.user))
-    const { data: { subscription } } = sb.auth.onAuthStateChange((_ev, s) => setUser(s?.user ?? null))
+    async function load() {
+      const { data } = await sb.auth.getUser()
+      const u = data.user ?? null
+      setUser(u)
+      setOwner(isRootOwner(u?.email))
+    }
+    load()
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_ev, s) => {
+      const u = s?.user ?? null
+      setUser(u)
+      setOwner(isRootOwner(u?.email))
+    })
     return () => subscription.unsubscribe()
   }, [])
+
+  const visibleModules = MODULES.filter(m => !('ownerOnly' in m && m.ownerOnly) || owner)
 
   return (
     <div className="relative min-h-screen">
@@ -303,11 +330,13 @@ export default function Home() {
                 >
                   News Feed
                 </Link>
-                <Link href="/admin/troll-panel"
-                  className="inline-flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.07] px-5 py-2.5 text-sm font-medium text-rose-400 transition-all duration-150 hover:bg-rose-500/[0.12] active:scale-[0.97]"
-                >
-                  Troll Engine
-                </Link>
+                {owner && (
+                  <Link href="/admin/troll-panel"
+                    className="inline-flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.07] px-5 py-2.5 text-sm font-medium text-rose-400 transition-all duration-150 hover:bg-rose-500/[0.12] active:scale-[0.97]"
+                  >
+                    Troll Engine
+                  </Link>
+                )}
               </>
             ) : (
               <>
@@ -372,7 +401,7 @@ export default function Home() {
         <div className="mb-10 flex items-center gap-3">
           <span className="font-mono text-[10px] tracking-[0.2em] text-zinc-500 uppercase">Platform Modules</span>
           <div className="h-px flex-1 bg-zinc-800/60" />
-          <span className="mono text-[10px] text-zinc-700">{MODULES.length} modules</span>
+          <span className="mono text-[10px] text-zinc-700">{visibleModules.length} modules</span>
         </div>
 
         <motion.div
@@ -382,7 +411,7 @@ export default function Home() {
           viewport={{ once: true, margin: '-60px' }}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
         >
-          {MODULES.map(m => (
+          {visibleModules.map(m => (
             <motion.div key={m.href} variants={cardVariants}>
               <TiltCard>
                 <Link
