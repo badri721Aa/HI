@@ -123,8 +123,8 @@ function ParticleCanvas() {
   return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-0" />
 }
 
-// ── Tilt card ────────────────────────────────────────────────
-function TiltCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+// ── Spotlight + tilt card ─────────────────────────────────────
+function SpotlightCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
 
   const onMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -135,13 +135,19 @@ function TiltCard({ children, className = '' }: { children: React.ReactNode; cla
     const y = e.clientY - rect.top
     const cx = rect.width / 2
     const cy = rect.height / 2
-    const rotX = ((y - cy) / cy) * -6
-    const rotY = ((x - cx) / cx) * 6
-    el.style.transform = `perspective(700px) rotateX(${rotX}deg) rotateY(${rotY}deg) translateZ(4px)`
+    const rotX = ((y - cy) / cy) * -5
+    const rotY = ((x - cx) / cx) * 5
+    el.style.transform = `perspective(800px) rotateX(${rotX}deg) rotateY(${rotY}deg) translateZ(6px)`
+    el.style.setProperty('--mouse-x', `${x}px`)
+    el.style.setProperty('--mouse-y', `${y}px`)
   }, [])
 
   const onLeave = useCallback(() => {
-    if (ref.current) ref.current.style.transform = ''
+    const el = ref.current
+    if (!el) return
+    el.style.transform = ''
+    el.style.setProperty('--mouse-x', '50%')
+    el.style.setProperty('--mouse-y', '50%')
   }, [])
 
   return (
@@ -149,8 +155,8 @@ function TiltCard({ children, className = '' }: { children: React.ReactNode; cla
       ref={ref}
       onMouseMove={onMove}
       onMouseLeave={onLeave}
-      className={className}
-      style={{ transition: 'transform 0.15s ease', willChange: 'transform' }}
+      className={`oled-card rounded-2xl ${className}`}
+      style={{ transition: 'transform 0.20s cubic-bezier(0.34,1.56,0.64,1)', willChange: 'transform' }}
     >
       {children}
     </div>
@@ -235,11 +241,14 @@ const STATS = [
 
 const containerVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.06 } },
+  visible: { transition: { staggerChildren: 0.055 } },
 }
 const cardVariants = {
-  hidden: { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
+  hidden: { opacity: 0, y: 20, scale: 0.97 },
+  visible: {
+    opacity: 1, y: 0, scale: 1,
+    transition: { type: 'spring' as const, stiffness: 400, damping: 30 },
+  },
 }
 
 export default function Home() {
@@ -271,12 +280,12 @@ export default function Home() {
 
       {/* Glow blobs */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute -top-60 left-1/2 -translate-x-1/2 w-[1000px] h-[700px] rounded-full"
-          style={{ background: 'radial-gradient(ellipse, rgba(99,59,218,0.07) 0%, transparent 65%)' }} />
+        <div className="absolute -top-60 left-1/2 -translate-x-1/2 w-[1100px] h-[700px] rounded-full"
+          style={{ background: 'radial-gradient(ellipse, rgba(99,59,218,0.09) 0%, transparent 65%)' }} />
         <div className="absolute top-[55%] -right-60 w-[600px] h-[600px] rounded-full"
-          style={{ background: 'radial-gradient(ellipse, rgba(59,130,246,0.04) 0%, transparent 65%)' }} />
+          style={{ background: 'radial-gradient(ellipse, rgba(59,130,246,0.05) 0%, transparent 65%)' }} />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full"
-          style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.04) 0%, transparent 65%)' }} />
+          style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.05) 0%, transparent 65%)' }} />
       </div>
 
       {/* Hero */}
@@ -325,7 +334,7 @@ export default function Home() {
                 padding: 1.5px; border-radius: 14px;
               }
               .grad-border-inner {
-                background: #09090b; border-radius: 12px;
+                background: #000000; border-radius: 12px;
               }
               .glass-btn {
                 backdrop-filter: blur(12px);
@@ -412,7 +421,7 @@ export default function Home() {
       >
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-2xl overflow-hidden border border-white/[0.06] bg-white/[0.03]" style={{ backdropFilter: 'blur(12px)' }}>
           {STATS.map(s => (
-            <div key={s.label} className="p-5 bg-zinc-950/40">
+            <div key={s.label} className="p-5" style={{ background: '#050505' }}>
               <p className="font-nacelle text-3xl font-semibold text-zinc-100">
                 <CountUp to={s.value} suffix={s.suffix} />
               </p>
@@ -443,35 +452,31 @@ export default function Home() {
         >
           {visibleModules.map(m => (
             <motion.div key={m.href} variants={cardVariants}>
-              <TiltCard>
-                <Link
-                  href={m.href}
-                  className="group relative flex flex-col p-5 rounded-2xl border border-white/[0.06] bg-zinc-950/60 overflow-hidden transition-all duration-200 hover:border-white/[0.12]"
-                  style={{ backdropFilter: 'blur(8px)' }}
-                >
-                  {/* Glow on hover */}
+              <SpotlightCard>
+                <Link href={m.href} className="group relative flex flex-col p-5 overflow-hidden rounded-2xl">
+                  {/* Static top-edge glow per module color */}
                   <div
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                    style={{ background: `radial-gradient(ellipse at 50% 0%, ${m.glow}, transparent 70%)` }}
+                    className="absolute inset-x-0 top-0 h-px pointer-events-none opacity-60"
+                    style={{ background: `linear-gradient(90deg, transparent, ${m.glow.replace('0.12', '0.5').replace('0.10', '0.4').replace('0.08', '0.35')}, transparent)` }}
                   />
-                  <div className="relative flex items-start justify-between mb-4">
+                  <div className="relative z-10 flex items-start justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${m.dot} shadow-[0_0_6px_currentColor]`} />
                       <span className="font-mono text-[9px] tracking-widest text-zinc-600 uppercase">{m.tag}</span>
                     </div>
-                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"
-                      className="text-zinc-700 group-hover:text-zinc-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-200">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"
+                      className="text-zinc-700 group-hover:text-zinc-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-200">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/>
                     </svg>
                   </div>
-                  <h3 className="relative mb-1.5 font-nacelle text-base font-semibold text-zinc-200 tracking-tight group-hover:text-zinc-100 transition-colors duration-200">
+                  <h3 className="relative z-10 mb-1.5 font-nacelle text-base font-semibold text-zinc-200 tracking-tight group-hover:text-white transition-colors duration-150">
                     {m.label}
                   </h3>
-                  <p className="relative text-xs text-zinc-500 leading-relaxed group-hover:text-zinc-400 transition-colors duration-200">
+                  <p className="relative z-10 text-xs text-zinc-600 leading-relaxed group-hover:text-zinc-400 transition-colors duration-150">
                     {m.desc}
                   </p>
                 </Link>
-              </TiltCard>
+              </SpotlightCard>
             </motion.div>
           ))}
         </motion.div>

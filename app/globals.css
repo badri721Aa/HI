@@ -56,16 +56,16 @@
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.07);
   }
 
   html {
     color-scheme: dark;
-    background: #09090b;
+    background: #000000;
   }
 
   body {
-    background: #09090b;
+    background: #000000;
   }
 }
 
@@ -75,29 +75,64 @@
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
 
-/* ── Glass surfaces ── */
+/* ── Glass surfaces — OLED edition ── */
 .glass {
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.07);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.02), inset 0 1px 0 0 rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.4);
+  background: rgba(5,5,5,0.85);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 0 rgba(255,255,255,0.06), 0 8px 40px rgba(0,0,0,0.7);
 }
 
 .glass-card {
-  background: rgba(24,24,27,0.7);
-  border: 1px solid rgba(255,255,255,0.07);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 0 rgba(255,255,255,0.05), 0 4px 24px rgba(0,0,0,0.5);
+  background: rgba(10,10,12,0.9);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02), inset 0 1px 0 0 rgba(255,255,255,0.06), 0 4px 32px rgba(0,0,0,0.8);
 }
 
 .glass-hi {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.12);
-  backdrop-filter: blur(20px) saturate(200%);
-  -webkit-backdrop-filter: blur(20px) saturate(200%);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 0 rgba(255,255,255,0.08), 0 8px 40px rgba(0,0,0,0.5);
+  background: rgba(5,5,5,0.92);
+  border: 1px solid rgba(255,255,255,0.10);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 0 rgba(255,255,255,0.10), 0 8px 48px rgba(0,0,0,0.9);
+}
+
+/* ── OLED module card ── */
+.oled-card {
+  position: relative;
+  overflow: hidden;
+  background: #050505;
+  border: 1px solid rgba(255,255,255,0.07);
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+}
+
+.oled-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    480px circle at var(--mouse-x) var(--mouse-y),
+    rgba(139,92,246,0.10) 0%,
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.oled-card:hover::before {
+  opacity: 1;
+}
+
+.oled-card:hover {
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.6);
 }
 
 /* ── Mono utility ── */
