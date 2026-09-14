@@ -5,8 +5,10 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 const HOP_BY_HOP = new Set([
   'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
   'te', 'trailers', 'transfer-encoding', 'upgrade', 'content-encoding',
-  'x-frame-options', 'content-security-policy', 'x-content-type-options',
-  'strict-transport-security', 'content-length',
+  'x-frame-options', 'content-security-policy', 'content-security-policy-report-only',
+  'x-content-type-options', 'strict-transport-security', 'content-length',
+  'cross-origin-embedder-policy', 'cross-origin-opener-policy', 'cross-origin-resource-policy',
+  'permissions-policy', 'feature-policy', 'report-to', 'nel',
 ])
 
 function px(raw: string, base: string): string {
@@ -41,7 +43,6 @@ function rewriteAttr(html: string, origin: string): string {
 function rewriteHtml(html: string, origin: string): string {
   html = rewriteAttr(html, origin)
 
-  // Rewrite @import in <style> blocks
   html = html.replace(
     /(<style[^>]*>)([\s\S]*?)(<\/style>)/gi,
     (_, open, css, close) => open + css.replace(
@@ -57,6 +58,12 @@ function rewriteHtml(html: string, origin: string): string {
 (function(){
 var B=${JSON.stringify(origin)};
 function px(u){try{var a=new URL(u,B);if(/^https?:/.test(a.protocol))return'/api/proxy?url='+encodeURIComponent(a.href);}catch(e){}return u;}
+function notify(url){try{var abs=new URL(url,B).href;window.top.postMessage({type:'proxy-nav',url:abs},'*');}catch(e){}}
+
+// Frame-busting prevention — make site think it IS the top frame
+try{Object.defineProperty(window,'top',{get:function(){return window;},configurable:true});}catch(e){}
+try{Object.defineProperty(window,'parent',{get:function(){return window;},configurable:true});}catch(e){}
+try{Object.defineProperty(window,'frameElement',{get:function(){return null;},configurable:true});}catch(e){}
 
 // XHR
 var xo=XMLHttpRequest.prototype.open;
@@ -66,8 +73,17 @@ XMLHttpRequest.prototype.open=function(m,u){try{if(typeof u==='string'&&/^https?
 var ff=window.fetch;
 window.fetch=function(u,o){try{if(typeof u==='string'&&/^https?:/.test(u))u=px(u);else if(u&&u.url)u=new Request(px(u.url),u);}catch(e){}return ff.call(this,u,o);};
 
-// Notify parent of navigation
-function notify(url){try{window.top.postMessage({type:'proxy-nav',url:new URL(url,B).href},'*');}catch(e){}}
+// WebSocket — proxy can't tunnel WS, redirect to origin
+var WS=window.WebSocket;
+window.WebSocket=function(url,proto){
+  try{var a=new URL(url,B);url=a.href;}catch(e){}
+  return proto?new WS(url,proto):new WS(url);
+};
+window.WebSocket.prototype=WS.prototype;
+window.WebSocket.CONNECTING=WS.CONNECTING;
+window.WebSocket.OPEN=WS.OPEN;
+window.WebSocket.CLOSING=WS.CLOSING;
+window.WebSocket.CLOSED=WS.CLOSED;
 
 // history
 ['pushState','replaceState'].forEach(function(k){
@@ -80,21 +96,26 @@ function notify(url){try{window.top.postMessage({type:'proxy-nav',url:new URL(ur
 });
 window.addEventListener('popstate',function(){notify(location.href);});
 
-// window.location.href setter
+// location.assign / replace
 try{
-  var desc=Object.getOwnPropertyDescriptor(window,'location');
-  if(!desc||desc.configurable){
-    // can't override location directly; patch assign/replace
-    var la=location.assign.bind(location);
-    location.assign=function(url){la(px(url));};
-    var lr=location.replace.bind(location);
-    location.replace=function(url){lr(px(url));};
-  }
+  var la=location.assign.bind(location);
+  location.assign=function(url){la(px(url));};
+  var lr=location.replace.bind(location);
+  location.replace=function(url){lr(px(url));};
 }catch(e){}
 
-// Notify parent of current URL on load
+// Intercept document.write to catch inline redirects
+var dw=document.write.bind(document);
+document.write=function(s){
+  if(typeof s==='string')s=s.replace(/((?:href|src|action)=["'])([^"']+)(["'])/gi,function(m,a,v,b){return SKIP(v)?m:a+px(v)+b;});
+  return dw(s);
+};
+function SKIP(v){return!v||v[0]==='#'||/^(?:data:|javascript:|mailto:|tel:|blob:)/.test(v);}
+
+// Notify parent of current URL immediately and on load
 notify(location.href);
 window.addEventListener('load',function(){notify(location.href);});
+document.addEventListener('DOMContentLoaded',function(){notify(location.href);});
 })();
 </script>`
 
@@ -135,6 +156,10 @@ export async function GET(req: NextRequest) {
         'Referer': url.origin + '/',
         'Origin': url.origin,
         'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
       },
       redirect: 'follow',
       signal: AbortSignal.timeout(20000),
@@ -142,11 +167,19 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     return new NextResponse(
-      `<!doctype html><html><body style="background:#000;color:#f87171;font-family:monospace;padding:40px">
-<h2 style="margin:0 0 12px">Proxy error</h2>
-<p style="color:#71717a;font-size:13px">${msg}</p>
-<p style="color:#52525b;font-size:11px">The server could not reach that URL.</p>
-</body></html>`,
+      `<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#f87171;font-family:ui-monospace,monospace;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:40px}
+.card{background:#050505;border:1px solid rgba(248,113,113,0.15);border-radius:16px;padding:32px;max-width:480px;width:100%;box-shadow:inset 0 1px 0 0 rgba(255,255,255,0.04)}
+h2{font-size:14px;font-weight:600;color:#fca5a5;margin-bottom:8px;letter-spacing:.05em;text-transform:uppercase}
+p{font-size:12px;color:#71717a;line-height:1.6;margin-top:6px}
+.url{font-size:11px;color:#3f3f46;word-break:break-all;margin-top:12px;padding:10px;background:#0A0A0C;border-radius:8px;border:1px solid rgba(255,255,255,0.06)}
+</style></head><body><div class="card">
+<h2>Could not reach this site</h2>
+<p>${msg}</p>
+<div class="url">${targetUrl}</div>
+<p style="margin-top:12px">The site may be down, blocking proxies, or requiring authentication. Try opening it directly in a new tab.</p>
+</div></body></html>`,
       { status: 502, headers: { 'Content-Type': 'text/html' } }
     )
   }
@@ -155,7 +188,6 @@ export async function GET(req: NextRequest) {
   const finalUrl = res.url || targetUrl
   const finalOrigin = new URL(finalUrl).origin
 
-  // Build output headers — strip hop-by-hop and security headers
   const out = new Headers()
   out.set('Access-Control-Allow-Origin', '*')
   out.set('X-Frame-Options', 'ALLOWALL')
@@ -166,7 +198,6 @@ export async function GET(req: NextRequest) {
     if (!HOP_BY_HOP.has(k.toLowerCase())) out.set(k, v)
   }
 
-  // HTML — buffer and rewrite, no cache
   if (contentType.includes('text/html')) {
     const html = rewriteHtml(await res.text(), finalOrigin)
     out.set('Content-Type', 'text/html; charset=utf-8')
@@ -174,18 +205,19 @@ export async function GET(req: NextRequest) {
     return new NextResponse(html, { status: res.status, headers: out })
   }
 
-  // CSS — buffer and rewrite, short cache
   if (contentType.includes('text/css')) {
     const css = (await res.text()).replace(
       /url\(['"]?(https?:\/\/[^'") ]+)['"]?\)/g,
       (_, u) => `url(/api/proxy?url=${encodeURIComponent(u)})`
+    ).replace(
+      /@import\s+url\(['"]?(https?:\/\/[^'")]+)['"]?\)/g,
+      (_, u) => `@import url(/api/proxy?url=${encodeURIComponent(u)})`
     )
     out.set('Content-Type', 'text/css; charset=utf-8')
     out.set('Cache-Control', 'public, max-age=3600')
     return new NextResponse(css, { status: res.status, headers: out })
   }
 
-  // Everything else — stream directly, cache aggressively
   const isStatic = contentType.includes('image/') || contentType.includes('font/') ||
     contentType.includes('audio/') || contentType.includes('video/')
   out.set('Cache-Control', isStatic ? 'public, max-age=86400, stale-while-revalidate=604800' : 'public, max-age=300')
