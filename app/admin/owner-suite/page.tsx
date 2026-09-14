@@ -63,7 +63,7 @@ export default function OwnerSuitePage() {
 
   // forms
   const [roleTarget, setRoleTarget] = useState('')
-  const [roleValue, setRoleValue] = useState<'user' | 'admin'>('admin')
+  const [roleValue, setRoleValue] = useState<'user' | 'admin' | 'owner'>('admin')
   const [banTarget, setBanTarget] = useState('')
   const [banReason, setBanReason] = useState('')
   const [unbanTarget, setUnbanTarget] = useState('')
@@ -326,8 +326,9 @@ export default function OwnerSuitePage() {
               <select
                 className="owner-input w-28"
                 value={roleValue}
-                onChange={e => setRoleValue(e.target.value as 'user' | 'admin')}
+                onChange={e => setRoleValue(e.target.value as 'user' | 'admin' | 'owner')}
               >
+                <option value="owner">owner</option>
                 <option value="admin">admin</option>
                 <option value="user">user</option>
               </select>
@@ -357,15 +358,21 @@ export default function OwnerSuitePage() {
                   <p className="mono text-[10px] text-zinc-600 truncate">{p.email}</p>
                 </div>
                 <span className={`mono text-[9px] border rounded-full px-2 py-0.5 ${ROLE_COLORS[p.role] ?? ROLE_COLORS.user}`}>{p.role}</span>
-                {p.role !== 'owner' && p.email !== user.email && (
+                {p.email !== user.email && (
                   <div className="flex gap-1">
-                    {p.role === 'user' && (
+                    {p.role !== 'owner' && (
                       <button
-                        onClick={() => { setRoleTarget(p.email); setRoleValue('admin'); setTab('roles') }}
+                        onClick={() => { setRoleTarget(p.email); setRoleValue('owner') }}
+                        className="mono text-[9px] px-2 py-1 rounded-lg border border-amber-500/20 text-amber-400/70 hover:bg-amber-500/10 transition-colors"
+                      >→ Owner</button>
+                    )}
+                    {p.role !== 'admin' && (
+                      <button
+                        onClick={() => { setRoleTarget(p.email); setRoleValue('admin') }}
                         className="mono text-[9px] px-2 py-1 rounded-lg border border-violet-500/20 text-violet-400/70 hover:bg-violet-500/10 transition-colors"
                       >→ Admin</button>
                     )}
-                    {p.role === 'admin' && (
+                    {p.role !== 'user' && (
                       <button
                         onClick={() => { setRoleTarget(p.email); setRoleValue('user') }}
                         className="mono text-[9px] px-2 py-1 rounded-lg border border-zinc-700/40 text-zinc-500 hover:bg-zinc-800/40 transition-colors"
