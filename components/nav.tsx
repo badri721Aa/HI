@@ -46,7 +46,7 @@ export function Nav() {
     window.location.href = '/'
   }
 
-  const showAdmin = canAdmin(role) || isOwner(user?.email ?? '')
+  const showAdmin = canAdmin(role)  // driven by DB role only
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4 px-4">
@@ -97,7 +97,7 @@ export function Nav() {
                 Admin
               </Link>
             )}
-            {isRootOwner(user?.email) && (
+            {role === 'owner' && isRootOwner(user?.email) && (
               <Link
                 href="/admin/owner-suite"
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 flex items-center gap-1 ${
@@ -118,7 +118,7 @@ export function Nav() {
           <div className="flex items-center gap-2 ml-1">
             {user ? (
               <>
-                {isOwner(user.email ?? '') && (
+                {role === 'owner' && (
                   <span className="hidden sm:flex items-center gap-1 font-mono text-[10px] text-amber-500/70 border border-amber-500/20 rounded-full px-2 py-0.5">
                     Owner
                   </span>
@@ -186,7 +186,7 @@ export function Nav() {
                 Admin Panel
               </Link>
             )}
-            {isRootOwner(user?.email) && (
+            {role === 'owner' && isRootOwner(user?.email) && (
               <Link
                 href="/admin/owner-suite"
                 onClick={() => setMenuOpen(false)}
