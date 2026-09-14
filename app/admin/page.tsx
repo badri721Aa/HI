@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 
 interface Profile { id: string; email: string; display_name: string; created_at: string; role: string }
 interface AuditLog { id: string; actor_email: string; action: string; target_email: string | null; payload: Record<string, unknown> | null; created_at: string }
+interface BannedUser { id: string; name: string; reason?: string; created_at: string }
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -17,10 +18,12 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<Profile[]>([])
   const [logs, setLogs] = useState<AuditLog[]>([])
+  const [bans, setBans] = useState<BannedUser[]>([])
   const [banTarget, setBanTarget] = useState('')
   const [broadcast, setBroadcast] = useState('')
   const [broadcastSent, setBroadcastSent] = useState(false)
   const [tab, setTab] = useState<'overview' | 'users' | 'broadcast' | 'ban' | 'logs'>('overview')
+  const [banActionMsg, setBanActionMsg] = useState<string | null>(null)
   const sb = createClient()
 
   useEffect(() => {
@@ -37,19 +40,33 @@ export default function AdminPage() {
   }, [])
 
   async function fetchData() {
-    const [{ data: u }, { data: l }] = await Promise.all([
+    const [{ data: u }, { data: l }, { data: b }] = await Promise.all([
       sb.from('profiles').select('*').order('created_at', { ascending: false }),
       sb.from('admin_audit_logs').select('*').order('created_at', { ascending: false }).limit(30),
+      sb.from('banned_users').select('*').order('created_at', { ascending: false }),
     ])
     if (u) setUsers(u)
     if (l) setLogs(l)
+    if (b) setBans(b)
   }
 
   async function banUser() {
     if (!banTarget.trim()) return
-    await sb.from('banned_users').insert({ name: banTarget.trim().toLowerCase() })
-    await sb.rpc('log_admin_action', { p_action: 'ban', p_target_email: banTarget.trim().toLowerCase(), p_payload: {} })
+    const email = banTarget.trim().toLowerCase()
+    await sb.from('banned_users').insert({ name: email })
+    await sb.rpc('log_admin_action', { p_action: 'ban', p_target_email: email, p_payload: {} })
     setBanTarget('')
+    setBanActionMsg(`Banned ${email}`)
+    setTimeout(() => setBanActionMsg(null), 3000)
+    fetchData()
+  }
+
+  async function unbanUser(email: string) {
+    await sb.from('banned_users').delete().eq('name', email)
+    await sb.rpc('log_admin_action', { p_action: 'unban', p_target_email: email, p_payload: {} })
+    setBanActionMsg(`Unbanned ${email}`)
+    setTimeout(() => setBanActionMsg(null), 3000)
+    fetchData()
   }
 
   async function sendBroadcast() {
@@ -79,9 +96,9 @@ export default function AdminPage() {
 
   const tabs: { id: typeof tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'users', label: 'Users' },
+    { id: 'users', label: `Users (${users.length})` },
     { id: 'broadcast', label: 'Broadcast' },
-    { id: 'ban', label: 'Ban' },
+    { id: 'ban', label: `Bans (${bans.length})` },
     { id: 'logs', label: 'Audit Log' },
   ]
 
@@ -193,13 +210,41 @@ export default function AdminPage() {
 
       {/* Ban */}
       {tab === 'ban' && (
-        <div className="glass-card rounded-2xl p-5 space-y-4">
-          <p className="text-sm font-semibold text-zinc-200 tracking-tight">Ban a user by email</p>
-          <div className="flex gap-2">
-            <Input placeholder="user@school.com" value={banTarget} onChange={e => setBanTarget(e.target.value)} onKeyDown={e => e.key === 'Enter' && banUser()} />
-            <Button variant="danger" onClick={banUser} className="flex-shrink-0">Ban</Button>
+        <div className="space-y-4">
+          <div className="glass-card rounded-2xl p-5 space-y-4">
+            <p className="text-sm font-semibold text-zinc-200 tracking-tight">Ban a user by email</p>
+            <div className="flex gap-2">
+              <Input placeholder="user@school.com" value={banTarget} onChange={e => setBanTarget(e.target.value)} onKeyDown={e => e.key === 'Enter' && banUser()} />
+              <Button variant="danger" onClick={banUser} className="flex-shrink-0">Ban</Button>
+            </div>
+            {banActionMsg && <p className="mono text-xs text-emerald-400">{banActionMsg}</p>}
+            <p className="mono text-xs text-zinc-700">Banned users cannot send chat messages.</p>
           </div>
-          <p className="mono text-xs text-zinc-700">Banned users cannot send chat messages.</p>
+
+          {/* Active bans list */}
+          <div>
+            <p className="mono text-xs text-zinc-600 mb-3">{bans.length} active ban{bans.length !== 1 ? 's' : ''}</p>
+            {bans.length === 0 && (
+              <p className="mono text-xs text-zinc-700 py-8 text-center">No active bans.</p>
+            )}
+            <div className="space-y-2">
+              {bans.map(b => (
+                <div key={b.id} className="glass-card flex items-center gap-3 rounded-xl px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="mono text-sm text-zinc-200">{b.name}</p>
+                    {b.reason && <p className="mono text-[10px] text-zinc-600">{b.reason}</p>}
+                    <p className="mono text-[9px] text-zinc-700">{new Date(b.created_at).toLocaleString()}</p>
+                  </div>
+                  <button
+                    onClick={() => unbanUser(b.name)}
+                    className="flex-shrink-0 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/[0.14] transition-all duration-200 active:scale-[0.97]"
+                  >
+                    Unban
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
