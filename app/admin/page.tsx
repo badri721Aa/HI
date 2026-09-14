@@ -300,7 +300,8 @@ export default function AdminPage() {
           <div className="flex items-center gap-3">
             <p className="mono text-xs text-zinc-600">{users.length} registered users</p>
             <input
-              className="flex-1 max-w-xs bg-zinc-900/60 border border-white/[0.07] rounded-xl px-3 py-1.5 mono text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15] transition-colors"
+              className="flex-1 max-w-xs border border-white/[0.07] rounded-xl px-3 py-1.5 mono text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15] transition-colors"
+              style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
               placeholder="Search email or name…"
               value={userSearch}
               onChange={e => setUserSearch(e.target.value)}
@@ -409,13 +410,15 @@ export default function AdminPage() {
             <div className="glass-card rounded-2xl p-5 space-y-3">
               <p className="text-sm font-semibold text-zinc-200">Ban User</p>
               <input
-                className="w-full bg-zinc-900/60 border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15]"
+                className="w-full border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15]"
+                style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
                 placeholder="Email to ban"
                 value={banTarget}
                 onChange={e => setBanTarget(e.target.value)}
               />
               <input
-                className="w-full bg-zinc-900/60 border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15]"
+                className="w-full border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15]"
+                style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
                 placeholder="Reason (optional)"
                 value={banReason}
                 onChange={e => setBanReason(e.target.value)}
@@ -428,7 +431,8 @@ export default function AdminPage() {
             <div className="glass-card rounded-2xl p-5 space-y-3">
               <p className="text-sm font-semibold text-zinc-200">Unban User</p>
               <input
-                className="w-full bg-zinc-900/60 border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15]"
+                className="w-full border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15]"
+                style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
                 placeholder="Email to unban"
                 value={unbanTarget}
                 onChange={e => setUnbanTarget(e.target.value)}
@@ -443,13 +447,15 @@ export default function AdminPage() {
             <p className="text-sm font-semibold text-zinc-200">Mute User</p>
             <div className="flex gap-2 flex-wrap">
               <input
-                className="flex-1 min-w-[180px] bg-zinc-900/60 border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15]"
+                className="flex-1 min-w-[180px] border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15]"
+                style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
                 placeholder="Email to mute"
                 value={muteTarget}
                 onChange={e => setMuteTarget(e.target.value)}
               />
               <select
-                className="bg-zinc-900/60 border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-400 outline-none"
+                className="border border-white/[0.07] rounded-xl px-3 py-2 mono text-xs text-zinc-400 outline-none"
+                style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
                 value={muteMins}
                 onChange={e => setMuteMins(Number(e.target.value))}
               >
@@ -493,7 +499,8 @@ export default function AdminPage() {
             <p className="mt-1 text-xs text-zinc-600">Posted as pinned news — visible site-wide in real-time</p>
           </div>
           <textarea
-            className="w-full h-32 resize-none rounded-xl border border-white/[0.08] bg-zinc-900/60 px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all duration-200 focus:border-white/[0.18] focus:outline-none"
+            className="w-full h-32 resize-none rounded-xl border border-white/[0.08] px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all duration-200 focus:border-white/[0.18] focus:outline-none"
+            style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
             placeholder="Your message to everyone…"
             value={broadcast}
             onChange={e => setBroadcast(e.target.value)}

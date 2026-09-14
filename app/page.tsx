@@ -239,22 +239,19 @@ export default function Home() {
               href={m.href}
               className="group relative flex flex-col rounded-2xl p-5 transition-all duration-200"
               style={{
-                background: 'rgba(9,9,11,0.5)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderTopColor: 'rgba(255,255,255,0.09)',
-                boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
+                background: '#050505',
+                border: '1px solid rgba(255,255,255,0.07)',
+                boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.06)',
               }}
               onMouseEnter={e => {
                 const el = e.currentTarget as HTMLElement
-                el.style.background = m.accent
                 el.style.borderColor = m.accentBorder
-                el.style.borderTopColor = m.accentBorder
+                el.style.boxShadow = `inset 0 1px 0 0 rgba(255,255,255,0.08), 0 0 0 1px ${m.accentBorder}`
               }}
               onMouseLeave={e => {
                 const el = e.currentTarget as HTMLElement
-                el.style.background = 'rgba(9,9,11,0.5)'
-                el.style.borderColor = 'rgba(255,255,255,0.06)'
-                el.style.borderTopColor = 'rgba(255,255,255,0.09)'
+                el.style.borderColor = 'rgba(255,255,255,0.07)'
+                el.style.boxShadow = 'inset 0 1px 0 0 rgba(255,255,255,0.06)'
               }}
             >
               <div className="mb-4 flex items-start justify-between">

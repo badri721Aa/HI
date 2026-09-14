@@ -556,7 +556,7 @@ export default function ChatPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex min-h-screen flex-col pt-16" style={{ background: 'rgb(9,9,11)' }}>
+    <div className="flex min-h-screen flex-col pt-16" style={{ background: '#000000' }}>
 
       {/* ── Incoming call toast ─────────────────────────────────────────── */}
       {incomingCall && !inCall && (
@@ -584,7 +584,7 @@ export default function ChatPage() {
 
         {/* ══ VIDEO PANEL (shown in call) ════════════════════════════════ */}
         {inCall && (
-          <div className="flex flex-col lg:w-[60%] border-b lg:border-b-0 lg:border-r border-white/[0.06]" style={{ background: 'rgb(6,6,8)' }}>
+          <div className="flex flex-col lg:w-[60%] border-b lg:border-b-0 lg:border-r border-white/[0.06]" style={{ background: '#050505' }}>
 
             {/* Room header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
@@ -762,7 +762,7 @@ export default function ChatPage() {
             </div>
             <div className="flex items-center gap-2">
               {!inCall && (
-                <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.07] bg-zinc-900/40 px-3 py-1.5">
+                <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.07] px-3 py-1.5" style={{ background: '#050505' }}>
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   <span className="font-mono text-[10px] text-zinc-500">{online.length} online</span>
                 </div>
@@ -830,7 +830,8 @@ export default function ChatPage() {
                     {callMessages.filter(m => m.type === 'question').map(msg => (
                       <div
                         key={msg.id}
-                        className={`rounded-xl p-3 ${pinnedAnswers.has(msg.id) ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-zinc-900/60 border border-white/[0.05]'}`}
+                        className={`rounded-xl p-3 ${pinnedAnswers.has(msg.id) ? 'bg-amber-500/10 border border-amber-500/20' : 'border border-white/[0.05]'}`}
+                        style={!pinnedAnswers.has(msg.id) ? { background: '#050505' } : undefined}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <div className="flex items-baseline gap-2">
@@ -862,7 +863,8 @@ export default function ChatPage() {
                   onChange={e => setCallInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCallMessage('chat') } }}
                   placeholder="Message…"
-                  className="flex-1 h-8 rounded-lg border border-white/[0.07] bg-zinc-900 px-3 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15] transition-colors"
+                  className="flex-1 h-8 rounded-lg border border-white/[0.07] px-3 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/[0.15] transition-colors"
+                  style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
                 />
                 <button
                   onClick={() => sendCallMessage('chat')}
@@ -923,7 +925,8 @@ export default function ChatPage() {
                                 <button
                                   key={emoji}
                                   onClick={() => toggleReaction(m.id, emoji)}
-                                  className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] transition-all active:scale-95 ${mine ? 'border-zinc-600 bg-zinc-700/60 text-zinc-300' : 'border-white/[0.07] bg-zinc-900/40 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'}`}
+                                  className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] transition-all active:scale-95 ${mine ? 'border-zinc-600 bg-zinc-700/60 text-zinc-300' : 'border-white/[0.07] text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'}`}
+                                  style={!mine ? { background: '#050505' } : undefined}
                                 >
                                   {emoji} {count}
                                 </button>
@@ -932,7 +935,7 @@ export default function ChatPage() {
                           )}
                         </div>
                         {hover === m.id && (
-                          <div className="absolute -top-2 right-0 flex items-center gap-0.5 rounded-xl border border-white/[0.08] bg-zinc-900/90 backdrop-blur px-1.5 py-1 shadow-lg z-10">
+                          <div className="absolute -top-2 right-0 flex items-center gap-0.5 rounded-xl border border-white/[0.08] backdrop-blur px-1.5 py-1 shadow-lg z-10" style={{ background: 'rgba(5,5,5,0.96)' }}>
                             {EMOJIS.map(e => (
                               <button key={e} onClick={() => toggleReaction(m.id, e)} className="rounded-lg px-1 py-0.5 text-xs hover:bg-white/[0.08] transition-all active:scale-95">{e}</button>
                             ))}
@@ -963,7 +966,8 @@ export default function ChatPage() {
                       onChange={e => { setInput(e.target.value); broadcastTyping() }}
                       disabled={loading}
                       maxLength={500}
-                      className="flex h-10 flex-1 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-4 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all focus:border-white/[0.18] outline-none"
+                      className="flex h-10 flex-1 rounded-xl border border-white/[0.08] px-4 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all focus:border-white/[0.18] outline-none"
+                      style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
                     />
                     <button type="submit" disabled={loading || !input.trim()} className="flex-shrink-0 flex h-10 items-center gap-2 rounded-xl bg-zinc-100 px-4 text-sm font-semibold text-zinc-950 transition-all hover:bg-white active:scale-[0.98] disabled:opacity-40">
                       Send
@@ -991,12 +995,14 @@ export default function ChatPage() {
                         onKeyDown={e => { if (e.key === 'Enter') joinRoom(joinRoomInput) }}
                         placeholder="Room code"
                         maxLength={6}
-                        className="flex-1 h-8 rounded-lg border border-white/[0.07] bg-zinc-900 px-2 font-mono text-xs text-zinc-300 placeholder:text-zinc-700 outline-none focus:border-white/[0.15] uppercase transition-colors"
+                        className="flex-1 h-8 rounded-lg border border-white/[0.07] px-2 font-mono text-xs text-zinc-300 placeholder:text-zinc-700 outline-none focus:border-white/[0.15] uppercase transition-colors"
+                        style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
                       />
                       <button
                         onClick={() => joinRoom(joinRoomInput)}
                         disabled={joinRoomInput.length < 3}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.07] bg-zinc-900 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-30 transition-all text-xs"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.07] text-zinc-500 hover:text-zinc-200 disabled:opacity-30 transition-all text-xs"
+                        style={{ background: '#121214' }}
                       >→</button>
                     </div>
                   </div>

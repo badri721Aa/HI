@@ -832,7 +832,14 @@ export default function TricksPage() {
               {cat.tricks.map((t, i) => (
                 <div
                   key={i}
-                  className="group rounded-xl bg-white/[0.025] border border-t-white/[0.1] border-x-white/[0.05] border-b-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
+                  className="group rounded-xl p-4 transition-all duration-200"
+                  style={{
+                    background: '#050505',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.05)',
+                  }}
+                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = 'rgba(255,255,255,0.12)'; el.style.boxShadow = 'inset 0 1px 0 0 rgba(255,255,255,0.07), 0 0 0 1px rgba(255,255,255,0.04)' }}
+                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = 'rgba(255,255,255,0.07)'; el.style.boxShadow = 'inset 0 1px 0 0 rgba(255,255,255,0.05)' }}
                 >
                   <div className="text-xs font-semibold text-zinc-300 mb-1.5 leading-snug">{t.title}</div>
                   <div className="text-xs text-zinc-500 leading-relaxed">{t.desc}</div>

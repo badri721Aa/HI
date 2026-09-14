@@ -210,7 +210,7 @@ export default function AIPage() {
   const isEmpty = messages.length === 0
 
   return (
-    <div className="flex flex-col min-h-screen" style={{ background: 'rgb(9,9,11)' }}>
+    <div className="flex flex-col min-h-screen" style={{ background: '#000000' }}>
       <style>{`
         .code-block {
           background: rgba(0,0,0,0.5);
@@ -257,7 +257,7 @@ export default function AIPage() {
       `}</style>
 
       {/* Header */}
-      <div className="sticky top-[64px] z-10 border-b border-white/[0.05]" style={{ background: 'rgba(9,9,11,0.92)', backdropFilter: 'blur(20px)' }}>
+      <div className="sticky top-[64px] z-10 border-b border-white/[0.05]" style={{ background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(24px) saturate(200%)', boxShadow: 'inset 0 -1px 0 0 rgba(255,255,255,0.05)' }}>
         <div className="mx-auto max-w-4xl px-6 py-3 flex items-center justify-between gap-4">
           {/* Tool tabs */}
           <div className="flex items-center gap-1 overflow-x-auto">
@@ -336,11 +336,11 @@ export default function AIPage() {
       </div>
 
       {/* Input bar */}
-      <div className="sticky bottom-0 border-t border-white/[0.05]" style={{ background: 'rgba(9,9,11,0.95)', backdropFilter: 'blur(20px)' }}>
+      <div className="sticky bottom-0 border-t border-white/[0.05]" style={{ background: 'rgba(0,0,0,0.98)', backdropFilter: 'blur(24px) saturate(200%)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.05)' }}>
         <div className="mx-auto max-w-4xl px-6 py-4">
           <div
             className="flex items-end gap-3 rounded-2xl px-4 py-3"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: '#0A0A0C', border: '1px solid rgba(255,255,255,0.09)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.06)' }}
           >
             <textarea
               ref={textareaRef}

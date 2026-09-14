@@ -162,7 +162,7 @@ export default function ExtensionsPage() {
         }}
       >
         <div className="flex items-center gap-3 mb-5">
-          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-900 text-zinc-500 text-xs">
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg text-zinc-500 text-xs" style={{ background: '#121214' }}>
             📋
           </span>
           <span className="font-mono text-[10px] tracking-widest text-zinc-600 uppercase">Installation Guide</span>

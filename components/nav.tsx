@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import { isOwner, isRootOwner, canAdmin } from '@/lib/utils'
@@ -75,13 +76,19 @@ export function Nav() {
                 <Link
                   key={l.href}
                   href={l.href}
-                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                    active
-                      ? 'text-zinc-100 bg-white/[0.07]'
-                      : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
+                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 ${
+                    active ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-200'
                   }`}
                 >
-                  {l.label}
+                  {active && (
+                    <motion.span
+                      layoutId="nav-active-pill"
+                      className="absolute inset-0 rounded-lg"
+                      style={{ background: 'rgba(255,255,255,0.08)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.08)' }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10">{l.label}</span>
                 </Link>
               )
             })}

@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} ${nacelle.variable} bg-zinc-950 text-zinc-300 antialiased font-inter`}>
+      <body className={`${inter.variable} ${nacelle.variable} bg-black text-zinc-300 antialiased font-inter`}>
         <div className="relative min-h-screen">
           <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-50" />
           <PanicHide />

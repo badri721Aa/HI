@@ -254,7 +254,7 @@ export default function DevToolsPage() {
               </button>
             ))}
           </div>
-          <div className="rounded-xl border border-white/[0.06] bg-zinc-900/40 p-4">
+          <div className="rounded-xl border border-white/[0.06] p-4" style={{ background: '#050505' }}>
             <p className="mono text-[10px] text-zinc-600 uppercase mb-2">UI preview as: {impersonateRole}</p>
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
@@ -292,7 +292,7 @@ export default function DevToolsPage() {
             Clear
           </button>
         </div>
-        <div className="font-mono text-[11px] bg-zinc-950/60 rounded-xl p-4 overflow-y-auto space-y-1 max-h-48">
+        <div className="font-mono text-[11px] rounded-xl p-4 overflow-y-auto space-y-1 max-h-48" style={{ background: '#050505' }}>
           {logs.length === 0 && <span className="text-zinc-700">— waiting for events —</span>}
           {logs.map((l, i) => (
             <div key={i} className={`flex gap-3 ${l.type === 'error' ? 'text-rose-400' : l.type === 'warn' ? 'text-amber-400' : 'text-zinc-400'}`}>

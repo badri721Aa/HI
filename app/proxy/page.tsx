@@ -91,13 +91,14 @@ export default function ProxyPage() {
   }, [])
 
   const glassBar = {
-    background: 'rgba(9,9,11,0.92)',
-    backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
+    background: 'rgba(5,5,5,0.96)',
+    backdropFilter: 'blur(24px) saturate(200%)',
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    boxShadow: 'inset 0 -1px 0 0 rgba(255,255,255,0.03)',
   }
 
   return (
-    <div className="fixed inset-0 pt-[64px] flex flex-col bg-zinc-950">
+    <div className="fixed inset-0 pt-[64px] flex flex-col bg-black">
       {/* Top bar */}
       <div className="flex items-center gap-2 px-3 py-2" style={glassBar}>
         {/* Stealth presets */}
