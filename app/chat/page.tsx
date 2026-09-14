@@ -47,7 +47,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true)
   const [banned, setBanned] = useState(false)
   const [typing, setTyping] = useState<string[]>([])
   const [online, setOnline] = useState<PresenceState[]>([])
@@ -70,16 +70,19 @@ export default function ChatPage() {
     sb.auth.getUser().then(async ({ data }) => {
       const u = data.user
       setUser(u)
+      setAuthLoading(false)
       if (!u) return
       uid = u.id
       uname = u.user_metadata?.display_name ?? u.email?.split('@')[0] ?? 'anon'
 
-      const { data: p } = await sb.from('profiles').select('role').eq('id', u.id).single()
+      // Fetch profile + messages + reactions in parallel
+      const [{ data: p }] = await Promise.all([
+        sb.from('profiles').select('role').eq('id', u.id).single(),
+        fetchMessages(),
+        fetchReactions(),
+        checkBanned(u.email ?? ''),
+      ])
       if (p) setUserRole(p.role)
-
-      checkBanned(u.email ?? '')
-      fetchMessages()
-      fetchReactions()
 
       // ── Presence ──────────────────────────────────────────
       presenceCh.current = sb.channel('chat-presence', { config: { presence: { key: uid } } })
@@ -88,7 +91,9 @@ export default function ChatPage() {
           setOnline(Object.values(state).flat())
         })
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, ({ new: row }) => {
-          setMessages(prev => [...prev, row as Message])
+          const msg = row as Message
+          // Skip if already present (optimistic update replaced the temp entry)
+          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages' }, ({ new: row }) => {
           const msg = row as Message
@@ -197,17 +202,35 @@ export default function ChatPage() {
   // ── Messaging ────────────────────────────────────────────────
   async function send() {
     if (!input.trim() || !user || banned) return
-    setLoading(true)
+    const text = input.trim()
     const displayName = user.user_metadata?.display_name ?? user.email?.split('@')[0] ?? 'anon'
-    await sb.from('chat_messages').insert({
+
+    // Optimistic: clear input and show message immediately
+    setInput('')
+    const tempId = `temp-${Date.now()}`
+    const tempMsg: Message = {
+      id: tempId,
       user_id: user.id,
       user_name: displayName,
-      message: input.trim(),
+      message: text,
       is_owner: isOwner(user.email ?? ''),
       deleted: false,
-    })
-    setInput('')
-    setLoading(false)
+      created_at: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, tempMsg])
+
+    // Persist to DB and swap temp with real row
+    const { data } = await sb.from('chat_messages').insert({
+      user_id: user.id,
+      user_name: displayName,
+      message: text,
+      is_owner: isOwner(user.email ?? ''),
+      deleted: false,
+    }).select().single()
+
+    if (data) {
+      setMessages(prev => prev.map(m => m.id === tempId ? (data as Message) : m))
+    }
   }
 
   function broadcastTyping() {
@@ -288,6 +311,14 @@ export default function ChatPage() {
   }, [call, user])
 
   // ── Gate ─────────────────────────────────────────────────────
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center pt-14">
+        <p className="mono text-xs text-zinc-700">Loading...</p>
+      </div>
+    )
+  }
+
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center pt-14">
@@ -527,13 +558,12 @@ export default function ChatPage() {
             placeholder="Message..."
             value={input}
             onChange={e => { setInput(e.target.value); broadcastTyping() }}
-            disabled={loading}
             maxLength={500}
             className="flex h-10 flex-1 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-4 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all duration-200 focus:border-white/[0.18] focus:outline-none shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]"
           />
           <button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={!input.trim()}
             className="flex-shrink-0 flex h-10 items-center gap-2 rounded-xl bg-zinc-100 px-4 text-sm font-semibold text-zinc-950 transition-all duration-200 hover:bg-white active:scale-[0.98] disabled:opacity-40"
           >
             Send
