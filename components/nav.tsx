@@ -12,8 +12,10 @@ const links = [
   { href: '/news', label: 'News' },
   { href: '/proxy', label: 'Proxy' },
   { href: '/ai', label: 'AI' },
-  { href: '/extensions', label: 'Extensions' },
+  { href: '/games', label: 'Games' },
   { href: '/tricks', label: 'Study' },
+  { href: '/notes', label: 'Notes' },
+  { href: '/extensions', label: 'Extensions' },
 ]
 
 export function Nav() {

@@ -4,6 +4,7 @@ import localFont from 'next/font/local'
 import './globals.css'
 import { Nav } from '@/components/nav'
 import { PanicHide } from '@/components/panic-hide'
+import { PanicHandler } from '@/components/panic-handler'
 import { TrollReceiver } from '@/components/troll-receiver'
 import { AIWidget } from '@/components/ai-widget'
 import { CommandPalette } from '@/components/command-palette'
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="relative min-h-screen">
           <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-50" />
           <PanicHide />
+          <PanicHandler />
           <TrollReceiver />
           <AIWidget />
           <CommandPalette />

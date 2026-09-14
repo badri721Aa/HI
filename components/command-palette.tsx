@@ -3,14 +3,16 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
-type Item = { label: string; desc: string; href: string; tag: string; icon: string }
+type ActionItem = { label: string; desc: string; href?: string; action?: () => void; tag: string; icon: string }
 
-const NAV_ITEMS: Item[] = [
+const NAV_ITEMS: ActionItem[] = [
   { label: 'Home', desc: 'Platform dashboard', href: '/', tag: 'Page', icon: '⌂' },
   { label: 'Live Chat', desc: 'Real-time messaging and P2P video', href: '/chat', tag: 'Chat', icon: '💬' },
   { label: 'News Feed', desc: 'Pinned announcements and broadcasts', href: '/news', tag: 'Feed', icon: '📡' },
-  { label: 'AI Assistant', desc: 'Local AI, no API keys', href: '/ai', tag: 'AI', icon: '🤖' },
-  { label: 'Proxy Browser', desc: 'Browse any site, bypass blocks', href: '/proxy', tag: 'Proxy', icon: '🌐' },
+  { label: 'AI Assistant', desc: 'Streaming AI — Chat, Essay, Summarize', href: '/ai', tag: 'AI', icon: '🤖' },
+  { label: 'Proxy Browser', desc: 'Browse any site, bypass blocks, stealth mode', href: '/proxy', tag: 'Proxy', icon: '🌐' },
+  { label: 'Game Arcade', desc: '20+ unblocked games, retro emulator, Flash', href: '/games', tag: 'Games', icon: '🎮' },
+  { label: 'Encrypted Notes', desc: 'PIN-protected local note vault', href: '/notes', tag: 'Vault', icon: '🔒' },
   { label: 'Extensions', desc: 'Chrome companion extension', href: '/extensions', tag: 'Chrome', icon: '🧩' },
   { label: 'Study Tools', desc: '600 exam tricks and strategies', href: '/tricks', tag: 'Study', icon: '📚' },
   { label: 'Admin Panel', desc: 'Roles, users, and platform settings', href: '/admin', tag: 'Admin', icon: '⚙️' },
@@ -19,6 +21,10 @@ const NAV_ITEMS: Item[] = [
   { label: 'Role Manager', desc: 'Grant and revoke user roles', href: '/admin/roles', tag: 'Admin', icon: '👑' },
   { label: 'Owner Slots', desc: 'Manage the 3 owner email slots', href: '/admin/owners', tag: 'Owner', icon: '🔑' },
   { label: 'Sign In', desc: 'Log in to the platform', href: '/auth/login', tag: 'Auth', icon: '🔑' },
+  { label: 'Stealth Settings', desc: 'Configure panic hotkey and redirect', tag: 'Stealth', icon: '🥷',
+    action: () => { if (typeof window !== 'undefined') (window as any).__panicSettings?.() } },
+  { label: 'Open in Popup', desc: 'Open current page in about:blank window', tag: 'Stealth', icon: '↗',
+    action: () => { window.open('about:blank', '_blank', 'width=1200,height=800') } },
 ]
 
 const TAG_COLORS: Record<string, string> = {
@@ -29,6 +35,9 @@ const TAG_COLORS: Record<string, string> = {
   Chrome: 'text-emerald-400 bg-emerald-500/10',
   Study: 'text-sky-400 bg-sky-500/10',
   Proxy: 'text-violet-400 bg-violet-500/10',
+  Games: 'text-pink-400 bg-pink-500/10',
+  Vault: 'text-amber-400 bg-amber-500/10',
+  Stealth: 'text-zinc-400 bg-zinc-700/40',
   Admin: 'text-rose-400 bg-rose-500/10',
   Owner: 'text-amber-400 bg-amber-500/10',
   Auth: 'text-zinc-400 bg-zinc-800/60',
@@ -51,11 +60,11 @@ export function CommandPalette() {
     : NAV_ITEMS
 
   const navigate = useCallback(
-    (item: Item) => {
+    (item: ActionItem) => {
       setOpen(false)
       setQuery('')
       setCursor(0)
-      router.push(item.href)
+      if (item.action) { item.action() } else if (item.href) { router.push(item.href) }
     },
     [router]
   )
@@ -84,7 +93,7 @@ export function CommandPalette() {
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => Math.min(c + 1, filtered.length - 1)) }
     if (e.key === 'ArrowUp') { e.preventDefault(); setCursor(c => Math.max(c - 1, 0)) }
-    if (e.key === 'Enter' && filtered[cursor]) navigate(filtered[cursor])
+    if (e.key === 'Enter' && filtered[cursor]) navigate(filtered[cursor] as ActionItem)
   }
 
   if (!open) return null
@@ -131,7 +140,7 @@ export function CommandPalette() {
           ) : (
             filtered.map((item, i) => (
               <button
-                key={item.href}
+                key={item.href ?? item.label}
                 onClick={() => navigate(item)}
                 onMouseEnter={() => setCursor(i)}
                 className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${

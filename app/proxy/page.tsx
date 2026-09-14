@@ -15,17 +15,30 @@ const STEALTH_PRESETS = [
   { label: 'Google Docs', title: 'Document 1 - Google Docs', favicon: 'https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico' },
   { label: 'Khan Academy', title: 'Khan Academy | Free Online Courses', favicon: 'https://www.khanacademy.org/favicon.ico' },
   { label: 'Canvas LMS', title: 'Dashboard - Canvas', favicon: 'https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e10d657a73.ico' },
+  { label: 'Edpuzzle', title: 'Edpuzzle | Make Any Video Your Lesson', favicon: 'https://edpuzzle.com/favicon.ico' },
+  { label: 'Schoology', title: 'Schoology | Sign In', favicon: 'https://asset-cdn.schoology.com/sites/all/themes/schoology_theme/favicon.ico' },
+  { label: 'Quizlet', title: 'Quizlet: Learn with Flashcards', favicon: 'https://quizlet.com/favicon.ico' },
 ]
 
 export default function ProxyPage() {
   const [url, setUrl] = useState('')
   const [loadedUrl, setLoadedUrl] = useState('')
   const [stealth, setStealth] = useState<string | null>(null)
+  const [base64Mode, setBase64Mode] = useState(false)
+  const [showUrlBar, setShowUrlBar] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
+  function decodeUrl(input: string): string {
+    try {
+      const decoded = atob(input)
+      if (decoded.startsWith('http')) return decoded
+    } catch { /* not base64 */ }
+    return input
+  }
+
   function navigate(target: string) {
-    let finalUrl = target.trim()
+    let finalUrl = decodeUrl(target.trim())
     if (!finalUrl) return
     if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
       if (!finalUrl.includes('.') || finalUrl.includes(' ')) {
@@ -34,8 +47,23 @@ export default function ProxyPage() {
         finalUrl = `https://${finalUrl}`
       }
     }
-    setUrl(finalUrl)
+    // Show encoded URL in bar if base64 mode
+    setUrl(base64Mode ? btoa(finalUrl) : finalUrl)
     setLoadedUrl(`/api/proxy?url=${encodeURIComponent(finalUrl)}`)
+  }
+
+  function openAboutBlank() {
+    if (!loadedUrl) return
+    const rawUrl = new URL(loadedUrl, window.location.origin).searchParams.get('url') ?? ''
+    const popup = window.open('about:blank', '_blank', 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no')
+    if (!popup) return
+    popup.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>New Tab</title>
+<style>*{margin:0;padding:0}html,body,iframe{width:100%;height:100%;border:none;background:#000}</style>
+</head><body><iframe src="/api/proxy?url=${encodeURIComponent(rawUrl)}"
+  sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-pointer-lock allow-downloads allow-modals"
+  allow="accelerometer;autoplay;fullscreen;gamepad;gyroscope"
+  style="width:100%;height:100%;border:none"></iframe></body></html>`)
+    popup.document.close()
   }
 
   function activateStealth(preset: typeof STEALTH_PRESETS[0]) {
@@ -88,6 +116,23 @@ export default function ProxyPage() {
               {p.label}
             </button>
           ))}
+          <div className="w-px h-4 bg-zinc-800 ml-1" />
+        </div>
+
+        {/* Extra controls */}
+        <div className="hidden sm:flex items-center gap-1 ml-1">
+          <button
+            onClick={openAboutBlank}
+            title="Open in about:blank popup (bypasses tracking)"
+            className="px-2 py-1 rounded-lg text-[10px] font-mono text-zinc-600 hover:text-zinc-300 border border-transparent hover:border-white/[0.06] hover:bg-white/[0.04] transition-all"
+          >↗</button>
+          <button
+            onClick={() => setBase64Mode(m => !m)}
+            title="Base64 URL encoding (masks URLs in bar)"
+            className={`px-2 py-1 rounded-lg text-[10px] font-mono transition-all ${
+              base64Mode ? 'text-violet-300 bg-violet-500/15 border border-violet-500/25' : 'text-zinc-600 border border-transparent hover:text-zinc-300 hover:border-white/[0.06]'
+            }`}
+          >B64</button>
           <div className="w-px h-4 bg-zinc-800 ml-1" />
         </div>
 
