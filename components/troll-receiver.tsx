@@ -173,7 +173,7 @@ export function TrollReceiver() {
 
       {/* Fake error toast */}
       {toast && (
-        <div className="fixed top-6 inset-x-4 z-[9999] flex items-start gap-3 rounded-2xl border border-rose-500/40 bg-zinc-950/95 backdrop-blur-xl p-5 shadow-2xl shadow-rose-950/40 sm:left-auto sm:right-6 sm:max-w-sm">
+        <div className="fixed top-6 inset-x-4 z-[9999] flex items-start gap-3 rounded-2xl border border-rose-500/40 backdrop-blur-xl p-5 shadow-2xl shadow-rose-950/40 sm:left-auto sm:right-6 sm:max-w-sm" style={{ background: 'rgba(5,5,5,0.97)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.08)' }}>
           <div className="flex-shrink-0 mt-0.5">
             <div className="h-8 w-8 rounded-full bg-rose-500/20 flex items-center justify-center">
               <svg className="h-4 w-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

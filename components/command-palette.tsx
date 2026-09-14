@@ -29,7 +29,7 @@ const NAV_ITEMS: ActionItem[] = [
 ]
 
 const TAG_COLORS: Record<string, string> = {
-  Page: 'text-zinc-500 bg-zinc-800/60',
+  Page: 'text-zinc-500 bg-zinc-900/80',
   Chat: 'text-blue-400 bg-blue-500/10',
   Feed: 'text-amber-400 bg-amber-500/10',
   AI: 'text-violet-400 bg-violet-500/10',
@@ -41,7 +41,7 @@ const TAG_COLORS: Record<string, string> = {
   Stealth: 'text-zinc-400 bg-zinc-700/40',
   Admin: 'text-rose-400 bg-rose-500/10',
   Owner: 'text-amber-400 bg-amber-500/10',
-  Auth: 'text-zinc-400 bg-zinc-800/60',
+  Auth: 'text-zinc-400 bg-zinc-900/80',
 }
 
 export function CommandPalette() {
@@ -111,7 +111,7 @@ export function CommandPalette() {
       <div
         className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-t-white/[0.15] border-x-white/[0.06] border-b-white/[0.04] shadow-2xl shadow-black/80"
         style={{
-          background: 'rgba(9,9,11,0.92)',
+          background: 'rgba(5,5,5,0.97)',
           backdropFilter: 'blur(32px) saturate(1.8)',
           boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.08), 0 40px 80px -20px rgba(0,0,0,0.9)',
         }}
@@ -153,7 +153,7 @@ export function CommandPalette() {
                   <div className="text-sm font-medium text-zinc-200 truncate">{item.label}</div>
                   <div className="text-xs text-zinc-600 truncate">{item.desc}</div>
                 </div>
-                <span className={`flex-shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide ${TAG_COLORS[item.tag] ?? 'text-zinc-500 bg-zinc-800/60'}`}>
+                <span className={`flex-shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide ${TAG_COLORS[item.tag] ?? 'text-zinc-500 bg-zinc-900/80'}`}>
                   {item.tag}
                 </span>
               </button>

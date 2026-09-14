@@ -95,7 +95,7 @@ function renderMarkdown(text: string): string {
   return text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code class="rounded bg-zinc-800 px-1 py-0.5 text-[11px] text-emerald-400 font-mono">$1</code>')
+    .replace(/`(.*?)`/g, '<code style="background:#0A0A0C;border:1px solid rgba(255,255,255,0.07)" class="rounded px-1 py-0.5 text-[11px] text-emerald-400 font-mono">$1</code>')
     .replace(/\n/g, '<br/>')
 }
 
@@ -157,7 +157,8 @@ export function AIWidget() {
       {/* Toggle button */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.1] bg-zinc-900/80 backdrop-blur-xl shadow-xl shadow-black/40 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-all duration-200 active:scale-[0.96]"
+        className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.1] backdrop-blur-xl shadow-xl shadow-black/40 text-zinc-400 hover:text-zinc-100 transition-all duration-200 active:scale-[0.96]"
+        style={{ background: 'rgba(5,5,5,0.92)' }}
         aria-label="Toggle AI assistant"
       >
         {open ? (
@@ -173,10 +174,10 @@ export function AIWidget() {
 
       {/* Drawer */}
       <div
-        className={`fixed bottom-22 right-6 z-50 w-80 rounded-2xl border border-white/[0.08] bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-black/60 flex flex-col transition-all duration-300 origin-bottom-right ${
+        className={`fixed bottom-22 right-6 z-50 w-80 rounded-2xl border border-white/[0.08] backdrop-blur-2xl shadow-2xl shadow-black/60 flex flex-col transition-all duration-300 origin-bottom-right ${
           open ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
         }`}
-        style={{ maxHeight: '28rem' }}
+        style={{ maxHeight: '28rem', background: 'rgba(5,5,5,0.97)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.08)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
@@ -209,16 +210,17 @@ export function AIWidget() {
               <div
                 className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
                   m.role === 'user'
-                    ? 'bg-zinc-800/80 text-zinc-200 rounded-br-sm'
-                    : 'bg-zinc-900/80 border border-white/[0.05] text-zinc-300 rounded-bl-sm'
+                    ? 'text-zinc-200 rounded-br-sm'
+                    : 'border border-white/[0.05] text-zinc-300 rounded-bl-sm'
                 }`}
+                style={{ background: m.role === 'user' ? '#121214' : '#050505' }}
                 dangerouslySetInnerHTML={{ __html: m.role === 'assistant' ? renderMarkdown(m.content) : m.content.replace(/</g, '&lt;') }}
               />
             </div>
           ))}
           {typing && (
             <div className="flex justify-start">
-              <div className="rounded-xl rounded-bl-sm bg-zinc-900/80 border border-white/[0.05] px-3 py-2.5 flex gap-1 items-center">
+              <div className="rounded-xl rounded-bl-sm border border-white/[0.05] px-3 py-2.5 flex gap-1 items-center" style={{ background: '#050505' }}>
                 <span className="h-1.5 w-1.5 rounded-full bg-zinc-600 animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="h-1.5 w-1.5 rounded-full bg-zinc-600 animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="h-1.5 w-1.5 rounded-full bg-zinc-600 animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -238,7 +240,8 @@ export function AIWidget() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && send()}
               placeholder="Ask anything..."
-              className="flex-1 h-9 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-white/[0.18] focus:outline-none transition-all"
+              className="flex-1 h-9 rounded-xl border border-white/[0.08] px-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-white/[0.18] focus:outline-none transition-all"
+              style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
             />
             <button
               onClick={send}
