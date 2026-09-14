@@ -34,7 +34,9 @@ export default function ProxyPage() {
         finalUrl = `https://${finalUrl}`
       }
     }
-    setLoadedUrl(finalUrl)
+    // Route through server-side proxy to bypass X-Frame-Options
+    const proxied = `/api/proxy?url=${encodeURIComponent(finalUrl)}`
+    setLoadedUrl(proxied)
     setUrl(finalUrl)
   }
 
@@ -166,7 +168,7 @@ export default function ProxyPage() {
             {QUICK_LINKS.map(l => (
               <button
                 key={l.url}
-                onClick={() => navigate(l.url)}
+                onClick={() => { setUrl(l.url); navigate(l.url) }}
                 className="group flex flex-col items-center gap-2 p-4 rounded-2xl transition-all duration-200 hover:scale-[1.02]"
                 style={{
                   background: 'rgba(255,255,255,0.03)',
