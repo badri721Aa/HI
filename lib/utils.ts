@@ -5,11 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const OWNERS = ['abdulla.mjasim@alhekma.com', 'abdullahmasoud063@gmail.com'] as const
+export const ROOT_OWNER = 'abdulla.mjasim@alhekma.com' as const
 
 export function isOwner(email: string | undefined | null): boolean {
   if (!email) return false
-  return (OWNERS as readonly string[]).includes(email)
+  return email.toLowerCase() === ROOT_OWNER
+}
+
+export function isRootOwner(email: string | undefined | null): boolean {
+  return isOwner(email)
 }
 
 export type UserRole = 'user' | 'admin' | 'owner'
