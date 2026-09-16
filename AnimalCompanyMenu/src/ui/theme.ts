@@ -1,6 +1,7 @@
 /**
- * theme.ts — colors & metrics. ImGui-style dark themes with a two-color accent
- * gradient. Add your own preset to THEMES and it shows up in the Theme page.
+ * theme.ts — colors & metrics. "Classic" is a plain grey Dear-ImGui look (flat),
+ * "Magenta" the black/pink Quest-menu look; the rest are fancier variants.
+ * Add your own preset to THEMES and it shows up in the Theme page.
  */
 import { hex, type RGBA } from "../core/math.js";
 
@@ -32,6 +33,8 @@ export interface Theme {
     sidebarActive: RGBA;
     sidebarText: RGBA;
     sidebarActiveText: RGBA;
+    /** flat = classic ImGui look: no glow, no gradients, square-ish corners */
+    flat: boolean;
     /** metrics (canvas units) */
     radius: number;
     widgetRadius: number;
@@ -45,8 +48,33 @@ export interface Theme {
 }
 
 const METRICS = {
-    radius: 16, widgetRadius: 9, glow: 0.7, fontSize: 15, smallFontSize: 12, titleSize: 17,
-    widgetHeight: 34, spacing: 7, padding: 12,
+    radius: 6, widgetRadius: 3, glow: 0, fontSize: 16, smallFontSize: 13, titleSize: 18,
+    widgetHeight: 38, spacing: 6, padding: 12,
+};
+const FANCY = { ...METRICS, radius: 14, widgetRadius: 8, glow: 0.7 };
+
+/** Plain grey Dear-ImGui look — the default. */
+const Classic: Theme = {
+    name: "Classic",
+    bg: hex("#1e1e1e"), surface: hex("#262626"), surface2: hex("#333333"), border: hex("#414141"), shadow: hex("#000000", 0.6),
+    titleBg: hex("#2a2a2a"), text: hex("#f0f0f0"), textDim: hex("#b5b5b5"), textMuted: hex("#7c7c7c"),
+    accent: hex("#4c8bf5"), accent2: hex("#8ab4ff"), onAccent: hex("#ffffff"),
+    hover: hex("#3a3a3a"), active: hex("#474747"),
+    success: hex("#4caf50"), warning: hex("#e0a83a"), danger: hex("#d9534f"), info: hex("#5aa9e6"),
+    track: hex("#3a3a3a"), knob: hex("#d4d4d4"),
+    sidebarBg: hex("#232323"), sidebarActive: hex("#3d3d3d"), sidebarText: hex("#bdbdbd"), sidebarActiveText: hex("#ffffff"),
+    flat: true,
+    ...METRICS,
+};
+
+/** Black + magenta, in the style of the popular Quest menus. */
+const Magenta: Theme = {
+    ...Classic, name: "Magenta",
+    bg: hex("#0b0b12"), surface: hex("#14141f"), surface2: hex("#1c1c2c"), border: hex("#2c2c44"), titleBg: hex("#c2157f"),
+    text: hex("#ffffff"), textDim: hex("#c9bfd6"), textMuted: hex("#7d6f8f"),
+    accent: hex("#ff2fa0"), accent2: hex("#ff7ac8"), onAccent: hex("#ffffff"),
+    hover: hex("#241a33"), active: hex("#3a1f44"), track: hex("#2c2c44"), knob: hex("#ffffff"),
+    sidebarBg: hex("#0d0d18"), sidebarActive: hex("#ff2fa0"), sidebarText: hex("#c9bfd6"), sidebarActiveText: hex("#ffffff"),
 };
 
 const Midnight: Theme = {
@@ -58,7 +86,8 @@ const Midnight: Theme = {
     success: hex("#22c55e"), warning: hex("#f59e0b"), danger: hex("#ef4444"), info: hex("#38bdf8"),
     track: hex("#232941"), knob: hex("#ffffff"),
     sidebarBg: hex("#0d101b"), sidebarActive: hex("#1a1f36"), sidebarText: hex("#8d97b5"), sidebarActiveText: hex("#ffffff"),
-    ...METRICS,
+    flat: false,
+    ...FANCY,
 };
 
 const Aurora: Theme = {
@@ -97,10 +126,10 @@ const Ghost: Theme = {
     sidebarBg: hex("#e9ebf3"), sidebarActive: hex("#ffffff"), sidebarText: hex("#5b6478"), sidebarActiveText: hex("#12141c"),
 };
 
-export const THEMES: Theme[] = [Midnight, Aurora, Ember, Ocean, Ghost];
+export const THEMES: Theme[] = [Classic, Magenta, Midnight, Aurora, Ember, Ocean, Ghost];
 
 /** The live theme. Mutate fields freely (Theme page does), then call bumpTheme(). */
-export const theme: Theme = { ...Midnight };
+export const theme: Theme = { ...Classic };
 /** Increments whenever the theme changes; widgets re-style when they see a new version. */
 export let themeVersion = 1;
 

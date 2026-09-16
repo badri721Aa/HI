@@ -1,26 +1,28 @@
 # AC Hand Menu — ImGui-style VR menu template for Animal Company
 
-A clean, animated, **ImGui-style menu that floats on your hand** in Animal Company (Quest / PC),
-written for the same stack the community menus use: **Frida + frida-il2cpp-bridge** (TypeScript).
+A big, flat, **ImGui-style menu that floats on your hand** in Animal Company (Quest / PC), written for the
+same stack the community menus use: **Frida + frida-il2cpp-bridge** (TypeScript). Landscape "tablet" panel,
+category list down the left, one feature per row with a square checkbox — the classic mod-menu layout.
 
 > **Template only.** It ships the complete UI framework, pages, settings, themes and a feature
 > system with *placeholder* features. It contains **no game modifications** — you add those.
 
 ```
- ┌──────────────────────────────────────────────────────────────┐
- │ ● AC MENU  hand menu template              12:31   72 FPS  ✕ │
- ├──────────┬───────────────────────────────────────────────────┤
- │ H  Home  │  Settings                                         │
- │ F  Feat… │  ▸ Hand & position                                │
- │ W  Widg… │    [Left hand | Right hand]                       │
- │ S  Sett… │    Size ───────●──────────────────────── 1.00x    │
- │ T  Theme │    Smoothing ──────────●───────────────── 0.35    │
- │ C  Cons… │  ▸ Opening the menu                               │
- │ i  About │    Open mode  ............ Press button to toggle │
- │          │    Open button ............... [   Y   ] [x]      │
- ├──────────┴───────────────────────────────────────────────────┤
- │ ● GorillaLocomotion        pointer: finger        Settings 4/7│
- └──────────────────────────────────────────────────────────────┘
+ ┌──────────────────────────────────────────────────────────────────────────────┐
+ │ AC MENU  hand menu template                              72 FPS   12:31   ✕  │
+ ├──────────────┬───────────────────────────────────────────────────────────────┤
+ │ Player       │  Player                                                       │
+ │ Visuals      │  ─────────────────────────────────────────────────────────── │
+ │ World        │  Example toggle                                        [x]    │
+ │ ───────────  │  Example with settings                                 [ ]  > │
+ │ Settings     │  Example per-frame                                     [ ]  > │
+ │ Theme        │  My feature                                            [ ]    │
+ │ Widgets      │                                                               │
+ │ Console      │  [ Disable all ]                                              │
+ │ About        │                                                               │
+ ├──────────────┴───────────────────────────────────────────────────────────────┤
+ │ ● GorillaLocomotion              pointer: finger                  Player 1/8 │
+ └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## What's inside
@@ -28,7 +30,7 @@ written for the same stack the community menus use: **Frida + frida-il2cpp-bridg
 **Widgets (immediate mode, `ui.xxx()` like Dear ImGui)**
 `label` · `text` · `textDim` · `textWrapped` · `header` · `separator(label)` · `keyValue` · `badge` ·
 `button` (default / primary / accent2 / danger / ghost, small) · `toggleButton` · `buttonRow` · `iconButton` ·
-`toggle` (animated switch or checkbox, optional description, disabled) · `slider` · `intSlider` · `stepper` · `progress` ·
+`featureRow` (label + square checkbox + settings chevron) · `toggle` (checkbox right/left or switch, optional description, disabled) · `slider` · `intSlider` · `stepper` · `progress` ·
 `dropdown` (inline list) · `tabs` (animated indicator) · `colorPicker` (swatch, hue presets, RGB + hue sliders) ·
 `keybind` (press-a-button capture) · `textField` (opens an on-panel keyboard) · `collapsingHeader` ·
 `beginCard/endCard` · `statCard` · `beginColumns/nextColumn/endColumns` · `sameLine` · `setNextWidth` · `indent` · `spacing` ·
@@ -39,10 +41,10 @@ written for the same stack the community menus use: **Frida + frida-il2cpp-bridg
 - **Pointer modes:** finger (push into the panel to click, touch-screen feel, with hysteresis), laser (button click, LineRenderer beam), gaze (head ray, for desktop testing). Cursor dot shrinks as the finger approaches.
 - **Open modes:** toggle button, hold button, or palm-facing-you gesture. Any controller button is bindable in-menu.
 - Drag-to-scroll with fling, thumbstick scroll, scrollbar, tooltips, haptic ticks on hover/click.
-- **5 themes** (Midnight, Aurora, Ember, Ocean, Ghost) with live color editing, corner radius, glow, font size.
+- **Themes:** `Classic` (flat grey Dear-ImGui look, default), `Magenta` (black + pink like the popular Quest menus), plus Midnight / Aurora / Ember / Ocean / Ghost for a fancier look. Live color editing, corner radius, glow, font size.
 - Toast notifications (info / success / warning / error), modal keyboard, console page with log filter.
 - Settings + feature state persisted with `PlayerPrefs` (works on Quest and PC without file access).
-- **Feature framework:** `class MyFeature extends Feature` with `onEnable / onDisable / onUpdate / drawSettings`, categories, search, persisted per-feature values.
+- **Feature framework:** `class MyFeature extends Feature` with `onEnable / onDisable / onUpdate / drawSettings`. Each `category` becomes a sidebar entry; its features render as rows (label, checkbox, settings chevron) — `ui.featureRow()`.
 - **Wrist HUD:** small clock/FPS card on the hand while the menu is closed.
 - Robustness: works with Animal Company's **obfuscated IL2CPP exports** (auto map + manual map + dump tool), frame-hook fallbacks, hand-transform fallbacks, page errors are caught and shown, unload/rebuild from the menu.
 
@@ -147,7 +149,7 @@ src/ui/    gui.ts         immediate-mode core + every widget
            sprites.ts     procedural anti-aliased sprites
            pointer.ts     finger / laser / gaze → panel coordinates
            theme.ts · notifications.ts · keyboard.ts
-src/pages/                home, features, gallery (all widgets), settings, theme, console, about
+src/pages/                features (category rows), gallery (all widgets), settings, theme, console, about
 src/features/             Feature base class + placeholder examples
 tools/                    run scripts, dump-exports.js
 dist/_agent.js            prebuilt bundle

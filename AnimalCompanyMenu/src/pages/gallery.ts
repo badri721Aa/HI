@@ -6,7 +6,7 @@ import type { VRButton } from "../config.js";
 
 const demo = {
     toggleA: true, toggleB: false, slider: 4.2, int: 3, drop: 1, step: 2, tab: 0, color: hex("#7c5cff") as RGBA,
-    key: "right.primary" as VRButton, text: "", tbtn: false, progress: 0,
+    key: "right.primary" as VRButton, text: "", tbtn: false, progress: 0, fr: true, frOpen: false, fr2: false,
 };
 
 registerPage({
@@ -38,6 +38,10 @@ registerPage({
         const row = ui.buttonRow(["one", "two", "three"]);
         if (row >= 0) ctx.notify.info(`buttonRow → ${row}`);
 
+        ui.separator("feature rows");
+        demo.fr = ui.featureRow("ui.featureRow() with settings", demo.fr, true, demo.frOpen, v => demo.fr = v, () => demo.frOpen = !demo.frOpen);
+        if (demo.frOpen) { ui.indent(12); ui.beginCard(); ui.textDim("feature settings go here"); ui.endCard(); ui.unindent(12); }
+        demo.fr2 = ui.featureRow("ui.featureRow() plain", demo.fr2, false, false, v => demo.fr2 = v);
         ui.separator("toggles");
         demo.toggleA = ui.toggle("ui.toggle()", demo.toggleA);
         demo.toggleB = ui.toggle("with description", demo.toggleB, undefined, { description: "opts.description adds a second line" });

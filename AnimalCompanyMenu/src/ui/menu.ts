@@ -21,7 +21,7 @@ import { Gui, newScroll, type ScrollState, type PointerState } from "./gui.js";
 import { Sprites } from "./sprites.js";
 import { theme, applyTheme } from "./theme.js";
 import {
-    createRect, createImage, createText, initTopLeft, place, setVisible, imageSetColor, textSet, textSetColor,
+    createRect, createImage, createText, initTopLeft, place, setVisible, imageSetColor, imageSetSprite, textSet, textSetColor,
     addCanvasGroup, groupSetAlpha, addMask, initTextBackend, textBackend, type ImageEl, type TextEl, type RectEl, type GroupEl,
 } from "./elements.js";
 import { PointerSource } from "./pointer.js";
@@ -29,13 +29,16 @@ import { Notify } from "./notifications.js";
 import { drawKeyboard } from "./keyboard.js";
 import { allPages, type PageContext, type MenuActions } from "../pages/page.js";
 import { featureRegistry } from "../features/feature.js";
+import { drawFeatureCategory } from "../pages/features.js";
+
+type View = { kind: "page"; id: string } | { kind: "cat"; name: string };
 
 const W = PANEL.width, H = PANEL.height, TH = PANEL.titleHeight, SW = PANEL.sidebarWidth, FH = PANEL.footerHeight, PAD = PANEL.padding;
 const VX = SW + 1, VY = TH, VW = W - SW - 1, VH = H - TH - FH;
 
 interface Chrome {
     shadow: ImageEl; bg: ImageEl; border: ImageEl; titleClip: RectEl; titleBg: ImageEl; titleLine: ImageEl;
-    divider: ImageEl; footerLine: ImageEl; scrollTrack: ImageEl; scrollThumb: ImageEl; statusDot: ImageEl;
+    divider: ImageEl; footerLine: ImageEl; scrollTrack: ImageEl; scrollThumb: ImageEl; statusDot: ImageEl; sidebarBg: ImageEl;
 }
 interface Hud { go: Obj; t: Obj; group: GroupEl; bg: ImageEl; border: ImageEl; time: TextEl; info: TextEl; shown: boolean }
 
@@ -64,7 +67,7 @@ export class Menu {
     private pos: V3 = { x: 0, y: 0, z: 0 };
     private rot: Q = { ...Q_IDENTITY };
     private poseInit = false;
-    private pageIndex = 0;
+    private view: View | null = null;
     private scrolls = new Map<string, ScrollState>();
     private fpsEma = 72;
     private startedAt = Date.now() / 1000;
@@ -95,10 +98,13 @@ export class Menu {
         const self = this;
         const actions: MenuActions = {
             close: () => self.setVisible(false),
-            goTo: (id: string) => { const i = allPages().findIndex(p => p.id === id); if (i >= 0) self.pageIndex = i; },
+            goTo: (id: string) => {
+                if (id.startsWith("cat:")) { self.view = { kind: "cat", name: id.slice(4) }; return; }
+                if (allPages().some(p => p.id === id)) self.view = { kind: "page", id };
+            },
             unload: () => self.unload(),
             rebuild: () => self.rebuild(),
-            get pageCount() { return allPages().length; },
+            get pageCount() { return allPages().length + featureRegistry.categories().length; },
             get openedAt() { return self.openedAt; },
             get fps() { return self.fpsEma; },
             get frameHook() { return frameHookName(); },
@@ -173,6 +179,7 @@ export class Menu {
         const titleClip = rect("TitleClip", P, 0, 0, W, TH); addMask(titleClip.go);
         const titleBg = img("TitleBg", transformOf(titleClip.go), Sprites.rounded(theme.radius), theme.titleBg); place(titleBg, 0, 0, W, H);
         const titleLine = img("TitleLine", P, Sprites.gradientH(), theme.accent, false); place(titleLine, 0, TH - 1, W, 1);
+        const sidebarBg = img("SidebarBg", P, Sprites.white(), theme.sidebarBg, false); place(sidebarBg, 0, TH, SW, VH);
         const sidebar = rect("Sidebar", P, 0, TH, SW, VH);
         const divider = img("Divider", P, Sprites.white(), theme.border, false); place(divider, SW, TH + 12, 1, VH - 24);
         const viewport = rect("Viewport", P, VX, VY, VW, VH); addMask(viewport.go);
@@ -186,7 +193,7 @@ export class Menu {
         const border = img("Border", P, Sprites.ring(theme.radius, 1), theme.border); place(border, 0, 0, W, H);
         const overlay = rect("Overlay", P, 0, 0, W, H);
 
-        this.chrome = { shadow, bg, border, titleClip, titleBg, titleLine, divider, footerLine, scrollTrack, scrollThumb, statusDot };
+        this.chrome = { shadow, bg, border, titleClip, titleBg, titleLine, divider, footerLine, scrollTrack, scrollThumb, statusDot, sidebarBg };
         this.layers = {
             title: transformOf(title.go), sidebar: transformOf(sidebar.go), content: transformOf(content.go),
             footer: transformOf(footer.go), overlay: transformOf(overlay.go),
@@ -272,9 +279,11 @@ export class Menu {
     private styleChrome(): void {
         const c = this.chrome;
         imageSetColor(c.bg, theme.bg); imageSetColor(c.titleBg, theme.titleBg); imageSetColor(c.border, theme.border);
-        imageSetColor(c.titleLine, theme.accent); imageSetColor(c.divider, theme.border); imageSetColor(c.footerLine, theme.border);
+        imageSetSprite(c.titleLine, theme.flat ? Sprites.white() : Sprites.gradientH(), false);
+        imageSetColor(c.titleLine, theme.flat ? theme.border : theme.accent); imageSetColor(c.divider, theme.border); imageSetColor(c.footerLine, theme.border);
         imageSetColor(c.shadow, theme.shadow); imageSetColor(c.scrollTrack, theme.track);
         imageSetColor(c.statusDot, this.rig.resolved ? theme.success : theme.warning);
+        imageSetColor(c.sidebarBg, theme.flat ? theme.sidebarBg : { ...theme.sidebarBg, a: 0 });
     }
 
     // ── open / close ────────────────────────────────────────────────────────
@@ -373,6 +382,26 @@ export class Menu {
         imageSetColor(h.bg, theme.bg); imageSetColor(h.border, theme.border); textSetColor(h.time, theme.text); textSetColor(h.info, theme.textDim);
     }
 
+    // ── views ───────────────────────────────────────────────────────────────
+    /** Everything the sidebar lists, in order: feature categories, then pages. */
+    private entries(): Array<{ view: View; title: string; icon: string }> {
+        const out: Array<{ view: View; title: string; icon: string }> = [];
+        for (const c of featureRegistry.categories()) out.push({ view: { kind: "cat", name: c }, title: c, icon: "" });
+        for (const p of allPages()) out.push({ view: { kind: "page", id: p.id }, title: p.title, icon: p.icon });
+        return out;
+    }
+    private sameView(a: View | null, b: View): boolean {
+        return !!a && a.kind === b.kind && (a.kind === "cat" ? a.name === (b as { name: string }).name : a.id === (b as { id: string }).id);
+    }
+    private currentView(): View | null {
+        const all = this.entries();
+        if (all.length === 0) return null;
+        if (!this.view || !all.some(e => this.sameView(this.view, e.view))) this.view = all[0].view;
+        return this.view;
+    }
+    private viewKey(v: View): string { return v.kind === "cat" ? `cat:${v.name}` : `page:${v.id}`; }
+    private viewTitle(v: View): string { return v.kind === "cat" ? v.name : (allPages().find(p => p.id === v.id)?.title ?? v.id); }
+
     // ── drawing ─────────────────────────────────────────────────────────────
     private drawTitle(): void {
         const gui = this.gui;
@@ -395,34 +424,41 @@ export class Menu {
     }
 
     private drawSidebar(): void {
-        const gui = this.gui, pages = allPages();
+        const gui = this.gui;
+        const cur = this.currentView();
         gui.beginLayer("sidebar", this.layers.sidebar, 0, TH, SW, { x: 0, y: TH, w: SW, h: VH });
-        gui.setCursor(8, 10); gui.setRightEdge(SW - 8);
-        pages.forEach((p, i) => { if (gui.sidebarItem(p.title, i === this.pageIndex, p.icon)) this.pageIndex = i; });
+        gui.setCursor(8, 8); gui.setRightEdge(SW - 8);
+        let lastKind: string | null = null;
+        for (const e of this.entries()) {
+            if (lastKind && lastKind !== e.view.kind) gui.separator();
+            lastKind = e.view.kind;
+            if (gui.sidebarItem(e.title, this.sameView(cur, e.view), theme.flat ? "" : e.icon)) this.view = e.view;
+        }
         gui.setCursor(8, VH - 26); gui.setNextWidth(SW - 16);
         gui.label(`${settings.hand === "left" ? "L" : "R"} hand · ${settings.pointerMode}`, { size: theme.smallFontSize - 1, color: theme.textMuted, align: "center", height: 20 });
         gui.endLayer();
     }
 
     private drawContent(dt: number): void {
-        const gui = this.gui, pages = allPages();
-        if (pages.length === 0) return;
-        if (this.pageIndex >= pages.length) this.pageIndex = 0;
-        const page = pages[this.pageIndex];
-        let sc = this.scrolls.get(page.id);
-        if (!sc) { sc = newScroll(); this.scrolls.set(page.id, sc); }
+        const gui = this.gui;
+        const view = this.currentView();
+        if (!view) return;
+        const key = this.viewKey(view);
+        let sc = this.scrolls.get(key);
+        if (!sc) { sc = newScroll(); this.scrolls.set(key, sc); }
         const stick = this.input.stick(settings.hand === "left" ? "right" : "left");
         if (Math.abs(stick.y) > 0.25) gui.scrollBy(sc, -stick.y * 800 * dt);
 
-        gui.beginLayer(`content:${page.id}`, this.layers.content, VX, VY, VW, { x: VX, y: VY, w: VW, h: VH }, sc);
+        gui.beginLayer(`content:${key}`, this.layers.content, VX, VY, VW, { x: VX, y: VY, w: VW, h: VH }, sc);
         gui.setCursor(PAD, PAD); gui.setRightEdge(VW - PAD - 8);
-        gui.pushId(page.id);
+        gui.pushId(key);
         try {
-            page.draw(this.ctx);
+            if (view.kind === "cat") drawFeatureCategory(this.ctx, view.name);
+            else allPages().find(p => p.id === view.id)?.draw(this.ctx);
             this.pageError = "";
         } catch (e) {
             const msg = describe(e);
-            if (msg !== this.pageError) { this.pageError = msg; log.error(`page "${page.id}" threw`, e); }
+            if (msg !== this.pageError) { this.pageError = msg; log.error(`view "${key}" threw`, e); }
             gui.text(`page error: ${msg.split("\n")[0]}`, theme.danger);
         }
         gui.popId();
@@ -441,14 +477,17 @@ export class Menu {
     }
 
     private drawFooter(): void {
-        const gui = this.gui, pages = allPages();
+        const gui = this.gui;
+        const view = this.currentView();
+        const all = this.entries();
+        const idx = view ? all.findIndex(e => this.sameView(view, e.view)) : -1;
         gui.beginLayer("footer", this.layers.footer, 0, H - FH, W, { x: 0, y: H - FH, w: W, h: FH });
         gui.setCursor(30, 2); gui.setNextWidth(200);
         gui.label(this.rig.resolved ? this.rig.source : "waiting for player…", { size: theme.smallFontSize - 1, color: theme.textMuted, height: 22 });
         gui.setCursor(W / 2 - 80, 2); gui.setNextWidth(160);
         gui.label(this.input.desktop ? "keyboard mode" : `pointer: ${settings.pointerMode}`, { size: theme.smallFontSize - 1, color: theme.textMuted, align: "center", height: 22 });
         gui.setCursor(W - 160, 2); gui.setNextWidth(146);
-        gui.label(`${pages[this.pageIndex]?.title ?? ""}  ${this.pageIndex + 1}/${pages.length}`, { size: theme.smallFontSize - 1, color: theme.textMuted, align: "right", height: 22 });
+        gui.label(`${view ? this.viewTitle(view) : ""}  ${idx + 1}/${all.length}`, { size: theme.smallFontSize - 1, color: theme.textMuted, align: "right", height: 22 });
         gui.endLayer();
     }
 

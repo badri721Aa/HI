@@ -412,7 +412,9 @@ export class Gui {
         const t = this.txt(w, "t", theme.titleSize, theme.text, "left", "middle", true);
         place(t, 0, 0, r.w, r.h - 6); textSet(t, GuiText(text)); textSetColor(t, theme.text); textSetSize(t, theme.titleSize);
         const line = this.img(w, "line", Sprites.gradientH(), theme.accent, false);
-        place(line, 0, r.h - 3, Math.min(r.w, 120), 2); imageSetColor(line, theme.accent);
+        imageSetSprite(line, theme.flat ? Sprites.white() : Sprites.gradientH(), false);
+        if (theme.flat) { place(line, 0, r.h - 2, r.w, 1); imageSetColor(line, theme.border); }
+        else { place(line, 0, r.h - 3, Math.min(r.w, 120), 2); imageSetColor(line, theme.accent); }
     }
 
     separator(label?: string): void {
@@ -472,16 +474,19 @@ export class Gui {
         bgc = lerpColor(bgc, theme.active, w.pressT * 0.6);
         if (opts.disabled) { bgc = withAlpha(bgc, 0.4); textC = withAlpha(textC, 0.5); }
         const rad = theme.widgetRadius;
-        if (v === "primary" || v === "accent2") {
+        const fancy = (v === "primary" || v === "accent2") && !theme.flat && theme.glow > 0;
+        if (fancy) {
             const glow = this.img(w, "glow", Sprites.shadow(rad, 10), withAlpha(base, 0.35));
+            this.show(glow);
             place(glow, -8, -6, r.w + 16, r.h + 16); imageSetColor(glow, withAlpha(base, 0.25 * theme.glow + 0.2 * w.hoverT));
-        }
+        } else this.hide(w, "glow");
         const bg = this.img(w, "bg", Sprites.rounded(rad), bgc);
         place(bg, 0, 0, r.w, r.h); imageSetColor(bg, bgc);
-        if (v === "primary" || v === "accent2") {
+        if (fancy) {
             const sheen = this.img(w, "sheen", Sprites.gradientV(), withAlpha({ r: 1, g: 1, b: 1, a: 1 }, 0.12), false);
+            this.show(sheen);
             place(sheen, 2, 1, r.w - 4, r.h / 2); imageSetColor(sheen, withAlpha({ r: 1, g: 1, b: 1, a: 1 }, 0.12));
-        }
+        } else this.hide(w, "sheen");
         const border = this.img(w, "border", Sprites.ring(rad, 1), borderC);
         place(border, 0, 0, r.w, r.h); imageSetColor(border, lerpColor(borderC, theme.accent, v === "default" ? w.hoverT * 0.6 : 0));
         const t = this.txt(w, "t", opts.small ? theme.smallFontSize + 1 : theme.fontSize, textC, "center", "middle", true);
@@ -549,15 +554,21 @@ export class Gui {
         w.anim = approach(w.anim, value ? 1 : 0, this.dt * 14);
         const bg = this.img(w, "bg", Sprites.rounded(theme.widgetRadius), TRANSPARENT);
         place(bg, 0, 0, r.w, r.h); imageSetColor(bg, withAlpha(theme.hover, w.hoverT * 0.9));
-        const sw = this.host.settings.toggleStyle === "switch";
+        const style = this.host.settings.toggleStyle;
+        const sw = style === "switch";
+        const left = style === "checkbox-left";
+        const bs = 24;
         const t = this.txt(w, "t", theme.fontSize, theme.text);
-        const textX = sw ? 10 : 36;
-        place(t, textX, hasDesc ? 3 : 0, r.w - textX - 56, hasDesc ? 24 : r.h);
+        const textX = sw ? 10 : left ? 8 + bs + 12 : 10;
+        const textW = sw ? r.w - textX - 56 : left ? r.w - textX - 8 : r.w - textX - bs - 16;
+        place(t, textX, hasDesc ? 3 : 0, textW, hasDesc ? 24 : r.h);
         textSet(t, Gui.display(label)); textSetColor(t, opts.disabled ? theme.textMuted : theme.text);
         if (hasDesc) {
             const d = this.txt(w, "d", theme.smallFontSize, theme.textMuted);
-            place(d, textX, 24, r.w - textX - 56, 18); textSet(d, opts.description!); textSetColor(d, theme.textMuted);
+            place(d, textX, 24, textW, 18); textSet(d, opts.description!); textSetColor(d, theme.textMuted);
         } else this.hide(w, "d");
+        const line = this.img(w, "ln", Sprites.white(), theme.border, false);
+        place(line, 0, r.h - 1, r.w, 1); imageSetColor(line, withAlpha(theme.border, theme.flat ? 0.7 : 0));
         if (sw) {
             const tw = 40, th = 22, ty = (r.h - th) / 2, tx = r.w - tw - 8;
             const trackC = lerpColor(theme.track, theme.accent, w.anim);
@@ -572,11 +583,11 @@ export class Gui {
             place(knob, kx, ty + 3, 16, 16); imageSetColor(knob, lerpColor(theme.textDim, theme.knob, w.anim));
             this.hide(w, "box"); this.hide(w, "boxr"); this.hide(w, "check");
         } else {
-            const bs = 22, bx = 6, by = (r.h - bs) / 2;
+            const bx = left ? 8 : r.w - bs - 8, by = (r.h - bs) / 2;
             const boxC = lerpColor(theme.surface2, theme.accent, w.anim);
-            const box = this.img(w, "box", Sprites.rounded(6), boxC);
+            const box = this.img(w, "box", Sprites.rounded(4), boxC);
             this.show(box); place(box, bx, by, bs, bs); imageSetColor(box, boxC);
-            const boxr = this.img(w, "boxr", Sprites.ring(6, 1), theme.border);
+            const boxr = this.img(w, "boxr", Sprites.ring(4, 1), theme.border);
             this.show(boxr); place(boxr, bx, by, bs, bs); imageSetColor(boxr, lerpColor(theme.border, theme.accent, Math.max(w.anim, w.hoverT * 0.5)));
             const check = this.img(w, "check", Sprites.check(), theme.onAccent, false, true);
             this.show(check);
@@ -587,12 +598,55 @@ export class Gui {
         return value;
     }
 
+    /**
+     * One feature per line, the classic mod-menu row: label on the left, square
+     * checkbox on the right (or left, per settings), optional settings chevron.
+     */
+    featureRow(label: string, enabled: boolean, hasSettings: boolean, settingsOpen: boolean, onToggle: (v: boolean) => void, onSettings?: () => void): boolean {
+        const w = this.get(label, "featrow");
+        const r = this.allocate(theme.widgetHeight + 4);
+        place(w.root, r.x, r.y, r.w, r.h);
+        const left = this.host.settings.toggleStyle === "checkbox-left";
+        const bs = 24, gearW = hasSettings ? 32 : 0;
+        const it = this.interact(w, { x: 0, y: 0, w: r.w - gearW, h: r.h });
+        if (it.clicked) { enabled = !enabled; onToggle(enabled); }
+        w.anim = approach(w.anim, enabled ? 1 : 0, this.dt * 16);
+        const rowOn = withAlpha(theme.accent, theme.flat ? 0.10 * w.anim : 0);
+        const bg = this.img(w, "bg", Sprites.rounded(theme.widgetRadius), TRANSPARENT);
+        place(bg, 0, 0, r.w, r.h); imageSetColor(bg, lerpColor(rowOn, theme.hover, w.hoverT * 0.9));
+        const bx = left ? 8 : r.w - gearW - bs - 8, by = (r.h - bs) / 2;
+        const textX = left ? 8 + bs + 12 : 10;
+        const t = this.txt(w, "t", theme.fontSize, theme.text);
+        place(t, textX, 0, r.w - textX - (left ? gearW + 8 : bs + gearW + 16), r.h);
+        textSet(t, Gui.display(label)); textSetColor(t, theme.text);
+        const boxC = lerpColor(theme.surface2, theme.accent, w.anim);
+        const box = this.img(w, "box", Sprites.rounded(4), boxC);
+        place(box, bx, by, bs, bs); imageSetColor(box, boxC);
+        const boxr = this.img(w, "boxr", Sprites.ring(4, 1), theme.border);
+        place(boxr, bx, by, bs, bs); imageSetColor(boxr, lerpColor(theme.border, theme.accent, Math.max(w.anim, w.hoverT * 0.5)));
+        const check = this.img(w, "check", Sprites.check(), theme.onAccent, false, true);
+        const cs = 8 + 12 * easeOutCubic(w.anim);
+        place(check, bx + (bs - cs) / 2, by + (bs - cs) / 2, cs, cs); imageSetColor(check, withAlpha(theme.onAccent, w.anim));
+        if (hasSettings) {
+            const gi = this.interact(w, { x: r.w - gearW, y: 0, w: gearW, h: r.h }, 1);
+            if (gi.clicked) onSettings?.();
+            const ch = this.img(w, "ch", Sprites.chevron(), theme.textDim, false, true);
+            this.show(ch);
+            place(ch, r.w - gearW + 7, (r.h - 18) / 2, 18, 18);
+            imageSetColor(ch, gi.hovered || settingsOpen ? theme.text : theme.textDim); imageSetRotation(ch, settingsOpen ? -90 : 0);
+        } else this.hide(w, "ch");
+        const line = this.img(w, "ln", Sprites.white(), theme.border, false);
+        place(line, 0, r.h - 1, r.w, 1); imageSetColor(line, withAlpha(theme.border, 0.7));
+        return enabled;
+    }
+
     // ── widgets: sliders ───────────────────────────────────────────────────
     slider(label: string, value: number, min: number, max: number, opts: { step?: number; format?: (v: number) => string; onChange?: (v: number) => void; suffix?: string } = {}): number {
         const w = this.get(label, "slider");
         const r = this.allocate(46);
         place(w.root, r.x, r.y, r.w, r.h);
-        const trackY = 30, trackH = 6, knob = 18, pad = 2;
+        const flat = theme.flat;
+        const trackY = flat ? 28 : 30, trackH = flat ? 10 : 6, knob = flat ? 16 : 18, pad = 2;
         const it = this.interact(w, { x: 0, y: 20, w: r.w, h: r.h - 20 }, 0, true);
         const span = Math.max(1e-6, max - min);
         if (it.held) {
@@ -613,15 +667,25 @@ export class Gui {
         place(track, pad, trackY, r.w - pad * 2, trackH); imageSetColor(track, theme.track);
         const fillW = Math.max(0, (r.w - pad * 2 - knob) * t + knob / 2);
         const fill = this.img(w, "fill", Sprites.rounded(3), theme.accent);
-        place(fill, pad, trackY, fillW, trackH); imageSetColor(fill, theme.accent);
-        const fill2 = this.img(w, "fill2", Sprites.gradientH(), theme.accent2, false);
-        place(fill2, pad, trackY, fillW, trackH); imageSetColor(fill2, withAlpha(theme.accent2, 0.9));
+        place(fill, pad, trackY, fillW, trackH); imageSetColor(fill, flat ? withAlpha(theme.accent, 0.85) : theme.accent);
         const kx = pad + (r.w - pad * 2 - knob) * t;
-        const glow = this.img(w, "glow", Sprites.glow(), theme.accent, false);
-        const gs = knob + 14 + 8 * w.hoverT;
-        place(glow, kx + knob / 2 - gs / 2, trackY + trackH / 2 - gs / 2, gs, gs); imageSetColor(glow, withAlpha(theme.accent, (0.35 + 0.35 * w.hoverT) * theme.glow));
-        const kn = this.img(w, "knob", Sprites.circle(), theme.knob, false);
-        place(kn, kx, trackY + trackH / 2 - knob / 2, knob, knob); imageSetColor(kn, lerpColor(theme.knob, theme.accent2, w.pressT * 0.5));
+        if (flat) {
+            this.hide(w, "fill2"); this.hide(w, "glow");
+            const kn = this.img(w, "knob", Sprites.rounded(3), theme.knob);
+            imageSetSprite(kn, Sprites.rounded(3), true);
+            place(kn, kx, trackY - 4, knob, trackH + 8); imageSetColor(kn, lerpColor(theme.knob, theme.accent2, Math.max(w.pressT, w.hoverT * 0.4)));
+        } else {
+            const fill2 = this.img(w, "fill2", Sprites.gradientH(), theme.accent2, false);
+            this.show(fill2);
+            place(fill2, pad, trackY, fillW, trackH); imageSetColor(fill2, withAlpha(theme.accent2, 0.9));
+            const glow = this.img(w, "glow", Sprites.glow(), theme.accent, false);
+            this.show(glow);
+            const gs = knob + 14 + 8 * w.hoverT;
+            place(glow, kx + knob / 2 - gs / 2, trackY + trackH / 2 - gs / 2, gs, gs); imageSetColor(glow, withAlpha(theme.accent, (0.35 + 0.35 * w.hoverT) * theme.glow));
+            const kn = this.img(w, "knob", Sprites.circle(), theme.knob, false);
+            imageSetSprite(kn, Sprites.circle(), false);
+            place(kn, kx, trackY + trackH / 2 - knob / 2, knob, knob); imageSetColor(kn, lerpColor(theme.knob, theme.accent2, w.pressT * 0.5));
+        }
         return value;
     }
     intSlider(label: string, value: number, min: number, max: number, onChange?: (v: number) => void, suffix = ""): number {
@@ -733,7 +797,7 @@ export class Gui {
         const bg = this.img(w, "bg", Sprites.rounded(theme.widgetRadius), bgc);
         place(bg, 0, 0, r.w, r.h); imageSetColor(bg, bgc);
         const bar = this.img(w, "bar", Sprites.rounded(2), theme.accent);
-        place(bar, 0, 8, 3, r.h - 16); imageSetColor(bar, withAlpha(theme.accent, 0.4 + 0.6 * w.anim));
+        place(bar, 0, 8, 3, r.h - 16); imageSetColor(bar, withAlpha(theme.accent, theme.flat ? 0 : 0.4 + 0.6 * w.anim));
         const ch = this.img(w, "ch", Sprites.chevron(), theme.textDim, false, true);
         place(ch, 8, (r.h - 18) / 2, 18, 18); imageSetColor(ch, lerpColor(theme.textDim, theme.accent2, w.anim)); imageSetRotation(ch, -90 * w.anim);
         const t = this.txt(w, "t", theme.fontSize, theme.text, "left", "middle", true);
@@ -956,7 +1020,7 @@ export class Gui {
         const bg = this.img(w, "bg", Sprites.rounded(10), bgc);
         place(bg, 0, 0, r.w, r.h); imageSetColor(bg, bgc);
         const bar = this.img(w, "bar", Sprites.rounded(2), theme.accent);
-        place(bar, 0, 10 + (1 - w.anim) * 8, 3, (r.h - 20) * w.anim + 1); imageSetColor(bar, withAlpha(theme.accent, w.anim));
+        place(bar, 0, 10 + (1 - w.anim) * 8, 3, (r.h - 20) * w.anim + 1); imageSetColor(bar, withAlpha(theme.accent, theme.flat ? 0 : w.anim));
         const ic = this.txt(w, "i", theme.fontSize, theme.sidebarText, "center", "middle", true);
         place(ic, 8, 0, 24, r.h); textSet(ic, icon); textSetColor(ic, lerpColor(theme.sidebarText, theme.accent2, w.anim));
         const t = this.txt(w, "t", theme.fontSize, theme.sidebarText, "left", "middle", true);
@@ -977,10 +1041,13 @@ export class Gui {
         place(wd.root, x, y, w, h);
         const col = kind === "success" ? theme.success : kind === "warning" ? theme.warning : kind === "error" ? theme.danger : theme.info;
         const sh = this.img(wd, "sh", Sprites.shadow(12, 14), theme.shadow);
-        place(sh, -10, -6, w + 20, h + 22); imageSetColor(sh, withAlpha(theme.shadow, 0.6 * alpha));
-        const bg = this.img(wd, "bg", Sprites.rounded(12), theme.surface);
+        place(sh, -10, -6, w + 20, h + 22); imageSetColor(sh, withAlpha(theme.shadow, (theme.flat ? 0.35 : 0.6) * alpha));
+        const tr = theme.flat ? 4 : 12;
+        const bg = this.img(wd, "bg", Sprites.rounded(tr), theme.surface);
+        imageSetSprite(bg, Sprites.rounded(tr), true);
         place(bg, 0, 0, w, h); imageSetColor(bg, withAlpha(theme.surface, alpha));
-        const br = this.img(wd, "br", Sprites.ring(12, 1), theme.border);
+        const br = this.img(wd, "br", Sprites.ring(tr, 1), theme.border);
+        imageSetSprite(br, Sprites.ring(tr, 1), true);
         place(br, 0, 0, w, h); imageSetColor(br, withAlpha(theme.border, alpha));
         const bar = this.img(wd, "bar", Sprites.rounded(2), col);
         place(bar, 8, 10, 4, h - 20); imageSetColor(bar, withAlpha(col, alpha));
@@ -1030,9 +1097,12 @@ export class Gui {
         place(wd.root, x, y, w, h);
         const sh = this.img(wd, "sh", Sprites.shadow(14, 18), theme.shadow);
         place(sh, -14, -10, w + 28, h + 30); imageSetColor(sh, theme.shadow);
-        const bg = this.img(wd, "bg", Sprites.rounded(14), theme.surface);
+        const kr = theme.flat ? 6 : 14;
+        const bg = this.img(wd, "bg", Sprites.rounded(kr), theme.surface);
+        imageSetSprite(bg, Sprites.rounded(kr), true);
         place(bg, 0, 0, w, h); imageSetColor(bg, theme.surface);
-        const br = this.img(wd, "br", Sprites.ring(14, 1), theme.border);
+        const br = this.img(wd, "br", Sprites.ring(kr, 1), theme.border);
+        imageSetSprite(br, Sprites.ring(kr, 1), true);
         place(br, 0, 0, w, h); imageSetColor(br, theme.border);
     }
 

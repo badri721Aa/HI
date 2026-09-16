@@ -22,7 +22,7 @@ export type HandSide = "left" | "right";
 export type OpenMode = "toggle" | "hold" | "palm";
 export type PointerMode = "finger" | "laser" | "gaze";
 export type FollowMode = "float" | "locked";
-export type ToggleStyle = "checkbox" | "switch";
+export type ToggleStyle = "checkbox" | "checkbox-left" | "switch";
 export type LayoutMode = "sidebar" | "tabs";
 
 /** Buttons that can be bound to actions. */
@@ -88,7 +88,7 @@ export const DEFAULT_SETTINGS: Settings = {
     hand: "left",
     scale: 1.0,
     followMode: "float",
-    offset: { x: 0.0, y: 0.13, z: 0.0 },
+    offset: { x: 0.0, y: 0.16, z: 0.0 },
     rotationOffset: { x: 0, y: 0, z: 0 },
     smoothing: 0.35,
 
@@ -103,23 +103,24 @@ export const DEFAULT_SETTINGS: Settings = {
 
     haptics: true,
     sounds: false,
-    toggleStyle: "switch",
+    toggleStyle: "checkbox",
     layout: "sidebar",
     tooltipDelay: 0.6,
     wristHud: true,
     showFps: true,
     showClock: true,
-    theme: "Midnight",
+    theme: "Classic",
 };
 
 /** Physical size / layout constants (canvas units). One unit = 1 px of the canvas; the canvas is scaled to meters at runtime. */
 export const PANEL = {
-    width: 520,
-    height: 600,
-    /** meters per canvas unit at scale 1.0 → 520u ≈ 0.21 m wide */
-    metersPerUnit: 0.0004,
-    titleHeight: 46,
-    sidebarWidth: 138,
-    footerHeight: 26,
+    /** landscape "tablet" held in the hand */
+    width: 800,
+    height: 560,
+    /** meters per canvas unit at scale 1.0 → 800u ≈ 0.28 m wide */
+    metersPerUnit: 0.00035,
+    titleHeight: 40,
+    sidebarWidth: 176,
+    footerHeight: 28,
     padding: 12,
 };

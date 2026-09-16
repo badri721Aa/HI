@@ -1,5 +1,5 @@
 📦
-299607 /src/index.js
+304916 /src/index.js
 ✄
 // node_modules/frida-il2cpp-bridge/dist/index.js
 var __decorate = function(decorators, target, key, desc) {
@@ -3862,7 +3862,7 @@ var DEFAULT_SETTINGS = {
   hand: "left",
   scale: 1,
   followMode: "float",
-  offset: { x: 0, y: 0.13, z: 0 },
+  offset: { x: 0, y: 0.16, z: 0 },
   rotationOffset: { x: 0, y: 0, z: 0 },
   smoothing: 0.35,
   openMode: "toggle",
@@ -3874,22 +3874,23 @@ var DEFAULT_SETTINGS = {
   laserButton: "right.trigger",
   haptics: true,
   sounds: false,
-  toggleStyle: "switch",
+  toggleStyle: "checkbox",
   layout: "sidebar",
   tooltipDelay: 0.6,
   wristHud: true,
   showFps: true,
   showClock: true,
-  theme: "Midnight"
+  theme: "Classic"
 };
 var PANEL = {
-  width: 520,
-  height: 600,
-  /** meters per canvas unit at scale 1.0 → 520u ≈ 0.21 m wide */
-  metersPerUnit: 4e-4,
-  titleHeight: 46,
-  sidebarWidth: 138,
-  footerHeight: 26,
+  /** landscape "tablet" held in the hand */
+  width: 800,
+  height: 560,
+  /** meters per canvas unit at scale 1.0 → 800u ≈ 0.28 m wide */
+  metersPerUnit: 35e-5,
+  titleHeight: 40,
+  sidebarWidth: 176,
+  footerHeight: 28,
   padding: 12
 };
 
@@ -4916,15 +4917,68 @@ function removeFrameHook() {
 
 // src/ui/theme.ts
 var METRICS = {
-  radius: 16,
-  widgetRadius: 9,
-  glow: 0.7,
-  fontSize: 15,
-  smallFontSize: 12,
-  titleSize: 17,
-  widgetHeight: 34,
-  spacing: 7,
+  radius: 6,
+  widgetRadius: 3,
+  glow: 0,
+  fontSize: 16,
+  smallFontSize: 13,
+  titleSize: 18,
+  widgetHeight: 38,
+  spacing: 6,
   padding: 12
+};
+var FANCY = { ...METRICS, radius: 14, widgetRadius: 8, glow: 0.7 };
+var Classic = {
+  name: "Classic",
+  bg: hex("#1e1e1e"),
+  surface: hex("#262626"),
+  surface2: hex("#333333"),
+  border: hex("#414141"),
+  shadow: hex("#000000", 0.6),
+  titleBg: hex("#2a2a2a"),
+  text: hex("#f0f0f0"),
+  textDim: hex("#b5b5b5"),
+  textMuted: hex("#7c7c7c"),
+  accent: hex("#4c8bf5"),
+  accent2: hex("#8ab4ff"),
+  onAccent: hex("#ffffff"),
+  hover: hex("#3a3a3a"),
+  active: hex("#474747"),
+  success: hex("#4caf50"),
+  warning: hex("#e0a83a"),
+  danger: hex("#d9534f"),
+  info: hex("#5aa9e6"),
+  track: hex("#3a3a3a"),
+  knob: hex("#d4d4d4"),
+  sidebarBg: hex("#232323"),
+  sidebarActive: hex("#3d3d3d"),
+  sidebarText: hex("#bdbdbd"),
+  sidebarActiveText: hex("#ffffff"),
+  flat: true,
+  ...METRICS
+};
+var Magenta = {
+  ...Classic,
+  name: "Magenta",
+  bg: hex("#0b0b12"),
+  surface: hex("#14141f"),
+  surface2: hex("#1c1c2c"),
+  border: hex("#2c2c44"),
+  titleBg: hex("#c2157f"),
+  text: hex("#ffffff"),
+  textDim: hex("#c9bfd6"),
+  textMuted: hex("#7d6f8f"),
+  accent: hex("#ff2fa0"),
+  accent2: hex("#ff7ac8"),
+  onAccent: hex("#ffffff"),
+  hover: hex("#241a33"),
+  active: hex("#3a1f44"),
+  track: hex("#2c2c44"),
+  knob: hex("#ffffff"),
+  sidebarBg: hex("#0d0d18"),
+  sidebarActive: hex("#ff2fa0"),
+  sidebarText: hex("#c9bfd6"),
+  sidebarActiveText: hex("#ffffff")
 };
 var Midnight = {
   name: "Midnight",
@@ -4952,7 +5006,8 @@ var Midnight = {
   sidebarActive: hex("#1a1f36"),
   sidebarText: hex("#8d97b5"),
   sidebarActiveText: hex("#ffffff"),
-  ...METRICS
+  flat: false,
+  ...FANCY
 };
 var Aurora = {
   ...Midnight,
@@ -5041,8 +5096,8 @@ var Ghost = {
   sidebarText: hex("#5b6478"),
   sidebarActiveText: hex("#12141c")
 };
-var THEMES = [Midnight, Aurora, Ember, Ocean, Ghost];
-var theme = { ...Midnight };
+var THEMES = [Classic, Magenta, Midnight, Aurora, Ember, Ocean, Ghost];
+var theme = { ...Classic };
 var themeVersion = 1;
 function bumpTheme() {
   themeVersion++;
@@ -5962,8 +6017,14 @@ var Gui = class _Gui {
     textSetColor(t, theme.text);
     textSetSize(t, theme.titleSize);
     const line = this.img(w, "line", Sprites.gradientH(), theme.accent, false);
-    place(line, 0, r.h - 3, Math.min(r.w, 120), 2);
-    imageSetColor(line, theme.accent);
+    imageSetSprite(line, theme.flat ? Sprites.white() : Sprites.gradientH(), false);
+    if (theme.flat) {
+      place(line, 0, r.h - 2, r.w, 1);
+      imageSetColor(line, theme.border);
+    } else {
+      place(line, 0, r.h - 3, Math.min(r.w, 120), 2);
+      imageSetColor(line, theme.accent);
+    }
   }
   separator(label) {
     const w = this.get((label ?? "") + "##sep" + (this.L.cursorY | 0), "separator");
@@ -6055,19 +6116,24 @@ var Gui = class _Gui {
       textC = withAlpha(textC, 0.5);
     }
     const rad2 = theme.widgetRadius;
-    if (v === "primary" || v === "accent2") {
+    const fancy = (v === "primary" || v === "accent2") && !theme.flat && theme.glow > 0;
+    if (fancy) {
       const glow = this.img(w, "glow", Sprites.shadow(rad2, 10), withAlpha(base, 0.35));
+      this.show(glow);
       place(glow, -8, -6, r.w + 16, r.h + 16);
       imageSetColor(glow, withAlpha(base, 0.25 * theme.glow + 0.2 * w.hoverT));
-    }
+    } else
+      this.hide(w, "glow");
     const bg = this.img(w, "bg", Sprites.rounded(rad2), bgc);
     place(bg, 0, 0, r.w, r.h);
     imageSetColor(bg, bgc);
-    if (v === "primary" || v === "accent2") {
+    if (fancy) {
       const sheen = this.img(w, "sheen", Sprites.gradientV(), withAlpha({ r: 1, g: 1, b: 1, a: 1 }, 0.12), false);
+      this.show(sheen);
       place(sheen, 2, 1, r.w - 4, r.h / 2);
       imageSetColor(sheen, withAlpha({ r: 1, g: 1, b: 1, a: 1 }, 0.12));
-    }
+    } else
+      this.hide(w, "sheen");
     const border = this.img(w, "border", Sprites.ring(rad2, 1), borderC);
     place(border, 0, 0, r.w, r.h);
     imageSetColor(border, lerpColor(borderC, theme.accent, v === "default" ? w.hoverT * 0.6 : 0));
@@ -6148,19 +6214,26 @@ var Gui = class _Gui {
     const bg = this.img(w, "bg", Sprites.rounded(theme.widgetRadius), TRANSPARENT);
     place(bg, 0, 0, r.w, r.h);
     imageSetColor(bg, withAlpha(theme.hover, w.hoverT * 0.9));
-    const sw = this.host.settings.toggleStyle === "switch";
+    const style = this.host.settings.toggleStyle;
+    const sw = style === "switch";
+    const left = style === "checkbox-left";
+    const bs = 24;
     const t = this.txt(w, "t", theme.fontSize, theme.text);
-    const textX = sw ? 10 : 36;
-    place(t, textX, hasDesc ? 3 : 0, r.w - textX - 56, hasDesc ? 24 : r.h);
+    const textX = sw ? 10 : left ? 8 + bs + 12 : 10;
+    const textW = sw ? r.w - textX - 56 : left ? r.w - textX - 8 : r.w - textX - bs - 16;
+    place(t, textX, hasDesc ? 3 : 0, textW, hasDesc ? 24 : r.h);
     textSet(t, _Gui.display(label));
     textSetColor(t, opts.disabled ? theme.textMuted : theme.text);
     if (hasDesc) {
       const d = this.txt(w, "d", theme.smallFontSize, theme.textMuted);
-      place(d, textX, 24, r.w - textX - 56, 18);
+      place(d, textX, 24, textW, 18);
       textSet(d, opts.description);
       textSetColor(d, theme.textMuted);
     } else
       this.hide(w, "d");
+    const line = this.img(w, "ln", Sprites.white(), theme.border, false);
+    place(line, 0, r.h - 1, r.w, 1);
+    imageSetColor(line, withAlpha(theme.border, theme.flat ? 0.7 : 0));
     if (sw) {
       const tw = 40, th = 22, ty = (r.h - th) / 2, tx = r.w - tw - 8;
       const trackC = lerpColor(theme.track, theme.accent, w.anim);
@@ -6181,13 +6254,13 @@ var Gui = class _Gui {
       this.hide(w, "boxr");
       this.hide(w, "check");
     } else {
-      const bs = 22, bx = 6, by = (r.h - bs) / 2;
+      const bx = left ? 8 : r.w - bs - 8, by = (r.h - bs) / 2;
       const boxC = lerpColor(theme.surface2, theme.accent, w.anim);
-      const box = this.img(w, "box", Sprites.rounded(6), boxC);
+      const box = this.img(w, "box", Sprites.rounded(4), boxC);
       this.show(box);
       place(box, bx, by, bs, bs);
       imageSetColor(box, boxC);
-      const boxr = this.img(w, "boxr", Sprites.ring(6, 1), theme.border);
+      const boxr = this.img(w, "boxr", Sprites.ring(4, 1), theme.border);
       this.show(boxr);
       place(boxr, bx, by, bs, bs);
       imageSetColor(boxr, lerpColor(theme.border, theme.accent, Math.max(w.anim, w.hoverT * 0.5)));
@@ -6203,12 +6276,66 @@ var Gui = class _Gui {
     }
     return value;
   }
+  /**
+   * One feature per line, the classic mod-menu row: label on the left, square
+   * checkbox on the right (or left, per settings), optional settings chevron.
+   */
+  featureRow(label, enabled, hasSettings, settingsOpen, onToggle, onSettings) {
+    const w = this.get(label, "featrow");
+    const r = this.allocate(theme.widgetHeight + 4);
+    place(w.root, r.x, r.y, r.w, r.h);
+    const left = this.host.settings.toggleStyle === "checkbox-left";
+    const bs = 24, gearW = hasSettings ? 32 : 0;
+    const it = this.interact(w, { x: 0, y: 0, w: r.w - gearW, h: r.h });
+    if (it.clicked) {
+      enabled = !enabled;
+      onToggle(enabled);
+    }
+    w.anim = approach(w.anim, enabled ? 1 : 0, this.dt * 16);
+    const rowOn = withAlpha(theme.accent, theme.flat ? 0.1 * w.anim : 0);
+    const bg = this.img(w, "bg", Sprites.rounded(theme.widgetRadius), TRANSPARENT);
+    place(bg, 0, 0, r.w, r.h);
+    imageSetColor(bg, lerpColor(rowOn, theme.hover, w.hoverT * 0.9));
+    const bx = left ? 8 : r.w - gearW - bs - 8, by = (r.h - bs) / 2;
+    const textX = left ? 8 + bs + 12 : 10;
+    const t = this.txt(w, "t", theme.fontSize, theme.text);
+    place(t, textX, 0, r.w - textX - (left ? gearW + 8 : bs + gearW + 16), r.h);
+    textSet(t, _Gui.display(label));
+    textSetColor(t, theme.text);
+    const boxC = lerpColor(theme.surface2, theme.accent, w.anim);
+    const box = this.img(w, "box", Sprites.rounded(4), boxC);
+    place(box, bx, by, bs, bs);
+    imageSetColor(box, boxC);
+    const boxr = this.img(w, "boxr", Sprites.ring(4, 1), theme.border);
+    place(boxr, bx, by, bs, bs);
+    imageSetColor(boxr, lerpColor(theme.border, theme.accent, Math.max(w.anim, w.hoverT * 0.5)));
+    const check = this.img(w, "check", Sprites.check(), theme.onAccent, false, true);
+    const cs = 8 + 12 * easeOutCubic(w.anim);
+    place(check, bx + (bs - cs) / 2, by + (bs - cs) / 2, cs, cs);
+    imageSetColor(check, withAlpha(theme.onAccent, w.anim));
+    if (hasSettings) {
+      const gi = this.interact(w, { x: r.w - gearW, y: 0, w: gearW, h: r.h }, 1);
+      if (gi.clicked)
+        onSettings?.();
+      const ch = this.img(w, "ch", Sprites.chevron(), theme.textDim, false, true);
+      this.show(ch);
+      place(ch, r.w - gearW + 7, (r.h - 18) / 2, 18, 18);
+      imageSetColor(ch, gi.hovered || settingsOpen ? theme.text : theme.textDim);
+      imageSetRotation(ch, settingsOpen ? -90 : 0);
+    } else
+      this.hide(w, "ch");
+    const line = this.img(w, "ln", Sprites.white(), theme.border, false);
+    place(line, 0, r.h - 1, r.w, 1);
+    imageSetColor(line, withAlpha(theme.border, 0.7));
+    return enabled;
+  }
   // ── widgets: sliders ───────────────────────────────────────────────────
   slider(label, value, min, max, opts = {}) {
     const w = this.get(label, "slider");
     const r = this.allocate(46);
     place(w.root, r.x, r.y, r.w, r.h);
-    const trackY = 30, trackH = 6, knob = 18, pad = 2;
+    const flat = theme.flat;
+    const trackY = flat ? 28 : 30, trackH = flat ? 10 : 6, knob = flat ? 16 : 18, pad = 2;
     const it = this.interact(w, { x: 0, y: 20, w: r.w, h: r.h - 20 }, 0, true);
     const span = Math.max(1e-6, max - min);
     if (it.held) {
@@ -6239,18 +6366,30 @@ var Gui = class _Gui {
     const fillW = Math.max(0, (r.w - pad * 2 - knob) * t + knob / 2);
     const fill = this.img(w, "fill", Sprites.rounded(3), theme.accent);
     place(fill, pad, trackY, fillW, trackH);
-    imageSetColor(fill, theme.accent);
-    const fill2 = this.img(w, "fill2", Sprites.gradientH(), theme.accent2, false);
-    place(fill2, pad, trackY, fillW, trackH);
-    imageSetColor(fill2, withAlpha(theme.accent2, 0.9));
+    imageSetColor(fill, flat ? withAlpha(theme.accent, 0.85) : theme.accent);
     const kx = pad + (r.w - pad * 2 - knob) * t;
-    const glow = this.img(w, "glow", Sprites.glow(), theme.accent, false);
-    const gs = knob + 14 + 8 * w.hoverT;
-    place(glow, kx + knob / 2 - gs / 2, trackY + trackH / 2 - gs / 2, gs, gs);
-    imageSetColor(glow, withAlpha(theme.accent, (0.35 + 0.35 * w.hoverT) * theme.glow));
-    const kn = this.img(w, "knob", Sprites.circle(), theme.knob, false);
-    place(kn, kx, trackY + trackH / 2 - knob / 2, knob, knob);
-    imageSetColor(kn, lerpColor(theme.knob, theme.accent2, w.pressT * 0.5));
+    if (flat) {
+      this.hide(w, "fill2");
+      this.hide(w, "glow");
+      const kn = this.img(w, "knob", Sprites.rounded(3), theme.knob);
+      imageSetSprite(kn, Sprites.rounded(3), true);
+      place(kn, kx, trackY - 4, knob, trackH + 8);
+      imageSetColor(kn, lerpColor(theme.knob, theme.accent2, Math.max(w.pressT, w.hoverT * 0.4)));
+    } else {
+      const fill2 = this.img(w, "fill2", Sprites.gradientH(), theme.accent2, false);
+      this.show(fill2);
+      place(fill2, pad, trackY, fillW, trackH);
+      imageSetColor(fill2, withAlpha(theme.accent2, 0.9));
+      const glow = this.img(w, "glow", Sprites.glow(), theme.accent, false);
+      this.show(glow);
+      const gs = knob + 14 + 8 * w.hoverT;
+      place(glow, kx + knob / 2 - gs / 2, trackY + trackH / 2 - gs / 2, gs, gs);
+      imageSetColor(glow, withAlpha(theme.accent, (0.35 + 0.35 * w.hoverT) * theme.glow));
+      const kn = this.img(w, "knob", Sprites.circle(), theme.knob, false);
+      imageSetSprite(kn, Sprites.circle(), false);
+      place(kn, kx, trackY + trackH / 2 - knob / 2, knob, knob);
+      imageSetColor(kn, lerpColor(theme.knob, theme.accent2, w.pressT * 0.5));
+    }
     return value;
   }
   intSlider(label, value, min, max, onChange, suffix = "") {
@@ -6406,7 +6545,7 @@ var Gui = class _Gui {
     imageSetColor(bg, bgc);
     const bar = this.img(w, "bar", Sprites.rounded(2), theme.accent);
     place(bar, 0, 8, 3, r.h - 16);
-    imageSetColor(bar, withAlpha(theme.accent, 0.4 + 0.6 * w.anim));
+    imageSetColor(bar, withAlpha(theme.accent, theme.flat ? 0 : 0.4 + 0.6 * w.anim));
     const ch = this.img(w, "ch", Sprites.chevron(), theme.textDim, false, true);
     place(ch, 8, (r.h - 18) / 2, 18, 18);
     imageSetColor(ch, lerpColor(theme.textDim, theme.accent2, w.anim));
@@ -6710,7 +6849,7 @@ var Gui = class _Gui {
     imageSetColor(bg, bgc);
     const bar = this.img(w, "bar", Sprites.rounded(2), theme.accent);
     place(bar, 0, 10 + (1 - w.anim) * 8, 3, (r.h - 20) * w.anim + 1);
-    imageSetColor(bar, withAlpha(theme.accent, w.anim));
+    imageSetColor(bar, withAlpha(theme.accent, theme.flat ? 0 : w.anim));
     const ic = this.txt(w, "i", theme.fontSize, theme.sidebarText, "center", "middle", true);
     place(ic, 8, 0, 24, r.h);
     textSet(ic, icon);
@@ -6742,11 +6881,14 @@ var Gui = class _Gui {
     const col = kind === "success" ? theme.success : kind === "warning" ? theme.warning : kind === "error" ? theme.danger : theme.info;
     const sh = this.img(wd, "sh", Sprites.shadow(12, 14), theme.shadow);
     place(sh, -10, -6, w + 20, h + 22);
-    imageSetColor(sh, withAlpha(theme.shadow, 0.6 * alpha));
-    const bg = this.img(wd, "bg", Sprites.rounded(12), theme.surface);
+    imageSetColor(sh, withAlpha(theme.shadow, (theme.flat ? 0.35 : 0.6) * alpha));
+    const tr = theme.flat ? 4 : 12;
+    const bg = this.img(wd, "bg", Sprites.rounded(tr), theme.surface);
+    imageSetSprite(bg, Sprites.rounded(tr), true);
     place(bg, 0, 0, w, h);
     imageSetColor(bg, withAlpha(theme.surface, alpha));
-    const br = this.img(wd, "br", Sprites.ring(12, 1), theme.border);
+    const br = this.img(wd, "br", Sprites.ring(tr, 1), theme.border);
+    imageSetSprite(br, Sprites.ring(tr, 1), true);
     place(br, 0, 0, w, h);
     imageSetColor(br, withAlpha(theme.border, alpha));
     const bar = this.img(wd, "bar", Sprites.rounded(2), col);
@@ -6808,10 +6950,13 @@ var Gui = class _Gui {
     const sh = this.img(wd, "sh", Sprites.shadow(14, 18), theme.shadow);
     place(sh, -14, -10, w + 28, h + 30);
     imageSetColor(sh, theme.shadow);
-    const bg = this.img(wd, "bg", Sprites.rounded(14), theme.surface);
+    const kr = theme.flat ? 6 : 14;
+    const bg = this.img(wd, "bg", Sprites.rounded(kr), theme.surface);
+    imageSetSprite(bg, Sprites.rounded(kr), true);
     place(bg, 0, 0, w, h);
     imageSetColor(bg, theme.surface);
-    const br = this.img(wd, "br", Sprites.ring(14, 1), theme.border);
+    const br = this.img(wd, "br", Sprites.ring(kr, 1), theme.border);
+    imageSetSprite(br, Sprites.ring(kr, 1), true);
     place(br, 0, 0, w, h);
     imageSetColor(br, theme.border);
   }
@@ -7202,6 +7347,43 @@ var featureRegistry = {
   }
 };
 
+// src/pages/features.ts
+var openSettings = /* @__PURE__ */ new Set();
+function drawFeatureCategory(ctx, category) {
+  const ui = ctx.ui;
+  const list = featureRegistry.byCategory(category);
+  ui.header(category);
+  if (list.length === 0) {
+    ui.textDim("No features in this category yet.");
+    return;
+  }
+  for (const f of list) {
+    ui.pushId(f.id);
+    const open = openSettings.has(f.id);
+    ui.featureRow(f.name, f.enabled, f.hasSettings, open, (v) => f.setEnabled(v, ctx), () => {
+      if (open)
+        openSettings.delete(f.id);
+      else
+        openSettings.add(f.id);
+    });
+    if (f.description)
+      ui.tooltip(f.description);
+    if (f.hasSettings && open) {
+      ui.indent(12);
+      ui.beginCard();
+      f.drawSettings(ui, ctx);
+      ui.endCard();
+      ui.unindent(12);
+    }
+    ui.popId();
+  }
+  ui.spacing(6);
+  ui.setNextWidth(150);
+  if (ui.button("Disable all##cat", { variant: "danger", small: true }))
+    for (const f of list)
+      f.setEnabled(false, ctx);
+}
+
 // src/ui/menu.ts
 var W = PANEL.width;
 var H = PANEL.height;
@@ -7236,7 +7418,7 @@ var Menu = class {
   pos = { x: 0, y: 0, z: 0 };
   rot = { ...Q_IDENTITY };
   poseInit = false;
-  pageIndex = 0;
+  view = null;
   scrolls = /* @__PURE__ */ new Map();
   fpsEma = 72;
   startedAt = Date.now() / 1e3;
@@ -7270,14 +7452,17 @@ var Menu = class {
     const actions = {
       close: () => self.setVisible(false),
       goTo: (id) => {
-        const i = allPages().findIndex((p) => p.id === id);
-        if (i >= 0)
-          self.pageIndex = i;
+        if (id.startsWith("cat:")) {
+          self.view = { kind: "cat", name: id.slice(4) };
+          return;
+        }
+        if (allPages().some((p) => p.id === id))
+          self.view = { kind: "page", id };
       },
       unload: () => self.unload(),
       rebuild: () => self.rebuild(),
       get pageCount() {
-        return allPages().length;
+        return allPages().length + featureRegistry.categories().length;
       },
       get openedAt() {
         return self.openedAt;
@@ -7388,6 +7573,8 @@ var Menu = class {
     place(titleBg, 0, 0, W, H);
     const titleLine = img("TitleLine", P, Sprites.gradientH(), theme.accent, false);
     place(titleLine, 0, TH - 1, W, 1);
+    const sidebarBg = img("SidebarBg", P, Sprites.white(), theme.sidebarBg, false);
+    place(sidebarBg, 0, TH, SW, VH);
     const sidebar = rect2("Sidebar", P, 0, TH, SW, VH);
     const divider = img("Divider", P, Sprites.white(), theme.border, false);
     place(divider, SW, TH + 12, 1, VH - 24);
@@ -7407,7 +7594,7 @@ var Menu = class {
     const border = img("Border", P, Sprites.ring(theme.radius, 1), theme.border);
     place(border, 0, 0, W, H);
     const overlay = rect2("Overlay", P, 0, 0, W, H);
-    this.chrome = { shadow, bg, border, titleClip, titleBg, titleLine, divider, footerLine, scrollTrack, scrollThumb, statusDot };
+    this.chrome = { shadow, bg, border, titleClip, titleBg, titleLine, divider, footerLine, scrollTrack, scrollThumb, statusDot, sidebarBg };
     this.layers = {
       title: transformOf(title.go),
       sidebar: transformOf(sidebar.go),
@@ -7513,12 +7700,14 @@ var Menu = class {
     imageSetColor(c.bg, theme.bg);
     imageSetColor(c.titleBg, theme.titleBg);
     imageSetColor(c.border, theme.border);
-    imageSetColor(c.titleLine, theme.accent);
+    imageSetSprite(c.titleLine, theme.flat ? Sprites.white() : Sprites.gradientH(), false);
+    imageSetColor(c.titleLine, theme.flat ? theme.border : theme.accent);
     imageSetColor(c.divider, theme.border);
     imageSetColor(c.footerLine, theme.border);
     imageSetColor(c.shadow, theme.shadow);
     imageSetColor(c.scrollTrack, theme.track);
     imageSetColor(c.statusDot, this.rig.resolved ? theme.success : theme.warning);
+    imageSetColor(c.sidebarBg, theme.flat ? theme.sidebarBg : { ...theme.sidebarBg, a: 0 });
   }
   // ── open / close ────────────────────────────────────────────────────────
   setVisible(v) {
@@ -7640,6 +7829,33 @@ var Menu = class {
     textSetColor(h.time, theme.text);
     textSetColor(h.info, theme.textDim);
   }
+  // ── views ───────────────────────────────────────────────────────────────
+  /** Everything the sidebar lists, in order: feature categories, then pages. */
+  entries() {
+    const out = [];
+    for (const c of featureRegistry.categories())
+      out.push({ view: { kind: "cat", name: c }, title: c, icon: "" });
+    for (const p of allPages())
+      out.push({ view: { kind: "page", id: p.id }, title: p.title, icon: p.icon });
+    return out;
+  }
+  sameView(a, b) {
+    return !!a && a.kind === b.kind && (a.kind === "cat" ? a.name === b.name : a.id === b.id);
+  }
+  currentView() {
+    const all = this.entries();
+    if (all.length === 0)
+      return null;
+    if (!this.view || !all.some((e) => this.sameView(this.view, e.view)))
+      this.view = all[0].view;
+    return this.view;
+  }
+  viewKey(v) {
+    return v.kind === "cat" ? `cat:${v.name}` : `page:${v.id}`;
+  }
+  viewTitle(v) {
+    return v.kind === "cat" ? v.name : allPages().find((p) => p.id === v.id)?.title ?? v.id;
+  }
   // ── drawing ─────────────────────────────────────────────────────────────
   drawTitle() {
     const gui = this.gui;
@@ -7666,46 +7882,53 @@ var Menu = class {
     gui.endLayer();
   }
   drawSidebar() {
-    const gui = this.gui, pages2 = allPages();
+    const gui = this.gui;
+    const cur = this.currentView();
     gui.beginLayer("sidebar", this.layers.sidebar, 0, TH, SW, { x: 0, y: TH, w: SW, h: VH });
-    gui.setCursor(8, 10);
+    gui.setCursor(8, 8);
     gui.setRightEdge(SW - 8);
-    pages2.forEach((p, i) => {
-      if (gui.sidebarItem(p.title, i === this.pageIndex, p.icon))
-        this.pageIndex = i;
-    });
+    let lastKind = null;
+    for (const e of this.entries()) {
+      if (lastKind && lastKind !== e.view.kind)
+        gui.separator();
+      lastKind = e.view.kind;
+      if (gui.sidebarItem(e.title, this.sameView(cur, e.view), theme.flat ? "" : e.icon))
+        this.view = e.view;
+    }
     gui.setCursor(8, VH - 26);
     gui.setNextWidth(SW - 16);
     gui.label(`${settings.hand === "left" ? "L" : "R"} hand \xB7 ${settings.pointerMode}`, { size: theme.smallFontSize - 1, color: theme.textMuted, align: "center", height: 20 });
     gui.endLayer();
   }
   drawContent(dt) {
-    const gui = this.gui, pages2 = allPages();
-    if (pages2.length === 0)
+    const gui = this.gui;
+    const view = this.currentView();
+    if (!view)
       return;
-    if (this.pageIndex >= pages2.length)
-      this.pageIndex = 0;
-    const page = pages2[this.pageIndex];
-    let sc = this.scrolls.get(page.id);
+    const key = this.viewKey(view);
+    let sc = this.scrolls.get(key);
     if (!sc) {
       sc = newScroll();
-      this.scrolls.set(page.id, sc);
+      this.scrolls.set(key, sc);
     }
     const stick = this.input.stick(settings.hand === "left" ? "right" : "left");
     if (Math.abs(stick.y) > 0.25)
       gui.scrollBy(sc, -stick.y * 800 * dt);
-    gui.beginLayer(`content:${page.id}`, this.layers.content, VX, VY, VW, { x: VX, y: VY, w: VW, h: VH }, sc);
+    gui.beginLayer(`content:${key}`, this.layers.content, VX, VY, VW, { x: VX, y: VY, w: VW, h: VH }, sc);
     gui.setCursor(PAD, PAD);
     gui.setRightEdge(VW - PAD - 8);
-    gui.pushId(page.id);
+    gui.pushId(key);
     try {
-      page.draw(this.ctx);
+      if (view.kind === "cat")
+        drawFeatureCategory(this.ctx, view.name);
+      else
+        allPages().find((p) => p.id === view.id)?.draw(this.ctx);
       this.pageError = "";
     } catch (e) {
       const msg = describe(e);
       if (msg !== this.pageError) {
         this.pageError = msg;
-        log.error(`page "${page.id}" threw`, e);
+        log.error(`view "${key}" threw`, e);
       }
       gui.text(`page error: ${msg.split("\n")[0]}`, theme.danger);
     }
@@ -7727,7 +7950,10 @@ var Menu = class {
     }
   }
   drawFooter() {
-    const gui = this.gui, pages2 = allPages();
+    const gui = this.gui;
+    const view = this.currentView();
+    const all = this.entries();
+    const idx = view ? all.findIndex((e) => this.sameView(view, e.view)) : -1;
     gui.beginLayer("footer", this.layers.footer, 0, H - FH, W, { x: 0, y: H - FH, w: W, h: FH });
     gui.setCursor(30, 2);
     gui.setNextWidth(200);
@@ -7737,7 +7963,7 @@ var Menu = class {
     gui.label(this.input.desktop ? "keyboard mode" : `pointer: ${settings.pointerMode}`, { size: theme.smallFontSize - 1, color: theme.textMuted, align: "center", height: 22 });
     gui.setCursor(W - 160, 2);
     gui.setNextWidth(146);
-    gui.label(`${pages2[this.pageIndex]?.title ?? ""}  ${this.pageIndex + 1}/${pages2.length}`, { size: theme.smallFontSize - 1, color: theme.textMuted, align: "right", height: 22 });
+    gui.label(`${view ? this.viewTitle(view) : ""}  ${idx + 1}/${all.length}`, { size: theme.smallFontSize - 1, color: theme.textMuted, align: "right", height: 22 });
     gui.endLayer();
   }
   drawOverlay(ptr2) {
@@ -7805,210 +8031,6 @@ function clock() {
   const d = /* @__PURE__ */ new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
-
-// src/pages/home.ts
-registerPage({
-  id: "home",
-  title: "Home",
-  icon: "H",
-  order: 0,
-  draw(ctx) {
-    const ui = ctx.ui;
-    ui.header(`Welcome to ${MENU_INFO.name}`);
-    ui.textWrapped("This is the template's dashboard. Everything you see is a widget you can reuse in your own pages.");
-    ui.spacing(4);
-    const up = Math.max(0, ctx.now - ctx.menu.startedAt);
-    ui.beginColumns(2);
-    ui.statCard("Rig", ctx.rig.resolved ? "Tracked" : "Searching", ctx.rig.source, ctx.rig.resolved ? theme.success : theme.warning);
-    ui.nextColumn();
-    ui.statCard("Pointer", ctx.input.desktop ? "Gaze / keys" : ctx.settings.pointerMode, `${ctx.settings.hand === "left" ? "right" : "left"} hand`, theme.accent2);
-    ui.endColumns();
-    ui.beginColumns(2);
-    ui.statCard("FPS", ctx.menu.fps.toFixed(0), `${(ctx.dt * 1e3).toFixed(1)} ms/frame`, theme.info);
-    ui.nextColumn();
-    ui.statCard("Features", `${featureRegistry.enabledCount()} / ${featureRegistry.all().length}`, "enabled", theme.accent);
-    ui.endColumns();
-    ui.separator("quick actions");
-    const hit = ui.buttonRow(["Features", "Settings", "Theme"]);
-    if (hit === 0)
-      ctx.menu.goTo("features");
-    if (hit === 1)
-      ctx.menu.goTo("settings");
-    if (hit === 2)
-      ctx.menu.goTo("theme");
-    ui.beginColumns(2);
-    if (ui.button("Test toast", { variant: "primary" }))
-      ctx.notify.success("Hello!", `uptime ${up.toFixed(0)} s`);
-    ui.nextColumn();
-    if (ui.button("Close menu", { variant: "ghost" }))
-      ctx.menu.close();
-    ui.endColumns();
-    ui.beginCard("tips");
-    ui.textWrapped("\u2022 Push your finger into a widget to click, pull back to release.\n\u2022 Drag on empty space or use the thumbstick to scroll.\n\u2022 Hold a widget to see its tooltip.\n\u2022 Position, size and hand are in Settings.");
-    ui.endCard();
-  }
-});
-
-// src/pages/features.ts
-var search = "";
-var openSettings = /* @__PURE__ */ new Set();
-registerPage({
-  id: "features",
-  title: "Features",
-  icon: "F",
-  order: 10,
-  draw(ctx) {
-    const ui = ctx.ui;
-    ui.header("Features");
-    search = ui.textField("##fsearch", search, "search features\u2026", (v) => search = v);
-    const q = search.trim().toLowerCase();
-    const cats = featureRegistry.categories();
-    if (featureRegistry.all().length === 0) {
-      ui.textDim("No features registered. Add one in src/features/.");
-      return;
-    }
-    for (const cat of cats) {
-      const list = featureRegistry.byCategory(cat).filter((f) => !q || f.name.toLowerCase().includes(q) || f.description.toLowerCase().includes(q));
-      if (list.length === 0)
-        continue;
-      ui.pushId(cat);
-      if (ui.collapsingHeader(`${cat}  (${list.length})`, true)) {
-        ui.indent(6);
-        for (const f of list) {
-          ui.pushId(f.id);
-          ui.toggle(f.name, f.enabled, (v) => f.setEnabled(v, ctx), { description: f.description });
-          if (f.tooltip)
-            ui.tooltip(f.tooltip);
-          if (f.hasSettings) {
-            const open = openSettings.has(f.id);
-            ui.setNextWidth(110);
-            ui.sameLine();
-            if (ui.button(open ? "hide##fs" : "settings##fs", { small: true, variant: "ghost" })) {
-              if (open)
-                openSettings.delete(f.id);
-              else
-                openSettings.add(f.id);
-            }
-            if (open) {
-              ui.beginCard();
-              f.drawSettings(ui, ctx);
-              ui.endCard();
-            }
-          }
-          ui.popId();
-        }
-        ui.unindent(6);
-      }
-      ui.popId();
-    }
-    ui.separator();
-    ui.beginColumns(2);
-    if (ui.button("Disable all", { variant: "danger" }))
-      featureRegistry.disableAll(ctx);
-    ui.nextColumn();
-    ui.label(`${featureRegistry.enabledCount()} enabled`, { color: theme.textDim, align: "right" });
-    ui.endColumns();
-  }
-});
-
-// src/pages/gallery.ts
-var demo = {
-  toggleA: true,
-  toggleB: false,
-  slider: 4.2,
-  int: 3,
-  drop: 1,
-  step: 2,
-  tab: 0,
-  color: hex("#7c5cff"),
-  key: "right.primary",
-  text: "",
-  tbtn: false,
-  progress: 0
-};
-registerPage({
-  id: "gallery",
-  title: "Widgets",
-  icon: "W",
-  order: 20,
-  draw(ctx) {
-    const ui = ctx.ui;
-    demo.progress = (demo.progress + ctx.dt * 0.15) % 1;
-    ui.header("Widget gallery");
-    ui.textDim("Every widget the template ships, with the call that draws it.");
-    ui.separator("text");
-    ui.label("ui.label(text)");
-    ui.label("bold + colored", { bold: true, color: theme.accent2 });
-    ui.textWrapped("ui.textWrapped(): long text wraps to the available width and pushes the layout down like any other widget.");
-    ui.keyValue("ui.keyValue(k, v)", "value");
-    ui.badge("badge");
-    ui.sameLine();
-    ui.badge("success", theme.success);
-    ui.sameLine();
-    ui.badge("danger", theme.danger);
-    ui.separator("buttons");
-    if (ui.button("ui.button()"))
-      ctx.notify.info("Clicked", "default button");
-    ui.tooltip("Tooltips appear after hovering a moment");
-    ui.beginColumns(3);
-    if (ui.button("primary", { variant: "primary" }))
-      ctx.notify.success("Primary");
-    ui.nextColumn();
-    if (ui.button("danger", { variant: "danger" }))
-      ctx.notify.error("Danger", "be careful");
-    ui.nextColumn();
-    if (ui.button("ghost", { variant: "ghost" }))
-      ctx.notify.warn("Ghost");
-    ui.endColumns();
-    demo.tbtn = ui.toggleButton("ui.toggleButton()", demo.tbtn);
-    const row = ui.buttonRow(["one", "two", "three"]);
-    if (row >= 0)
-      ctx.notify.info(`buttonRow \u2192 ${row}`);
-    ui.separator("toggles");
-    demo.toggleA = ui.toggle("ui.toggle()", demo.toggleA);
-    demo.toggleB = ui.toggle("with description", demo.toggleB, void 0, { description: "opts.description adds a second line" });
-    ui.toggle("disabled", true, void 0, { disabled: true });
-    ui.separator("sliders");
-    demo.slider = ui.slider("ui.slider()", demo.slider, 0, 10, { step: 0.1, suffix: " m" });
-    demo.int = ui.intSlider("ui.intSlider()", demo.int, 0, 10, void 0, " px");
-    demo.step = ui.stepper("ui.stepper()", demo.step, 0, 10);
-    ui.progress(demo.progress, "ui.progress()");
-    ui.separator("selection");
-    demo.drop = ui.dropdown("ui.dropdown()", demo.drop, ["Alpha", "Beta", "Gamma", "Delta"]);
-    demo.tab = ui.tabs("demo", demo.tab, ["Tab A", "Tab B", "Tab C"]);
-    demo.color = ui.colorPicker("ui.colorPicker()", demo.color);
-    demo.key = ui.keybind("ui.keybind()", demo.key);
-    demo.text = ui.textField("ui.textField()", demo.text, "tap to type\u2026");
-    ui.separator("layout");
-    if (ui.collapsingHeader("ui.collapsingHeader()")) {
-      ui.indent();
-      ui.textDim("Content inside a collapsing header.");
-      ui.beginColumns(2);
-      ui.button("col 1");
-      ui.nextColumn();
-      ui.button("col 2");
-      ui.endColumns();
-      ui.unindent();
-    }
-    ui.beginCard("ui.beginCard() / endCard()");
-    ui.textDim("Cards group related widgets.");
-    ui.label("ui.sameLine() + setNextWidth():");
-    ui.setNextWidth(90);
-    ui.button("A##sl");
-    ui.sameLine();
-    ui.setNextWidth(90);
-    ui.button("B##sl");
-    ui.sameLine();
-    ui.button("C fills the rest##sl");
-    ui.endCard();
-    ui.beginColumns(2);
-    ui.statCard("stat card", "42", "ui.statCard()", theme.accent);
-    ui.nextColumn();
-    ui.statCard("another", "1.2k", "with accent", theme.success);
-    ui.endColumns();
-    ui.spacing(20);
-  }
-});
 
 // src/pages/settings.ts
 var dirty2 = () => markDirty();
@@ -8136,7 +8158,7 @@ registerPage({
       });
       ui.unindent(6);
     }
-    if (ui.collapsingHeader("Appearance")) {
+    if (ui.collapsingHeader("Appearance", true)) {
       ui.indent(6);
       const names = themeNames();
       ui.dropdown("Theme", Math.max(0, names.indexOf(settings.theme)), names, (i) => {
@@ -8144,8 +8166,9 @@ registerPage({
         applyTheme(names[i]);
         dirty2();
       });
-      ui.dropdown("Toggle style", settings.toggleStyle === "switch" ? 0 : 1, ["Switch", "Checkbox"], (i) => {
-        settings.toggleStyle = i === 0 ? "switch" : "checkbox";
+      const ts = ["checkbox", "checkbox-left", "switch"];
+      ui.dropdown("Checkbox side", Math.max(0, ts.indexOf(settings.toggleStyle)), ["Right", "Left", "Switch style"], (i) => {
+        settings.toggleStyle = ts[i];
         dirty2();
       });
       ui.slider("Tooltip delay", settings.tooltipDelay, 0.1, 2, { step: 0.1, onChange: (v) => {
@@ -8262,6 +8285,118 @@ registerPage({
     ui.endCard();
     if (ui.button("Revert to preset", { variant: "ghost", small: true }))
       applyTheme(theme.name);
+  }
+});
+
+// src/pages/gallery.ts
+var demo = {
+  toggleA: true,
+  toggleB: false,
+  slider: 4.2,
+  int: 3,
+  drop: 1,
+  step: 2,
+  tab: 0,
+  color: hex("#7c5cff"),
+  key: "right.primary",
+  text: "",
+  tbtn: false,
+  progress: 0,
+  fr: true,
+  frOpen: false,
+  fr2: false
+};
+registerPage({
+  id: "gallery",
+  title: "Widgets",
+  icon: "W",
+  order: 20,
+  draw(ctx) {
+    const ui = ctx.ui;
+    demo.progress = (demo.progress + ctx.dt * 0.15) % 1;
+    ui.header("Widget gallery");
+    ui.textDim("Every widget the template ships, with the call that draws it.");
+    ui.separator("text");
+    ui.label("ui.label(text)");
+    ui.label("bold + colored", { bold: true, color: theme.accent2 });
+    ui.textWrapped("ui.textWrapped(): long text wraps to the available width and pushes the layout down like any other widget.");
+    ui.keyValue("ui.keyValue(k, v)", "value");
+    ui.badge("badge");
+    ui.sameLine();
+    ui.badge("success", theme.success);
+    ui.sameLine();
+    ui.badge("danger", theme.danger);
+    ui.separator("buttons");
+    if (ui.button("ui.button()"))
+      ctx.notify.info("Clicked", "default button");
+    ui.tooltip("Tooltips appear after hovering a moment");
+    ui.beginColumns(3);
+    if (ui.button("primary", { variant: "primary" }))
+      ctx.notify.success("Primary");
+    ui.nextColumn();
+    if (ui.button("danger", { variant: "danger" }))
+      ctx.notify.error("Danger", "be careful");
+    ui.nextColumn();
+    if (ui.button("ghost", { variant: "ghost" }))
+      ctx.notify.warn("Ghost");
+    ui.endColumns();
+    demo.tbtn = ui.toggleButton("ui.toggleButton()", demo.tbtn);
+    const row = ui.buttonRow(["one", "two", "three"]);
+    if (row >= 0)
+      ctx.notify.info(`buttonRow \u2192 ${row}`);
+    ui.separator("feature rows");
+    demo.fr = ui.featureRow("ui.featureRow() with settings", demo.fr, true, demo.frOpen, (v) => demo.fr = v, () => demo.frOpen = !demo.frOpen);
+    if (demo.frOpen) {
+      ui.indent(12);
+      ui.beginCard();
+      ui.textDim("feature settings go here");
+      ui.endCard();
+      ui.unindent(12);
+    }
+    demo.fr2 = ui.featureRow("ui.featureRow() plain", demo.fr2, false, false, (v) => demo.fr2 = v);
+    ui.separator("toggles");
+    demo.toggleA = ui.toggle("ui.toggle()", demo.toggleA);
+    demo.toggleB = ui.toggle("with description", demo.toggleB, void 0, { description: "opts.description adds a second line" });
+    ui.toggle("disabled", true, void 0, { disabled: true });
+    ui.separator("sliders");
+    demo.slider = ui.slider("ui.slider()", demo.slider, 0, 10, { step: 0.1, suffix: " m" });
+    demo.int = ui.intSlider("ui.intSlider()", demo.int, 0, 10, void 0, " px");
+    demo.step = ui.stepper("ui.stepper()", demo.step, 0, 10);
+    ui.progress(demo.progress, "ui.progress()");
+    ui.separator("selection");
+    demo.drop = ui.dropdown("ui.dropdown()", demo.drop, ["Alpha", "Beta", "Gamma", "Delta"]);
+    demo.tab = ui.tabs("demo", demo.tab, ["Tab A", "Tab B", "Tab C"]);
+    demo.color = ui.colorPicker("ui.colorPicker()", demo.color);
+    demo.key = ui.keybind("ui.keybind()", demo.key);
+    demo.text = ui.textField("ui.textField()", demo.text, "tap to type\u2026");
+    ui.separator("layout");
+    if (ui.collapsingHeader("ui.collapsingHeader()")) {
+      ui.indent();
+      ui.textDim("Content inside a collapsing header.");
+      ui.beginColumns(2);
+      ui.button("col 1");
+      ui.nextColumn();
+      ui.button("col 2");
+      ui.endColumns();
+      ui.unindent();
+    }
+    ui.beginCard("ui.beginCard() / endCard()");
+    ui.textDim("Cards group related widgets.");
+    ui.label("ui.sameLine() + setNextWidth():");
+    ui.setNextWidth(90);
+    ui.button("A##sl");
+    ui.sameLine();
+    ui.setNextWidth(90);
+    ui.button("B##sl");
+    ui.sameLine();
+    ui.button("C fills the rest##sl");
+    ui.endCard();
+    ui.beginColumns(2);
+    ui.statCard("stat card", "42", "ui.statCard()", theme.accent);
+    ui.nextColumn();
+    ui.statCard("another", "1.2k", "with accent", theme.success);
+    ui.endColumns();
+    ui.spacing(20);
   }
 });
 

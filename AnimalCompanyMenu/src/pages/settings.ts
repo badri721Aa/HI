@@ -1,6 +1,6 @@
 import { registerPage } from "./page.js";
 import { settings, markDirty, resetSettings, saveSettings } from "../core/prefs.js";
-import { ALL_BUTTONS, BUTTON_LABELS, DEFAULT_SETTINGS, type FollowMode, type OpenMode, type PointerMode } from "../config.js";
+import { ALL_BUTTONS, BUTTON_LABELS, DEFAULT_SETTINGS, type FollowMode, type OpenMode, type PointerMode, type ToggleStyle } from "../config.js";
 import { theme, themeNames, applyTheme } from "../ui/theme.js";
 
 const dirty = (): void => markDirty();
@@ -64,11 +64,12 @@ registerPage({
             ui.unindent(6);
         }
 
-        if (ui.collapsingHeader("Appearance")) {
+        if (ui.collapsingHeader("Appearance", true)) {
             ui.indent(6);
             const names = themeNames();
             ui.dropdown("Theme", Math.max(0, names.indexOf(settings.theme)), names, i => { settings.theme = names[i]; applyTheme(names[i]); dirty(); });
-            ui.dropdown("Toggle style", settings.toggleStyle === "switch" ? 0 : 1, ["Switch", "Checkbox"], i => { settings.toggleStyle = i === 0 ? "switch" : "checkbox"; dirty(); });
+            const ts: ToggleStyle[] = ["checkbox", "checkbox-left", "switch"];
+            ui.dropdown("Checkbox side", Math.max(0, ts.indexOf(settings.toggleStyle)), ["Right", "Left", "Switch style"], i => { settings.toggleStyle = ts[i]; dirty(); });
             ui.slider("Tooltip delay", settings.tooltipDelay, 0.1, 2, { step: 0.1, onChange: v => { settings.tooltipDelay = v; dirty(); }, suffix: " s" });
             ui.toggle("Show FPS", settings.showFps, v => { settings.showFps = v; dirty(); });
             ui.toggle("Show clock", settings.showClock, v => { settings.showClock = v; dirty(); });
