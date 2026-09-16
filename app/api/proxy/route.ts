@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+const UA_PROFILES: Record<string, string> = {
+  chrome: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  safari: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+  firefox: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0',
+  'mobile-ios': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+  'mobile-android': 'Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+}
 
 const HOP_BY_HOP = new Set([
   'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
@@ -11,11 +17,27 @@ const HOP_BY_HOP = new Set([
   'permissions-policy', 'feature-policy', 'report-to', 'nel',
 ])
 
-function px(raw: string, base: string): string {
+// Common ad/tracker domains for basic ad blocking
+const AD_HOSTS = [
+  'doubleclick.net', 'googlesyndication.com', 'googletagmanager.com', 'google-analytics.com',
+  'googletagservices.com', 'googleadservices.com', 'adservice.google.',
+  'facebook.com/tr', 'connect.facebook.net',
+  'scorecardresearch.com', 'quantserve.com', 'outbrain.com', 'taboola.com',
+  'adnxs.com', 'adroll.com', 'criteo.com', 'pubmatic.com', 'rubiconproject.com',
+  'amazon-adsystem.com', 'adform.net', 'openx.net', 'moatads.com',
+  'hotjar.com', 'segment.io', 'mixpanel.com', 'fullstory.com',
+  'chartbeat.com', 'newrelic.com', 'branch.io',
+]
+
+function isAdUrl(url: string): boolean {
+  return AD_HOSTS.some(host => url.includes(host))
+}
+
+function px(raw: string, base: string, params: string): string {
   try {
     const abs = new URL(raw, base).href
     if (abs.startsWith('http://') || abs.startsWith('https://')) {
-      return `/api/proxy?url=${encodeURIComponent(abs)}`
+      return `/api/proxy?url=${encodeURIComponent(abs)}${params}`
     }
   } catch {}
   return raw
@@ -25,42 +47,58 @@ const SKIP = (v: string) =>
   v.startsWith('#') || v.startsWith('data:') || v.startsWith('javascript:') ||
   v.startsWith('mailto:') || v.startsWith('tel:') || v.startsWith('blob:') || v === ''
 
-function rewriteAttr(html: string, origin: string): string {
+function rewriteAttr(html: string, origin: string, params: string, adblock: boolean): string {
   return html.replace(
     /((?:href|src|action|data-src|data-href|poster))\s*=\s*(["'])([^"']*)\2/gi,
-    (m, attr, q, val) => SKIP(val) ? m : `${attr}=${q}${px(val, origin)}${q}`
+    (m, attr, q, val) => {
+      if (SKIP(val)) return m
+      if (adblock && isAdUrl(val)) return `${attr}=${q}about:blank${q}`
+      return `${attr}=${q}${px(val, origin, params)}${q}`
+    }
   ).replace(
     /srcset\s*=\s*(["'])([^"']*)\1/gi,
     (m, q, val) => `srcset=${q}${val.replace(/(\S+)(\s+[^,]*)?/g,
-      (_: string, u: string, d: string = '') => SKIP(u) ? _ : px(u, origin) + d
+      (_: string, u: string, d: string = '') => SKIP(u) ? _ : px(u, origin, params) + d
     )}${q}`
   ).replace(
     /url\(['"]?(https?:\/\/[^'") ]+)['"]?\)/g,
-    (_, u) => `url(/api/proxy?url=${encodeURIComponent(u)})`
+    (_, u) => `url(/api/proxy?url=${encodeURIComponent(u)}${params})`
   )
 }
 
-function rewriteHtml(html: string, origin: string): string {
-  html = rewriteAttr(html, origin)
+function rewriteHtml(html: string, origin: string, params: string, adblock: boolean): string {
+  // Strip ad-tracker <script> tags outright when ad-block is on
+  if (adblock) {
+    html = html.replace(/<script[^>]*src\s*=\s*["']([^"']+)["'][^>]*><\/script>/gi, (m, src) =>
+      isAdUrl(src) ? '' : m
+    )
+    html = html.replace(/<iframe[^>]*src\s*=\s*["']([^"']+)["'][^>]*>[\s\S]*?<\/iframe>/gi, (m, src) =>
+      isAdUrl(src) ? '' : m
+    )
+  }
+
+  html = rewriteAttr(html, origin, params, adblock)
 
   html = html.replace(
     /(<style[^>]*>)([\s\S]*?)(<\/style>)/gi,
     (_, open, css, close) => open + css.replace(
       /@import\s+url\(['"]?(https?:\/\/[^'")]+)['"]?\)/g,
-      (__, u) => `@import url(/api/proxy?url=${encodeURIComponent(u)})`
+      (__, u) => `@import url(/api/proxy?url=${encodeURIComponent(u)}${params})`
     ).replace(
       /url\(['"]?(https?:\/\/[^'")]+)['"]?\)/g,
-      (__, u) => `url(/api/proxy?url=${encodeURIComponent(u)})`
+      (__, u) => `url(/api/proxy?url=${encodeURIComponent(u)}${params})`
     ) + close
   )
 
   const shim = `<script>
 (function(){
 var B=${JSON.stringify(origin)};
-function px(u){try{var a=new URL(u,B);if(/^https?:/.test(a.protocol))return'/api/proxy?url='+encodeURIComponent(a.href);}catch(e){}return u;}
-function notify(url){try{var abs=new URL(url,B).href;window.top.postMessage({type:'proxy-nav',url:abs},'*');}catch(e){}}
+var P=${JSON.stringify(params)};
+function px(u){try{var a=new URL(u,B);if(/^https?:/.test(a.protocol))return'/api/proxy?url='+encodeURIComponent(a.href)+P;}catch(e){}return u;}
+function notify(url){try{var abs=new URL(url,B).href;window.top.postMessage({type:'proxy-nav',url:abs,title:document.title},'*');}catch(e){}}
+function SKIP(v){return!v||v[0]==='#'||/^(?:data:|javascript:|mailto:|tel:|blob:)/.test(v);}
 
-// Frame-busting prevention — make site think it IS the top frame
+// Frame-busting prevention
 try{Object.defineProperty(window,'top',{get:function(){return window;},configurable:true});}catch(e){}
 try{Object.defineProperty(window,'parent',{get:function(){return window;},configurable:true});}catch(e){}
 try{Object.defineProperty(window,'frameElement',{get:function(){return null;},configurable:true});}catch(e){}
@@ -73,49 +111,33 @@ XMLHttpRequest.prototype.open=function(m,u){try{if(typeof u==='string'&&/^https?
 var ff=window.fetch;
 window.fetch=function(u,o){try{if(typeof u==='string'&&/^https?:/.test(u))u=px(u);else if(u&&u.url)u=new Request(px(u.url),u);}catch(e){}return ff.call(this,u,o);};
 
-// WebSocket — proxy can't tunnel WS, redirect to origin
+// WebSocket
 var WS=window.WebSocket;
-window.WebSocket=function(url,proto){
-  try{var a=new URL(url,B);url=a.href;}catch(e){}
-  return proto?new WS(url,proto):new WS(url);
-};
+window.WebSocket=function(url,proto){try{var a=new URL(url,B);url=a.href;}catch(e){}return proto?new WS(url,proto):new WS(url);};
 window.WebSocket.prototype=WS.prototype;
-window.WebSocket.CONNECTING=WS.CONNECTING;
-window.WebSocket.OPEN=WS.OPEN;
-window.WebSocket.CLOSING=WS.CLOSING;
-window.WebSocket.CLOSED=WS.CLOSED;
+window.WebSocket.CONNECTING=WS.CONNECTING;window.WebSocket.OPEN=WS.OPEN;window.WebSocket.CLOSING=WS.CLOSING;window.WebSocket.CLOSED=WS.CLOSED;
 
 // history
 ['pushState','replaceState'].forEach(function(k){
   var orig=history[k];
-  history[k]=function(s,t,url){
-    var r=orig.apply(this,arguments);
-    if(url)notify(String(url));
-    return r;
-  };
+  history[k]=function(s,t,url){var r=orig.apply(this,arguments);if(url)notify(String(url));return r;};
 });
 window.addEventListener('popstate',function(){notify(location.href);});
 
-// location.assign / replace
+// location.assign/replace
 try{
-  var la=location.assign.bind(location);
-  location.assign=function(url){la(px(url));};
-  var lr=location.replace.bind(location);
-  location.replace=function(url){lr(px(url));};
+  var la=location.assign.bind(location);location.assign=function(url){la(px(url));};
+  var lr=location.replace.bind(location);location.replace=function(url){lr(px(url));};
 }catch(e){}
 
-// Intercept document.write to catch inline redirects
-var dw=document.write.bind(document);
-document.write=function(s){
-  if(typeof s==='string')s=s.replace(/((?:href|src|action)=["'])([^"']+)(["'])/gi,function(m,a,v,b){return SKIP(v)?m:a+px(v)+b;});
-  return dw(s);
-};
-function SKIP(v){return!v||v[0]==='#'||/^(?:data:|javascript:|mailto:|tel:|blob:)/.test(v);}
-
-// Notify parent of current URL immediately and on load
+// Notify parent
 notify(location.href);
 window.addEventListener('load',function(){notify(location.href);});
 document.addEventListener('DOMContentLoaded',function(){notify(location.href);});
+
+// Report title updates
+var lastTitle='';
+setInterval(function(){if(document.title!==lastTitle){lastTitle=document.title;notify(location.href);}},1000);
 })();
 </script>`
 
@@ -136,6 +158,17 @@ export async function GET(req: NextRequest) {
   const targetUrl = req.nextUrl.searchParams.get('url')
   if (!targetUrl) return new NextResponse('Missing url', { status: 400 })
 
+  // Parse options
+  const adblock = req.nextUrl.searchParams.get('adblock') === '1'
+  const uaProfile = req.nextUrl.searchParams.get('ua') || 'chrome'
+  const ua = UA_PROFILES[uaProfile] ?? UA_PROFILES.chrome
+
+  // Build params to carry forward on same-origin sub-requests
+  const parts: string[] = []
+  if (adblock) parts.push('adblock=1')
+  if (uaProfile !== 'chrome') parts.push(`ua=${encodeURIComponent(uaProfile)}`)
+  const params = parts.length ? '&' + parts.join('&') : ''
+
   let url: URL
   try { url = new URL(targetUrl) } catch {
     return new NextResponse('Invalid URL', { status: 400 })
@@ -144,11 +177,16 @@ export async function GET(req: NextRequest) {
     return new NextResponse('Protocol not allowed', { status: 403 })
   }
 
+  // Block ad requests at the edge
+  if (adblock && isAdUrl(targetUrl)) {
+    return new NextResponse('', { status: 204 })
+  }
+
   let res: Response
   try {
     res = await fetch(targetUrl, {
       headers: {
-        'User-Agent': UA,
+        'User-Agent': ua,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'identity',
@@ -199,7 +237,7 @@ p{font-size:12px;color:#71717a;line-height:1.6;margin-top:6px}
   }
 
   if (contentType.includes('text/html')) {
-    const html = rewriteHtml(await res.text(), finalOrigin)
+    const html = rewriteHtml(await res.text(), finalOrigin, params, adblock)
     out.set('Content-Type', 'text/html; charset=utf-8')
     out.set('Cache-Control', 'no-store')
     return new NextResponse(html, { status: res.status, headers: out })
@@ -208,10 +246,10 @@ p{font-size:12px;color:#71717a;line-height:1.6;margin-top:6px}
   if (contentType.includes('text/css')) {
     const css = (await res.text()).replace(
       /url\(['"]?(https?:\/\/[^'") ]+)['"]?\)/g,
-      (_, u) => `url(/api/proxy?url=${encodeURIComponent(u)})`
+      (_, u) => `url(/api/proxy?url=${encodeURIComponent(u)}${params})`
     ).replace(
       /@import\s+url\(['"]?(https?:\/\/[^'")]+)['"]?\)/g,
-      (_, u) => `@import url(/api/proxy?url=${encodeURIComponent(u)})`
+      (_, u) => `@import url(/api/proxy?url=${encodeURIComponent(u)}${params})`
     )
     out.set('Content-Type', 'text/css; charset=utf-8')
     out.set('Cache-Control', 'public, max-age=3600')
