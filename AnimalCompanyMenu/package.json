@@ -1,0 +1,21 @@
+{
+  "name": "ac-hand-menu-template",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ImGui-style VR hand menu template for Animal Company (Frida + frida-il2cpp-bridge). UI framework only - no mods included.",
+  "type": "module",
+  "scripts": {
+    "build": "frida-compile src/index.ts -o dist/_agent.js -S",
+    "build:min": "frida-compile src/index.ts -o dist/_agent.js -S -c",
+    "watch": "frida-compile src/index.ts -o dist/_agent.js -S -w",
+    "typecheck": "tsc --noEmit",
+    "run:pc": "frida -l dist/_agent.js AnimalCompany.exe",
+    "run:quest": "frida -U -l dist/_agent.js -n AnimalCompany"
+  },
+  "devDependencies": {
+    "@types/frida-gum": "^19.10.0",
+    "frida-compile": "^19.0.5",
+    "frida-il2cpp-bridge": "^0.14.0",
+    "typescript": "^5.9.3"
+  }
+}
