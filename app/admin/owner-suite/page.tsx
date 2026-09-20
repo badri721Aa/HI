@@ -1,745 +1,424 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import { isRootOwner, isOwner } from '@/lib/utils'
+import { isRootOwner } from '@/lib/utils'
+import Link from 'next/link'
 
-interface Profile { id: string; email: string; display_name: string; role: string; created_at: string; muted_until: string | null }
-interface BannedUser { id: string; name: string; email: string | null; banned_by: string | null; reason: string | null; unbanned_at: string | null; created_at: string }
-interface FeatureFlag { key: string; enabled_for_roles: string[]; updated_by: string | null; updated_at: string }
-interface SiteSetting { key: string; value: string | null; updated_by: string | null; updated_at: string }
-interface IpBan { id: string; ip_address: string; reason: string | null; banned_by: string | null; created_at: string; expires_at: string | null }
-interface WordFilter { id: string; pattern: string; action: string; created_by: string | null; created_at: string }
+interface Profile { id: string; email: string; display_name: string; role: string; created_at: string }
+interface BannedUser { id: string; name: string; reason?: string; created_at: string }
+interface AuditLog { id: string; actor_email: string; action: string; target_email: string | null; payload: Record<string, unknown> | null; created_at: string }
 
-const TABS = [
-  { id: 'roles', label: 'Role Manager' },
-  { id: 'bans', label: 'Ban / Unban' },
-  { id: 'ipbans', label: 'IP Bans' },
-  { id: 'features', label: 'Feature Flags' },
-  { id: 'settings', label: 'Site Settings' },
-  { id: 'wordfilters', label: 'Word Filters' },
-  { id: 'danger', label: '⚡ Danger Zone' },
-] as const
-type Tab = typeof TABS[number]['id']
-
-const FEATURE_LABELS: Record<string, string> = {
-  proxy: 'Proxy Browser',
-  games: 'Game Arcade',
-  ai: 'AI Assistant',
-  notes: 'Encrypted Notes',
-  chat: 'Live Chat',
-}
-
-const SETTING_LABELS: Record<string, string> = {
-  maintenance_mode: 'Maintenance Mode',
-  accent_theme: 'Accent Theme',
-  custom_css: 'Custom Global CSS',
-  site_name: 'Site Display Name',
-  emergency_lock: 'Emergency Lock',
-}
-
-const ROLE_COLORS: Record<string, string> = {
-  owner: 'text-amber-400 bg-amber-500/10 border-amber-500/25',
-  admin: 'text-violet-400 bg-violet-500/10 border-violet-500/25',
-  user: 'text-zinc-500 bg-zinc-800/40 border-zinc-700/40',
-}
+type Tab = 'roles' | 'bans' | 'danger' | 'logs'
 
 export default function OwnerSuitePage() {
-  const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>('roles')
+  const [tab, setTab] = useState<Tab>('bans')
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [bans, setBans] = useState<BannedUser[]>([])
-  const [ipbans, setIpBans] = useState<IpBan[]>([])
-  const [flags, setFlags] = useState<FeatureFlag[]>([])
-  const [settings, setSettings] = useState<SiteSetting[]>([])
-  const [filters, setFilters] = useState<WordFilter[]>([])
-  const [search, setSearch] = useState('')
-  const [working, setWorking] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null)
-
-  // forms
+  const [logs, setLogs] = useState<AuditLog[]>([])
   const [roleTarget, setRoleTarget] = useState('')
-  const [roleValue, setRoleValue] = useState<'user' | 'admin' | 'owner'>('admin')
+  const [roleValue, setRoleValue] = useState<'user' | 'admin' | 'owner'>('user')
   const [banTarget, setBanTarget] = useState('')
   const [banReason, setBanReason] = useState('')
-  const [unbanTarget, setUnbanTarget] = useState('')
-  const [ipTarget, setIpTarget] = useState('')
-  const [ipReason, setIpReason] = useState('')
-  const [filterPattern, setFilterPattern] = useState('')
-  const [filterAction, setFilterAction] = useState<'flag' | 'mute' | 'ban'>('flag')
-  const [settingEdits, setSettingEdits] = useState<Record<string, string>>({})
-  const [customCss, setCustomCss] = useState('')
-
+  const [unbanSearch, setUnbanSearch] = useState('')
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
   const sb = createClient()
-
-  const showToast = useCallback((ok: boolean, msg: string) => {
-    setToast({ ok, msg })
-    setTimeout(() => setToast(null), 3500)
-  }, [])
 
   useEffect(() => {
     sb.auth.getUser().then(async ({ data }) => {
       const u = data.user
-      if (!u || !isOwner(u.email ?? '')) {
-        router.replace('/admin')
-        return
-      }
       setUser(u)
-      await loadAll()
+      if (!u || !isRootOwner(u.email)) { setLoading(false); return }
+      await fetchAll()
       setLoading(false)
     })
   }, [])
 
-  async function loadAll() {
-    const [{ data: p }, { data: b }, { data: ip }, { data: f }, { data: s }, { data: wf }] = await Promise.all([
-      sb.from('profiles').select('*').order('role').order('created_at'),
+  async function fetchAll() {
+    const [{ data: p }, { data: b }, { data: l }] = await Promise.all([
+      sb.from('profiles').select('*').order('created_at', { ascending: false }),
       sb.from('banned_users').select('*').order('created_at', { ascending: false }),
-      sb.from('ip_bans').select('*').order('created_at', { ascending: false }),
-      sb.from('feature_flags').select('*').order('key'),
-      sb.from('site_settings').select('*').order('key'),
-      sb.from('word_filters').select('*').order('created_at', { ascending: false }),
+      sb.from('admin_audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
     ])
     if (p) setProfiles(p)
     if (b) setBans(b)
-    if (ip) setIpBans(ip)
-    if (f) setFlags(f)
-    if (s) {
-      setSettings(s)
-      const css = s.find(x => x.key === 'custom_css')?.value ?? ''
-      setCustomCss(css)
-      const edits: Record<string, string> = {}
-      s.forEach(x => { edits[x.key] = x.value ?? '' })
-      setSettingEdits(edits)
-    }
-    if (wf) setFilters(wf)
+    if (l) setLogs(l)
+  }
+
+  function flash(text: string, ok = true) {
+    setMsg({ text, ok })
+    setTimeout(() => setMsg(null), 3500)
   }
 
   async function grantRole() {
     if (!roleTarget.trim()) return
-    setWorking('role')
-    const { data, error } = await sb.rpc('grant_role_by_email', { p_target_email: roleTarget.trim(), p_target_role: roleValue })
-    setWorking(null)
-    if (error) { showToast(false, error.message); return }
-    showToast(data?.ok, data?.msg ?? 'Done')
-    if (data?.ok) { setRoleTarget(''); await loadAll() }
+    const email = roleTarget.trim().toLowerCase()
+    const { error } = await sb.rpc('grant_role_by_email', { p_email: email, p_role: roleValue })
+    if (error) { flash(error.message, false); return }
+    await sb.rpc('log_admin_action', { p_action: `grant_role_${roleValue}`, p_target_email: email, p_payload: {} })
+    flash(`${email} → ${roleValue}`)
+    setRoleTarget('')
+    fetchAll()
   }
 
   async function banUser() {
     if (!banTarget.trim()) return
-    setWorking('ban')
-    const { data, error } = await sb.rpc('ban_user_by_email', { p_email: banTarget.trim(), p_reason: banReason.trim() || null })
-    setWorking(null)
-    if (error) { showToast(false, error.message); return }
-    showToast(data?.ok, data?.msg ?? 'Done')
-    if (data?.ok) { setBanTarget(''); setBanReason(''); await loadAll() }
+    const email = banTarget.trim().toLowerCase()
+    if (email === 'abdulla.mjasim@alhekma.com') { flash('Cannot ban root owner.', false); return }
+    const { error } = await sb.from('banned_users').insert({ name: email, reason: banReason.trim() || null })
+    if (error) { flash(error.message, false); return }
+    await sb.rpc('log_admin_action', { p_action: 'ban', p_target_email: email, p_payload: { reason: banReason } })
+    flash(`Banned: ${email}`)
+    setBanTarget('')
+    setBanReason('')
+    fetchAll()
   }
 
-  async function unbanUser(email?: string) {
-    const target = email ?? unbanTarget.trim()
-    if (!target) return
-    setWorking('unban-' + target)
-    const { data, error } = await sb.rpc('unban_user_by_email', { p_email: target })
-    setWorking(null)
-    if (error) { showToast(false, error.message); return }
-    showToast(data?.ok, data?.msg ?? 'Done')
-    if (data?.ok) { setUnbanTarget(''); await loadAll() }
+  async function unbanUser(nameOrEmail: string) {
+    const { error } = await sb.from('banned_users').delete().eq('name', nameOrEmail.toLowerCase())
+    if (error) { flash(error.message, false); return }
+    await sb.rpc('log_admin_action', { p_action: 'unban', p_target_email: nameOrEmail, p_payload: {} })
+    flash(`Unbanned: ${nameOrEmail}`)
+    fetchAll()
   }
 
-  async function addIpBan() {
-    if (!ipTarget.trim()) return
-    setWorking('ipban')
-    const { error } = await sb.from('ip_bans').insert({ ip_address: ipTarget.trim(), reason: ipReason.trim() || null, banned_by: user?.email })
-    setWorking(null)
-    if (error) { showToast(false, error.message); return }
-    showToast(true, 'IP banned')
-    setIpTarget(''); setIpReason('')
-    await loadAll()
+  async function unbanBySearch() {
+    if (!unbanSearch.trim()) return
+    await unbanUser(unbanSearch.trim().toLowerCase())
+    setUnbanSearch('')
   }
-
-  async function removeIpBan(id: string) {
-    setWorking('ipban-del-' + id)
-    await sb.from('ip_bans').delete().eq('id', id)
-    setWorking(null)
-    await loadAll()
-  }
-
-  async function toggleFeatureRole(flagKey: string, role: string) {
-    const flag = flags.find(f => f.key === flagKey)
-    if (!flag) return
-    const cur = flag.enabled_for_roles
-    const next = cur.includes(role) ? cur.filter(r => r !== role) : [...cur, role]
-    setWorking('flag-' + flagKey + role)
-    const { data, error } = await sb.rpc('set_feature_flag', { p_key: flagKey, p_roles: next })
-    setWorking(null)
-    if (error) { showToast(false, error.message); return }
-    showToast(data?.ok, data?.ok ? 'Updated' : data?.msg)
-    await loadAll()
-  }
-
-  async function saveSetting(key: string) {
-    setWorking('setting-' + key)
-    const { data, error } = await sb.rpc('set_site_setting', { p_key: key, p_value: settingEdits[key] ?? '' })
-    setWorking(null)
-    if (error) { showToast(false, error.message); return }
-    showToast(data?.ok, data?.ok ? 'Saved' : data?.msg)
-    await loadAll()
-  }
-
-  async function saveCustomCss() {
-    setWorking('setting-custom_css')
-    const { data, error } = await sb.rpc('set_site_setting', { p_key: 'custom_css', p_value: customCss })
-    setWorking(null)
-    if (error) { showToast(false, error.message); return }
-    showToast(data?.ok, data?.ok ? 'CSS saved' : data?.msg)
-  }
-
-  async function addWordFilter() {
-    if (!filterPattern.trim()) return
-    setWorking('wf-add')
-    const { data, error } = await sb.rpc('add_word_filter', { p_pattern: filterPattern.trim(), p_action: filterAction })
-    setWorking(null)
-    if (error) { showToast(false, error.message); return }
-    showToast(data?.ok, data?.ok ? 'Filter added' : data?.msg)
-    if (data?.ok) { setFilterPattern(''); await loadAll() }
-  }
-
-  async function removeWordFilter(pattern: string) {
-    setWorking('wf-del-' + pattern)
-    const { data, error } = await sb.rpc('remove_word_filter', { p_pattern: pattern })
-    setWorking(null)
-    if (error) { showToast(false, error.message); return }
-    showToast(data?.ok, data?.ok ? 'Removed' : data?.msg)
-    await loadAll()
-  }
-
-  async function forceLogoutAll() {
-    if (!confirm('Force-log out ALL users? This will invalidate every session.')) return
-    setWorking('logout-all')
-    // Supabase doesn't expose admin.listUsers on client; we send a broadcast and the client handles it
-    await sb.from('site_settings').upsert({ key: 'force_logout_token', value: Date.now().toString(), updated_by: user?.email, updated_at: new Date().toISOString() })
-    setWorking(null)
-    showToast(true, 'Force logout signal sent — active sessions will be terminated on next request')
-  }
-
-  async function toggleMaintenanceMode() {
-    const cur = settings.find(s => s.key === 'maintenance_mode')?.value === 'true'
-    const { data, error } = await sb.rpc('set_site_setting', { p_key: 'maintenance_mode', p_value: cur ? 'false' : 'true' })
-    if (error) { showToast(false, error.message); return }
-    showToast(true, cur ? 'Maintenance mode OFF' : 'Maintenance mode ON')
-    await loadAll()
-  }
-
-  async function toggleEmergencyLock() {
-    const cur = settings.find(s => s.key === 'emergency_lock')?.value === 'true'
-    const { data, error } = await sb.rpc('set_site_setting', { p_key: 'emergency_lock', p_value: cur ? 'false' : 'true' })
-    if (error) { showToast(false, error.message); return }
-    showToast(true, cur ? 'Emergency lock DEACTIVATED' : 'Emergency lock ACTIVATED — all non-owner access blocked')
-    await loadAll()
-  }
-
-  const filteredProfiles = profiles.filter(p =>
-    !search || p.email?.toLowerCase().includes(search.toLowerCase()) || p.display_name?.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const activeBans = bans.filter(b => !b.unbanned_at)
-  const maintenanceMode = settings.find(s => s.key === 'maintenance_mode')?.value === 'true'
-  const emergencyLock = settings.find(s => s.key === 'emergency_lock')?.value === 'true'
 
   if (loading) return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="mono text-xs text-zinc-700 animate-pulse">Authenticating…</div>
+    <div className="flex min-h-screen items-center justify-center pt-14">
+      <p className="mono text-xs text-zinc-600">Loading…</p>
     </div>
   )
 
-  if (!user || !isOwner(user.email ?? '')) return null
+  if (!user || !isRootOwner(user.email)) return (
+    <div className="flex min-h-screen items-center justify-center pt-14">
+      <div className="space-y-2 text-center">
+        <p className="font-nacelle text-5xl font-semibold text-zinc-800">403</p>
+        <p className="text-sm text-zinc-600">Root owner only.</p>
+        <Link href="/admin" className="block mt-3 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">← Admin Panel</Link>
+      </div>
+    </div>
+  )
+
+  const tabDefs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'bans', label: 'Bans', icon: '🚫' },
+    { id: 'roles', label: 'Roles', icon: '👑' },
+    { id: 'logs', label: 'Audit', icon: '📋' },
+    { id: 'danger', label: 'Danger', icon: '⚠️' },
+  ]
+
+  const filteredBans = unbanSearch.trim()
+    ? bans.filter(b => b.name.includes(unbanSearch.toLowerCase()))
+    : bans
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-24 pt-24">
+    <div className="mx-auto max-w-5xl px-6 pt-28 pb-20">
       {/* Header */}
-      <div className="mb-8 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl"
-            style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.2) 0%, rgba(245,158,11,0.1) 100%)', border: '1px solid rgba(251,191,36,0.3)', boxShadow: '0 0 20px rgba(251,191,36,0.15)' }}
-          >
-            <span className="text-lg">👑</span>
-          </div>
-          <div>
-            <h1 className="font-nacelle text-xl font-semibold text-zinc-100 tracking-tight">Owner Suite</h1>
-            <p className="mono text-[10px] text-amber-500/60 tracking-widest uppercase">Root access — {user.email}</p>
-          </div>
+      <div className="mb-10">
+        <div className="mb-3 flex items-center gap-2">
+          <Link href="/admin" className="mono text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">← Admin</Link>
+          <span className="h-px w-4 bg-zinc-800" />
+          <span className="mono text-[10px] tracking-[0.15em] text-amber-600/70 uppercase">Owner Suite</span>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          {maintenanceMode && (
-            <span className="mono text-[10px] border border-amber-500/30 bg-amber-500/10 text-amber-400 rounded-full px-2 py-0.5 animate-pulse">Maintenance</span>
-          )}
-          {emergencyLock && (
-            <span className="mono text-[10px] border border-red-500/30 bg-red-500/10 text-red-400 rounded-full px-2 py-0.5 animate-pulse">LOCKED</span>
-          )}
+        <div className="flex items-center gap-3">
+          <h1 className="font-nacelle text-3xl font-semibold text-zinc-100 tracking-tight">Owner Suite</h1>
+          <span className="mono text-[10px] border border-amber-500/25 bg-amber-500/[0.08] text-amber-400 rounded-full px-2 py-0.5">👑 Root</span>
         </div>
+        <p className="mt-2 text-sm text-zinc-500">
+          {profiles.length} users · {bans.length} banned
+        </p>
       </div>
 
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-6 right-6 z-[999] mono text-xs px-4 py-3 rounded-xl border shadow-2xl transition-all ${
-          toast.ok ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-300' : 'bg-red-950/90 border-red-500/30 text-red-300'
-        }`}>
-          {toast.ok ? '✓ ' : '✗ '}{toast.msg}
+      {/* Flash */}
+      {msg && (
+        <div className={`mb-6 rounded-xl px-4 py-3 mono text-xs ${msg.ok ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+          {msg.ok ? '✓' : '✗'} {msg.text}
         </div>
       )}
 
       {/* Tabs */}
-      <div className="mb-6 flex flex-wrap gap-1">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`mono text-[11px] px-3 py-1.5 rounded-lg transition-all ${
-              tab === t.id
-                ? t.id === 'danger'
-                  ? 'bg-red-500/15 text-red-300 border border-red-500/30'
-                  : 'bg-amber-500/12 text-amber-300 border border-amber-500/25'
-                : 'text-zinc-600 hover:text-zinc-300 border border-transparent hover:border-white/[0.06]'
+      <div className="mb-8 flex items-center gap-1 rounded-xl glass-card p-1 w-fit">
+        {tabDefs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-all duration-200 flex items-center gap-1.5 active:scale-[0.98] ${
+              tab === t.id ? 'bg-zinc-700/60 border border-white/[0.1] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
             }`}
-          >{t.label}</button>
+          >
+            <span className="text-[11px]">{t.icon}</span> {t.label}
+          </button>
         ))}
       </div>
 
-      {/* ── ROLE MANAGER ── */}
-      {tab === 'roles' && (
-        <div className="space-y-6">
-          <div className="neon-card p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-200">Grant / Revoke Role</h3>
-            <p className="mono text-[10px] text-zinc-600">Only owner can promote to admin. Owner role is immutable here.</p>
-            <div className="flex gap-2 flex-wrap">
-              <input
-                className="owner-input flex-1 min-w-[200px]"
-                placeholder="user@example.com"
-                value={roleTarget}
-                onChange={e => setRoleTarget(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && grantRole()}
-              />
-              <select
-                className="owner-input w-28"
-                value={roleValue}
-                onChange={e => setRoleValue(e.target.value as 'user' | 'admin' | 'owner')}
-              >
-                <option value="owner">owner</option>
-                <option value="admin">admin</option>
-                <option value="user">user</option>
-              </select>
-              <button onClick={grantRole} disabled={working === 'role'} className="owner-btn-amber">
-                {working === 'role' ? '…' : 'Apply'}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 mb-3">
-              <p className="mono text-xs text-zinc-600">{profiles.length} accounts</p>
-              <input
-                className="owner-input flex-1 max-w-xs text-[11px]"
-                placeholder="Search email or name…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-            {filteredProfiles.map(p => (
-              <div key={p.id} className="neon-card flex items-center gap-3 px-4 py-3">
-                <div className="h-7 w-7 flex-shrink-0 flex items-center justify-center rounded-lg bg-zinc-800/80 text-[10px] font-bold text-zinc-500 border border-white/[0.05]">
-                  {(p.display_name || p.email || 'A')[0].toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-200 truncate">{p.display_name || 'Unnamed'}</p>
-                  <p className="mono text-[10px] text-zinc-600 truncate">{p.email}</p>
-                </div>
-                <span className={`mono text-[9px] border rounded-full px-2 py-0.5 ${ROLE_COLORS[p.role] ?? ROLE_COLORS.user}`}>{p.role}</span>
-                {p.email !== user.email && (
-                  <div className="flex gap-1">
-                    {p.role !== 'owner' && (
-                      <button
-                        onClick={() => { setRoleTarget(p.email); setRoleValue('owner') }}
-                        className="mono text-[9px] px-2 py-1 rounded-lg border border-amber-500/20 text-amber-400/70 hover:bg-amber-500/10 transition-colors"
-                      >→ Owner</button>
-                    )}
-                    {p.role !== 'admin' && (
-                      <button
-                        onClick={() => { setRoleTarget(p.email); setRoleValue('admin') }}
-                        className="mono text-[9px] px-2 py-1 rounded-lg border border-violet-500/20 text-violet-400/70 hover:bg-violet-500/10 transition-colors"
-                      >→ Admin</button>
-                    )}
-                    {p.role !== 'user' && (
-                      <button
-                        onClick={() => { setRoleTarget(p.email); setRoleValue('user') }}
-                        className="mono text-[9px] px-2 py-1 rounded-lg border border-zinc-700/40 text-zinc-500 hover:bg-zinc-800/40 transition-colors"
-                      >→ User</button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── BAN / UNBAN ── */}
+      {/* ── Bans Tab ── */}
       {tab === 'bans' && (
         <div className="space-y-6">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="neon-card p-5 space-y-3">
-              <h3 className="text-sm font-semibold text-zinc-200">Ban User</h3>
-              <input className="owner-input w-full" placeholder="Email to ban" value={banTarget} onChange={e => setBanTarget(e.target.value)} />
-              <input className="owner-input w-full" placeholder="Reason (optional)" value={banReason} onChange={e => setBanReason(e.target.value)} onKeyDown={e => e.key === 'Enter' && banUser()} />
-              <button onClick={banUser} disabled={working === 'ban'} className="owner-btn-red w-full">
-                {working === 'ban' ? '…' : 'Ban User'}
+          {/* Ban a user */}
+          <div className="glass-card rounded-2xl p-5 space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-zinc-200 tracking-tight">Ban a user</p>
+              <p className="mt-0.5 text-xs text-zinc-600">Prevents login and chat for the target account.</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 h-9 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-white/[0.18] focus:outline-none transition-all"
+                placeholder="email@example.com"
+                value={banTarget}
+                onChange={e => setBanTarget(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && banUser()}
+              />
+              <button
+                onClick={banUser}
+                disabled={!banTarget.trim()}
+                className="flex h-9 items-center px-4 rounded-xl border border-rose-500/20 bg-rose-500/[0.08] text-xs text-rose-400 hover:bg-rose-500/[0.14] transition-all active:scale-[0.98] disabled:opacity-40"
+              >
+                Ban
               </button>
             </div>
-            <div className="neon-card p-5 space-y-3">
-              <h3 className="text-sm font-semibold text-zinc-200">Unban User</h3>
-              <input className="owner-input w-full" placeholder="Email to unban" value={unbanTarget} onChange={e => setUnbanTarget(e.target.value)} onKeyDown={e => e.key === 'Enter' && unbanUser()} />
-              <button onClick={() => unbanUser()} disabled={!!working?.startsWith('unban')} className="owner-btn-emerald w-full">
-                {working?.startsWith('unban') ? '…' : 'Unban User'}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <p className="mono text-[10px] text-zinc-600 mb-3 uppercase tracking-widest">Active Bans ({activeBans.length})</p>
-            {activeBans.length === 0 && <p className="mono text-xs text-zinc-700 py-6 text-center">No active bans.</p>}
-            {activeBans.map(b => (
-              <div key={b.id} className="neon-card flex items-center gap-3 px-4 py-3 mb-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-200 truncate">{b.email || b.name}</p>
-                  {b.reason && <p className="mono text-[10px] text-zinc-600 truncate">{b.reason}</p>}
-                  <p className="mono text-[9px] text-zinc-700">by {b.banned_by ?? 'system'} · {new Date(b.created_at).toLocaleDateString()}</p>
-                </div>
-                <button
-                  onClick={() => unbanUser(b.email ?? b.name)}
-                  disabled={!!working?.startsWith('unban')}
-                  className="owner-btn-emerald text-[10px] px-3 py-1.5 flex-shrink-0"
-                >Unban</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── IP BANS ── */}
-      {tab === 'ipbans' && (
-        <div className="space-y-6">
-          <div className="neon-card p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-zinc-200">Add IP Ban</h3>
-            <div className="flex gap-2 flex-wrap">
-              <input className="owner-input flex-1 min-w-[180px]" placeholder="IP address" value={ipTarget} onChange={e => setIpTarget(e.target.value)} />
-              <input className="owner-input flex-1 min-w-[180px]" placeholder="Reason (optional)" value={ipReason} onChange={e => setIpReason(e.target.value)} onKeyDown={e => e.key === 'Enter' && addIpBan()} />
-              <button onClick={addIpBan} disabled={working === 'ipban'} className="owner-btn-red">
-                {working === 'ipban' ? '…' : 'Block IP'}
-              </button>
-            </div>
-          </div>
-          <div>
-            <p className="mono text-[10px] text-zinc-600 mb-3 uppercase tracking-widest">Blocked IPs ({ipbans.length})</p>
-            {ipbans.length === 0 && <p className="mono text-xs text-zinc-700 py-6 text-center">No IP bans.</p>}
-            {ipbans.map(b => (
-              <div key={b.id} className="neon-card flex items-center gap-3 px-4 py-3 mb-2">
-                <div className="flex-1">
-                  <p className="mono text-sm text-zinc-200">{b.ip_address}</p>
-                  {b.reason && <p className="mono text-[10px] text-zinc-600">{b.reason}</p>}
-                  <p className="mono text-[9px] text-zinc-700">by {b.banned_by ?? 'system'} · {new Date(b.created_at).toLocaleDateString()}</p>
-                </div>
-                <button
-                  onClick={() => removeIpBan(b.id)}
-                  disabled={working === 'ipban-del-' + b.id}
-                  className="owner-btn-emerald text-[10px] px-3 py-1.5 flex-shrink-0"
-                >Unblock</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── FEATURE FLAGS ── */}
-      {tab === 'features' && (
-        <div className="space-y-4">
-          <p className="mono text-[10px] text-zinc-600 uppercase tracking-widest">Toggle which roles can access each module</p>
-          {flags.map(flag => (
-            <div key={flag.key} className="neon-card px-5 py-4 flex items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-zinc-200">{FEATURE_LABELS[flag.key] ?? flag.key}</p>
-                <p className="mono text-[10px] text-zinc-700">key: {flag.key} · updated {new Date(flag.updated_at).toLocaleDateString()}</p>
-              </div>
-              <div className="flex gap-2">
-                {['user','admin','owner'].map(role => {
-                  const enabled = flag.enabled_for_roles.includes(role)
-                  const busy = working === 'flag-' + flag.key + role
-                  return (
-                    <button
-                      key={role}
-                      onClick={() => toggleFeatureRole(flag.key, role)}
-                      disabled={busy || role === 'owner'}
-                      title={role === 'owner' ? 'Owner always has access' : (enabled ? `Disable for ${role}` : `Enable for ${role}`)}
-                      className={`mono text-[9px] px-2 py-1 rounded-lg border transition-all ${
-                        role === 'owner' ? 'border-amber-500/20 text-amber-500/50 opacity-60 cursor-default' :
-                        enabled
-                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                          : 'border-zinc-700/40 text-zinc-600 hover:border-zinc-600'
-                      }`}
-                    >{busy ? '…' : role}</button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ── SITE SETTINGS ── */}
-      {tab === 'settings' && (
-        <div className="space-y-4">
-          {settings.filter(s => s.key !== 'custom_css' && s.key !== 'emergency_lock' && s.key !== 'force_logout_token').map(s => (
-            <div key={s.key} className="neon-card px-5 py-4 flex items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-zinc-200">{SETTING_LABELS[s.key] ?? s.key}</p>
-                <p className="mono text-[10px] text-zinc-700">updated by {s.updated_by ?? 'system'}</p>
-              </div>
-              {s.key === 'maintenance_mode' ? (
-                <button
-                  onClick={toggleMaintenanceMode}
-                  className={`mono text-[11px] px-3 py-1.5 rounded-lg border transition-all ${
-                    s.value === 'true'
-                      ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
-                      : 'border-zinc-700/40 text-zinc-500 hover:border-zinc-600'
-                  }`}
-                >{s.value === 'true' ? 'ON — click to disable' : 'OFF — click to enable'}</button>
-              ) : s.key === 'accent_theme' ? (
-                <div className="flex gap-2 items-center">
-                  <select
-                    className="owner-input text-[11px]"
-                    value={settingEdits[s.key] ?? s.value ?? ''}
-                    onChange={e => setSettingEdits(p => ({ ...p, [s.key]: e.target.value }))}
-                  >
-                    {['cyber','emerald','crimson','solar','dark'].map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <button onClick={() => saveSetting(s.key)} disabled={working === 'setting-' + s.key} className="owner-btn-amber">
-                    {working === 'setting-' + s.key ? '…' : 'Save'}
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-2 items-center">
-                  <input
-                    className="owner-input text-[11px] w-48"
-                    value={settingEdits[s.key] ?? s.value ?? ''}
-                    onChange={e => setSettingEdits(p => ({ ...p, [s.key]: e.target.value }))}
-                    onKeyDown={e => e.key === 'Enter' && saveSetting(s.key)}
-                  />
-                  <button onClick={() => saveSetting(s.key)} disabled={working === 'setting-' + s.key} className="owner-btn-amber">
-                    {working === 'setting-' + s.key ? '…' : 'Save'}
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Custom CSS */}
-          <div className="neon-card px-5 py-4 space-y-3">
-            <p className="text-sm font-medium text-zinc-200">Custom Global CSS</p>
-            <textarea
-              className="owner-input w-full h-36 resize-y font-mono text-[11px]"
-              placeholder="/* Injected into every page */ body { --accent: #a78bfa; }"
-              value={customCss}
-              onChange={e => setCustomCss(e.target.value)}
+            <input
+              className="w-full h-9 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-white/[0.18] focus:outline-none transition-all"
+              placeholder="Reason (optional)"
+              value={banReason}
+              onChange={e => setBanReason(e.target.value)}
             />
-            <button onClick={saveCustomCss} disabled={working === 'setting-custom_css'} className="owner-btn-amber">
-              {working === 'setting-custom_css' ? '…' : 'Inject CSS'}
+          </div>
+
+          {/* Unban by search */}
+          <div className="glass-card rounded-2xl p-5 space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-zinc-200 tracking-tight">Unban by email</p>
+              <p className="mt-0.5 text-xs text-zinc-600">Immediately restores access.</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 h-9 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-white/[0.18] focus:outline-none transition-all"
+                placeholder="Search banned email…"
+                value={unbanSearch}
+                onChange={e => setUnbanSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && unbanBySearch()}
+              />
+              <button
+                onClick={unbanBySearch}
+                disabled={!unbanSearch.trim()}
+                className="flex h-9 items-center px-4 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.08] text-xs text-emerald-400 hover:bg-emerald-500/[0.14] transition-all active:scale-[0.98] disabled:opacity-40"
+              >
+                Unban
+              </button>
+            </div>
+          </div>
+
+          {/* Banned users table */}
+          <div className="glass-card rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="mono text-[10px] tracking-[0.15em] text-zinc-600 uppercase">
+                Banned accounts ({bans.length})
+              </p>
+              <button onClick={fetchAll} className="mono text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">↻ Refresh</button>
+            </div>
+            {bans.length === 0 && (
+              <p className="mono text-xs text-zinc-700 py-4 text-center">No banned users.</p>
+            )}
+            <div className="space-y-2">
+              {filteredBans.map(b => (
+                <div key={b.id} className="flex items-center gap-3 rounded-xl border border-white/[0.04] bg-rose-500/[0.03] px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="mono text-xs text-zinc-200 truncate">{b.name}</p>
+                    {b.reason && <p className="mono text-[10px] text-zinc-600 truncate mt-0.5">Reason: {b.reason}</p>}
+                    <p className="mono text-[10px] text-zinc-700">{new Date(b.created_at).toLocaleString()}</p>
+                  </div>
+                  <button
+                    onClick={() => unbanUser(b.name)}
+                    className="flex-shrink-0 flex h-7 items-center px-3 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.07] text-[10px] text-emerald-400 hover:bg-emerald-500/[0.14] transition-all active:scale-[0.97]"
+                  >
+                    Unban
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Roles Tab ── */}
+      {tab === 'roles' && (
+        <div className="space-y-6">
+          <div className="glass-card rounded-2xl p-5 space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-zinc-200 tracking-tight">Grant role</p>
+              <p className="mt-0.5 text-xs text-zinc-600">Sets any user to user / admin / owner.</p>
+            </div>
+            <input
+              className="w-full h-9 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-white/[0.18] focus:outline-none transition-all"
+              placeholder="email@example.com"
+              value={roleTarget}
+              onChange={e => setRoleTarget(e.target.value)}
+            />
+            <div className="flex gap-2">
+              {(['user', 'admin', 'owner'] as const).map(r => (
+                <button key={r} onClick={() => setRoleValue(r)}
+                  className={`flex-1 rounded-xl border py-2 text-xs font-medium transition-all active:scale-[0.98] ${
+                    roleValue === r
+                      ? r === 'owner' ? 'border-amber-500/40 bg-amber-500/[0.12] text-amber-400'
+                        : r === 'admin' ? 'border-blue-500/30 bg-blue-500/[0.1] text-blue-400'
+                        : 'border-white/[0.12] bg-zinc-800/80 text-zinc-200'
+                      : 'border-white/[0.07] bg-white/[0.02] text-zinc-600 hover:text-zinc-300'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={grantRole}
+              disabled={!roleTarget.trim()}
+              className="w-full flex h-9 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/[0.08] text-xs text-amber-400 hover:bg-amber-500/[0.14] transition-all active:scale-[0.98] disabled:opacity-40"
+            >
+              Apply role
             </button>
           </div>
-        </div>
-      )}
 
-      {/* ── WORD FILTERS ── */}
-      {tab === 'wordfilters' && (
-        <div className="space-y-6">
-          <div className="neon-card p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-zinc-200">Add Word Filter</h3>
-            <p className="mono text-[10px] text-zinc-600">Patterns are matched case-insensitively. Use regex syntax for flexibility.</p>
-            <div className="flex gap-2 flex-wrap">
-              <input
-                className="owner-input flex-1 min-w-[180px]"
-                placeholder="word or pattern"
-                value={filterPattern}
-                onChange={e => setFilterPattern(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addWordFilter()}
-              />
-              <select className="owner-input w-24" value={filterAction} onChange={e => setFilterAction(e.target.value as 'flag' | 'mute' | 'ban')}>
-                <option value="flag">flag</option>
-                <option value="mute">mute</option>
-                <option value="ban">ban</option>
-              </select>
-              <button onClick={addWordFilter} disabled={working === 'wf-add'} className="owner-btn-amber">
-                {working === 'wf-add' ? '…' : 'Add'}
-              </button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {filters.length === 0 && <p className="mono text-xs text-zinc-700 py-6 text-center">No filters yet.</p>}
-            {filters.map(f => (
-              <div key={f.id} className="neon-card flex items-center gap-3 px-4 py-3">
-                <p className="mono text-sm text-zinc-200 flex-1 truncate">{f.pattern}</p>
-                <span className={`mono text-[9px] border rounded-full px-2 py-0.5 ${
-                  f.action === 'ban' ? 'border-red-500/25 text-red-400' :
-                  f.action === 'mute' ? 'border-amber-500/25 text-amber-400' :
-                  'border-zinc-700/40 text-zinc-500'
-                }`}>{f.action}</span>
-                <p className="mono text-[9px] text-zinc-700 hidden sm:block">{new Date(f.created_at).toLocaleDateString()}</p>
-                <button
-                  onClick={() => removeWordFilter(f.pattern)}
-                  disabled={working === 'wf-del-' + f.pattern}
-                  className="mono text-[9px] px-2 py-1 rounded-lg border border-red-500/20 text-red-500/60 hover:bg-red-500/10 transition-colors"
-                >{working === 'wf-del-' + f.pattern ? '…' : 'Remove'}</button>
+          {/* All users */}
+          <div className="glass-card rounded-2xl p-5 space-y-3">
+            <p className="mono text-[10px] tracking-[0.15em] text-zinc-600 uppercase">All users ({profiles.length})</p>
+            {profiles.map(p => (
+              <div key={p.id} className="flex items-center gap-3 rounded-xl border border-white/[0.04] px-4 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-zinc-200 truncate">{p.email}</p>
+                  <p className="mono text-[10px] text-zinc-700">{new Date(p.created_at).toLocaleDateString()}</p>
+                </div>
+                <span className={`mono text-[9px] border rounded-full px-1.5 py-0.5 ${
+                  p.role === 'owner' ? 'border-amber-500/25 text-amber-400' :
+                  p.role === 'admin' ? 'border-blue-500/25 text-blue-400' :
+                  'border-zinc-800 text-zinc-700'
+                }`}>{p.role}</span>
+                <div className="flex gap-1">
+                  {p.email !== 'abdulla.mjasim@alhekma.com' && (
+                    <>
+                      {p.role !== 'owner' && (
+                        <button onClick={() => { setRoleTarget(p.email); setRoleValue('owner'); setTab('roles') }}
+                          className="mono text-[9px] px-2 py-1 rounded-lg border border-amber-500/15 text-amber-600/70 hover:text-amber-400 hover:bg-amber-500/[0.08] transition-all active:scale-[0.97]">
+                          → owner
+                        </button>
+                      )}
+                      {p.role !== 'admin' && (
+                        <button onClick={() => { setRoleTarget(p.email); setRoleValue('admin'); setTab('roles') }}
+                          className="mono text-[9px] px-2 py-1 rounded-lg border border-blue-500/15 text-blue-600/70 hover:text-blue-400 hover:bg-blue-500/[0.08] transition-all active:scale-[0.97]">
+                          → admin
+                        </button>
+                      )}
+                      {p.role !== 'user' && (
+                        <button onClick={() => { setRoleTarget(p.email); setRoleValue('user'); setTab('roles') }}
+                          className="mono text-[9px] px-2 py-1 rounded-lg border border-zinc-700/50 text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800/60 transition-all active:scale-[0.97]">
+                          → user
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* ── DANGER ZONE ── */}
-      {tab === 'danger' && (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] px-4 py-3 mono text-[10px] text-red-400/80">
-            ⚠ These controls have immediate, site-wide effects. They cannot be undone except manually.
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            {/* Emergency lock */}
-            <div className="neon-card p-5 space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-200">Emergency Lock</h3>
-                <p className="mono text-[10px] text-zinc-600 mt-1">Blocks all non-owner access to the platform instantly.</p>
+      {/* ── Audit Log Tab ── */}
+      {tab === 'logs' && (
+        <div className="space-y-2">
+          <p className="mono text-xs text-zinc-600 mb-4">Last 50 admin actions</p>
+          {logs.length === 0 && <p className="mono text-xs text-zinc-700 py-8 text-center">No entries yet.</p>}
+          {logs.map(l => (
+            <div key={l.id} className="glass-card rounded-xl px-4 py-3 flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className={`mono text-xs font-medium ${
+                    l.action.includes('ban') ? 'text-rose-400' :
+                    l.action.includes('unban') ? 'text-emerald-400' :
+                    l.action.includes('grant') ? 'text-amber-400' :
+                    'text-zinc-300'
+                  }`}>{l.action}</span>
+                  {l.target_email && <span className="mono text-[10px] text-zinc-600">→ {l.target_email}</span>}
+                </div>
+                <p className="mono text-[10px] text-zinc-700">{l.actor_email}</p>
               </div>
-              <button
-                onClick={toggleEmergencyLock}
-                className={`w-full mono text-xs rounded-xl px-4 py-3 border transition-all font-semibold ${
-                  emergencyLock
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
-                    : 'bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20'
-                }`}
-              >{emergencyLock ? '🔓 Deactivate Lock' : '🔒 Activate Emergency Lock'}</button>
+              <span className="mono text-[9px] text-zinc-700 flex-shrink-0">{new Date(l.created_at).toLocaleString()}</span>
             </div>
-
-            {/* Force logout all */}
-            <div className="neon-card p-5 space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-200">Force Logout All</h3>
-                <p className="mono text-[10px] text-zinc-600 mt-1">Invalidates all active user sessions across the platform.</p>
-              </div>
-              <button
-                onClick={forceLogoutAll}
-                disabled={working === 'logout-all'}
-                className="w-full mono text-xs rounded-xl px-4 py-3 border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-all font-semibold"
-              >{working === 'logout-all' ? '…' : '⏏ Force Logout Everyone'}</button>
-            </div>
-
-            {/* Maintenance mode */}
-            <div className="neon-card p-5 space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-200">Maintenance Mode</h3>
-                <p className="mono text-[10px] text-zinc-600 mt-1">Shows a maintenance banner to regular users.</p>
-              </div>
-              <button
-                onClick={toggleMaintenanceMode}
-                className={`w-full mono text-xs rounded-xl px-4 py-3 border transition-all font-semibold ${
-                  maintenanceMode
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                }`}
-              >{maintenanceMode ? '✓ Disable Maintenance Mode' : '⚙ Enable Maintenance Mode'}</button>
-            </div>
-
-            {/* Database export placeholder */}
-            <div className="neon-card p-5 space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-200">Data Export</h3>
-                <p className="mono text-[10px] text-zinc-600 mt-1">Export profiles and ban list as JSON.</p>
-              </div>
-              <button
-                onClick={() => {
-                  const blob = new Blob([JSON.stringify({ profiles, bans, flags, settings }, null, 2)], { type: 'application/json' })
-                  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-                  a.download = `alhekma-export-${Date.now()}.json`; a.click()
-                }}
-                className="w-full mono text-xs rounded-xl px-4 py-3 border border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 transition-all font-semibold"
-              >⬇ Export JSON</button>
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
-      <style>{`
-        .neon-card {
-          background: rgba(9,9,11,0.85);
-          border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 1rem;
-          box-shadow: 0 0 0 1px rgba(251,191,36,0.04), inset 0 1px 0 0 rgba(255,255,255,0.04);
-        }
-        .owner-input {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 0.625rem;
-          padding: 0.4rem 0.75rem;
-          font-size: 0.75rem;
-          color: #e4e4e7;
-          outline: none;
-          transition: border-color 0.15s;
-        }
-        .owner-input:focus { border-color: rgba(251,191,36,0.35); }
-        .owner-input::placeholder { color: #52525b; }
-        .owner-btn-amber {
-          background: rgba(251,191,36,0.1);
-          border: 1px solid rgba(251,191,36,0.25);
-          border-radius: 0.625rem;
-          padding: 0.4rem 1rem;
-          font-size: 0.7rem;
-          font-family: monospace;
-          color: #fcd34d;
-          cursor: pointer;
-          transition: all 0.15s;
-          white-space: nowrap;
-        }
-        .owner-btn-amber:hover { background: rgba(251,191,36,0.18); }
-        .owner-btn-amber:disabled { opacity: 0.4; cursor: default; }
-        .owner-btn-red {
-          background: rgba(239,68,68,0.1);
-          border: 1px solid rgba(239,68,68,0.25);
-          border-radius: 0.625rem;
-          padding: 0.4rem 1rem;
-          font-size: 0.7rem;
-          font-family: monospace;
-          color: #fca5a5;
-          cursor: pointer;
-          transition: all 0.15s;
-          white-space: nowrap;
-        }
-        .owner-btn-red:hover { background: rgba(239,68,68,0.18); }
-        .owner-btn-red:disabled { opacity: 0.4; cursor: default; }
-        .owner-btn-emerald {
-          background: rgba(16,185,129,0.1);
-          border: 1px solid rgba(16,185,129,0.25);
-          border-radius: 0.625rem;
-          padding: 0.4rem 1rem;
-          font-size: 0.7rem;
-          font-family: monospace;
-          color: #6ee7b7;
-          cursor: pointer;
-          transition: all 0.15s;
-          white-space: nowrap;
-        }
-        .owner-btn-emerald:hover { background: rgba(16,185,129,0.18); }
-        .owner-btn-emerald:disabled { opacity: 0.4; cursor: default; }
-      `}</style>
+      {/* ── Danger Zone ── */}
+      {tab === 'danger' && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-rose-500/20 bg-rose-500/[0.04] px-5 py-4">
+            <p className="text-xs text-rose-400/80 font-medium mb-1">⚠️ Danger Zone</p>
+            <p className="text-xs text-zinc-600">These actions are irreversible or affect all users.</p>
+          </div>
+          <DangerAction
+            label="Clear all chat messages"
+            desc="Permanently deletes every message in public chat."
+            onConfirm={async () => {
+              await sb.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+              await sb.rpc('log_admin_action', { p_action: 'danger_clear_chat', p_payload: {} })
+              flash('All chat cleared.')
+            }}
+          />
+          <DangerAction
+            label="Revoke all admin roles"
+            desc="Sets every non-owner profile to role=user."
+            onConfirm={async () => {
+              await sb.from('profiles').update({ role: 'user' }).neq('email', 'abdulla.mjasim@alhekma.com').eq('role', 'admin')
+              await sb.rpc('log_admin_action', { p_action: 'danger_revoke_all_admins', p_payload: {} })
+              flash('All admin roles revoked.')
+              fetchAll()
+            }}
+          />
+          <DangerAction
+            label="Wipe all bans"
+            desc="Removes every entry from banned_users."
+            onConfirm={async () => {
+              await sb.from('banned_users').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+              await sb.rpc('log_admin_action', { p_action: 'danger_wipe_bans', p_payload: {} })
+              flash('All bans cleared.')
+              fetchAll()
+            }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DangerAction({ label, desc, onConfirm }: { label: string; desc: string; onConfirm: () => Promise<void> }) {
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="glass-card rounded-2xl p-5 flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-semibold text-zinc-200">{label}</p>
+        <p className="mono text-[10px] text-zinc-600 mt-0.5">{desc}</p>
+      </div>
+      {!confirm ? (
+        <button onClick={() => setConfirm(true)}
+          className="flex-shrink-0 flex h-8 items-center px-4 rounded-xl border border-rose-500/20 bg-rose-500/[0.07] text-xs text-rose-400 hover:bg-rose-500/[0.14] transition-all active:scale-[0.98]">
+          Run
+        </button>
+      ) : (
+        <div className="flex-shrink-0 flex items-center gap-2">
+          <button onClick={() => setConfirm(false)} className="flex h-8 items-center px-3 rounded-xl border border-white/[0.08] text-xs text-zinc-500 hover:text-zinc-300 transition-all">Cancel</button>
+          <button
+            onClick={async () => { setBusy(true); await onConfirm(); setBusy(false); setConfirm(false) }}
+            disabled={busy}
+            className="flex h-8 items-center px-4 rounded-xl border border-rose-400/30 bg-rose-500/20 text-xs text-rose-300 hover:bg-rose-500/30 transition-all active:scale-[0.98] disabled:opacity-50">
+            {busy ? '…' : 'Confirm'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -83,8 +83,8 @@ export function Nav() {
                   {active && (
                     <motion.span
                       layoutId="nav-active-pill"
-                      className="absolute inset-0 rounded-lg"
-                      style={{ background: 'rgba(255,255,255,0.08)', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.08)' }}
+                      className="absolute inset-0 rounded-lg bg-white/[0.08]"
+                      style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.08)' }}
                       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                     />
                   )}

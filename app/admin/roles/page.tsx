@@ -94,14 +94,12 @@ export default function RolesPage() {
             value={targetEmail}
             onChange={e => setTargetEmail(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && grantRole()}
-            className="flex h-10 flex-1 rounded-xl border border-white/[0.08] px-4 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all duration-200 focus:border-white/[0.18] focus:outline-none"
-            style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
+            className="flex h-10 flex-1 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-4 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all duration-200 focus:border-white/[0.18] focus:outline-none shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]"
           />
           <select
             value={targetRole}
             onChange={e => setTargetRole(e.target.value as 'user' | 'admin' | 'owner')}
-            className="h-10 rounded-xl border border-white/[0.08] px-3 text-sm text-zinc-300 focus:outline-none focus:border-white/[0.18] transition-all"
-            style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
+            className="h-10 rounded-xl border border-white/[0.08] bg-zinc-900/60 px-3 text-sm text-zinc-300 focus:outline-none focus:border-white/[0.18] transition-all"
           >
             <option value="user">user</option>
             <option value="admin">admin</option>

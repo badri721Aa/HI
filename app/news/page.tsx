@@ -120,8 +120,7 @@ export default function NewsPage() {
             onChange={e => setCompose(e.target.value)}
             placeholder="Post an announcement..."
             rows={3}
-            className="w-full resize-none rounded-xl border border-white/[0.08] px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all duration-200 focus:border-white/[0.18] focus:outline-none"
-            style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
+            className="w-full resize-none rounded-xl border border-white/[0.08] bg-zinc-900/60 px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all duration-200 focus:border-white/[0.18] focus:outline-none shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]"
             onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) post() }}
           />
           <div className="flex items-center justify-between">
@@ -154,8 +153,7 @@ export default function NewsPage() {
             {editId === item.id ? (
               <div className="space-y-3">
                 <textarea
-                  className="w-full resize-none rounded-xl border border-white/[0.08] px-3 py-2 text-sm text-zinc-200 focus:border-white/[0.18] focus:outline-none"
-                  style={{ background: '#0A0A0C', boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)' }}
+                  className="w-full resize-none rounded-xl border border-white/[0.08] bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200 focus:border-white/[0.18] focus:outline-none"
                   value={editText}
                   onChange={e => setEditText(e.target.value)}
                   rows={3}
