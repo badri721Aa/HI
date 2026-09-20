@@ -279,6 +279,25 @@
 }
 .marquee-pause:hover .marquee-track { animation-play-state: paused; }
 
+/* Shimmer for skeleton loaders */
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(200%); }
+}
+
+/* Global reduced-motion respect — matches your manifesto */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .aurora::before, .aurora::after {
+    animation: none !important;
+  }
+}
+
 /* Kbd */
 kbd {
   display: inline-flex;
