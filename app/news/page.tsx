@@ -55,12 +55,15 @@ export default function NewsPage() {
   }, [])
 
   async function loadNews() {
-    const { data } = await sb.from('news')
+    // NOTE: don't filter with .eq('deleted', false) here — that hides rows
+    // where the DB column is NULL (default for new inserts before triggers
+    // set the flag). Client-side `visible` handles the filter safely below.
+    const { data, error } = await sb.from('news')
       .select('*')
-      .eq('deleted', false)
       .order('pinned', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(50)
+    if (error) console.error('[news] loadNews failed', error)
     if (data) setItems(data)
   }
 

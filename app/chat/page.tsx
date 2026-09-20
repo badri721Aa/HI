@@ -207,7 +207,7 @@ export default function ChatPage() {
 
     // Optimistic: clear input and show message immediately
     setInput('')
-    const tempId = `temp-${Date.now()}`
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
     const tempMsg: Message = {
       id: tempId,
       user_id: user.id,
@@ -219,8 +219,9 @@ export default function ChatPage() {
     }
     setMessages(prev => [...prev, tempMsg])
 
-    // Persist to DB and swap temp with real row
-    const { data } = await sb.from('chat_messages').insert({
+    // Persist to DB; swap or drop the temp depending on whether the
+    // realtime echo already added the real row.
+    const { data, error } = await sb.from('chat_messages').insert({
       user_id: user.id,
       user_name: displayName,
       message: text,
@@ -228,8 +229,21 @@ export default function ChatPage() {
       deleted: false,
     }).select().single()
 
+    if (error) {
+      // Restore input + drop temp on failure so the user can retry
+      console.error('[chat] send failed', error)
+      setMessages(prev => prev.filter(m => m.id !== tempId))
+      setInput(text)
+      return
+    }
+
     if (data) {
-      setMessages(prev => prev.map(m => m.id === tempId ? (data as Message) : m))
+      const real = data as Message
+      setMessages(prev => {
+        const alreadyReal = prev.some(m => m.id === real.id)
+        if (alreadyReal) return prev.filter(m => m.id !== tempId)
+        return prev.map(m => m.id === tempId ? real : m)
+      })
     }
   }
 
@@ -242,7 +256,15 @@ export default function ChatPage() {
   }
 
   async function deleteMessage(msg: Message) {
-    await sb.from('chat_messages').update({ deleted: true }).eq('id', msg.id)
+    // Optimistic: drop from UI immediately so the user gets feedback
+    setMessages(prev => prev.filter(m => m.id !== msg.id))
+    const { error } = await sb.from('chat_messages').update({ deleted: true }).eq('id', msg.id)
+    if (error) {
+      // RLS refused — likely because admins lack UPDATE policy on others' rows.
+      // Restore the message so the UI matches DB state and log for the operator.
+      console.error('[chat] delete refused', error)
+      setMessages(prev => [...prev, msg].sort((a, b) => a.created_at.localeCompare(b.created_at)))
+    }
   }
 
   async function toggleReaction(msgId: string, emoji: string) {
