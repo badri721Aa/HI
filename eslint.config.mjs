@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone Solana bot with its own package.json/tsconfig.
+    "bot/**",
   ]),
 ]);
 
