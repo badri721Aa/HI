@@ -360,34 +360,80 @@ public partial class MainWindow : Window
         try
         {
             var selected = _allGames.Where(g => g.IsSelected).ToList();
-            if (!selected.Any()) { MessageBox.Show("No games selected.", "Info", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+            if (!selected.Any())
+            { MessageBox.Show("Select at least one game first.", "Nothing selected", MessageBoxButton.OK, MessageBoxImage.Information); return; }
 
             var luaDir    = ResolveLuaToolsDir();
             var steamPath = _settings.SteamPath;
             if (luaDir == null) return;
             if (string.IsNullOrEmpty(steamPath))
-            { MessageBox.Show("Steam path not set. Go to Settings → Auto-Detect first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+            { MessageBox.Show("Steam path not set.\nGo to Settings → Auto-Detect first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
 
-            if (SteamService.IsSteamRunning() &&
-                MessageBox.Show("Steam is running.\n\nLua + manifest changes need a Steam restart to take effect. Continue?",
-                    "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            if (SteamService.IsSteamRunning())
+            {
+                if (MessageBox.Show(
+                    "Steam must be CLOSED before injecting.\n\nKill Steam now and continue?",
+                    "Kill Steam Required", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                SteamService.KillSteam();
+                System.Threading.Thread.Sleep(2000);
+            }
 
             int ok = 0, fail = 0;
             foreach (var g in selected)
             {
                 var (success, msg) = SteamService.InjectViaLuaTools(steamPath, g.AppId, g.Name, luaDir);
-                if (success) { ok++; g.IsInjected = true; } else fail++;
+                if (success) { ok++; g.IsInjected = false; } else fail++;
                 foreach (var line in msg.Split('\n', StringSplitOptions.RemoveEmptyEntries))
                     Log(line);
             }
             RefreshStatus();
             MessageBox.Show(
-                $"LuaTools — Done!\nGames processed: {ok}   Failed: {fail}\n\n" +
-                "Restart Steam for the games to show as 'Install' instead of 'Purchase'.\n" +
-                "(Requires Millennium + stplug-in plugin installed)",
-                "LuaTools", MessageBoxButton.OK, MessageBoxImage.Information);
+                $"Done! Processed: {ok}   Failed: {fail}\n\n" +
+                "Old manifests removed. Lua files written to stplug-in folder.\n\n" +
+                "Now START STEAM — Millennium will load the lua files\nand games will show 'Install' instead of 'Purchase'.",
+                "Add via LuaTools — Complete", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) { Log($"[ERROR] AddLuaTools: {ex.Message}"); }
+    }
+
+    private void BtnCleanManifests_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var steamPath = _settings.SteamPath;
+            if (string.IsNullOrEmpty(steamPath))
+            { MessageBox.Show("Steam path not set. Go to Settings → Auto-Detect.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+
+            // Find all injected games that are causing PURCHASE
+            var targets = _allGames.Where(g => g.IsInjected).ToList();
+            if (!targets.Any())
+            { MessageBox.Show("No injected manifests found to clean.", "Nothing to clean", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+
+            if (MessageBox.Show(
+                $"This will DELETE all {targets.Count} injected appmanifest ACF files.\n" +
+                "Games showing 'PURCHASE' will disappear from your library.\n\n" +
+                "You should then use 'Add via LuaTools' to re-add them properly.\n\nContinue?",
+                "Clean All Manifests", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+
+            if (SteamService.IsSteamRunning())
+            {
+                if (MessageBox.Show("Kill Steam first?", "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    SteamService.KillSteam();
+            }
+
+            int total = 0;
+            foreach (var g in targets)
+            {
+                int r = SteamService.RemoveAllAcf(steamPath, g.AppId);
+                if (r > 0) { g.IsInjected = false; total += r; }
+                Log($"[CLEAN] {g.Name} ({g.AppId}) — removed {r} file(s)");
+            }
+            RefreshStatus();
+            MessageBox.Show(
+                $"Cleaned {total} manifest file(s).\n\nNow use 'Add via LuaTools' to re-add selected games — they'll show 'Install' after Steam restarts.",
+                "Clean Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) { Log($"[ERROR] CleanManifests: {ex.Message}"); }
     }
 
     private void BtnRemoveSelected_Click(object sender, RoutedEventArgs e)
@@ -396,14 +442,15 @@ public partial class MainWindow : Window
         {
             var selected = _allGames.Where(g => g.IsSelected).ToList();
             if (!selected.Any()) return;
-            var lib = GetDefaultLibrary(); if (lib == null) return;
-            if (MessageBox.Show($"Remove {selected.Count} manifest(s) from {lib.Path}?", "Confirm Remove",
+            var steamPath = _settings.SteamPath;
+            if (string.IsNullOrEmpty(steamPath)) { MessageBox.Show("Steam path not set.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+            if (MessageBox.Show($"Remove {selected.Count} manifest(s)?", "Confirm Remove",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
             foreach (var g in selected)
             {
-                var removed = SteamService.RemoveManifest(lib.Path, g.AppId);
-                Log($"[{(removed ? "REMOVED" : "NOT FOUND")}] appmanifest_{g.AppId}.acf");
-                if (removed) g.IsInjected = false;
+                int r = SteamService.RemoveAllAcf(steamPath, g.AppId);
+                Log($"[{(r > 0 ? "REMOVED" : "NOT FOUND")}] appmanifest_{g.AppId}.acf");
+                if (r > 0) g.IsInjected = false;
             }
             RefreshStatus();
         }

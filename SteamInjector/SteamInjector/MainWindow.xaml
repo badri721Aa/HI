@@ -392,9 +392,10 @@
           <TextBlock Grid.Column="1" x:Name="TxtSelected" Text="0 selected" Foreground="#8888AA"
                      FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
           <StackPanel Grid.Column="2" Orientation="Horizontal">
-            <Button x:Name="BtnAddLuaTools"   Content="Add via LuaTools"   Style="{StaticResource LuaBtn}"     Margin="0,0,8,0" Click="BtnAddLuaTools_Click" Height="34"/>
-            <Button x:Name="BtnInjectSelected" Content="💉 Inject Selected" Style="{StaticResource PrimaryBtn}" Margin="0,0,8,0" Click="BtnInjectSelected_Click" Height="34"/>
-            <Button x:Name="BtnRemoveSelected" Content="🗑 Remove"          Style="{StaticResource DangerBtn}"  Click="BtnRemoveSelected_Click" Height="34"/>
+            <Button x:Name="BtnCleanManifests" Content="🧹 Clean PURCHASE Manifests" Style="{StaticResource DangerBtn}"  Margin="0,0,8,0" Click="BtnCleanManifests_Click" Height="34"/>
+            <Button x:Name="BtnAddLuaTools"    Content="➕ Add via LuaTools"         Style="{StaticResource LuaBtn}"     Margin="0,0,8,0" Click="BtnAddLuaTools_Click"   Height="34"/>
+            <Button x:Name="BtnInjectSelected" Content="💉 Inject ACF"              Style="{StaticResource PrimaryBtn}" Margin="0,0,8,0" Click="BtnInjectSelected_Click" Height="34"/>
+            <Button x:Name="BtnRemoveSelected" Content="🗑 Remove"                  Style="{StaticResource SecondaryBtn}" Click="BtnRemoveSelected_Click" Height="34"/>
           </StackPanel>
         </Grid>
       </Grid>
