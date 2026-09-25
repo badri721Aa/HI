@@ -631,7 +631,7 @@ class App(tk.Tk):
 
         self._lbl(toolbar, "Search:").pack(side="left")
         self._search = tk.StringVar()
-        self._search.trace("w", lambda *_: self._load_games())
+        self._search.trace_add("write", lambda *_: self._load_games())
         self._entry(toolbar, textvariable=self._search, width=28).pack(
             side="left", padx=(4, 14))
 
