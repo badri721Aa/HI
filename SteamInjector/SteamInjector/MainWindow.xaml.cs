@@ -5,6 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using WinFormsColor = System.Drawing.Color;
+using WinFormsMessageBox = System.Windows.Forms.MessageBox;
+using WinFormsButton = System.Windows.Forms.Button;
 
 namespace SteamInjector;
 
@@ -240,7 +243,7 @@ public partial class MainWindow : Window
 
     private void Nav_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn) return;
+        if (sender is not System.Windows.Controls.Button btn) return;
         ShowPage(btn.Tag?.ToString() ?? "Dashboard");
     }
 
