@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 import threading
-import requests
 import shutil
 import zipfile
 import tempfile
