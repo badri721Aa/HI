@@ -362,21 +362,29 @@ public partial class MainWindow : Window
             var selected = _allGames.Where(g => g.IsSelected).ToList();
             if (!selected.Any()) { MessageBox.Show("No games selected.", "Info", MessageBoxButton.OK, MessageBoxImage.Information); return; }
 
-            var luaDir = ResolveLuaToolsDir();
+            var luaDir    = ResolveLuaToolsDir();
+            var steamPath = _settings.SteamPath;
             if (luaDir == null) return;
+            if (string.IsNullOrEmpty(steamPath))
+            { MessageBox.Show("Steam path not set. Go to Settings → Auto-Detect first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
 
             if (SteamService.IsSteamRunning() &&
-                MessageBox.Show("Steam is running. Lua changes take effect after Steam restarts.\n\nContinue?",
+                MessageBox.Show("Steam is running.\n\nLua + manifest changes need a Steam restart to take effect. Continue?",
                     "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
 
             int ok = 0, fail = 0;
             foreach (var g in selected)
             {
-                var (success, msg) = WriteLuaFile(luaDir, g.AppId, g.Name);
-                if (success) ok++; else fail++;
-                Log(msg);
+                var (success, msg) = SteamService.InjectViaLuaTools(steamPath, g.AppId, g.Name, luaDir);
+                if (success) { ok++; g.IsInjected = true; } else fail++;
+                foreach (var line in msg.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                    Log(line);
             }
-            MessageBox.Show($"LuaTools — Done!\nWritten: {ok}   Failed: {fail}\n\nRestart Steam for changes to apply.",
+            RefreshStatus();
+            MessageBox.Show(
+                $"LuaTools — Done!\nGames processed: {ok}   Failed: {fail}\n\n" +
+                "Restart Steam for the games to show as 'Install' instead of 'Purchase'.\n" +
+                "(Requires Millennium + stplug-in plugin installed)",
                 "LuaTools", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) { Log($"[ERROR] AddLuaTools: {ex.Message}"); }
@@ -445,16 +453,21 @@ public partial class MainWindow : Window
             var name = TxtInjectName.Text.Trim();
             if (string.IsNullOrEmpty(name)) { TxtInjectResult.Text = "[ERROR] Game name required."; return; }
 
-            var luaDir = ResolveLuaToolsDir();
+            var luaDir    = ResolveLuaToolsDir();
+            var steamPath = _settings.SteamPath;
             if (luaDir == null) return;
+            if (string.IsNullOrEmpty(steamPath))
+            { TxtInjectResult.Text = "[ERROR] Steam path not set. Go to Settings → Auto-Detect."; return; }
 
             if (SteamService.IsSteamRunning() &&
-                MessageBox.Show("Steam is running. Lua changes apply after restart.\n\nContinue?",
+                MessageBox.Show("Steam is running. Changes apply after restart.\n\nContinue?",
                     "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
 
-            var (ok, msg) = WriteLuaFile(luaDir, appId, name);
+            var (ok, msg) = SteamService.InjectViaLuaTools(steamPath, appId, name, luaDir);
             TxtInjectResult.Text = msg;
-            Log(msg);
+            foreach (var line in msg.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                Log(line);
+            if (ok) RefreshStatus();
         }
         catch (Exception ex)
         {
@@ -674,25 +687,6 @@ public partial class MainWindow : Window
             return null;
         }
         return dir;
-    }
-
-    private (bool ok, string msg) WriteLuaFile(string dir, int appId, string name)
-    {
-        try
-        {
-            var lua  = SteamService.GenerateLua(appId, name, null);
-            var path = Path.Combine(dir, $"{appId}.lua");
-            File.WriteAllText(path, lua);
-            return (true, $"[LUATOOLS] Written: {path}");
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return (false, $"[ERROR] Access denied writing lua for {appId}. Run as Administrator.");
-        }
-        catch (Exception ex)
-        {
-            return (false, $"[ERROR] Lua write {appId}: {ex.Message}");
-        }
     }
 
     // ── Generic helpers ───────────────────────────────────────────────────────
