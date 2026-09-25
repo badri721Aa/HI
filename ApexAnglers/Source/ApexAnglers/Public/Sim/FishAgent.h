@@ -104,7 +104,8 @@ namespace apex::sim
 			if (bSubmerged && S.Behavior != EFishBehavior::Breach)
 			{
 				const double Depth = Surface - S.Position.Z;
-				Swim.Z += Clamp((Depth - Species.CruiseDepth) * -40.0, -Species.MaxForce, Species.MaxForce) * 0.5;
+				// Too shallow (Depth < CruiseDepth) -> push down; too deep -> push up.
+				Swim.Z += Clamp((Depth - Species.CruiseDepth) * 40.0, -Species.MaxForce, Species.MaxForce) * 0.5;
 			}
 
 			// Breach: kick upward once close to the surface -> airborne arc.

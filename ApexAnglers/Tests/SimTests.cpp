@@ -181,6 +181,20 @@ TEST(Fight_IsDeterministicPerSeed)
 	CHECK(A.GetElapsed() != C.GetElapsed() || A.Fish.State.Position.X != C.Fish.State.Position.X, "different seed should differ");
 }
 
+TEST(Fish_HoldsCruiseDepthWithoutLine)
+{
+	// Regression: depth-keeping force had the wrong sign and floated fish to the surface.
+	WaveField Water;
+	Water.SetWaves({});
+	FishAgent Fish;
+	FishSpecies Sp;
+	Fish.Reset(Sp, Vec3(20, 0, -0.5), 11);
+	int Airborne = 0;
+	for (int I = 0; I < 240 * 10; ++I) { Fish.Step(1.0 / 240.0, Vec3(0, 0, 2), 0.0, Water, I / 240.0); Airborne += Fish.State.bAirborne; }
+	CHECK(Fish.State.Position.Z < -1.0, "fish should settle toward cruise depth (z=%f)", Fish.State.Position.Z);
+	CHECK(Airborne < 240, "fish shouldn't spend seconds out of the water on its own (%d steps)", Airborne);
+}
+
 TEST(Fight_AnchorForcePointsAtFish)
 {
 	FishFight F;
