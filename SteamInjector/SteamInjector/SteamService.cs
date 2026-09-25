@@ -197,14 +197,14 @@ public static class SteamService
     public static (bool ok, string msg) InjectManifest(
         string steamAppsPath, int appId, string name,
         bool generateLua = false, string? luaOutputDir = null,
-        int stateFlags = 4, List<(int, string)>? depots = null)
+        int stateFlags = 4, string buildId = "0", List<(int, string)>? depots = null)
     {
         try
         {
             if (!Directory.Exists(steamAppsPath))
                 return (false, $"steamapps path not found: {steamAppsPath}");
 
-            var acfContent = GenerateAcf(appId, name, stateFlags, depots: depots);
+            var acfContent = GenerateAcf(appId, name, stateFlags, buildId: buildId, depots: depots);
             var acfPath = System.IO.Path.Combine(steamAppsPath, $"appmanifest_{appId}.acf");
             File.WriteAllText(acfPath, acfContent, Encoding.UTF8);
 
