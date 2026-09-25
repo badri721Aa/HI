@@ -1,4 +1,5 @@
 using System.Windows;
+using FormsApp = System.Windows.Forms.Application;
 
 namespace SteamInjector;
 
