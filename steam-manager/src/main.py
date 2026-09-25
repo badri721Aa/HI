@@ -439,11 +439,12 @@ class SteamKitApp(tk.Tk):
                      foreground=PALETTE["accent"])
 
     def _btn(self, parent, text, cmd, color=None, **kwargs):
+        kwargs.setdefault("font", ("Segoe UI", 9, "bold"))
         b = tk.Button(parent, text=text, command=cmd,
                       bg=color or PALETTE["surface2"], fg=PALETTE["text"],
                       activebackground=PALETTE["accent2"], activeforeground=PALETTE["text"],
                       relief="flat", bd=0, padx=12, pady=5,
-                      font=("Segoe UI", 9, "bold"), cursor="hand2", **kwargs)
+                      cursor="hand2", **kwargs)
         return b
 
     def _entry(self, parent, textvariable=None, **kwargs):
