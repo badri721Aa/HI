@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep Waters</title>
+<style>
+  :root { --bg:#06121f; --panel:#0d2033f2; --line:#23445f; --ink:#e8f4ff; --dim:#8fb0c8; --acc:#3ad1c5; --gold:#ffc94a; --red:#ff4d5e; --good:#5ee37a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; overflow: hidden; user-select: none; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  button { font: inherit; color: var(--ink); background: #173450; border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; transition: background .12s, transform .06s; }
+  button:hover { background: #1f4568; } button:active { transform: translateY(1px); }
+  button.primary { background: linear-gradient(180deg,#2bc1b6,#1b8f87); border-color: #3ad1c5; color: #032; font-weight: 800; }
+  button.danger { background: #5a1a22; border-color: #8a2a36; }
+  button:disabled { opacity: .45; cursor: default; }
+  input, select { font: inherit; color: var(--ink); background: #0a1a2a; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; outline: none; }
+  input:focus, select:focus { border-color: var(--acc); }
+  .hidden { display: none !important; }
+  .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 30%, #0f335099 0%, #04101cdd 70%); z-index: 20; }
+  .screen.overlay { background: rgba(2,8,16,.72); backdrop-filter: blur(3px); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: 0 20px 60px #0008; max-height: 92vh; overflow: auto; }
+  h1.logo { font-size: 64px; margin: 0; letter-spacing: 4px; font-weight: 900; background: linear-gradient(180deg,#bff9ff,#2bc1b6 55%,#0b5d7a); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 8px 30px #2bc1b644; }
+  .tag { color: var(--dim); margin: 4px 0 22px; letter-spacing: 1px; }
+  .menu { display: grid; gap: 10px; width: 320px; }
+  .menu button { padding: 12px; font-size: 16px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .col { display: flex; flex-direction: column; gap: 8px; }
+  .muted { color: var(--dim); }
+  .small { font-size: 12px; }
+  .gold { color: var(--gold); } .good { color: var(--good); } .bad { color: var(--red); }
+  table.lob { width: 100%; border-collapse: collapse; }
+  table.lob td, table.lob th { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: #173450; border: 1px solid var(--line); }
+  .pill.pvp { background: #5a1a22; border-color: #8a2a36; } .pill.off { background: #1b4d2e; border-color: #2e7a4a; }
+  /* panels */
+  .panel { width: min(1100px, 96vw); height: min(760px, 92vh); display: flex; flex-direction: column; }
+  .panel header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .panel header h2 { margin: 0; flex: 1; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tabs button.on { background: var(--acc); color: #032; font-weight: 800; }
+  .scroll { flex: 1; overflow: auto; padding-right: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .item { background: #0a1a2a; border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .item.owned { border-color: #2e7a4a; } .item.equipped { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
+  .item h4 { margin: 0; font-size: 15px; }
+  .stats { font-size: 12px; color: var(--dim); display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; }
+  .cargo-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-bottom: 1px solid #16304a; }
+  .cargo-row canvas { background: #0a1a2a; border-radius: 6px; }
+  .cargo-row .n { flex: 1; }
+  .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .dex .e { background: #0a1a2a; border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; font-size: 12px; cursor: pointer; }
+  .dex .e canvas { display: block; margin: 0 auto 4px; }
+  .dex .e.unk { opacity: .6; }
+  .ach { display: flex; gap: 10px; align-items: center; padding: 8px; border-bottom: 1px solid #16304a; }
+  .ach .i { width: 30px; height: 30px; border-radius: 8px; background: #173450; display: grid; place-items: center; font-weight: 900; }
+  .ach.got .i { background: var(--gold); color: #321; }
+  /* hud dom bits */
+  #chat { position: fixed; left: 14px; bottom: 120px; width: 380px; z-index: 5; pointer-events: none; }
+  #chatlog div { background: #0008; padding: 3px 8px; border-radius: 6px; margin-top: 3px; width: fit-content; max-width: 100%; text-shadow: 0 1px 2px #000; animation: fadeout 12s forwards; }
+  #chatlog div.sys { color: var(--dim); font-style: italic; }
+  #chat.open #chatlog div { animation: none; opacity: 1; }
+  #chatin { width: 100%; margin-top: 6px; pointer-events: auto; }
+  @keyframes fadeout { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+  #toasts { position: fixed; top: 90px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
+  .toast { background: #0d2033ee; border: 1px solid var(--line); border-radius: 10px; padding: 8px 16px; font-weight: 600; animation: toast 3.2s forwards; }
+  .toast.good { border-color: #2e7a4a; } .toast.warn { border-color: #8a6a1a; } .toast.bad { border-color: #8a2a36; } .toast.big { font-size: 20px; border-color: var(--gold); color: var(--gold); }
+  @keyframes toast { 0% { opacity: 0; transform: translateY(-8px); } 8%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  #catch { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 7; width: 300px; text-align: center; pointer-events: none; }
+  #catch .card { animation: pop .35s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+  #catch h3 { margin: 6px 0 2px; }
+  .kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; background: #0a1a2a; font-size: 12px; text-align: center; }
+  .help td { padding: 4px 10px 4px 0; }
+  #scoreboard { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 8; min-width: 520px; }
+  .vol { width: 160px; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="chat" class="hidden"><div id="chatlog"></div><input id="chatin" class="hidden" maxlength="140" placeholder="Say something… (Enter to send, Esc to cancel)"></div>
+<div id="toasts"></div>
+<div id="catch" class="hidden"></div>
+<div id="scoreboard" class="card hidden"></div>
+
+<!-- main menu -->
+<div id="s-menu" class="screen">
+  <div style="text-align:center">
+    <h1 class="logo">DEEP WATERS</h1>
+    <div class="tag">FISH · FIGHT · SURVIVE · <span id="speciesCount">1000+</span> SPECIES · <span id="bossCount">15</span> BOSSES</div>
+    <div class="menu" style="margin:0 auto">
+      <input id="nameIn" maxlength="16" placeholder="Captain name">
+      <button class="primary" id="bSolo">⚓ Play Solo</button>
+      <button id="bMulti">🌐 Multiplayer</button>
+      <button id="bHelp">📖 How to Play</button>
+      <button id="bSettings">⚙ Settings</button>
+      <div class="muted small">Solo saves are stored on this device. Online progress is stored on the server.</div>
+    </div>
+  </div>
+</div>
+
+<!-- multiplayer -->
+<div id="s-multi" class="screen hidden">
+  <div class="card" style="width:min(820px,96vw)">
+    <div class="row" style="margin-bottom:12px"><h2 style="margin:0;flex:1">Multiplayer</h2><button id="mBack">← Back</button></div>
+    <div class="row" style="margin-bottom:10px">
+      <span class="muted">Server</span><input id="srvIn" style="flex:1" placeholder="ws://localhost:8080/ws"><button id="mConnect" class="primary">Connect</button>
+      <span id="mStatus" class="small muted"></span>
+    </div>
+    <div id="mLobbies" class="hidden">
+      <div class="row" style="justify-content:space-between;margin:6px 0"><b>Public &amp; private lobbies</b><button id="mRefresh">⟳ Refresh</button></div>
+      <table class="lob"><thead><tr><th>Name</th><th>Type</th><th>Mode</th><th>Players</th><th></th></tr></thead><tbody id="lobBody"></tbody></table>
+      <div class="row" style="margin-top:14px">
+        <b>Have an invite code?</b><input id="invIn" maxlength="8" placeholder="INVITE CODE" style="text-transform:uppercase;width:140px"><button id="mInvJoin">Join</button>
+        <span class="muted">or lobby ID</span><input id="idIn" maxlength="6" placeholder="ID" style="text-transform:uppercase;width:90px"><button id="mIdJoin">Join</button>
+      </div>
+      <div class="card" style="margin-top:14px;padding:14px;background:#0a1a2a">
+        <b>Create lobby</b> <span class="muted small">(max 10 players)</span>
+        <div class="row" style="margin-top:8px">
+          <input id="cName" maxlength="28" placeholder="Lobby name">
+          <select id="cType"><option value="public">Public — anyone can join</option><option value="private">Private — password</option><option value="invite">Invite only — hidden, invite codes</option></select>
+          <input id="cPw" maxlength="32" placeholder="Password" class="hidden">
+          <label class="row"><input type="checkbox" id="cPvp"> PvP</label>
+          <button id="mCreate" class="primary">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- generic overlay panel -->
+<div id="s-panel" class="screen overlay hidden"><div class="card panel" id="panel"></div></div>
+
+<script src="../shared/data.js"></script>
+<script src="../shared/sim.js"></script>
+<script src="audio.js"></script>
+<script src="render.js"></script>
+<script src="ui.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

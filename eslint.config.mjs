@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone game (own package, plain JS + Node server)
+    "game/**",
   ]),
 ]);
 

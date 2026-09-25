@@ -1,0 +1,31 @@
+{
+  "name": "deep-waters-desktop",
+  "version": "0.1.0",
+  "description": "Deep Waters desktop build (Electron + Steamworks)",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "copy": "node copy-game.js",
+    "start": "npm run copy && electron .",
+    "dist": "npm run copy && electron-builder --win --linux",
+    "dist:mac": "npm run copy && electron-builder --mac"
+  },
+  "dependencies": {
+    "steamworks.js": "^0.4.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.deepwaters.game",
+    "productName": "Deep Waters",
+    "files": ["main.js", "preload.js", "config.json", "app/**/*"],
+    "extraFiles": [{ "from": "steam_appid.txt", "to": "steam_appid.txt" }],
+    "asarUnpack": ["node_modules/steamworks.js/dist/**/*"],
+    "win": { "target": "dir" },
+    "linux": { "target": "dir" },
+    "mac": { "target": "dir" },
+    "directories": { "output": "dist" }
+  }
+}

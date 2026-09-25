@@ -1,0 +1,15 @@
+{
+  "name": "deep-waters",
+  "version": "0.1.0",
+  "description": "Deep Waters — multiplayer ocean fishing, guns, gore and bosses. Up to 10 players per lobby.",
+  "private": true,
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node test/sim.test.js && node test/server.test.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
