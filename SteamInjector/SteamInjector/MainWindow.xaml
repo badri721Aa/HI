@@ -7,6 +7,83 @@
         Background="#0F0F12" Foreground="#E8E8F0">
 
   <Window.Resources>
+
+    <!-- ── Base button template ── -->
+    <ControlTemplate x:Key="RoundBtnTemplate" TargetType="Button">
+      <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="7"
+              Padding="{TemplateBinding Padding}">
+        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      </Border>
+      <ControlTemplate.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter TargetName="bd" Property="Opacity" Value="0.85"/>
+        </Trigger>
+        <Trigger Property="IsPressed" Value="True">
+          <Setter TargetName="bd" Property="Opacity" Value="0.65"/>
+        </Trigger>
+        <Trigger Property="IsEnabled" Value="False">
+          <Setter TargetName="bd" Property="Opacity" Value="0.4"/>
+        </Trigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <!-- ── Button styles ── -->
+    <Style x:Key="PrimaryBtn" TargetType="Button">
+      <Setter Property="Background"  Value="#6C5CE7"/>
+      <Setter Property="Foreground"  Value="#FFFFFF"/>
+      <Setter Property="FontWeight"  Value="SemiBold"/>
+      <Setter Property="FontSize"    Value="13"/>
+      <Setter Property="Padding"     Value="16,8"/>
+      <Setter Property="Cursor"      Value="Hand"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Template"    Value="{StaticResource RoundBtnTemplate}"/>
+    </Style>
+
+    <Style x:Key="SecondaryBtn" TargetType="Button">
+      <Setter Property="Background"  Value="#2A2A3E"/>
+      <Setter Property="Foreground"  Value="#C0C0D8"/>
+      <Setter Property="FontWeight"  Value="Normal"/>
+      <Setter Property="FontSize"    Value="13"/>
+      <Setter Property="Padding"     Value="14,7"/>
+      <Setter Property="Cursor"      Value="Hand"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Template"    Value="{StaticResource RoundBtnTemplate}"/>
+    </Style>
+
+    <Style x:Key="GreenBtn" TargetType="Button">
+      <Setter Property="Background"  Value="#00B894"/>
+      <Setter Property="Foreground"  Value="#FFFFFF"/>
+      <Setter Property="FontWeight"  Value="SemiBold"/>
+      <Setter Property="FontSize"    Value="13"/>
+      <Setter Property="Padding"     Value="14,7"/>
+      <Setter Property="Cursor"      Value="Hand"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Template"    Value="{StaticResource RoundBtnTemplate}"/>
+    </Style>
+
+    <Style x:Key="DangerBtn" TargetType="Button">
+      <Setter Property="Background"  Value="#D63031"/>
+      <Setter Property="Foreground"  Value="#FFFFFF"/>
+      <Setter Property="FontWeight"  Value="SemiBold"/>
+      <Setter Property="FontSize"    Value="13"/>
+      <Setter Property="Padding"     Value="14,7"/>
+      <Setter Property="Cursor"      Value="Hand"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Template"    Value="{StaticResource RoundBtnTemplate}"/>
+    </Style>
+
+    <Style x:Key="LuaBtn" TargetType="Button">
+      <Setter Property="Background"  Value="#0984E3"/>
+      <Setter Property="Foreground"  Value="#FFFFFF"/>
+      <Setter Property="FontWeight"  Value="SemiBold"/>
+      <Setter Property="FontSize"    Value="13"/>
+      <Setter Property="Padding"     Value="14,7"/>
+      <Setter Property="Cursor"      Value="Hand"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Template"    Value="{StaticResource RoundBtnTemplate}"/>
+    </Style>
+
+    <!-- ── Nav button styles ── -->
     <Style x:Key="NavBtn" TargetType="Button">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Foreground" Value="#8888AA"/>
@@ -22,18 +99,102 @@
               <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#2A2A36"/><Setter Property="Foreground" Value="#E8E8F0"/></Trigger>
-              <Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="#362E5E"/></Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#2A2A36"/>
+                <Setter Property="Foreground" Value="#E8E8F0"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="#362E5E"/>
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
       </Setter>
     </Style>
+
     <Style x:Key="NavBtnActive" TargetType="Button" BasedOn="{StaticResource NavBtn}">
       <Setter Property="Background" Value="#1E1E30"/>
       <Setter Property="Foreground" Value="#6C5CE7"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
+
+    <!-- ── TextBox ── -->
+    <Style x:Key="DarkTextBox" TargetType="TextBox">
+      <Setter Property="Background"       Value="#1A1A28"/>
+      <Setter Property="Foreground"       Value="#E8E8F0"/>
+      <Setter Property="CaretBrush"       Value="#E8E8F0"/>
+      <Setter Property="BorderBrush"      Value="#3A3A52"/>
+      <Setter Property="BorderThickness"  Value="1"/>
+      <Setter Property="Padding"          Value="10,7"/>
+      <Setter Property="FontSize"         Value="13"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="6">
+              <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsFocused" Value="True">
+                <Setter Property="BorderBrush" Value="#6C5CE7"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- ── ComboBox ── -->
+    <Style x:Key="DarkCombo" TargetType="ComboBox">
+      <Setter Property="Background"      Value="#1A1A28"/>
+      <Setter Property="Foreground"      Value="#E8E8F0"/>
+      <Setter Property="BorderBrush"     Value="#3A3A52"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding"         Value="10,7"/>
+      <Setter Property="FontSize"        Value="13"/>
+    </Style>
+
+    <!-- ── ListBox ── -->
+    <Style x:Key="DarkListBox" TargetType="ListBox">
+      <Setter Property="Background"      Value="#161620"/>
+      <Setter Property="BorderBrush"     Value="#2A2A36"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground"      Value="#E8E8F0"/>
+      <Setter Property="FontSize"        Value="13"/>
+      <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+    </Style>
+
+    <Style x:Key="DarkListItem" TargetType="ListBoxItem">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="#E8E8F0"/>
+      <Setter Property="Padding"    Value="8,4"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Border Background="{TemplateBinding Background}" CornerRadius="4" Margin="2,1" Padding="{TemplateBinding Padding}">
+              <ContentPresenter/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#252535"/>
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="#2D2B55"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- ── CheckBox ── -->
+    <Style x:Key="DarkCheckBox" TargetType="CheckBox">
+      <Setter Property="Foreground" Value="#C0C0D8"/>
+      <Setter Property="FontSize"   Value="13"/>
+    </Style>
+
   </Window.Resources>
 
   <Grid>
@@ -42,7 +203,7 @@
       <ColumnDefinition Width="*"/>
     </Grid.ColumnDefinitions>
 
-    <!-- Sidebar -->
+    <!-- ── Sidebar ── -->
     <Border Grid.Column="0" Background="#161620" BorderBrush="#2A2A36" BorderThickness="0,0,1,0">
       <DockPanel>
         <StackPanel DockPanel.Dock="Top" Margin="16,20,16,24">
@@ -66,12 +227,12 @@
           <Button x:Name="BtnNavDepot"    Content="📦  Depot Config"    Style="{StaticResource NavBtn}"       Click="Nav_Click" Tag="Depot"/>
           <Button x:Name="BtnNavBatch"    Content="⚡  Batch Inject"    Style="{StaticResource NavBtn}"       Click="Nav_Click" Tag="Batch"/>
           <Button x:Name="BtnNavLog"      Content="📋  Log Terminal"    Style="{StaticResource NavBtn}"       Click="Nav_Click" Tag="Log"/>
-          <Button x:Name="BtnNavSettings" Content="⚙️  Settings"         Style="{StaticResource NavBtn}"       Click="Nav_Click" Tag="Settings"/>
+          <Button x:Name="BtnNavSettings" Content="⚙️  Settings"        Style="{StaticResource NavBtn}"       Click="Nav_Click" Tag="Settings"/>
         </StackPanel>
       </DockPanel>
     </Border>
 
-    <!-- Content -->
+    <!-- ── Content area ── -->
     <Grid Grid.Column="1">
 
       <!-- DASHBOARD -->
@@ -81,16 +242,32 @@
           <TextBlock x:Name="TxtSteamPathDash" Text="Steam Path: (not detected)" FontSize="13" Foreground="#8888AA" Margin="0,0,0,18"/>
           <WrapPanel Orientation="Horizontal" Margin="0,0,0,24">
             <Border Background="#1F1F28" CornerRadius="12" Padding="20,16" Margin="0,0,12,12" Width="200">
-              <StackPanel><TextBlock Text="🎮" FontSize="28"/><TextBlock x:Name="StatGames" Text="0" FontSize="30" FontWeight="Bold" Foreground="#6C5CE7" Margin="0,4,0,2"/><TextBlock Text="Games in DB" FontSize="12" Foreground="#8888AA"/></StackPanel>
+              <StackPanel>
+                <TextBlock Text="🎮" FontSize="28"/>
+                <TextBlock x:Name="StatGames" Text="0" FontSize="30" FontWeight="Bold" Foreground="#6C5CE7" Margin="0,4,0,2"/>
+                <TextBlock Text="Games in DB" FontSize="12" Foreground="#8888AA"/>
+              </StackPanel>
             </Border>
             <Border Background="#1F1F28" CornerRadius="12" Padding="20,16" Margin="0,0,12,12" Width="200">
-              <StackPanel><TextBlock Text="💉" FontSize="28"/><TextBlock x:Name="StatInjected" Text="0" FontSize="30" FontWeight="Bold" Foreground="#00CEC9" Margin="0,4,0,2"/><TextBlock Text="Injected Manifests" FontSize="12" Foreground="#8888AA"/></StackPanel>
+              <StackPanel>
+                <TextBlock Text="💉" FontSize="28"/>
+                <TextBlock x:Name="StatInjected" Text="0" FontSize="30" FontWeight="Bold" Foreground="#00CEC9" Margin="0,4,0,2"/>
+                <TextBlock Text="Injected Manifests" FontSize="12" Foreground="#8888AA"/>
+              </StackPanel>
             </Border>
             <Border Background="#1F1F28" CornerRadius="12" Padding="20,16" Margin="0,0,12,12" Width="200">
-              <StackPanel><TextBlock Text="📂" FontSize="28"/><TextBlock x:Name="StatLibs" Text="0" FontSize="30" FontWeight="Bold" Foreground="#FDCB6E" Margin="0,4,0,2"/><TextBlock Text="Library Folders" FontSize="12" Foreground="#8888AA"/></StackPanel>
+              <StackPanel>
+                <TextBlock Text="📂" FontSize="28"/>
+                <TextBlock x:Name="StatLibs" Text="0" FontSize="30" FontWeight="Bold" Foreground="#FDCB6E" Margin="0,4,0,2"/>
+                <TextBlock Text="Library Folders" FontSize="12" Foreground="#8888AA"/>
+              </StackPanel>
             </Border>
             <Border Background="#1F1F28" CornerRadius="12" Padding="20,16" Margin="0,0,12,12" Width="200">
-              <StackPanel><TextBlock Text="⚡" FontSize="28"/><TextBlock x:Name="StatStatus" Text="OFFLINE" FontSize="22" FontWeight="Bold" Foreground="#FF4757" Margin="0,4,0,2"/><TextBlock Text="Steam Running" FontSize="12" Foreground="#8888AA"/></StackPanel>
+              <StackPanel>
+                <TextBlock Text="⚡" FontSize="28"/>
+                <TextBlock x:Name="StatStatus" Text="OFFLINE" FontSize="22" FontWeight="Bold" Foreground="#FF4757" Margin="0,4,0,2"/>
+                <TextBlock Text="Steam Running" FontSize="12" Foreground="#8888AA"/>
+              </StackPanel>
             </Border>
           </WrapPanel>
           <TextBlock Text="Library Folders" FontSize="15" FontWeight="SemiBold" Foreground="#E8E8F0" Margin="0,0,0,8"/>
@@ -99,9 +276,9 @@
           </ListBox>
           <WrapPanel Margin="0,16,0,0">
             <Button Content="🔄 Refresh Status" Style="{StaticResource SecondaryBtn}" Margin="0,0,8,0" Click="BtnRefresh_Click"/>
-            <Button Content="▶ Start Steam" Style="{StaticResource GreenBtn}" Margin="0,0,8,0" Click="BtnStartSteam_Click"/>
-            <Button Content="⏹ Kill Steam" Style="{StaticResource DangerBtn}" Margin="0,0,8,0" Click="BtnKillSteam_Click"/>
-            <Button Content="🔁 Restart Steam" Style="{StaticResource SecondaryBtn}" Click="BtnRestartSteam_Click"/>
+            <Button Content="▶ Start Steam"     Style="{StaticResource GreenBtn}"     Margin="0,0,8,0" Click="BtnStartSteam_Click"/>
+            <Button Content="⏹ Kill Steam"      Style="{StaticResource DangerBtn}"    Margin="0,0,8,0" Click="BtnKillSteam_Click"/>
+            <Button Content="🔁 Restart Steam"  Style="{StaticResource SecondaryBtn}"               Click="BtnRestartSteam_Click"/>
           </WrapPanel>
         </StackPanel>
       </ScrollViewer>
@@ -109,26 +286,45 @@
       <!-- GAME BROWSER -->
       <Grid x:Name="PageGames" Visibility="Collapsed" Margin="28,24,28,16">
         <Grid.RowDefinitions>
-          <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+
         <TextBlock Text="Game Browser" FontSize="22" FontWeight="Bold" Foreground="#E8E8F0" Margin="0,0,0,4"/>
-        <TextBlock Grid.Row="0" x:Name="TxtGameCount" Text="0 games" FontSize="12" Foreground="#8888AA" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,0,4"/>
+        <TextBlock Grid.Row="0" x:Name="TxtGameCount" Text="0 games" FontSize="12" Foreground="#8888AA"
+                   VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,0,4"/>
+
         <Grid Grid.Row="1" Margin="0,8,0,12">
-          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="160"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
           <TextBox x:Name="TxtSearch" Style="{StaticResource DarkTextBox}" TextChanged="TxtSearch_TextChanged"/>
           <ComboBox Grid.Column="1" x:Name="CmbGenre" Style="{StaticResource DarkCombo}" Margin="8,0,0,0" SelectionChanged="CmbGenre_SelectionChanged"/>
-          <CheckBox Grid.Column="2" x:Name="ChkSelectedOnly" Content="Selected only" Style="{StaticResource DarkCheckBox}" Margin="10,0,0,0" VerticalAlignment="Center" Checked="ChkSelectedOnly_Changed" Unchecked="ChkSelectedOnly_Changed"/>
+          <CheckBox Grid.Column="2" x:Name="ChkSelectedOnly" Content="Selected only" Style="{StaticResource DarkCheckBox}"
+                    Margin="10,0,0,0" VerticalAlignment="Center" Checked="ChkSelectedOnly_Changed" Unchecked="ChkSelectedOnly_Changed"/>
         </Grid>
+
         <Border Grid.Row="2" Background="#161620" CornerRadius="8" BorderBrush="#2A2A36" BorderThickness="1">
-          <ListBox x:Name="ListGames" Style="{StaticResource DarkListBox}" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox x:Name="ListGames" Style="{StaticResource DarkListBox}" BorderThickness="0"
+                   Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemContainerStyle>
               <Style TargetType="ListBoxItem">
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="Template">
                   <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                      <Border Background="{TemplateBinding Background}" CornerRadius="4" Margin="3,1"><ContentPresenter/></Border>
-                      <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#252535"/></Trigger></ControlTemplate.Triggers>
+                      <Border Background="{TemplateBinding Background}" CornerRadius="4" Margin="3,1">
+                        <ContentPresenter/>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter Property="Background" Value="#252535"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
                     </ControlTemplate>
                   </Setter.Value>
                 </Setter>
@@ -138,22 +334,41 @@
               <DataTemplate>
                 <Grid Margin="4,3">
                   <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="28"/><ColumnDefinition Width="*"/><ColumnDefinition Width="90"/><ColumnDefinition Width="110"/><ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="28"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="90"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="90"/>
                   </Grid.ColumnDefinitions>
                   <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" Foreground="#E8E8F0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                  <TextBlock Grid.Column="2" Text="{Binding AppId}" FontSize="12" Foreground="#6C5CE7" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                  <TextBlock Grid.Column="3" Text="{Binding Genre}" FontSize="11" Foreground="#8888AA" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" Foreground="#E8E8F0"
+                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Grid.Column="2" Text="{Binding AppId}" FontSize="12" Foreground="#6C5CE7"
+                             VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                  <TextBlock Grid.Column="3" Text="{Binding Genre}" FontSize="11" Foreground="#8888AA"
+                             VerticalAlignment="Center" HorizontalAlignment="Center"/>
                   <Border Grid.Column="4" CornerRadius="4" Padding="5,2" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Border.Style>
-                      <Style TargetType="Border"><Setter Property="Background" Value="#1A2A1A"/>
-                        <Style.Triggers><DataTrigger Binding="{Binding IsInjected}" Value="True"><Setter Property="Background" Value="#1A3A1A"/></DataTrigger></Style.Triggers>
+                      <Style TargetType="Border">
+                        <Setter Property="Background" Value="#1A2A1A"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding IsInjected}" Value="True">
+                            <Setter Property="Background" Value="#1A3A1A"/>
+                          </DataTrigger>
+                        </Style.Triggers>
                       </Style>
                     </Border.Style>
                     <TextBlock FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center">
                       <TextBlock.Style>
-                        <Style TargetType="TextBlock"><Setter Property="Text" Value="Not Injected"/><Setter Property="Foreground" Value="#557755"/>
-                          <Style.Triggers><DataTrigger Binding="{Binding IsInjected}" Value="True"><Setter Property="Text" Value="✓ Injected"/><Setter Property="Foreground" Value="#00B894"/></DataTrigger></Style.Triggers>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Text" Value="Not Injected"/>
+                          <Setter Property="Foreground" Value="#557755"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsInjected}" Value="True">
+                              <Setter Property="Text" Value="✓ Injected"/>
+                              <Setter Property="Foreground" Value="#00B894"/>
+                            </DataTrigger>
+                          </Style.Triggers>
                         </Style>
                       </TextBlock.Style>
                     </TextBlock>
@@ -163,16 +378,23 @@
             </ListBox.ItemTemplate>
           </ListBox>
         </Border>
+
         <Grid Grid.Row="3" Margin="0,12,0,0">
-          <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
           <StackPanel Orientation="Horizontal">
             <Button Content="☑ Select All" Style="{StaticResource SecondaryBtn}" Margin="0,0,6,0" Click="BtnSelectAll_Click"/>
-            <Button Content="☐ Clear All" Style="{StaticResource SecondaryBtn}" Click="BtnClearAll_Click"/>
+            <Button Content="☐ Clear All"  Style="{StaticResource SecondaryBtn}" Click="BtnClearAll_Click"/>
           </StackPanel>
-          <TextBlock Grid.Column="1" x:Name="TxtSelected" Text="0 selected" Foreground="#8888AA" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+          <TextBlock Grid.Column="1" x:Name="TxtSelected" Text="0 selected" Foreground="#8888AA"
+                     FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
           <StackPanel Grid.Column="2" Orientation="Horizontal">
-            <Button x:Name="BtnInjectSelected" Content="💉 Inject Selected" Style="{StaticResource PrimaryBtn}" Margin="0,0,8,0" Click="BtnInjectSelected_Click"/>
-            <Button x:Name="BtnRemoveSelected" Content="🗑 Remove Selected" Style="{StaticResource DangerBtn}" Click="BtnRemoveSelected_Click"/>
+            <Button x:Name="BtnAddLuaTools"   Content="Add via LuaTools"   Style="{StaticResource LuaBtn}"     Margin="0,0,8,0" Click="BtnAddLuaTools_Click" Height="34"/>
+            <Button x:Name="BtnInjectSelected" Content="💉 Inject Selected" Style="{StaticResource PrimaryBtn}" Margin="0,0,8,0" Click="BtnInjectSelected_Click" Height="34"/>
+            <Button x:Name="BtnRemoveSelected" Content="🗑 Remove"          Style="{StaticResource DangerBtn}"  Click="BtnRemoveSelected_Click" Height="34"/>
           </StackPanel>
         </Grid>
       </Grid>
@@ -185,8 +407,6 @@
           <TextBox x:Name="TxtInjectAppId" Style="{StaticResource DarkTextBox}" Margin="0,0,0,12"/>
           <TextBlock Text="Game Name" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
           <TextBox x:Name="TxtInjectName" Style="{StaticResource DarkTextBox}" Margin="0,0,0,12"/>
-          <TextBlock Text="Install Directory Name (optional)" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
-          <TextBox x:Name="TxtInjectInstallDir" Style="{StaticResource DarkTextBox}" Margin="0,0,0,12"/>
           <TextBlock Text="State Flags" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
           <ComboBox x:Name="CmbStateFlags" Style="{StaticResource DarkCombo}" Margin="0,0,0,12">
             <ComboBoxItem Content="4 — Installed" IsSelected="True"/>
@@ -204,9 +424,13 @@
               <Button Grid.Column="1" Content="Browse" Style="{StaticResource SecondaryBtn}" Margin="8,0,0,0" Click="BtnBrowseLuaDir_Click"/>
             </Grid>
           </StackPanel>
-          <Button Content="💉  Inject Now" Style="{StaticResource PrimaryBtn}" Width="200" HorizontalAlignment="Left" Height="40" FontSize="14" Click="BtnInjectNow_Click"/>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+            <Button Content="💉  Inject Now"     Style="{StaticResource PrimaryBtn}" Height="40" FontSize="14" Click="BtnInjectNow_Click" Margin="0,0,8,0"/>
+            <Button Content="Add via LuaTools"   Style="{StaticResource LuaBtn}"     Height="40" FontSize="14" Click="BtnInjectLuaToolsSingle_Click"/>
+          </StackPanel>
           <Border Margin="0,16,0,0" Background="#1F1F28" CornerRadius="8" Padding="16">
-            <TextBox x:Name="TxtInjectResult" IsReadOnly="True" Background="Transparent" Foreground="#00CEC9" BorderThickness="0" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Height="80"/>
+            <TextBox x:Name="TxtInjectResult" IsReadOnly="True" Background="Transparent" Foreground="#00CEC9"
+                     BorderThickness="0" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Height="80"/>
           </Border>
         </StackPanel>
       </ScrollViewer>
@@ -230,7 +454,8 @@
           <Button Content="🌙  Generate Lua" Style="{StaticResource PrimaryBtn}" Width="200" HorizontalAlignment="Left" Height="40" FontSize="14" Click="BtnGenLua_Click"/>
           <TextBlock Text="Preview:" FontSize="13" Foreground="#8888AA" Margin="0,16,0,6"/>
           <Border Background="#161620" CornerRadius="8" Padding="16">
-            <TextBox x:Name="TxtLuaPreview" IsReadOnly="True" Background="Transparent" Foreground="#00CEC9" BorderThickness="0" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Height="220"/>
+            <TextBox x:Name="TxtLuaPreview" IsReadOnly="True" Background="Transparent" Foreground="#00CEC9"
+                     BorderThickness="0" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Height="220"/>
           </Border>
         </StackPanel>
       </ScrollViewer>
@@ -244,14 +469,17 @@
           <TextBlock Text="Game Name" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
           <TextBox x:Name="TxtDepotName" Style="{StaticResource DarkTextBox}" Margin="0,0,0,12"/>
           <TextBlock Text="Depots (format: DepotID=ManifestID, one per line)" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
-          <TextBox x:Name="TxtDepots" Style="{StaticResource DarkTextBox}" Height="120" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,0,0,12" FontFamily="Consolas"/>
+          <TextBox x:Name="TxtDepots" Style="{StaticResource DarkTextBox}" Height="120" TextWrapping="Wrap"
+                   AcceptsReturn="True" Margin="0,0,0,12" FontFamily="Consolas"/>
           <TextBlock Text="Branch / Build ID" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
           <TextBox x:Name="TxtBuildId" Style="{StaticResource DarkTextBox}" Margin="0,0,0,16"/>
           <TextBlock Text="Target Library Folder" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
           <ComboBox x:Name="CmbDepotLibrary" Style="{StaticResource DarkCombo}" Margin="0,0,0,16"/>
-          <Button Content="📦  Generate &amp; Inject with Depots" Style="{StaticResource PrimaryBtn}" Width="280" HorizontalAlignment="Left" Height="40" FontSize="14" Click="BtnInjectDepot_Click"/>
+          <Button Content="📦  Generate &amp; Inject with Depots" Style="{StaticResource PrimaryBtn}"
+                  Width="280" HorizontalAlignment="Left" Height="40" FontSize="14" Click="BtnInjectDepot_Click"/>
           <Border Margin="0,16,0,0" Background="#1F1F28" CornerRadius="8" Padding="16">
-            <TextBox x:Name="TxtDepotResult" IsReadOnly="True" Background="Transparent" Foreground="#00CEC9" BorderThickness="0" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Height="100"/>
+            <TextBox x:Name="TxtDepotResult" IsReadOnly="True" Background="Transparent" Foreground="#00CEC9"
+                     BorderThickness="0" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Height="100"/>
           </Border>
         </StackPanel>
       </ScrollViewer>
@@ -259,7 +487,10 @@
       <!-- BATCH INJECT -->
       <Grid x:Name="PageBatch" Visibility="Collapsed" Margin="28,24,28,16">
         <Grid.RowDefinitions>
-          <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Text="Batch Inject" FontSize="22" FontWeight="Bold" Foreground="#E8E8F0" Margin="0,0,0,6"/>
         <Grid Grid.Row="1" Margin="0,12,0,12">
@@ -268,15 +499,22 @@
           <ComboBox Grid.Column="1" x:Name="CmbBatchLibrary" Style="{StaticResource DarkCombo}" Width="360" Margin="8,0,0,0"/>
         </Grid>
         <Border Grid.Row="2" Background="#161620" CornerRadius="8" BorderBrush="#2A2A36" BorderThickness="1">
-          <ListBox x:Name="ListBatch" Style="{StaticResource DarkListBox}" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox x:Name="ListBatch" Style="{StaticResource DarkListBox}" BorderThickness="0"
+                   Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemContainerStyle>
               <Style TargetType="ListBoxItem">
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="Template">
                   <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                      <Border Background="{TemplateBinding Background}" CornerRadius="3" Margin="3,1"><ContentPresenter/></Border>
-                      <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#252535"/></Trigger></ControlTemplate.Triggers>
+                      <Border Background="{TemplateBinding Background}" CornerRadius="3" Margin="3,1">
+                        <ContentPresenter/>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter Property="Background" Value="#252535"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
                     </ControlTemplate>
                   </Setter.Value>
                 </Setter>
@@ -286,12 +524,18 @@
               <DataTemplate>
                 <Grid Margin="6,4">
                   <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="28"/><ColumnDefinition Width="*"/><ColumnDefinition Width="90"/><ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="28"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="90"/>
+                    <ColumnDefinition Width="110"/>
                   </Grid.ColumnDefinitions>
                   <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" Foreground="#E8E8F0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                  <TextBlock Grid.Column="2" Text="{Binding AppId}" FontSize="12" Foreground="#6C5CE7" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                  <TextBlock Grid.Column="3" Text="{Binding Genre}" FontSize="11" Foreground="#8888AA" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" Foreground="#E8E8F0"
+                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                  <TextBlock Grid.Column="2" Text="{Binding AppId}" FontSize="12" Foreground="#6C5CE7"
+                             VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                  <TextBlock Grid.Column="3" Text="{Binding Genre}" FontSize="11" Foreground="#8888AA"
+                             VerticalAlignment="Center" HorizontalAlignment="Center"/>
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
@@ -299,7 +543,8 @@
         </Border>
         <Grid Grid.Row="3" Margin="0,12,0,0">
           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <ProgressBar x:Name="BatchProgress" Height="6" Maximum="100" Value="0" Background="#2A2A36" Foreground="#6C5CE7" VerticalAlignment="Center"/>
+          <ProgressBar x:Name="BatchProgress" Height="6" Maximum="100" Value="0"
+                       Background="#2A2A36" Foreground="#6C5CE7" VerticalAlignment="Center"/>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
             <CheckBox x:Name="ChkBatchLua" Content="Generate Lua" Style="{StaticResource DarkCheckBox}" VerticalAlignment="Center" Margin="0,0,10,0"/>
             <Button x:Name="BtnBatchInject" Content="⚡ Batch Inject All Selected" Style="{StaticResource PrimaryBtn}" Click="BtnBatchInject_Click" Height="38"/>
@@ -309,11 +554,16 @@
 
       <!-- LOG TERMINAL -->
       <Grid x:Name="PageLog" Visibility="Collapsed" Margin="28,24,28,16">
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
         <TextBlock Text="Log Terminal" FontSize="22" FontWeight="Bold" Foreground="#E8E8F0" Margin="0,0,0,14"/>
         <Border Grid.Row="1" Background="#0A0A10" CornerRadius="8" BorderBrush="#2A2A36" BorderThickness="1">
           <ScrollViewer x:Name="LogScroller" VerticalScrollBarVisibility="Auto" Padding="4">
-            <TextBox x:Name="TxtLog" IsReadOnly="True" Background="Transparent" Foreground="#00CEC9" BorderThickness="0" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
+            <TextBox x:Name="TxtLog" IsReadOnly="True" Background="Transparent" Foreground="#00CEC9"
+                     BorderThickness="0" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
           </ScrollViewer>
         </Border>
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
@@ -327,12 +577,25 @@
           <TextBlock Text="Settings" FontSize="22" FontWeight="Bold" Foreground="#E8E8F0" Margin="0,0,0,18"/>
           <TextBlock Text="Steam Path" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
           <Grid Margin="0,0,0,4">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
             <TextBox x:Name="TxtSteamPath" Style="{StaticResource DarkTextBox}"/>
-            <Button Grid.Column="1" Content="Browse" Style="{StaticResource SecondaryBtn}" Margin="8,0,0,0" Click="BtnBrowseSteam_Click"/>
+            <Button Grid.Column="1" Content="Browse"      Style="{StaticResource SecondaryBtn}" Margin="8,0,0,0" Click="BtnBrowseSteam_Click"/>
             <Button Grid.Column="2" Content="🔍 Auto-Detect" Style="{StaticResource PrimaryBtn}" Margin="8,0,0,0" Click="BtnAutoDetect_Click"/>
           </Grid>
           <TextBlock x:Name="TxtSteamPathStatus" Text="" FontSize="11" Foreground="#00B894" Margin="0,4,0,16"/>
+
+          <TextBlock Text="LuaTools / Millennium Scripts Folder" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
+          <Grid Margin="0,0,0,4">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBox x:Name="TxtLuaToolsDir" Style="{StaticResource DarkTextBox}"/>
+            <Button Grid.Column="1" Content="Browse" Style="{StaticResource SecondaryBtn}" Margin="8,0,0,0" Click="BtnBrowseLuaToolsDir_Click"/>
+          </Grid>
+          <TextBlock Text="e.g. C:\Program Files (x86)\Steam\ext\data\plugins" FontSize="11" Foreground="#555570" Margin="0,0,0,16"/>
+
           <TextBlock Text="Default Lua Output Directory" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
           <Grid Margin="0,0,0,16">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -346,11 +609,10 @@
               <TextBlock Text="ℹ️ How to use" FontSize="14" FontWeight="SemiBold" Foreground="#6C5CE7" Margin="0,0,0,8"/>
               <TextBlock TextWrapping="Wrap" Foreground="#8888AA" FontSize="12" LineHeight="20">
                 1. Set your Steam path above (or use Auto-Detect).&#10;
-                2. Go to Game Browser → select games → click Inject Selected.&#10;
-                3. Or use Batch Inject to inject all selected games at once.&#10;
+                2. Go to Game Browser → select games → Inject Selected (ACF manifest).&#10;
+                3. "Add via LuaTools" writes a .lua file to the LuaTools/Millennium scripts folder.&#10;
                 4. Restart Steam for injected manifests to appear in your library.&#10;
-                5. If Steam shows permission errors, run this app as Administrator.&#10;
-                6. Lua configs go into your Millennium / stplug-in scripts folder.
+                5. If Steam shows permission errors, run this app as Administrator.
               </TextBlock>
             </StackPanel>
           </Border>
