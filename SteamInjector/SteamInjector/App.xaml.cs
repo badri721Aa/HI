@@ -1,12 +1,10 @@
 using System.Windows;
-
-// Explicit aliases so WinForms implicit globals never shadow WPF types
-using MessageBox = System.Windows.MessageBox;
-using Application = System.Windows.Application;
+using WpfApp       = System.Windows.Application;
+using MessageBox   = System.Windows.MessageBox;
 
 namespace SteamInjector;
 
-public partial class App : Application
+public partial class App : WpfApp
 {
     protected override void OnStartup(StartupEventArgs e)
     {
