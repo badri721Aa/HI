@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -6,77 +8,145 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-// Explicit aliases — kills every WinForms vs WPF ambiguity at the root
 using MessageBox = System.Windows.MessageBox;
-using Color = System.Windows.Media.Color;
-using Button = System.Windows.Controls.Button;
+using Color      = System.Windows.Media.Color;
+using Button     = System.Windows.Controls.Button;
 
 namespace SteamInjector;
 
-public class GameViewModel : System.ComponentModel.INotifyPropertyChanged
+// ── View model for a search result / add-queue item ───────────────────────────
+
+public class GameItem : INotifyPropertyChanged
 {
-    public int    AppId     { get; set; }
-    public string Name      { get; set; } = "";
-    public string Genre     { get; set; } = "";
-    public string Developer { get; set; } = "";
+    public int    AppId { get; set; }
+    public string Name  { get; set; } = "";
 
     private bool _isSelected;
     public bool IsSelected
     {
         get => _isSelected;
-        set { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); }
+        set { _isSelected = value; OnProp(nameof(IsSelected)); }
     }
 
-    private bool _isInjected;
-    public bool IsInjected
+    // idle | pending | checking | downloading | success | failed | limit | unavailable | cancelled
+    private string _status = "idle";
+    public string Status
     {
-        get => _isInjected;
-        set { _isInjected = value; OnPropertyChanged(nameof(IsInjected)); }
+        get => _status;
+        set
+        {
+            _status = value;
+            OnProp(nameof(Status));
+            OnProp(nameof(StatusText));
+            OnProp(nameof(StatusColor));
+            OnProp(nameof(BtnLabel));
+            OnProp(nameof(BtnColor));
+            OnProp(nameof(BtnEnabled));
+        }
     }
 
-    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-    protected void OnPropertyChanged(string name) =>
-        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
+    private string _detail = "";
+    public string Detail
+    {
+        get => _detail;
+        set { _detail = value; OnProp(nameof(StatusText)); }
+    }
+
+    public string StatusText => Status switch
+    {
+        "idle"        => "",
+        "pending"     => "⏳ Queued…",
+        "checking"    => "🔍 Checking sources…",
+        "downloading" => $"⬇ Downloading via {Detail}…",
+        "success"     => $"✅ {(string.IsNullOrEmpty(Detail) ? "Added!" : Detail)}",
+        "failed"      => $"❌ {Detail}",
+        "limit"       => "🚫 Daily limit reached (25/day). Upgrade to Supporter.",
+        "unavailable" => "⚠ Not available on any source",
+        "cancelled"   => "Cancelled",
+        _             => Detail,
+    };
+
+    public SolidColorBrush StatusColor => Status switch
+    {
+        "success"     => new SolidColorBrush(Color.FromRgb(0x00, 0xB8, 0x94)),
+        "failed"      => new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x81)),
+        "limit"       => new SolidColorBrush(Color.FromRgb(0xFD, 0xCB, 0x6E)),
+        "unavailable" => new SolidColorBrush(Color.FromRgb(0xFD, 0xCB, 0x6E)),
+        "checking"    => new SolidColorBrush(Color.FromRgb(0x74, 0xB9, 0xFF)),
+        "downloading" => new SolidColorBrush(Color.FromRgb(0xA2, 0x9B, 0xFE)),
+        _             => new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x99)),
+    };
+
+    public string BtnLabel => Status is "pending" or "checking" or "downloading" ? "✕" : "+ Add";
+    public SolidColorBrush BtnColor => Status is "pending" or "checking" or "downloading"
+        ? new SolidColorBrush(Color.FromRgb(0xD6, 0x30, 0x31))
+        : new SolidColorBrush(Color.FromRgb(0x6C, 0x5C, 0xE7));
+    public bool   BtnEnabled => true;
+
+    public CancellationTokenSource? Cts { get; set; }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    void OnProp(string n) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 }
+
+// ── App settings ──────────────────────────────────────────────────────────────
 
 public class AppSettings
 {
-    public string SteamPath      { get; set; } = "";
-    public string DefaultLuaDir  { get; set; } = "";
-    public string LuaToolsDir    { get; set; } = "";
+    public string SteamPath    { get; set; } = "";
+    public string StplugDir    { get; set; } = "";
+    public string BackendPath  { get; set; } = "";
+    public int    BackendPort  { get; set; } = 3000;
+    public string AppListPath  { get; set; } = "";
+    public string Mode         { get; set; } = "Bst";
+    public bool   FastFetch    { get; set; } = true;
 }
+
+// ── MainWindow ────────────────────────────────────────────────────────────────
 
 public partial class MainWindow : Window
 {
-    private static readonly string SettingsFile =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "SteamInjector", "settings.json");
+    private static readonly string SettingsFile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SteamInjector", "settings.json");
 
-    private AppSettings _settings = new();
-    private List<SteamLibrary> _libraries = [];
-    private ObservableCollection<GameViewModel> _allGames      = [];
-    private ObservableCollection<GameViewModel> _filteredGames = [];
-    private ObservableCollection<GameViewModel> _batchGames    = [];
+    private AppSettings _cfg = new();
+    private List<SteamLibrary> _libs = [];
+
+    private readonly ObservableCollection<GameItem> _results = [];
     private readonly DispatcherTimer _statusTimer = new();
+    private readonly SemaphoreSlim   _addSem      = new(1, 1);
 
     public MainWindow()
     {
         InitializeComponent();
         LoadSettings();
-        BuildGameLists();
-        PopulateGenreFilter();
-        RefreshStatus();
-        BindLists();
+        ListResults.ItemsSource = _results;
 
-        _statusTimer.Interval = TimeSpan.FromSeconds(5);
-        _statusTimer.Tick += (_, _) => { UpdateSteamRunningBadge(); UpdateMillenniumStatus(); };
+        _statusTimer.Interval = TimeSpan.FromSeconds(6);
+        _statusTimer.Tick    += (_, _) => Dispatcher.Invoke(UpdateStatusBadges);
         _statusTimer.Start();
-        UpdateMillenniumStatus();
 
-        ChkGenerateLua.Checked   += (_, _) => PanelLuaOutput.Visibility = Visibility.Visible;
-        ChkGenerateLua.Unchecked += (_, _) => PanelLuaOutput.Visibility = Visibility.Collapsed;
+        _ = InitAsync();
+    }
 
-        TxtVersion.Text = $"v1.0.0 — {SteamService.GetBuiltInGames().Count} games";
+    private async Task InitAsync()
+    {
+        await Task.WhenAll(
+            LoadGameDbAsync(),
+            DetectBackendAsync(),
+            Task.Run(RefreshLibraries)
+        );
+        Dispatcher.Invoke(() =>
+        {
+            UpdateStatusBadges();
+            FillLibCombos();
+            UpdateLibStats();
+            TxtVersion.Text = $"v2.0 · {AppListService.Count:N0} games";
+            TxtDbInfo.Text  = AppListService.IsLoaded
+                ? $"{AppListService.Count:N0} games"
+                : "No DB loaded";
+        });
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
@@ -86,763 +156,659 @@ public partial class MainWindow : Window
         try
         {
             if (File.Exists(SettingsFile))
-                _settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsFile)) ?? new();
+                _cfg = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsFile)) ?? new();
         }
-        catch { _settings = new(); }
+        catch { _cfg = new(); }
 
-        if (string.IsNullOrEmpty(_settings.SteamPath))
-            _settings.SteamPath = SteamService.DetectSteamPath() ?? "";
+        if (string.IsNullOrEmpty(_cfg.SteamPath))
+            _cfg.SteamPath = SteamService.DetectSteamPath() ?? "";
 
-        if (string.IsNullOrEmpty(_settings.DefaultLuaDir))
-            _settings.DefaultLuaDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                "SteamInjector", "lua");
+        if (string.IsNullOrEmpty(_cfg.StplugDir) && !string.IsNullOrEmpty(_cfg.SteamPath))
+            _cfg.StplugDir = Path.Combine(_cfg.SteamPath, "config", "stplug-in");
 
-        // Auto-detect LuaTools / stplug-in scripts dir from Steam path
-        if (string.IsNullOrEmpty(_settings.LuaToolsDir) && !string.IsNullOrEmpty(_settings.SteamPath))
-            _settings.LuaToolsDir = Path.Combine(_settings.SteamPath, "config", "stplug-in");
+        SteamAutoBackend.Port = _cfg.BackendPort;
 
-        TxtSteamPath.Text     = _settings.SteamPath;
-        TxtDefaultLuaDir.Text = _settings.DefaultLuaDir;
-        TxtLuaToolsDir.Text   = _settings.LuaToolsDir;
-        TxtLuaDir.Text        = _settings.DefaultLuaDir;
-        TxtLuaOutDir.Text     = _settings.DefaultLuaDir;
+        // Bind to UI
+        TxtSteamPath.Text    = _cfg.SteamPath;
+        TxtStplugDir.Text    = _cfg.StplugDir;
+        TxtBackendPath.Text  = _cfg.BackendPath;
+        TxtBackendPort.Text  = _cfg.BackendPort.ToString();
+        TxtAppListPath.Text  = _cfg.AppListPath;
+        TxtLuaDir.Text       = _cfg.StplugDir;
+
+        CmbMode.SelectedIndex = _cfg.Mode == "Custom" ? 1 : 0;
+        ChkFastFetch.IsChecked = _cfg.FastFetch;
     }
 
     private void SaveSettings()
     {
+        _cfg.SteamPath   = TxtSteamPath.Text.Trim();
+        _cfg.StplugDir   = TxtStplugDir.Text.Trim();
+        _cfg.BackendPath = TxtBackendPath.Text.Trim();
+        _cfg.AppListPath = TxtAppListPath.Text.Trim();
+        _cfg.Mode        = (CmbMode.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Bst";
+        _cfg.FastFetch   = ChkFastFetch.IsChecked == true;
+
+        if (int.TryParse(TxtBackendPort.Text.Trim(), out var port))
+        {
+            _cfg.BackendPort       = port;
+            SteamAutoBackend.Port  = port;
+        }
+
         try
         {
-            _settings.SteamPath     = TxtSteamPath.Text.Trim();
-            _settings.DefaultLuaDir = TxtDefaultLuaDir.Text.Trim();
-            _settings.LuaToolsDir   = TxtLuaToolsDir.Text.Trim();
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsFile)!);
             File.WriteAllText(SettingsFile,
-                JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(_cfg, new JsonSerializerOptions { WriteIndented = true }));
         }
-        catch (Exception ex) { Log($"[ERROR] Save settings: {ex.Message}"); }
+        catch (Exception ex) { Log($"[ERROR] Save: {ex.Message}"); }
     }
 
-    // ── Game list ─────────────────────────────────────────────────────────────
+    // ── Game DB ───────────────────────────────────────────────────────────────
 
-    private void BuildGameLists()
+    private async Task LoadGameDbAsync()
     {
-        var seen = new HashSet<int>();
-        _allGames.Clear();
-        foreach (var g in SteamService.GetBuiltInGames())
+        var loaded = await AppListService.LoadAsync(
+            string.IsNullOrWhiteSpace(_cfg.AppListPath) ? null : _cfg.AppListPath);
+
+        Dispatcher.Invoke(() =>
         {
-            if (g.AppId == 0 || !seen.Add(g.AppId)) continue;
-            _allGames.Add(new GameViewModel
+            if (loaded)
             {
-                AppId = g.AppId, Name = g.Name, Genre = g.Genre, Developer = g.Developer
-            });
-        }
-        _filteredGames = new ObservableCollection<GameViewModel>(_allGames);
-        _batchGames    = new ObservableCollection<GameViewModel>(_allGames);
-        StatGames.Text = _allGames.Count.ToString();
-    }
-
-    private void PopulateGenreFilter()
-    {
-        CmbGenre.Items.Clear();
-        CmbGenre.Items.Add(new ComboBoxItem { Content = "All Genres", IsSelected = true });
-        foreach (var g in _allGames.Select(x => x.Genre).Distinct().OrderBy(x => x))
-            CmbGenre.Items.Add(new ComboBoxItem { Content = g });
-        CmbGenre.SelectedIndex = 0;
-    }
-
-    private void BindLists()
-    {
-        ListGames.ItemsSource = _filteredGames;
-        ListBatch.ItemsSource = _batchGames;
-        TxtGameCount.Text = $"{_filteredGames.Count} games";
-    }
-
-    private void ApplyFilter()
-    {
-        var search       = TxtSearch.Text.Trim().ToLowerInvariant();
-        var genre        = (CmbGenre.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All Genres";
-        var selectedOnly = ChkSelectedOnly.IsChecked == true;
-
-        _filteredGames.Clear();
-        foreach (var g in _allGames.Where(g =>
-            (string.IsNullOrEmpty(search) ||
-             g.Name.ToLowerInvariant().Contains(search) ||
-             g.AppId.ToString().Contains(search) ||
-             g.Developer.ToLowerInvariant().Contains(search)) &&
-            (genre == "All Genres" || g.Genre == genre) &&
-            (!selectedOnly || g.IsSelected)))
-            _filteredGames.Add(g);
-
-        TxtGameCount.Text = $"{_filteredGames.Count} games";
-        UpdateSelectedCount();
-    }
-
-    private void UpdateSelectedCount() =>
-        TxtSelected.Text = $"{_allGames.Count(g => g.IsSelected)} selected";
-
-    // ── Status / Steam ────────────────────────────────────────────────────────
-
-    private void RefreshStatus()
-    {
-        try
-        {
-            _settings.SteamPath = TxtSteamPath.Text.Trim();
-            if (string.IsNullOrEmpty(_settings.SteamPath))
-                _settings.SteamPath = SteamService.DetectSteamPath() ?? "";
-
-            _libraries = SteamService.GetAllLibraryFolders(_settings.SteamPath);
-
-            ListLibs.Items.Clear();
-            foreach (var lib in _libraries) ListLibs.Items.Add(lib.Label);
-
-            foreach (var combo in new[] { CmbInjectLibrary, CmbDepotLibrary, CmbBatchLibrary })
-            {
-                combo.Items.Clear();
-                foreach (var lib in _libraries) combo.Items.Add(lib.Path);
-                if (combo.Items.Count > 0) combo.SelectedIndex = 0;
+                TxtDbInfo.Text   = $"{AppListService.Count:N0} games";
+                TxtDbStatus.Text = $"✓ Loaded from {AppListService.LoadedFrom}  ({AppListService.Count:N0} entries)";
+                TxtDbStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xB8, 0x94));
             }
-
-            TxtSteamPathDash.Text = $"Steam Path: {(_settings.SteamPath.Length == 0 ? "(not detected — go to Settings)" : _settings.SteamPath)}";
-            StatLibs.Text = _libraries.Count.ToString();
-
-            StatInjected.Text = _libraries
-                .Sum(lib =>
-                {
-                    try { return Directory.GetFiles(lib.Path, "appmanifest_*.acf").Length; }
-                    catch { return 0; }
-                }).ToString();
-
-            foreach (var g in _allGames)
-                g.IsInjected = _libraries.Any(lib => SteamService.AcfExists(lib.Path, g.AppId));
-        }
-        catch (Exception ex) { Log($"[ERROR] RefreshStatus: {ex.Message}"); }
-
-        UpdateSteamRunningBadge();
-        UpdateMillenniumStatus();
-    }
-
-    private void UpdateSteamRunningBadge()
-    {
-        Dispatcher.Invoke(() =>
-        {
-            var running = SteamService.IsSteamRunning();
-            SteamDot.Fill         = new SolidColorBrush(running ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0xFF,0x47,0x57));
-            TxtSteamStatus.Text   = running ? "Running" : "Not Running";
-            StatStatus.Text       = running ? "ONLINE" : "OFFLINE";
-            StatStatus.Foreground = new SolidColorBrush(running ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0xFF,0x47,0x57));
+            else
+            {
+                TxtDbInfo.Text   = "No DB (using built-in)";
+                TxtDbStatus.Text = "steam-applist.json not found. Using built-in list (~200 games).\nTip: copy steam-applist.json from LuaToolsGui\\AppData folder next to the exe.";
+                TxtDbStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x88));
+            }
+            StatGames.Text = AppListService.IsLoaded ? $"{AppListService.Count:N0}" : "~200";
         });
     }
 
-    private void UpdateMillenniumStatus()
+    // ── Backend detection ─────────────────────────────────────────────────────
+
+    private async Task DetectBackendAsync()
     {
+        var running = await SteamAutoBackend.IsRunningAsync();
+        if (!running)
+        {
+            var found = await SteamAutoBackend.AutoDetectPortAsync();
+            running   = found >= 0;
+        }
+        Dispatcher.Invoke(() => UpdateBackendBadge(running));
+    }
+
+    private void UpdateBackendBadge(bool running)
+    {
+        var col = running
+            ? Color.FromRgb(0x00, 0xB8, 0x94)
+            : Color.FromRgb(0xFF, 0x47, 0x57);
+        var brush = new SolidColorBrush(col);
+
+        BackendDot.Fill          = brush;
+        TxtBackendStatus.Text    = running ? $"Online :{SteamAutoBackend.Port}" : "Offline";
+        TxtBackendStatus.Foreground = brush;
+        BackendBanner.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
+
+        if (running)
+            TxtBannerMsg.Text = "SteamAutoCrack backend is offline. Set its path in Settings and launch it.";
+    }
+
+    // ── Status badges ─────────────────────────────────────────────────────────
+
+    private void UpdateStatusBadges()
+    {
+        var steam = SteamService.IsSteamRunning();
+        SteamDot.Fill          = new SolidColorBrush(steam ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0xFF,0x47,0x57));
+        TxtSteamStatus.Text    = steam ? "Running" : "Not Running";
+        TxtSteamStatus.Foreground = new SolidColorBrush(steam ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0x66,0x66,0x88));
+
+        var steamPath  = _cfg.SteamPath;
+        var hasMill    = SteamService.IsMillenniumInstalled(steamPath);
+        var hasStplug  = SteamService.IsStplugInReady(steamPath);
+        var luaCnt     = SteamService.CountStplugInFiles(steamPath);
+
+        MillDot.Fill = new SolidColorBrush(hasMill ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0xFF,0x47,0x57));
+        TxtMillStatus.Text = hasMill
+            ? $"✓ stplug-in: {(hasStplug ? $"{luaCnt}" : "not found")}"
+            : "Not detected";
+        TxtMillStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x66,0x66,0x88));
+
+        _ = Task.Run(async () =>
+        {
+            var on = await SteamAutoBackend.IsRunningAsync();
+            Dispatcher.Invoke(() => UpdateBackendBadge(on));
+        });
+    }
+
+    // ── Library helpers ───────────────────────────────────────────────────────
+
+    private void RefreshLibraries()
+    {
+        _libs = SteamService.GetAllLibraryFolders(_cfg.SteamPath);
+    }
+
+    private void FillLibCombos()
+    {
+        foreach (var combo in new[] { CmbToolLib })
+        {
+            combo.Items.Clear();
+            foreach (var lib in _libs) combo.Items.Add(lib.Path);
+            if (combo.Items.Count > 0) combo.SelectedIndex = 0;
+        }
+    }
+
+    private void UpdateLibStats()
+    {
+        StatLibs.Text = _libs.Count.ToString();
+        var acfCount  = _libs.Sum(lib =>
+        {
+            try { return Directory.GetFiles(lib.Path, "appmanifest_*.acf").Length; } catch { return 0; }
+        });
+        StatAcf.Text = acfCount.ToString();
+
+        var stplug  = string.IsNullOrEmpty(_cfg.StplugDir) ? "" : _cfg.StplugDir;
+        StatLua.Text = SteamService.CountStplugInFiles(_cfg.SteamPath).ToString();
+
+        ListLibs.Items.Clear();
+        foreach (var lib in _libs) ListLibs.Items.Add(lib.Label);
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────────
+
+    private void TxtSearch_Changed(object sender, TextChangedEventArgs e)
+    {
+        var q = TxtSearch.Text.Trim();
+        _results.Clear();
+
+        if (q.Length < 2) return;
+
+        List<(int, string)> hits;
+        if (AppListService.IsLoaded)
+        {
+            hits = AppListService.Search(q, 60);
+        }
+        else
+        {
+            // Fall back to built-in list
+            hits = SteamService.GetBuiltInGames()
+                .Where(g => g.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
+                         || g.AppId.ToString() == q)
+                .Select(g => (g.AppId, g.Name))
+                .Take(60)
+                .ToList();
+        }
+
+        foreach (var (id, name) in hits)
+            _results.Add(new GameItem { AppId = id, Name = name });
+
+        TxtSelCount.Text = $"{_results.Count} results";
+    }
+
+    // ── Add single item ───────────────────────────────────────────────────────
+
+    private void BtnAddItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is not GameItem item) return;
+
+        // If in-progress → cancel
+        if (item.Status is "pending" or "checking" or "downloading")
+        {
+            item.Cts?.Cancel();
+            item.Status = "cancelled";
+            Log($"[CANCEL] {item.Name} ({item.AppId})");
+            return;
+        }
+
+        _ = AddItemAsync(item);
+    }
+
+    private async Task AddItemAsync(GameItem item)
+    {
+        await _addSem.WaitAsync();
         try
         {
-            var steamPath  = _settings.SteamPath;
-            var hasMillennium = SteamService.IsMillenniumInstalled(steamPath);
-            var hasStplug  = SteamService.IsStplugInReady(steamPath);
-            var luaCount   = SteamService.CountStplugInFiles(steamPath);
+            item.Cts    = new CancellationTokenSource();
+            item.Status = "checking";
+            Log($"[ADD] {item.Name} ({item.AppId}) — checking sources…");
 
-            MillenniumDot.Fill = new SolidColorBrush(
-                hasMillennium ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0xFF,0x47,0x57));
-            TxtMillenniumStatus.Text =
-                hasMillennium
-                    ? $"Millennium ✓  |  stplug-in: {(hasStplug ? $"{luaCount} files" : "not found")}"
-                    : "Millennium NOT detected";
-            TxtMillenniumStatus.Foreground = new SolidColorBrush(
-                hasMillennium ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0xFF,0x47,0x57));
+            var result = await SteamAutoBackend.AddAppAsync(item.AppId, item.Cts.Token);
 
-            StatLuaFiles.Text = luaCount.ToString();
+            if (result.DailyLimit)
+            {
+                item.Status = "limit";
+                Log($"[LIMIT] Daily limit reached (25/day).");
+                return;
+            }
+            if (result.NoSource)
+            {
+                item.Status = "unavailable";
+                Log($"[UNAVAIL] {item.Name} ({item.AppId}) — no downloadable source.");
+                return;
+            }
+            if (result.Success)
+            {
+                item.Detail = result.Message.Length > 0 ? result.Message : $"Added via {result.Source}";
+                item.Status = "success";
+                Log($"[OK] {item.Name} ({item.AppId}) — {item.Detail}");
+
+                // Also write a local stplug-in lua as fallback
+                var stplug = string.IsNullOrEmpty(_cfg.StplugDir)
+                    ? Path.Combine(_cfg.SteamPath, "config", "stplug-in")
+                    : _cfg.StplugDir;
+                if (!string.IsNullOrEmpty(_cfg.SteamPath))
+                    SteamService.InjectViaLuaTools(_cfg.SteamPath, item.AppId, item.Name, stplug);
+            }
+            else
+            {
+                // Backend offline or connection error — do local lua
+                var msg = result.Message;
+                if (msg.Contains("unreachable") || msg.Contains("offline") || msg.Contains("refused"))
+                {
+                    Log($"[WARN] Backend offline — writing local stplug-in lua for {item.Name}");
+                    var stplug = string.IsNullOrEmpty(_cfg.StplugDir)
+                        ? Path.Combine(_cfg.SteamPath, "config", "stplug-in")
+                        : _cfg.StplugDir;
+                    var (ok, m) = SteamService.InjectViaLuaTools(_cfg.SteamPath, item.AppId, item.Name, stplug);
+                    item.Detail = ok ? "Lua written (offline)" : m;
+                    item.Status = ok ? "success" : "failed";
+                }
+                else
+                {
+                    item.Detail = msg.Length > 0 ? msg : "Download failed.";
+                    item.Status = "failed";
+                    Log($"[FAIL] {item.Name} ({item.AppId}) — {item.Detail}");
+                }
+            }
         }
-        catch { }
+        finally
+        {
+            _addSem.Release();
+        }
     }
 
-    private void Log(string message)
+    // ── Add selected ──────────────────────────────────────────────────────────
+
+    private void BtnAddSelected_Click(object sender, RoutedEventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        var sel = _results.Where(g => g.IsSelected).ToList();
+        if (!sel.Any())
         {
-            TxtLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}\n");
-            LogScroller.ScrollToBottom();
+            MessageBox.Show("Select at least one game first.", "Nothing Selected",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        _ = Task.Run(async () =>
+        {
+            foreach (var item in sel)
+            {
+                Task addTask = null!;
+                await Dispatcher.InvokeAsync(() => { addTask = AddItemAsync(item); });
+                if (addTask != null) await addTask;
+            }
         });
     }
 
-    // ── Nav ───────────────────────────────────────────────────────────────────
-
-    private void Nav_Click(object sender, RoutedEventArgs e)
+    private void BtnSelAll_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button btn) ShowPage(btn.Tag?.ToString() ?? "Dashboard");
+        foreach (var g in _results) g.IsSelected = true;
+        TxtSelCount.Text = $"{_results.Count(g => g.IsSelected)} selected";
+    }
+    private void BtnSelNone_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var g in _results) g.IsSelected = false;
+        TxtSelCount.Text = "";
     }
 
-    private void ShowPage(string tag)
-    {
-        foreach (var p in new FrameworkElement[] { PageDashboard, PageGames, PageInject, PageLua, PageDepot, PageBatch, PageLog, PageSettings })
-            p.Visibility = Visibility.Collapsed;
-        foreach (var b in new[] { BtnNavDash, BtnNavGames, BtnNavInject, BtnNavLua, BtnNavDepot, BtnNavBatch, BtnNavLog, BtnNavSettings })
-            b.Style = (Style)FindResource("NavBtn");
+    // ── Backend controls ──────────────────────────────────────────────────────
 
-        var (page, btn, extra) = tag switch
+    private void BtnLaunchBackend_Click(object sender, RoutedEventArgs e)
+    {
+        var path = _cfg.BackendPath;
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
         {
-            "Dashboard" => ((FrameworkElement)PageDashboard, BtnNavDash,     (Action)RefreshStatus),
-            "Games"     => (PageGames,    BtnNavGames,    null!),
-            "Inject"    => (PageInject,   BtnNavInject,   null!),
-            "Lua"       => (PageLua,      BtnNavLua,      null!),
-            "Depot"     => (PageDepot,    BtnNavDepot,    null!),
-            "Batch"     => (PageBatch,    BtnNavBatch,    (Action)SyncBatchList),
-            "Log"       => (PageLog,      BtnNavLog,      null!),
-            "Settings"  => (PageSettings, BtnNavSettings, null!),
-            _           => (PageDashboard,BtnNavDash,     (Action)RefreshStatus),
-        };
-        page.Visibility = Visibility.Visible;
-        btn.Style = (Style)FindResource("NavBtnActive");
-        extra?.Invoke();
+            MessageBox.Show(
+                "SteamAutoCrack path not set or file not found.\n\nGo to Settings → set the path to SteamAutoCrack.exe.",
+                "Path Not Set", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        try
+        {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            Log($"[BACKEND] Launched: {path}");
+            Task.Delay(3000).ContinueWith(_ =>
+                Dispatcher.Invoke(() => _ = DetectBackendAsync()));
+        }
+        catch (Exception ex) { Log($"[ERROR] Launch backend: {ex.Message}"); }
     }
 
-    private void SyncBatchList()
-    {
-        _batchGames.Clear();
-        foreach (var g in _allGames) _batchGames.Add(g);
-    }
+    private void BtnCheckBackend_Click(object sender, RoutedEventArgs e) => _ = DetectBackendAsync();
 
-    // ── Dashboard buttons ─────────────────────────────────────────────────────
-
-    private void BtnRefresh_Click(object sender, RoutedEventArgs e) => RefreshStatus();
-
-    private void BtnDiagnose_Click(object sender, RoutedEventArgs e)
-    {
-        var steam   = _settings.SteamPath;
-        var luaDir  = _settings.LuaToolsDir;
-        var steamOk = !string.IsNullOrEmpty(steam) && Directory.Exists(steam);
-        var millOk  = steamOk && SteamService.IsMillenniumInstalled(steam);
-        var plugOk  = steamOk && SteamService.IsStplugInReady(steam);
-        var luaCnt  = steamOk ? SteamService.CountStplugInFiles(steam) : 0;
-
-        string Tick(bool v) => v ? "✅" : "❌";
-        var msg =
-            $"{Tick(steamOk)} Steam path: {(steamOk ? steam : "(not found)")}\n" +
-            $"{Tick(millOk)} Millennium: {(millOk ? "INSTALLED" : "NOT FOUND")}\n" +
-            $"{Tick(plugOk)} stplug-in folder: {(plugOk ? "EXISTS" : "NOT FOUND")}\n" +
-            $"   Lua scripts in folder: {luaCnt}\n\n";
-
-        if (!steamOk)
-            msg += "👉 Go to Settings → Auto-Detect to find your Steam path.\n";
-        if (!millOk)
-            msg += "👉 Install Millennium from: https://millennium.web.app/\n";
-        if (millOk && !plugOk)
-            msg += "👉 Install the 'stplug-in' plugin inside Millennium Settings.\n";
-        if (steamOk && millOk && plugOk && luaCnt == 0)
-            msg += "👉 Go to Game Browser → select games → Add via LuaTools.\n";
-        if (steamOk && millOk && plugOk && luaCnt > 0)
-            msg += "✅ Everything looks good! Restart Steam and games should show Install.";
-
-        Log($"[DIAGNOSE] Steam={steamOk} Millennium={millOk} stplug-in={plugOk} lua-files={luaCnt}");
-        MessageBox.Show(msg, "Setup Diagnostic", MessageBoxButton.OK,
-            steamOk && millOk && plugOk ? MessageBoxImage.Information : MessageBoxImage.Warning);
-    }
+    // ── Steam controls ────────────────────────────────────────────────────────
 
     private void BtnStartSteam_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            if (string.IsNullOrEmpty(_settings.SteamPath))
-            { MessageBox.Show("Steam path not set. Go to Settings → Auto-Detect.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-            Log("Starting Steam...");
-            SteamService.StartSteam(_settings.SteamPath);
-            Task.Delay(2500).ContinueWith(_ => UpdateSteamRunningBadge());
-        }
-        catch (Exception ex) { Log($"[ERROR] Start Steam: {ex.Message}"); }
+        if (string.IsNullOrEmpty(_cfg.SteamPath))
+        { MessageBox.Show("Steam path not set. Go to Settings → Auto-Detect.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        try { SteamService.StartSteam(_cfg.SteamPath); Log("Starting Steam…"); }
+        catch (Exception ex) { Log($"[ERROR] {ex.Message}"); }
     }
 
     private void BtnKillSteam_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            if (MessageBox.Show("Kill Steam process?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            Log("Killing Steam...");
-            SteamService.KillSteam();
-            Task.Delay(2500).ContinueWith(_ => UpdateSteamRunningBadge());
-        }
-        catch (Exception ex) { Log($"[ERROR] Kill Steam: {ex.Message}"); }
+        if (MessageBox.Show("Kill Steam?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        SteamService.KillSteam();
+        Log("Killed Steam.");
     }
 
     private void BtnRestartSteam_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            if (string.IsNullOrEmpty(_settings.SteamPath))
-            { MessageBox.Show("Steam path not set.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-            if (MessageBox.Show("Restart Steam?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            Log("Restarting Steam...");
-            Task.Run(() => { SteamService.RestartSteam(_settings.SteamPath); Dispatcher.Invoke(UpdateSteamRunningBadge); });
-        }
-        catch (Exception ex) { Log($"[ERROR] Restart Steam: {ex.Message}"); }
+        if (string.IsNullOrEmpty(_cfg.SteamPath)) { MessageBox.Show("Steam path not set.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        if (MessageBox.Show("Restart Steam?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Task.Run(() => { SteamService.RestartSteam(_cfg.SteamPath); Dispatcher.Invoke(UpdateStatusBadges); });
+        Log("Restarting Steam…");
     }
 
-    // ── Game browser ──────────────────────────────────────────────────────────
-
-    private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
-    private void CmbGenre_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
-    private void ChkSelectedOnly_Changed(object sender, RoutedEventArgs e) => ApplyFilter();
-    private void BtnSelectAll_Click(object sender, RoutedEventArgs e) { foreach (var g in _filteredGames) g.IsSelected = true; UpdateSelectedCount(); }
-    private void BtnClearAll_Click(object sender, RoutedEventArgs e)  { foreach (var g in _allGames) g.IsSelected = false; UpdateSelectedCount(); }
-
-    private void BtnInjectSelected_Click(object sender, RoutedEventArgs e)
+    private void BtnRefreshSteam_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            var selected = _allGames.Where(g => g.IsSelected).ToList();
-            if (!selected.Any()) { MessageBox.Show("No games selected.", "Info", MessageBoxButton.OK, MessageBoxImage.Information); return; }
-            var lib = GetDefaultLibrary();
-            if (lib == null) { MessageBox.Show("No Steam library found. Check Settings → Auto-Detect.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-
-            if (SteamService.IsSteamRunning() &&
-                MessageBox.Show("Steam is running. Manifests won't appear until Steam restarts.\n\nContinue anyway?",
-                    "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-
-            int ok = 0, fail = 0;
-            foreach (var g in selected)
-            {
-                var (success, msg) = SteamService.InjectManifest(lib.Path, g.AppId, g.Name);
-                if (success) { ok++; g.IsInjected = true; } else fail++;
-                Log(msg);
-            }
-            RefreshStatus();
-            MessageBox.Show($"Done!\nInjected: {ok}   Failed: {fail}\n\nRestart Steam to see them in your library.",
-                "Inject Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        catch (Exception ex) { Log($"[ERROR] InjectSelected: {ex.Message}"); }
+        Task.Run(() => { RefreshLibraries(); Dispatcher.Invoke(() => { FillLibCombos(); UpdateLibStats(); UpdateStatusBadges(); }); });
     }
 
-    private void BtnAddLuaTools_Click(object sender, RoutedEventArgs e)
+    // ── Library page ──────────────────────────────────────────────────────────
+
+    private void BtnRefreshLib_Click(object sender, RoutedEventArgs e) => BtnRefreshSteam_Click(sender, e);
+
+    private void BtnCleanAcf_Click(object sender, RoutedEventArgs e)
     {
-        try
+        if (string.IsNullOrEmpty(_cfg.SteamPath))
+        { MessageBox.Show("Steam path not set.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        int total = 0;
+        foreach (var lib in _libs)
         {
-            var selected = _allGames.Where(g => g.IsSelected).ToList();
-            if (!selected.Any())
-            { MessageBox.Show("Select at least one game first.", "Nothing selected", MessageBoxButton.OK, MessageBoxImage.Information); return; }
-
-            var steamPath = _settings.SteamPath;
-            if (string.IsNullOrEmpty(steamPath))
-            { MessageBox.Show("Steam path not set.\nGo to Settings → click Auto-Detect → Save Settings.", "Steam Path Missing", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-
-            // Warn if Millennium not detected — files will be written but won't do anything
-            if (!SteamService.IsMillenniumInstalled(steamPath))
+            try
             {
-                var proceed = MessageBox.Show(
-                    "⚠ Millennium Steam patcher not detected in your Steam folder.\n\n" +
-                    "The .lua files will be written BUT Steam will ignore them without Millennium.\n\n" +
-                    "To make games show 'Install' instead of 'Purchase':\n" +
-                    "1. Install Millennium from: https://millennium.web.app/\n" +
-                    "2. Install the stplug-in plugin inside Millennium\n" +
-                    "3. Then use 'Add via LuaTools' again\n\n" +
-                    "Write files anyway (for later use)?",
-                    "Millennium Not Detected", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (proceed != MessageBoxResult.Yes) return;
+                foreach (var f in Directory.GetFiles(lib.Path, "appmanifest_*.acf"))
+                {
+                    File.Delete(f);
+                    total++;
+                    Log($"[CLEAN] Deleted: {Path.GetFileName(f)}");
+                }
             }
-
-            var luaDir = ResolveLuaToolsDir();
-            if (luaDir == null) return;
-
-            if (SteamService.IsSteamRunning())
-            {
-                if (MessageBox.Show(
-                    "Steam must be CLOSED before injecting.\n\nKill Steam now and continue?",
-                    "Kill Steam Required", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-                SteamService.KillSteam();
-                System.Threading.Thread.Sleep(2000);
-            }
-
-            int ok = 0, fail = 0;
-            foreach (var g in selected)
-            {
-                var (success, msg) = SteamService.InjectViaLuaTools(steamPath, g.AppId, g.Name, luaDir);
-                if (success) { ok++; g.IsInjected = false; } else fail++;
-                foreach (var line in msg.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                    Log(line);
-            }
-            RefreshStatus();
-            UpdateMillenniumStatus();
-
-            var luaCount = SteamService.CountStplugInFiles(steamPath);
-            MessageBox.Show(
-                $"✅ Done!  Written: {ok}   Failed: {fail}\n\n" +
-                $"Lua files folder: {luaDir}\n" +
-                $"Total .lua files in folder: {luaCount}\n\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-                "NEXT STEPS:\n" +
-                "1. Make sure Millennium is running\n" +
-                "2. START Steam normally\n" +
-                "3. Games should now show 'Install' ✓\n\n" +
-                "If still showing 'Purchase' → check that\nMillennium + stplug-in plugin are active.",
-                "Add via LuaTools — Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            catch (Exception ex) { Log($"[WARN] {ex.Message}"); }
         }
-        catch (Exception ex) { Log($"[ERROR] AddLuaTools: {ex.Message}"); }
+        UpdateLibStats();
+        MessageBox.Show($"Removed {total} ACF manifest(s).\n\nRestart Steam and use Add Games to re-add properly.",
+            "Clean Complete", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    private void BtnCleanManifests_Click(object sender, RoutedEventArgs e)
+    private void BtnDiagnose_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            var steamPath = _settings.SteamPath;
-            if (string.IsNullOrEmpty(steamPath))
-            { MessageBox.Show("Steam path not set. Go to Settings → Auto-Detect.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        var sp    = _cfg.SteamPath;
+        var steamOk = !string.IsNullOrEmpty(sp) && Directory.Exists(sp);
+        var millOk  = steamOk && SteamService.IsMillenniumInstalled(sp);
+        var plugOk  = steamOk && SteamService.IsStplugInReady(sp);
+        var luaCnt  = steamOk ? SteamService.CountStplugInFiles(sp) : 0;
 
-            // Find all injected games that are causing PURCHASE
-            var targets = _allGames.Where(g => g.IsInjected).ToList();
-            if (!targets.Any())
-            { MessageBox.Show("No injected manifests found to clean.", "Nothing to clean", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+        string T(bool v) => v ? "✅" : "❌";
+        var msg =
+            $"{T(steamOk)} Steam path:   {(steamOk ? sp : "(not found)")}\n" +
+            $"{T(millOk)} Millennium:   {(millOk ? "Installed" : "NOT FOUND")}\n" +
+            $"{T(plugOk)} stplug-in:    {(plugOk ? $"Found ({luaCnt} scripts)" : "NOT FOUND")}\n\n";
 
-            if (MessageBox.Show(
-                $"This will DELETE all {targets.Count} injected appmanifest ACF files.\n" +
-                "Games showing 'PURCHASE' will disappear from your library.\n\n" +
-                "You should then use 'Add via LuaTools' to re-add them properly.\n\nContinue?",
-                "Clean All Manifests", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (!steamOk)  msg += "👉 Settings → Auto-Detect Steam\n";
+        if (!millOk)   msg += "👉 Install Millennium: https://millennium.web.app/\n";
+        if (millOk && !plugOk) msg += "👉 Install stplug-in inside Millennium\n";
+        if (plugOk && luaCnt == 0) msg += "👉 Use Add Games to add scripts\n";
+        if (plugOk && luaCnt > 0) msg += "✅ Everything looks good!";
 
-            if (SteamService.IsSteamRunning())
-            {
-                if (MessageBox.Show("Kill Steam first?", "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                    SteamService.KillSteam();
-            }
-
-            int total = 0;
-            foreach (var g in targets)
-            {
-                int r = SteamService.RemoveAllAcf(steamPath, g.AppId);
-                if (r > 0) { g.IsInjected = false; total += r; }
-                Log($"[CLEAN] {g.Name} ({g.AppId}) — removed {r} file(s)");
-            }
-            RefreshStatus();
-            MessageBox.Show(
-                $"Cleaned {total} manifest file(s).\n\nNow use 'Add via LuaTools' to re-add selected games — they'll show 'Install' after Steam restarts.",
-                "Clean Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        catch (Exception ex) { Log($"[ERROR] CleanManifests: {ex.Message}"); }
+        Log($"[DIAGNOSE] Steam={steamOk} Mil={millOk} stplug={plugOk} lua={luaCnt}");
+        MessageBox.Show(msg, "Diagnose", MessageBoxButton.OK,
+            (steamOk && millOk && plugOk) ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
 
-    private void BtnRemoveSelected_Click(object sender, RoutedEventArgs e)
+    // ── Manual tools page ─────────────────────────────────────────────────────
+
+    private void BtnInjectAcf_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            var selected = _allGames.Where(g => g.IsSelected).ToList();
-            if (!selected.Any()) return;
-            var steamPath = _settings.SteamPath;
-            if (string.IsNullOrEmpty(steamPath)) { MessageBox.Show("Steam path not set.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-            if (MessageBox.Show($"Remove {selected.Count} manifest(s)?", "Confirm Remove",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            foreach (var g in selected)
-            {
-                int r = SteamService.RemoveAllAcf(steamPath, g.AppId);
-                Log($"[{(r > 0 ? "REMOVED" : "NOT FOUND")}] appmanifest_{g.AppId}.acf");
-                if (r > 0) g.IsInjected = false;
-            }
-            RefreshStatus();
-        }
-        catch (Exception ex) { Log($"[ERROR] RemoveSelected: {ex.Message}"); }
+        if (!TryGetToolParams(out var appId, out var name)) return;
+        var lib = CmbToolLib.SelectedItem?.ToString();
+        if (string.IsNullOrEmpty(lib)) { TxtToolResult.Text = "[ERROR] No library selected."; return; }
+        var (ok, msg) = SteamService.InjectManifest(lib, appId, name);
+        TxtToolResult.Text = msg;
+        Log(msg);
     }
 
-    // ── Inject page ───────────────────────────────────────────────────────────
-
-    private void BtnBrowseLuaDir_Click(object sender, RoutedEventArgs e)
-    { var d = PickFolder(); if (d != null) TxtLuaOutDir.Text = d; }
-
-    private void BtnInjectNow_Click(object sender, RoutedEventArgs e)
+    private void BtnWriteLua_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            if (!int.TryParse(TxtInjectAppId.Text.Trim(), out var appId) || appId <= 0)
-            { TxtInjectResult.Text = "[ERROR] Invalid AppID."; return; }
-            var name = TxtInjectName.Text.Trim();
-            if (string.IsNullOrEmpty(name)) { TxtInjectResult.Text = "[ERROR] Game name required."; return; }
-            var lib = CmbInjectLibrary.SelectedItem?.ToString();
-            if (string.IsNullOrEmpty(lib)) { TxtInjectResult.Text = "[ERROR] No library folder selected. Refresh or set Steam path in Settings."; return; }
-
-            if (SteamService.IsSteamRunning() &&
-                MessageBox.Show("Steam is running — manifest changes won't apply until Steam restarts.\n\nContinue?",
-                    "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-
-            var sf = ParseStateFlags();
-            var (ok, msg) = SteamService.InjectManifest(lib, appId, name,
-                ChkGenerateLua.IsChecked == true, TxtLuaOutDir.Text.Trim(), sf);
-            TxtInjectResult.Text = msg;
-            Log(msg);
-            if (ok) RefreshStatus();
-        }
-        catch (Exception ex)
-        {
-            TxtInjectResult.Text = $"[ERROR] {ex.Message}";
-            Log($"[ERROR] InjectNow: {ex.Message}");
-        }
+        if (!TryGetToolParams(out var appId, out var name)) return;
+        var dir = string.IsNullOrEmpty(_cfg.StplugDir)
+            ? Path.Combine(_cfg.SteamPath, "config", "stplug-in")
+            : _cfg.StplugDir;
+        var (ok, msg) = SteamService.InjectViaLuaTools(_cfg.SteamPath, appId, name, dir);
+        TxtToolResult.Text = msg;
+        Log(msg);
     }
 
-    private void BtnInjectLuaToolsSingle_Click(object sender, RoutedEventArgs e)
+    private void BtnRemoveAcf_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            if (!int.TryParse(TxtInjectAppId.Text.Trim(), out var appId) || appId <= 0)
-            { TxtInjectResult.Text = "[ERROR] Invalid AppID."; return; }
-            var name = TxtInjectName.Text.Trim();
-            if (string.IsNullOrEmpty(name)) { TxtInjectResult.Text = "[ERROR] Game name required."; return; }
-
-            var luaDir    = ResolveLuaToolsDir();
-            var steamPath = _settings.SteamPath;
-            if (luaDir == null) return;
-            if (string.IsNullOrEmpty(steamPath))
-            { TxtInjectResult.Text = "[ERROR] Steam path not set. Go to Settings → Auto-Detect."; return; }
-
-            if (SteamService.IsSteamRunning() &&
-                MessageBox.Show("Steam is running. Changes apply after restart.\n\nContinue?",
-                    "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-
-            var (ok, msg) = SteamService.InjectViaLuaTools(steamPath, appId, name, luaDir);
-            TxtInjectResult.Text = msg;
-            foreach (var line in msg.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                Log(line);
-            if (ok) RefreshStatus();
-        }
-        catch (Exception ex)
-        {
-            TxtInjectResult.Text = $"[ERROR] {ex.Message}";
-            Log($"[ERROR] LuaToolsSingle: {ex.Message}");
-        }
+        if (!TryGetToolParams(out var appId, out var name)) return;
+        var removed = SteamService.RemoveAllAcf(_cfg.SteamPath, appId);
+        TxtToolResult.Text = removed > 0 ? $"[OK] Removed {removed} ACF file(s) for {appId}" : "[INFO] No ACF files found.";
+        Log(TxtToolResult.Text);
     }
 
-    // ── Lua page ──────────────────────────────────────────────────────────────
+    private bool TryGetToolParams(out int appId, out string name)
+    {
+        appId = 0; name = TxtToolName.Text.Trim();
+        if (!int.TryParse(TxtToolAppId.Text.Trim(), out appId) || appId <= 0)
+        { TxtToolResult.Text = "[ERROR] Invalid AppID."; return false; }
+        if (string.IsNullOrEmpty(name))
+        { TxtToolResult.Text = "[ERROR] Name required."; return false; }
+        return true;
+    }
 
-    private void BtnBrowseLuaDir2_Click(object sender, RoutedEventArgs e)
+    // ── Lua generator page ────────────────────────────────────────────────────
+
+    private void BtnBrowseLua_Click(object sender, RoutedEventArgs e)
     { var d = PickFolder(); if (d != null) TxtLuaDir.Text = d; }
 
     private void BtnGenLua_Click(object sender, RoutedEventArgs e)
     {
-        try
+        if (!int.TryParse(TxtLuaAppId.Text.Trim(), out var appId) || appId <= 0)
+        { TxtLuaPreview.Text = "[ERROR] Invalid AppID."; return; }
+        var name = TxtLuaName.Text.Trim();
+        if (string.IsNullOrEmpty(name)) { TxtLuaPreview.Text = "[ERROR] Name required."; return; }
+
+        List<int>? depots = null;
+        if (!string.IsNullOrWhiteSpace(TxtLuaDepots.Text))
+            depots = TxtLuaDepots.Text.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Where(s => int.TryParse(s.Trim(), out _)).Select(s => int.Parse(s.Trim())).ToList();
+
+        var lua = SteamService.GenerateLua(appId, name, depots);
+        TxtLuaPreview.Text = lua;
+
+        var dir = TxtLuaDir.Text.Trim();
+        if (!string.IsNullOrEmpty(dir))
         {
-            if (!int.TryParse(TxtLuaAppId.Text.Trim(), out var appId) || appId <= 0)
-            { TxtLuaPreview.Text = "[ERROR] Invalid AppID."; return; }
-            var name = TxtLuaName.Text.Trim();
-            if (string.IsNullOrEmpty(name)) { TxtLuaPreview.Text = "[ERROR] Game name required."; return; }
-
-            List<int>? depots = null;
-            if (!string.IsNullOrWhiteSpace(TxtLuaDepots.Text))
-                depots = TxtLuaDepots.Text.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim()).Where(s => int.TryParse(s, out _)).Select(int.Parse).ToList();
-
-            var lua = SteamService.GenerateLua(appId, name, depots);
-            TxtLuaPreview.Text = lua;
-
-            var dir = TxtLuaDir.Text.Trim();
-            if (!string.IsNullOrEmpty(dir))
+            try
             {
                 Directory.CreateDirectory(dir);
                 var path = Path.Combine(dir, $"{appId}.lua");
                 File.WriteAllText(path, lua);
-                Log($"[LUA] Written: {path}");
+                Log($"[LUA] Written → {path}");
             }
-        }
-        catch (Exception ex) { TxtLuaPreview.Text = $"[ERROR] {ex.Message}"; Log($"[ERROR] GenLua: {ex.Message}"); }
-    }
-
-    // ── Depot page ────────────────────────────────────────────────────────────
-
-    private void BtnInjectDepot_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            if (!int.TryParse(TxtDepotAppId.Text.Trim(), out var appId) || appId <= 0)
-            { TxtDepotResult.Text = "[ERROR] Invalid AppID."; return; }
-            var name = TxtDepotName.Text.Trim();
-            if (string.IsNullOrEmpty(name)) { TxtDepotResult.Text = "[ERROR] Game name required."; return; }
-            var lib = CmbDepotLibrary.SelectedItem?.ToString();
-            if (string.IsNullOrEmpty(lib)) { TxtDepotResult.Text = "[ERROR] No library folder. Refresh or set Steam path."; return; }
-
-            var depots = new List<(int, string)>();
-            foreach (var line in TxtDepots.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            {
-                var parts = line.Trim().Split('=');
-                if (parts.Length == 2 && int.TryParse(parts[0].Trim(), out var did))
-                    depots.Add((did, parts[1].Trim()));
-            }
-
-            var buildId = string.IsNullOrWhiteSpace(TxtBuildId.Text) ? "0" : TxtBuildId.Text.Trim();
-
-            if (SteamService.IsSteamRunning() &&
-                MessageBox.Show("Steam is running — manifest changes won't apply until Steam restarts.\n\nContinue?",
-                    "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-
-            var (ok, msg) = SteamService.InjectManifest(lib, appId, name,
-                stateFlags: 4, buildId: buildId, depots: depots.Count > 0 ? depots : null);
-            TxtDepotResult.Text = msg;
-            Log(msg);
-            if (ok) RefreshStatus();
-        }
-        catch (Exception ex)
-        {
-            TxtDepotResult.Text = $"[ERROR] {ex.Message}";
-            Log($"[ERROR] InjectDepot: {ex.Message}");
+            catch (Exception ex) { Log($"[ERROR] Lua write: {ex.Message}"); }
         }
     }
-
-    // ── Batch page ────────────────────────────────────────────────────────────
-
-    private void BtnBatchInject_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var selected = _allGames.Where(g => g.IsSelected).ToList();
-            if (!selected.Any())
-            {
-                if (MessageBox.Show($"No games selected. Inject ALL {_allGames.Count} games?", "Confirm",
-                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-                selected = _allGames.ToList();
-            }
-            var lib = CmbBatchLibrary.SelectedItem?.ToString();
-            if (string.IsNullOrEmpty(lib))
-            { MessageBox.Show("No library folder selected.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-
-            if (SteamService.IsSteamRunning() &&
-                MessageBox.Show("Steam is running — injected manifests won't appear until Steam restarts.\n\nContinue?",
-                    "Steam Running", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-
-            var genLua = ChkBatchLua.IsChecked == true;
-            var luaDir = _settings.DefaultLuaDir;
-            BtnBatchInject.IsEnabled = false;
-            BatchProgress.Value = 0;
-
-            Task.Run(() =>
-            {
-                int ok = 0, fail = 0, total = selected.Count;
-                for (int i = 0; i < total; i++)
-                {
-                    var g = selected[i];
-                    try
-                    {
-                        var (success, msg) = SteamService.InjectManifest(lib, g.AppId, g.Name, genLua, luaDir);
-                        if (success) { ok++; Dispatcher.Invoke(() => g.IsInjected = true); } else fail++;
-                        Dispatcher.Invoke(() => { Log(msg); BatchProgress.Value = (double)(i + 1) / total * 100; });
-                    }
-                    catch (Exception ex)
-                    {
-                        fail++;
-                        Dispatcher.Invoke(() => Log($"[ERROR] {g.Name}: {ex.Message}"));
-                    }
-                }
-                Dispatcher.Invoke(() =>
-                {
-                    BtnBatchInject.IsEnabled = true;
-                    RefreshStatus();
-                    MessageBox.Show($"Batch done!\nInjected: {ok}   Failed: {fail}\n\nRestart Steam to see them.",
-                        "Batch Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-                });
-            });
-        }
-        catch (Exception ex) { Log($"[ERROR] BatchInject: {ex.Message}"); BtnBatchInject.IsEnabled = true; }
-    }
-
-    // ── Log page ──────────────────────────────────────────────────────────────
-
-    private void BtnClearLog_Click(object sender, RoutedEventArgs e) => TxtLog.Clear();
 
     // ── Settings page ─────────────────────────────────────────────────────────
 
     private void BtnBrowseSteam_Click(object sender, RoutedEventArgs e)
     { var d = PickFolder(); if (d != null) TxtSteamPath.Text = d; }
 
-    private void BtnBrowseDefaultLua_Click(object sender, RoutedEventArgs e)
-    { var d = PickFolder(); if (d != null) TxtDefaultLuaDir.Text = d; }
+    private void BtnBrowseStplug_Click(object sender, RoutedEventArgs e)
+    { var d = PickFolder(); if (d != null) TxtStplugDir.Text = d; }
 
-    private void BtnBrowseLuaToolsDir_Click(object sender, RoutedEventArgs e)
-    { var d = PickFolder(); if (d != null) TxtLuaToolsDir.Text = d; }
+    private void BtnBrowseBackend_Click(object sender, RoutedEventArgs e)
+    {
+        using var dlg = new System.Windows.Forms.OpenFileDialog
+        { Filter = "Executable|*.exe", Title = "Select SteamAutoCrack.exe" };
+        if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            TxtBackendPath.Text = dlg.FileName;
+    }
+
+    private void BtnBrowseAppList_Click(object sender, RoutedEventArgs e)
+    {
+        using var dlg = new System.Windows.Forms.OpenFileDialog
+        { Filter = "JSON|*.json", Title = "Select steam-applist.json" };
+        if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            TxtAppListPath.Text = dlg.FileName;
+    }
 
     private void BtnAutoDetect_Click(object sender, RoutedEventArgs e)
     {
-        try
+        var path = SteamService.DetectSteamPath();
+        if (!string.IsNullOrEmpty(path))
         {
-            var path = SteamService.DetectSteamPath();
-            if (!string.IsNullOrEmpty(path))
-            {
-                TxtSteamPath.Text = path;
-                TxtSteamPathStatus.Text = $"✓ Detected: {path}";
-                TxtSteamPathStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x00,0xB8,0x94));
+            TxtSteamPath.Text = path;
+            _cfg.SteamPath    = path;
+            if (string.IsNullOrEmpty(TxtStplugDir.Text))
+                TxtStplugDir.Text = Path.Combine(path, "config", "stplug-in");
 
-                // Auto-fill LuaTools dir
-                var luaToolsCandidate = Path.Combine(path, "config", "stplug-in");
-                if (string.IsNullOrEmpty(TxtLuaToolsDir.Text))
-                    TxtLuaToolsDir.Text = luaToolsCandidate;
-
-                _settings.SteamPath   = path;
-                _settings.LuaToolsDir = luaToolsCandidate;
-                UpdateMillenniumStatus();
-
-                var hasMill = SteamService.IsMillenniumInstalled(path);
-                Log($"[AUTO-DETECT] Steam: {path}");
-                Log($"[AUTO-DETECT] Millennium: {(hasMill ? "FOUND ✓" : "NOT FOUND — install from millennium.web.app")}");
-                Log($"[AUTO-DETECT] stplug-in dir: {luaToolsCandidate}");
-            }
-            else
-            {
-                TxtSteamPathStatus.Text = "✗ Could not auto-detect. Set path manually.";
-                TxtSteamPathStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xFF,0x47,0x57));
-            }
+            TxtSteamDetectStatus.Text       = $"✓ Detected: {path}";
+            TxtSteamDetectStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x00,0xB8,0x94));
+            Log($"[AUTO] Steam: {path}  Millennium: {SteamService.IsMillenniumInstalled(path)}");
         }
-        catch (Exception ex) { Log($"[ERROR] AutoDetect: {ex.Message}"); }
+        else
+        {
+            TxtSteamDetectStatus.Text       = "✗ Not found — set path manually.";
+            TxtSteamDetectStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xFF,0x47,0x57));
+        }
+    }
+
+    private void BtnAutoFindBackend_Click(object sender, RoutedEventArgs e)
+    {
+        // Look in common locations for SteamAutoCrack.exe
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var profile   = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        var candidates = new[]
+        {
+            Path.Combine(appData,   "LuaToolsGui",        "SteamAutoCrack.exe"),
+            Path.Combine(localData, "LuaToolsGui",        "SteamAutoCrack.exe"),
+            Path.Combine(profile,   "Downloads",          "SteamAutoCrack.exe"),
+            Path.Combine("C:\\",   "SteamAutoCrack",     "SteamAutoCrack.exe"),
+            Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? "", "SteamAutoCrack.exe"),
+        };
+
+        var found = candidates.FirstOrDefault(File.Exists);
+        if (found != null)
+        {
+            TxtBackendPath.Text = found;
+            Log($"[AUTO] Found backend: {found}");
+        }
+        else
+        {
+            MessageBox.Show("SteamAutoCrack.exe not found in common locations.\nBrowse to it manually.",
+                "Not Found", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    private void BtnScanPorts_Click(object sender, RoutedEventArgs e)
+    {
+        TxtPortStatus.Text       = "Scanning…";
+        TxtPortStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xA2,0x9B,0xFE));
+        _ = Task.Run(async () =>
+        {
+            var port = await SteamAutoBackend.AutoDetectPortAsync();
+            Dispatcher.Invoke(() =>
+            {
+                if (port >= 0)
+                {
+                    TxtBackendPort.Text      = port.ToString();
+                    TxtPortStatus.Text       = $"✓ Backend found on port {port}";
+                    TxtPortStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x00,0xB8,0x94));
+                    UpdateBackendBadge(true);
+                }
+                else
+                {
+                    TxtPortStatus.Text       = "✗ Backend not found on any port. Start SteamAutoCrack.exe first.";
+                    TxtPortStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xFF,0x47,0x57));
+                }
+            });
+        });
     }
 
     private void BtnSaveSettings_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            SaveSettings();
-            TxtSettingsStatus.Text = "✓ Settings saved.";
-            TxtSettingsStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x00,0xB8,0x94));
-            Log("[SETTINGS] Saved.");
-            RefreshStatus();
-        }
-        catch (Exception ex) { Log($"[ERROR] SaveSettings: {ex.Message}"); }
+        SaveSettings();
+        TxtSaveStatus.Text       = "✓ Saved.";
+        TxtSaveStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x00,0xB8,0x94));
+        Log("[SETTINGS] Saved.");
+        Task.Run(() => { RefreshLibraries(); Dispatcher.Invoke(() => { FillLibCombos(); UpdateLibStats(); }); });
+        _ = LoadGameDbAsync();
     }
 
-    // ── LuaTools helpers ──────────────────────────────────────────────────────
-
-    private string? ResolveLuaToolsDir()
+    private void CmbMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var dir = TxtLuaToolsDir?.Text.Trim();
-
-        // fallback: derive from Steam path
-        if (string.IsNullOrEmpty(dir) && !string.IsNullOrEmpty(_settings.SteamPath))
-            dir = Path.Combine(_settings.SteamPath, "config", "stplug-in");
-
-        if (string.IsNullOrEmpty(dir))
-        {
-            MessageBox.Show(
-                "LuaTools/Millennium scripts folder not set.\n\nGo to Settings and set or browse to your stplug-in folder\n(usually: Steam\\config\\stplug-in).",
-                "LuaTools Folder Missing", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return null;
-        }
-
-        try { Directory.CreateDirectory(dir); }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Cannot create LuaTools directory:\n{dir}\n\n{ex.Message}",
-                "Directory Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            return null;
-        }
-        return dir;
+        _cfg.Mode = (CmbMode.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Bst";
     }
 
-    // ── Generic helpers ───────────────────────────────────────────────────────
+    // ── Nav ───────────────────────────────────────────────────────────────────
 
-    private SteamLibrary? GetDefaultLibrary() =>
-        _libraries.Count == 0 ? null : _libraries[0];
-
-    private int ParseStateFlags()
+    private void Nav_Click(object sender, RoutedEventArgs e)
     {
-        var text = (CmbStateFlags.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "4";
-        return int.TryParse(text.Split(' ')[0], out var sf) ? sf : 4;
+        if (sender is Button btn) ShowPage(btn.Tag?.ToString() ?? "Add");
     }
+
+    private void ShowPage(string tag)
+    {
+        foreach (var p in new FrameworkElement[] { PageAdd, PageLibrary, PageTools, PageLog, PageSettings })
+            p.Visibility = Visibility.Collapsed;
+        foreach (var b in new[] { BtnNavAdd, BtnNavLibrary, BtnNavTools, BtnNavLog, BtnNavSettings })
+            b.Style = (Style)FindResource("NavBtn");
+
+        var (page, btn, extra) = tag switch
+        {
+            "Add"      => ((FrameworkElement)PageAdd,      BtnNavAdd,      (Action?)null),
+            "Library"  => (PageLibrary,  BtnNavLibrary,  (Action)(() => { Task.Run(() => { RefreshLibraries(); Dispatcher.Invoke(() => { FillLibCombos(); UpdateLibStats(); }); }); })),
+            "Tools"    => (PageTools,    BtnNavTools,    null!),
+            "Log"      => (PageLog,      BtnNavLog,      null!),
+            "Settings" => (PageSettings, BtnNavSettings, null!),
+            _          => (PageAdd,      BtnNavAdd,      null!),
+        };
+        page.Visibility = Visibility.Visible;
+        btn.Style = (Style)FindResource("NavBtnActive");
+        extra?.Invoke();
+    }
+
+    // ── Log ───────────────────────────────────────────────────────────────────
+
+    private void Log(string msg)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            TxtLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {msg}\n");
+            LogScroller.ScrollToBottom();
+        });
+    }
+
+    private void BtnClearLog_Click(object sender, RoutedEventArgs e) => TxtLog.Clear();
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static string? PickFolder()
     {
         using var dlg = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description         = "Select folder",
+            Description            = "Select folder",
             UseDescriptionForTitle = true,
-            ShowNewFolderButton = true,
+            ShowNewFolderButton    = true,
         };
         return dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK ? dlg.SelectedPath : null;
     }
