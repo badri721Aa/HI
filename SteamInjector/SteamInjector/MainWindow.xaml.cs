@@ -69,8 +69,9 @@ public partial class MainWindow : Window
         BindLists();
 
         _statusTimer.Interval = TimeSpan.FromSeconds(5);
-        _statusTimer.Tick += (_, _) => UpdateSteamRunningBadge();
+        _statusTimer.Tick += (_, _) => { UpdateSteamRunningBadge(); UpdateMillenniumStatus(); };
         _statusTimer.Start();
+        UpdateMillenniumStatus();
 
         ChkGenerateLua.Checked   += (_, _) => PanelLuaOutput.Visibility = Visibility.Visible;
         ChkGenerateLua.Unchecked += (_, _) => PanelLuaOutput.Visibility = Visibility.Collapsed;
@@ -218,6 +219,7 @@ public partial class MainWindow : Window
         catch (Exception ex) { Log($"[ERROR] RefreshStatus: {ex.Message}"); }
 
         UpdateSteamRunningBadge();
+        UpdateMillenniumStatus();
     }
 
     private void UpdateSteamRunningBadge()
@@ -230,6 +232,29 @@ public partial class MainWindow : Window
             StatStatus.Text       = running ? "ONLINE" : "OFFLINE";
             StatStatus.Foreground = new SolidColorBrush(running ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0xFF,0x47,0x57));
         });
+    }
+
+    private void UpdateMillenniumStatus()
+    {
+        try
+        {
+            var steamPath  = _settings.SteamPath;
+            var hasMillennium = SteamService.IsMillenniumInstalled(steamPath);
+            var hasStplug  = SteamService.IsStplugInReady(steamPath);
+            var luaCount   = SteamService.CountStplugInFiles(steamPath);
+
+            MillenniumDot.Fill = new SolidColorBrush(
+                hasMillennium ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0xFF,0x47,0x57));
+            TxtMillenniumStatus.Text =
+                hasMillennium
+                    ? $"Millennium ✓  |  stplug-in: {(hasStplug ? $"{luaCount} files" : "not found")}"
+                    : "Millennium NOT detected";
+            TxtMillenniumStatus.Foreground = new SolidColorBrush(
+                hasMillennium ? Color.FromRgb(0x00,0xB8,0x94) : Color.FromRgb(0xFF,0x47,0x57));
+
+            StatLuaFiles.Text = luaCount.ToString();
+        }
+        catch { }
     }
 
     private void Log(string message)
@@ -281,6 +306,38 @@ public partial class MainWindow : Window
     // ── Dashboard buttons ─────────────────────────────────────────────────────
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => RefreshStatus();
+
+    private void BtnDiagnose_Click(object sender, RoutedEventArgs e)
+    {
+        var steam   = _settings.SteamPath;
+        var luaDir  = _settings.LuaToolsDir;
+        var steamOk = !string.IsNullOrEmpty(steam) && Directory.Exists(steam);
+        var millOk  = steamOk && SteamService.IsMillenniumInstalled(steam);
+        var plugOk  = steamOk && SteamService.IsStplugInReady(steam);
+        var luaCnt  = steamOk ? SteamService.CountStplugInFiles(steam) : 0;
+
+        string Tick(bool v) => v ? "✅" : "❌";
+        var msg =
+            $"{Tick(steamOk)} Steam path: {(steamOk ? steam : "(not found)")}\n" +
+            $"{Tick(millOk)} Millennium: {(millOk ? "INSTALLED" : "NOT FOUND")}\n" +
+            $"{Tick(plugOk)} stplug-in folder: {(plugOk ? "EXISTS" : "NOT FOUND")}\n" +
+            $"   Lua scripts in folder: {luaCnt}\n\n";
+
+        if (!steamOk)
+            msg += "👉 Go to Settings → Auto-Detect to find your Steam path.\n";
+        if (!millOk)
+            msg += "👉 Install Millennium from: https://millennium.web.app/\n";
+        if (millOk && !plugOk)
+            msg += "👉 Install the 'stplug-in' plugin inside Millennium Settings.\n";
+        if (steamOk && millOk && plugOk && luaCnt == 0)
+            msg += "👉 Go to Game Browser → select games → Add via LuaTools.\n";
+        if (steamOk && millOk && plugOk && luaCnt > 0)
+            msg += "✅ Everything looks good! Restart Steam and games should show Install.";
+
+        Log($"[DIAGNOSE] Steam={steamOk} Millennium={millOk} stplug-in={plugOk} lua-files={luaCnt}");
+        MessageBox.Show(msg, "Setup Diagnostic", MessageBoxButton.OK,
+            steamOk && millOk && plugOk ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
 
     private void BtnStartSteam_Click(object sender, RoutedEventArgs e)
     {
@@ -363,11 +420,27 @@ public partial class MainWindow : Window
             if (!selected.Any())
             { MessageBox.Show("Select at least one game first.", "Nothing selected", MessageBoxButton.OK, MessageBoxImage.Information); return; }
 
-            var luaDir    = ResolveLuaToolsDir();
             var steamPath = _settings.SteamPath;
-            if (luaDir == null) return;
             if (string.IsNullOrEmpty(steamPath))
-            { MessageBox.Show("Steam path not set.\nGo to Settings → Auto-Detect first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+            { MessageBox.Show("Steam path not set.\nGo to Settings → click Auto-Detect → Save Settings.", "Steam Path Missing", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+
+            // Warn if Millennium not detected — files will be written but won't do anything
+            if (!SteamService.IsMillenniumInstalled(steamPath))
+            {
+                var proceed = MessageBox.Show(
+                    "⚠ Millennium Steam patcher not detected in your Steam folder.\n\n" +
+                    "The .lua files will be written BUT Steam will ignore them without Millennium.\n\n" +
+                    "To make games show 'Install' instead of 'Purchase':\n" +
+                    "1. Install Millennium from: https://millennium.web.app/\n" +
+                    "2. Install the stplug-in plugin inside Millennium\n" +
+                    "3. Then use 'Add via LuaTools' again\n\n" +
+                    "Write files anyway (for later use)?",
+                    "Millennium Not Detected", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (proceed != MessageBoxResult.Yes) return;
+            }
+
+            var luaDir = ResolveLuaToolsDir();
+            if (luaDir == null) return;
 
             if (SteamService.IsSteamRunning())
             {
@@ -387,10 +460,19 @@ public partial class MainWindow : Window
                     Log(line);
             }
             RefreshStatus();
+            UpdateMillenniumStatus();
+
+            var luaCount = SteamService.CountStplugInFiles(steamPath);
             MessageBox.Show(
-                $"Done! Processed: {ok}   Failed: {fail}\n\n" +
-                "Old manifests removed. Lua files written to stplug-in folder.\n\n" +
-                "Now START STEAM — Millennium will load the lua files\nand games will show 'Install' instead of 'Purchase'.",
+                $"✅ Done!  Written: {ok}   Failed: {fail}\n\n" +
+                $"Lua files folder: {luaDir}\n" +
+                $"Total .lua files in folder: {luaCount}\n\n" +
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                "NEXT STEPS:\n" +
+                "1. Make sure Millennium is running\n" +
+                "2. START Steam normally\n" +
+                "3. Games should now show 'Install' ✓\n\n" +
+                "If still showing 'Purchase' → check that\nMillennium + stplug-in plugin are active.",
                 "Add via LuaTools — Complete", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) { Log($"[ERROR] AddLuaTools: {ex.Message}"); }
@@ -684,7 +766,14 @@ public partial class MainWindow : Window
                 if (string.IsNullOrEmpty(TxtLuaToolsDir.Text))
                     TxtLuaToolsDir.Text = luaToolsCandidate;
 
-                Log($"[AUTO-DETECT] Steam found at: {path}");
+                _settings.SteamPath   = path;
+                _settings.LuaToolsDir = luaToolsCandidate;
+                UpdateMillenniumStatus();
+
+                var hasMill = SteamService.IsMillenniumInstalled(path);
+                Log($"[AUTO-DETECT] Steam: {path}");
+                Log($"[AUTO-DETECT] Millennium: {(hasMill ? "FOUND ✓" : "NOT FOUND — install from millennium.web.app")}");
+                Log($"[AUTO-DETECT] stplug-in dir: {luaToolsCandidate}");
             }
             else
             {

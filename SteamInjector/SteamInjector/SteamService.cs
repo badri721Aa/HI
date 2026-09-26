@@ -283,6 +283,30 @@ public static class SteamService
     public static bool AcfExists(string steamAppsPath, int appId) =>
         File.Exists(System.IO.Path.Combine(steamAppsPath, $"appmanifest_{appId}.acf"));
 
+    // Checks for Millennium Steam patcher installation
+    public static bool IsMillenniumInstalled(string steamPath)
+    {
+        if (string.IsNullOrEmpty(steamPath)) return false;
+        return Directory.Exists(System.IO.Path.Combine(steamPath, "ext")) ||
+               Directory.Exists(System.IO.Path.Combine(steamPath, "ext", "data")) ||
+               File.Exists(System.IO.Path.Combine(steamPath, "millennium.patcher")) ||
+               File.Exists(System.IO.Path.Combine(steamPath, "user32.dll")) &&
+                   new FileInfo(System.IO.Path.Combine(steamPath, "user32.dll")).Length < 5_000_000;
+    }
+
+    // Checks for stplug-in scripts directory
+    public static bool IsStplugInReady(string steamPath) =>
+        !string.IsNullOrEmpty(steamPath) &&
+        Directory.Exists(System.IO.Path.Combine(steamPath, "config", "stplug-in"));
+
+    // How many stplug-in .lua files are installed
+    public static int CountStplugInFiles(string steamPath)
+    {
+        var dir = System.IO.Path.Combine(steamPath, "config", "stplug-in");
+        try { return Directory.Exists(dir) ? Directory.GetFiles(dir, "*.lua").Length : 0; }
+        catch { return 0; }
+    }
+
     public static bool RemoveManifest(string steamAppsPath, int appId)
     {
         try

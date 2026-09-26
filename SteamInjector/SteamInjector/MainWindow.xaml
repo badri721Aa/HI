@@ -213,9 +213,14 @@
         <Border DockPanel.Dock="Bottom" Margin="12,0,12,12" Background="#1F1F2E" CornerRadius="8" Padding="12,8">
           <StackPanel>
             <TextBlock Text="STEAM STATUS" FontSize="10" FontWeight="Bold" Foreground="#555570" Margin="0,0,0,4"/>
-            <StackPanel Orientation="Horizontal">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
               <Ellipse x:Name="SteamDot" Width="8" Height="8" Fill="#FF4757" VerticalAlignment="Center" Margin="0,0,6,0"/>
               <TextBlock x:Name="TxtSteamStatus" Text="Not Running" FontSize="12" Foreground="#8888AA"/>
+            </StackPanel>
+            <TextBlock Text="MILLENNIUM" FontSize="10" FontWeight="Bold" Foreground="#555570" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal">
+              <Ellipse x:Name="MillenniumDot" Width="8" Height="8" Fill="#FF4757" VerticalAlignment="Center" Margin="0,0,6,0"/>
+              <TextBlock x:Name="TxtMillenniumStatus" Text="Not detected" FontSize="11" Foreground="#FF4757" TextWrapping="Wrap"/>
             </StackPanel>
           </StackPanel>
         </Border>
@@ -269,17 +274,35 @@
                 <TextBlock Text="Steam Running" FontSize="12" Foreground="#8888AA"/>
               </StackPanel>
             </Border>
+            <Border Background="#1F1F28" CornerRadius="12" Padding="20,16" Margin="0,0,12,12" Width="200">
+              <StackPanel>
+                <TextBlock Text="🌙" FontSize="28"/>
+                <TextBlock x:Name="StatLuaFiles" Text="0" FontSize="30" FontWeight="Bold" Foreground="#0984E3" Margin="0,4,0,2"/>
+                <TextBlock Text="stplug-in Lua Files" FontSize="12" Foreground="#8888AA"/>
+              </StackPanel>
+            </Border>
           </WrapPanel>
           <TextBlock Text="Library Folders" FontSize="15" FontWeight="SemiBold" Foreground="#E8E8F0" Margin="0,0,0,8"/>
           <ListBox x:Name="ListLibs" Height="140" Style="{StaticResource DarkListBox}">
             <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem" BasedOn="{StaticResource DarkListItem}"/></ListBox.ItemContainerStyle>
           </ListBox>
           <WrapPanel Margin="0,16,0,0">
-            <Button Content="🔄 Refresh Status" Style="{StaticResource SecondaryBtn}" Margin="0,0,8,0" Click="BtnRefresh_Click"/>
-            <Button Content="▶ Start Steam"     Style="{StaticResource GreenBtn}"     Margin="0,0,8,0" Click="BtnStartSteam_Click"/>
-            <Button Content="⏹ Kill Steam"      Style="{StaticResource DangerBtn}"    Margin="0,0,8,0" Click="BtnKillSteam_Click"/>
-            <Button Content="🔁 Restart Steam"  Style="{StaticResource SecondaryBtn}"               Click="BtnRestartSteam_Click"/>
+            <Button Content="🔄 Refresh"        Style="{StaticResource SecondaryBtn}" Margin="0,0,8,8" Click="BtnRefresh_Click"/>
+            <Button Content="▶ Start Steam"     Style="{StaticResource GreenBtn}"     Margin="0,0,8,8" Click="BtnStartSteam_Click"/>
+            <Button Content="⏹ Kill Steam"      Style="{StaticResource DangerBtn}"    Margin="0,0,8,8" Click="BtnKillSteam_Click"/>
+            <Button Content="🔁 Restart Steam"  Style="{StaticResource SecondaryBtn}" Margin="0,0,8,8" Click="BtnRestartSteam_Click"/>
+            <Button Content="🔍 Diagnose Setup" Style="{StaticResource LuaBtn}"       Margin="0,0,8,8" Click="BtnDiagnose_Click"/>
           </WrapPanel>
+          <Border Margin="0,8,0,0" Background="#1A1A2A" CornerRadius="8" Padding="14,10">
+            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#8888AA">
+              <Run FontWeight="SemiBold" Foreground="#0984E3">How it works: </Run>
+              <Run>Install </Run><Run FontWeight="Bold" Foreground="#E8E8F0">Millennium</Run><Run> (millennium.web.app) + </Run>
+              <Run FontWeight="Bold" Foreground="#E8E8F0">stplug-in</Run><Run> plugin → go to </Run>
+              <Run FontWeight="Bold" Foreground="#E8E8F0">Game Browser</Run><Run> → select games → </Run>
+              <Run FontWeight="Bold" Foreground="#0984E3">Add via LuaTools</Run><Run> → start Steam. Games show </Run>
+              <Run FontWeight="Bold" Foreground="#00B894">Install</Run><Run> ✓</Run>
+            </TextBlock>
+          </Border>
         </StackPanel>
       </ScrollViewer>
 
@@ -595,7 +618,7 @@
             <TextBox x:Name="TxtLuaToolsDir" Style="{StaticResource DarkTextBox}"/>
             <Button Grid.Column="1" Content="Browse" Style="{StaticResource SecondaryBtn}" Margin="8,0,0,0" Click="BtnBrowseLuaToolsDir_Click"/>
           </Grid>
-          <TextBlock Text="e.g. C:\Program Files (x86)\Steam\ext\data\plugins" FontSize="11" Foreground="#555570" Margin="0,0,0,16"/>
+          <TextBlock Text="Auto-filled as Steam\config\stplug-in  (default stplug-in scripts folder)" FontSize="11" Foreground="#555570" Margin="0,0,0,16"/>
 
           <TextBlock Text="Default Lua Output Directory" FontSize="13" Foreground="#8888AA" Margin="0,0,0,4"/>
           <Grid Margin="0,0,0,16">
@@ -608,12 +631,16 @@
           <Border Margin="0,24,0,0" Background="#1F1F28" CornerRadius="8" Padding="16">
             <StackPanel>
               <TextBlock Text="ℹ️ How to use" FontSize="14" FontWeight="SemiBold" Foreground="#6C5CE7" Margin="0,0,0,8"/>
-              <TextBlock TextWrapping="Wrap" Foreground="#8888AA" FontSize="12" LineHeight="20">
-                1. Set your Steam path above (or use Auto-Detect).&#10;
-                2. Go to Game Browser → select games → Inject Selected (ACF manifest).&#10;
-                3. "Add via LuaTools" writes a .lua file to the LuaTools/Millennium scripts folder.&#10;
-                4. Restart Steam for injected manifests to appear in your library.&#10;
-                5. If Steam shows permission errors, run this app as Administrator.
+              <TextBlock TextWrapping="Wrap" Foreground="#8888AA" FontSize="12" LineHeight="22">
+                <Run FontWeight="Bold" Foreground="#E8E8F0">To show games as 'Install' (not 'Purchase'):</Run>&#10;
+                1. Install Millennium from millennium.web.app&#10;
+                2. Inside Millennium, install the stplug-in plugin&#10;
+                3. Auto-Detect your Steam path here → Save Settings&#10;
+                4. Go to Game Browser → select games → Add via LuaTools&#10;
+                5. Start Steam with Millennium active → games show Install ✓&#10;&#10;
+                <Run FontWeight="Bold" Foreground="#E8E8F0">Old ACF manifest inject (shows Purchase in new Steam):</Run>&#10;
+                Use 'Inject ACF' button if you specifically need ACF files.&#10;
+                Run as Administrator if you get permission errors.
               </TextBlock>
             </StackPanel>
           </Border>
