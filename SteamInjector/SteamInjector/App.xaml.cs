@@ -1,21 +1,17 @@
-using System.Windows;
-using WpfApp       = System.Windows.Application;
-using MessageBox   = System.Windows.MessageBox;
-
 namespace SteamInjector;
 
-public partial class App : WpfApp
+public partial class App : System.Windows.Application
 {
-    protected override void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
         base.OnStartup(e);
         DispatcherUnhandledException += (_, ex) =>
         {
-            MessageBox.Show(
+            System.Windows.MessageBox.Show(
                 $"Unhandled error:\n{ex.Exception.Message}",
                 "SteamInjector Error",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
             ex.Handled = true;
         };
     }
