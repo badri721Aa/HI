@@ -655,17 +655,17 @@ public partial class MainWindow : Window
 
     private void BtnBrowseBackend_Click(object sender, RoutedEventArgs e)
     {
-        using var dlg = new System.Windows.Forms.OpenFileDialog
+        var dlg = new Microsoft.Win32.OpenFileDialog
         { Filter = "Executable|*.exe", Title = "Select SteamAutoCrack.exe" };
-        if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        if (dlg.ShowDialog() == true)
             TxtBackendPath.Text = dlg.FileName;
     }
 
     private void BtnBrowseAppList_Click(object sender, RoutedEventArgs e)
     {
-        using var dlg = new System.Windows.Forms.OpenFileDialog
+        var dlg = new Microsoft.Win32.OpenFileDialog
         { Filter = "JSON|*.json", Title = "Select steam-applist.json" };
-        if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        if (dlg.ShowDialog() == true)
             TxtAppListPath.Text = dlg.FileName;
     }
 
@@ -804,12 +804,7 @@ public partial class MainWindow : Window
 
     private static string? PickFolder()
     {
-        using var dlg = new System.Windows.Forms.FolderBrowserDialog
-        {
-            Description            = "Select folder",
-            UseDescriptionForTitle = true,
-            ShowNewFolderButton    = true,
-        };
-        return dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK ? dlg.SelectedPath : null;
+        var dlg = new Microsoft.Win32.OpenFolderDialog { Title = "Select folder" };
+        return dlg.ShowDialog() == true ? dlg.FolderName : null;
     }
 }

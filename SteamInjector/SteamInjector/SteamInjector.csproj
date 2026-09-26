@@ -12,6 +12,5 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 </Project>
