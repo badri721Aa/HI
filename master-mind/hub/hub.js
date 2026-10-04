@@ -47,8 +47,11 @@ async function route() {
     get settings() { return settings },
     db, uid, onDbChange: onChange, runTask, renderMarkdown, escapeHtml, toast,
     navigate(v, p = '') { location.hash = `${v}${p ? `?${p}` : ''}` },
-    /** Open (or focus) a URL in a normal browser tab. */
-    openUrl(url) { return chrome.tabs.create({ url }) },
+    /** Open a web URL in a normal browser tab. Stored URLs are untrusted, so only http(s) is allowed. */
+    openUrl(url) {
+      if (!/^https?:\/\//i.test(String(url || ''))) { toast('Only web links can be opened.'); return Promise.resolve(null) }
+      return chrome.tabs.create({ url })
+    },
   }
   let mod = null
   let error = null
