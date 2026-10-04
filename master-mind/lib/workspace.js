@@ -17,6 +17,9 @@ const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024
 const HL_MIME = 'application/x-mm-highlight'
 const LIST_CAP = 400
 const RECENT_HL = 60
+const MENU_GAP = 8 // min distance between a dropdown menu and the viewport edge
+const NARROW = 820 // full-mode width below which the notes list stacks above the editor
+const SPLIT_MIN = 520 // narrowest editor area that still fits Split (two panes of ~250px)
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'
 
 /** [[Note Title]] or [[Note Title|label]] */
@@ -125,6 +128,41 @@ export function plainText(md) {
     .trim()
 }
 
+const HEADING_RE = /^\s{0,3}#{1,6}\s/
+const BLOCK_START_RE = /^\s{0,3}(?:#{1,6}\s|>|[-*+]\s|\d+[.)]\s|\|)/
+const TABLE_RULE_RE = /^\s{0,3}\|?(?:\s*:?-{2,}:?\s*\|)+\s*(?::?-{2,}:?\s*)?$/
+/**
+ * Markdown → one-line preview for note lists. Blocks (headings, paragraphs, list items, quotes) stay
+ * apart: "SEI · The SEI forms on first charge." rather than "SEI The SEI forms…". A leading heading that
+ * just repeats the note title is dropped.
+ */
+export function snippetText(md, title = '', max = 160) {
+  const blocks = []
+  let cur = null
+  let afterHeading = false
+  for (let line of String(md || '').replace(/\r/g, '').replace(/```[\s\S]*?```/g, '\n\n').split('\n')) {
+    if (TABLE_RULE_RE.test(line)) continue
+    if (!line.trim()) { cur = null; continue }
+    const heading = HEADING_RE.test(line)
+    if (!cur || heading || afterHeading || BLOCK_START_RE.test(line)) { cur = { lines: [], heading }; blocks.push(cur) }
+    if (/^\s{0,3}\|/.test(line)) line = line.split('|').map(c => c.trim()).filter(Boolean).join(' · ') // table row → its cells
+    cur.lines.push(line) // soft-wrapped lines of one paragraph stay together
+    afterHeading = heading
+  }
+  const same = (a, b) => a.toLowerCase() === b.toLowerCase()
+  let out = ''
+  let first = true
+  for (const b of blocks) {
+    const text = plainText(b.lines.join('\n'))
+    if (!text) continue
+    if (first && b.heading && title && same(text, plainText(title))) { first = false; continue }
+    first = false
+    out = !out ? text : /[.!?:;…,]$/.test(out) ? `${out} ${text}` : `${out} · ${text}`
+    if (out.length >= max) break
+  }
+  return out.slice(0, max)
+}
+
 /** Replace [[wiki links]] in text nodes under root (skipping code, links, math) with make(title, label) nodes. */
 export function replaceWikiLinks(root, make) {
   const doc = root.ownerDocument || document
@@ -215,7 +253,7 @@ const store = {
 // ───────── styles (adopted once per document) ─────────
 const STYLES = `
 .ws { container: ws / inline-size; position: relative; min-width: 0; --ws-float: rgba(19, 22, 32, .97); }
-.ws.full { height: 100%; min-height: 540px; }
+.ws.full { height: 100%; min-height: 420px; }
 .ws-shell { display: grid; grid-template-columns: 272px minmax(0, 1fr); gap: 16px; height: 100%; min-height: 0; }
 .ws.compact .ws-shell { display: flex; flex-direction: column; gap: 10px; height: auto; }
 
@@ -258,13 +296,14 @@ const STYLES = `
 /* editor */
 .ws-main { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; }
 .ws-editor { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
-.ws-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.ws-title { flex: 1; min-width: 0; font: 750 22px/1.25 var(--mm-font); letter-spacing: -.015em; color: var(--mm-heading); background: transparent; border: 0; border-radius: 9px; padding: 5px 8px; margin-left: -8px; outline: none; transition: background .15s, box-shadow .15s; }
+/* The title keeps a readable width: when it can't, the actions wrap below it (right-aligned). */
+.ws-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.ws-title { flex: 1 1 240px; min-width: 0; text-overflow: ellipsis; font: 750 22px/1.25 var(--mm-font); letter-spacing: -.015em; color: var(--mm-heading); background: transparent; border: 0; border-radius: 9px; padding: 5px 8px; margin-left: -8px; outline: none; transition: background .15s, box-shadow .15s; }
 .ws-title:hover { background: rgba(255, 255, 255, .03); }
 .ws-title:focus { background: rgba(255, 255, 255, .04); box-shadow: 0 0 0 1px var(--mm-border-strong); }
 .ws-title::placeholder { color: var(--mm-muted); }
-.ws.compact .ws-title { font-size: 17px; }
-.ws-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.ws.compact .ws-title { font-size: 17px; flex-basis: 160px; }
+.ws-actions { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; }
 .ws-actions .mm-btn[aria-pressed="true"] { color: var(--mm-accent); background: color-mix(in srgb, var(--mm-accent) 12%, transparent); }
 .ws-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 28px; }
 .ws-tag { display: inline-flex; align-items: center; gap: 3px; font: 600 12px/1 var(--mm-font); padding: 3px 3px 3px 9px; border-radius: 999px; color: var(--mm-fg); background: color-mix(in srgb, var(--mm-accent-2) 14%, transparent); border: 1px solid color-mix(in srgb, var(--mm-accent-2) 35%, transparent); }
@@ -275,6 +314,8 @@ const STYLES = `
 .ws-tag-input::placeholder { color: var(--mm-muted); }
 .ws-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ws-spacer { flex: 1; }
+/* Highlights, AI and Export wrap as one right-aligned group, so their menus always open leftwards in view. */
+.ws-bar-end { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .ws-toolbar { display: flex; align-items: center; gap: 1px; padding: 3px; border-radius: 11px; background: rgba(0, 0, 0, .28); border: 1px solid var(--mm-border); flex-wrap: wrap; }
 .ws-tb { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; border: 0; padding: 0; background: transparent; color: var(--mm-fg-2); cursor: pointer; transition: background .12s, color .12s, transform .1s; }
 .ws-tb:hover { background: rgba(255, 255, 255, .08); color: var(--mm-heading); }
@@ -397,7 +438,7 @@ const STYLES = `
 
 /* menus + dialog + empty */
 .ws-menu-wrap { position: relative; }
-.ws-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 270px; max-width: min(320px, 86vw); padding: 6px; display: flex; flex-direction: column; gap: 1px; border-radius: 12px; background: var(--ws-float); border: 1px solid var(--mm-border-strong); box-shadow: var(--mm-shadow); backdrop-filter: var(--mm-blur); -webkit-backdrop-filter: var(--mm-blur); animation: ws-drop .14s var(--mm-ease); }
+.ws-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: min(270px, calc(100vw - 16px)); max-width: min(320px, calc(100vw - 16px)); padding: 6px; display: flex; flex-direction: column; gap: 1px; border-radius: 12px; background: var(--ws-float); border: 1px solid var(--mm-border-strong); box-shadow: var(--mm-shadow); backdrop-filter: var(--mm-blur); -webkit-backdrop-filter: var(--mm-blur); animation: ws-drop .14s var(--mm-ease); }
 .ws-menu-label { font: 700 10.5px/1 var(--mm-font); letter-spacing: .08em; text-transform: uppercase; color: var(--mm-muted); padding: 7px 10px 5px; }
 .ws-mi { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--mm-fg); font: 600 13px/1.3 var(--mm-font); text-align: left; cursor: pointer; }
 .ws-mi .mm-icon { margin-top: 1px; color: var(--mm-accent); }
@@ -424,13 +465,13 @@ const STYLES = `
 
 @keyframes ws-slide { from { opacity: 0; transform: translateX(16px); } }
 @keyframes ws-drop { from { opacity: 0; transform: translateY(-4px); } }
-/* Narrow hub windows: stack the list above the editor; the workspace scrolls (never the page) so panes keep a usable height. */
-@container ws (max-width: 820px) {
-  .ws.full .ws-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; overflow-y: auto; padding-right: 4px; }
+/* Narrow hub windows: the list stacks above the editor and the workspace is the one scroller (the hub fits
+   it to the viewport, so the page never scrolls too). The editor row is a full workspace-height tall, so
+   scrolling past the list shows the whole editor; Split stays side by side (JS falls back to Edit when
+   two panes can't fit). */
+@container ws (max-width: ${NARROW}px) {
+  .ws.full .ws-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: max-content max(420px, 100%); overflow-y: auto; padding-right: 4px; }
   .ws.full .ws-list { max-height: 240px; }
-  .ws.full .ws-editor, .ws.full .ws-body { flex: none; }
-  .ws.full .ws-body { min-height: 480px; }
-  .ws.full .ws-body[data-mode="split"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: 380px 420px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ws *, .ws-dialog { animation: none !important; transition: none !important; }
@@ -471,12 +512,19 @@ export function createWorkspace(container, opts = {}) {
   let pages = null // cache of db.pages, loaded lazily
   let dirty = false
   let destroyed = false
-  let mode = compact ? (store.get('mm-ws-mode-compact', 'edit') === 'preview' ? 'preview' : 'edit') : (['edit', 'split', 'preview'].includes(store.get('mm-ws-mode', 'split')) ? store.get('mm-ws-mode', 'split') : 'split')
+  // pref = the view mode the user picked (remembered); mode = what's shown. Split falls back to Edit while
+  // the editor is too narrow for two panes (tight), without forgetting the preference.
+  let pref = compact ? (store.get('mm-ws-mode-compact', 'edit') === 'preview' ? 'preview' : 'edit') : (['edit', 'split', 'preview'].includes(store.get('mm-ws-mode', 'split')) ? store.get('mm-ws-mode', 'split') : 'split')
+  let mode = pref
+  let tight = false
   let saveChain = Promise.resolve()
   let lastSel = null // last caret/selection in the textarea, for inserts at the cursor
   let internalDrag = false
   let suggest = null // { start, items, index }
   let aiJob = null
+  // Id of the open note while a delete/clear from another view awaits confirmation: autosave holds off,
+  // so a pending write can't re-create a note the user just deleted elsewhere.
+  let goneId = null
   const createdHere = new Set()
   const infoCache = new Map() // note id → { updated, plain, kw }
   const timers = {}
@@ -572,7 +620,7 @@ export function createWorkspace(container, opts = {}) {
     : h('div', { class: 'ws-head' }, titleInput, h('div', { class: 'ws-actions' }, pinBtn, aiMenu.wrap, exportMenu.wrap, deleteBtn))
   const tagsRow = h('div', { class: 'ws-tags-row' }, tagsEl, tagList)
   const barRow = compact
-    ? [h('div', { class: 'ws-bar' }, modeSeg, h('span', { class: 'ws-spacer' }), hlBtn, aiMenu.wrap, exportMenu.wrap), toolbar]
+    ? [h('div', { class: 'ws-bar' }, modeSeg, h('div', { class: 'ws-bar-end' }, hlBtn, aiMenu.wrap, exportMenu.wrap)), toolbar]
     : [h('div', { class: 'ws-bar' }, toolbar, h('span', { class: 'ws-spacer' }), hlBtn, modeSeg)]
   const editor = h('div', { class: 'ws-editor', hidden: true }, headRow, tagsRow, barRow, compact ? drawer : null, aiPanel, body, compact ? contextEl : null, status)
   const main = h('section', { class: 'ws-main', 'aria-label': 'Note editor' }, editor, emptyEl)
@@ -649,7 +697,8 @@ export function createWorkspace(container, opts = {}) {
 
   function itemEl(nt) {
     const current = note?.id === nt.id
-    const snippet = info(nt).plain.slice(0, 160)
+    const c = info(nt)
+    const snippet = (c.snippet ??= snippetText(nt.body, nt.title))
     const pin = iconBtn('pin', nt.pinned ? 'Unpin note' : 'Pin note', () => togglePin(nt.id))
     pin.setAttribute('aria-pressed', String(!!nt.pinned))
     const del = iconBtn('trash', 'Delete note', () => deleteNote(nt.id), 'mm-btn ghost icon sm ws-del')
@@ -731,6 +780,7 @@ export function createWorkspace(container, opts = {}) {
     clearTimeout(timers.save)
     dirty = false
     lastSel = null
+    goneId = null
     if (!rec) {
       note = null
       editor.hidden = true
@@ -791,6 +841,7 @@ export function createWorkspace(container, opts = {}) {
 
   async function togglePin(id) {
     if (note?.id === id) {
+      if (goneId === id) return // being deleted elsewhere: don't write it back
       note.pinned = !note.pinned
       renderPin()
       await flush()
@@ -834,6 +885,7 @@ export function createWorkspace(container, opts = {}) {
     clearTimeout(timers.save)
     saveChain = saveChain.then(async () => {
       if (!note || !dirty) return
+      if (goneId === note.id) return // stays dirty; syncExternal() resumes saving or closes the note
       dirty = false
       note.updated = Date.now()
       const rec = snapshot()
@@ -849,18 +901,24 @@ export function createWorkspace(container, opts = {}) {
   }
   const flush = () => (dirty ? save() : saveChain)
 
-  // Another view (hub ⇄ side panel) changed the open note: adopt it unless we have unsaved edits.
-  async function syncExternal() {
-    if (!note) return
+  // Another view (hub ⇄ side panel) changed or deleted the open note: adopt the change unless we have
+  // unsaved edits; close the note if it's gone. Runs are serialized so callers can await a settled state.
+  let syncChain = Promise.resolve()
+  const syncExternal = () => (syncChain = syncChain.then(syncNow).catch(e => console.warn('[MM notes] sync failed', e)))
+  async function syncNow() {
+    if (!note || destroyed) return
     const id = note.id
-    const rec = await db.get('notes', id).catch(() => undefined)
-    if (destroyed || note?.id !== id || rec === undefined) return
-    if (!rec) {
-      notify('This note was deleted in another window.', 'error')
-      note = null
-      const next = notes.filter(x => x.id !== id).sort(byPinnedUpdated)[0]
-      if (next) openNote(next.id, { quiet: true }); else setNote(null)
+    // IndexedDB resolves a missing key as undefined: map it to null so "deleted" and "couldn't read" differ.
+    const rec = await db.get('notes', id).then(r => r ?? null, () => undefined)
+    if (destroyed || note?.id !== id) return
+    if (rec === undefined) { // read failed: if a delete is pending, check again rather than guess
+      if (goneId === id) later('sync', syncExternal, 1000)
       return
+    }
+    if (!rec) return closeDeleted(id)
+    if (goneId === id) { // false alarm (e.g. re-imported right away): resume the held autosave
+      goneId = null
+      if (dirty) later('save', save, 0)
     }
     if ((rec.updated || 0) <= (note.updated || 0) && !!rec.pinned === note.pinned) return
     if (dirty) return
@@ -873,6 +931,24 @@ export function createWorkspace(container, opts = {}) {
       if (focused) ta.setSelectionRange(Math.min(s, ta.value.length), Math.min(e, ta.value.length))
     }
     renderTags(); renderPin(); renderPreview(); renderCounts(); renderList(); renderContext()
+  }
+
+  /** The open note was deleted in another view: drop it (never write it back) and open the next one. */
+  async function closeDeleted(id) {
+    const lost = dirty
+    clearTimeout(timers.save)
+    dirty = false
+    goneId = null
+    note = null // from here on save(), insert() and the editor handlers no longer target it
+    abortAi(true)
+    createdHere.delete(id)
+    infoCache.delete(id)
+    notes = notes.filter(x => x.id !== id)
+    notify(lost ? 'This note was deleted in another window. Your unsaved edits were discarded.' : 'This note was deleted in another window.', 'error', 7000)
+    const all = await db.all('notes').catch(() => notes)
+    if (destroyed || note) return // the user opened another note meanwhile
+    const next = all.filter(x => x.id !== id).sort(byPinnedUpdated)[0]
+    if (next) await openNote(next.id, { quiet: true }); else setNote(null)
   }
 
   // ───────── title + tags ─────────
@@ -1241,7 +1317,7 @@ export function createWorkspace(container, opts = {}) {
     if (id) return openNote(id)
     await flush()
     await newNote({ title }, { focusTitle: false })
-    if (!destroyed) { setMode(compact ? 'edit' : mode === 'preview' ? 'split' : mode); ta.focus() }
+    if (!destroyed) { setMode(compact ? 'edit' : pref === 'preview' ? 'split' : pref); ta.focus() }
     notify(`Created “${title}”.`, 'ok')
   }
 
@@ -1254,13 +1330,28 @@ export function createWorkspace(container, opts = {}) {
 
   function setMode(m) {
     if (!MODES.some(([x]) => x === m)) m = MODES[0][0]
-    mode = m
-    body.dataset.mode = m
-    for (const b of modeSeg.children) b.setAttribute('aria-pressed', String(b.dataset.mode === m))
-    toolbar.hidden = m === 'preview'
+    pref = m
     store.set(compact ? 'mm-ws-mode-compact' : 'mm-ws-mode', m)
-    if (m !== 'edit') renderPreview()
+    applyMode()
   }
+  function applyMode() {
+    mode = tight && pref === 'split' ? 'edit' : pref
+    body.dataset.mode = mode
+    for (const b of modeSeg.children) {
+      b.hidden = tight && b.dataset.mode === 'split'
+      b.setAttribute('aria-pressed', String(b.dataset.mode === mode))
+    }
+    toolbar.hidden = mode === 'preview'
+    if (mode !== 'edit') renderPreview()
+  }
+  // Full mode: offer Split only while the editor area fits two readable panes.
+  const bodyObs = !compact && typeof ResizeObserver === 'function' ? new ResizeObserver(([entry]) => {
+    const w = entry.contentRect.width
+    if (!w) return // editor hidden (no note open)
+    const next = w < SPLIT_MIN
+    if (next !== tight) { tight = next; applyMode() }
+  }) : null
+  bodyObs?.observe(body)
 
   // ───────── inserting content ─────────
   function appendBlock(md, { focus = false } = {}) {
@@ -1591,11 +1682,27 @@ export function createWorkspace(container, opts = {}) {
     btn.setAttribute('aria-expanded', 'false')
     const items = () => [...menu.querySelectorAll('[role="menuitem"]')]
     const outside = e => { if (!wrapEl.contains(e.target)) close(false) }
+    // The menu hangs right-aligned under its button. When the button sits near the left edge (a wrapped
+    // toolbar row in a narrow side panel), shift it so it stays inside the viewport.
+    let placeRaf = 0
+    function place() {
+      placeRaf = 0
+      if (menu.hidden) return
+      menu.style.removeProperty('right')
+      const vw = document.documentElement.clientWidth
+      const r = menu.getBoundingClientRect()
+      const shift = r.left < MENU_GAP ? MENU_GAP - r.left : r.right > vw - MENU_GAP ? vw - MENU_GAP - r.right : 0
+      if (shift) menu.style.right = `${-Math.round(shift)}px`
+    }
+    const onResize = () => { if (!placeRaf) placeRaf = requestAnimationFrame(place) }
     function close(focusBtn) {
       if (menu.hidden) return
       menu.hidden = true
       btn.setAttribute('aria-expanded', 'false')
       document.removeEventListener('pointerdown', outside, true)
+      removeEventListener('resize', onResize)
+      cancelAnimationFrame(placeRaf)
+      placeRaf = 0
       if (focusBtn) btn.focus()
     }
     function open(focusLast = false) {
@@ -1610,8 +1717,10 @@ export function createWorkspace(container, opts = {}) {
         }, icon(it.icon), h('span', {}, h('span', { text: it.label }), it.hint ? h('small', { text: it.hint }) : null))
       }))
       menu.hidden = false
+      place()
       btn.setAttribute('aria-expanded', 'true')
       document.addEventListener('pointerdown', outside, true)
+      addEventListener('resize', onResize)
       const list = items()
       ;(focusLast ? list[list.length - 1] : list.find(x => x.getAttribute('aria-disabled') !== 'true') || list[0])?.focus()
     }
@@ -1835,7 +1944,11 @@ export function createWorkspace(container, opts = {}) {
     if (destroyed || !evt) return
     if (evt.store === 'notes') {
       later('reload', loadNotes, 150)
-      if (note && (evt.key == null || evt.key === note.id)) later('sync', syncExternal, 60)
+      if (note && (evt.key == null || evt.key === note.id)) {
+        // A delete/clear may have removed the open note: hold autosave until syncExternal has checked.
+        if (evt.op === 'delete' || evt.op === 'clear') goneId = note.id
+        later('sync', syncExternal, 60)
+      }
     } else if (evt.store === 'pages') {
       pages = null
       later('ctx', renderContext, 800)
@@ -1853,7 +1966,7 @@ export function createWorkspace(container, opts = {}) {
   const tick = setInterval(() => { if (!destroyed && !document.hidden) renderList() }, 60000)
 
   // ───────── boot ─────────
-  setMode(mode)
+  applyMode()
   const ready = (async () => {
     try { liveSettings = await readSettings() } catch { /* keep given settings */ }
     try {
@@ -1882,6 +1995,8 @@ export function createWorkspace(container, opts = {}) {
       if (destroyed) return null
       const md = String(markdown || '').trim()
       if (!md) return current()
+      if (note && goneId === note.id) await syncExternal() // settle a pending delete first, never re-create it
+      if (destroyed) return null
       const src = source?.url ? cleanSource(source) : null
       if (!note) {
         const rec = newRecord({ title: String(title || src?.title || 'Untitled note').slice(0, 200), body: `${md}\n`, sources: src && /^https?:/i.test(src.url) ? [src] : [] })
@@ -1911,6 +2026,7 @@ export function createWorkspace(container, opts = {}) {
       for (const t of Object.values(timers)) clearTimeout(t)
       cancelAnimationFrame(syncRaf)
       clearInterval(tick)
+      bodyObs?.disconnect()
       for (const m of menus) m.close(false)
       if (dialog.open) dialog.close('cancel')
       offDb()

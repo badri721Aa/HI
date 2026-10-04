@@ -227,7 +227,8 @@ export function mount(root, ctx) {
     playBtn.dataset.state = state
     playBtn.replaceChildren(icon(state === 'playing' ? 'pause' : 'play', state !== 'playing'), playLabel)
     playLabel.textContent = state === 'playing' ? 'Pause' : state === 'paused' ? 'Resume' : 'Play'
-    playBtn.setAttribute('aria-label', state === 'playing' ? 'Pause reading aloud' : state === 'paused' ? 'Resume reading aloud' : 'Read this page aloud')
+    // Each accessible name starts with the visible word (WCAG 2.5.3), so "click Play" works for voice control.
+    playBtn.setAttribute('aria-label', state === 'playing' ? 'Pause reading aloud' : state === 'paused' ? 'Resume reading aloud' : 'Play this page aloud')
     stopBtn.disabled = state === 'stopped'
     if (!dragging) setRateUi(S.tts.rate ?? rate)
   }

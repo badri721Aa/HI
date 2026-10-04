@@ -153,11 +153,35 @@ function h(tag, props = {}, ...kids) {
 
 const strs = (v, n, max = 200) => (Array.isArray(v) ? v : []).filter(x => typeof x === 'string').map(x => x.replace(/\s+/g, ' ').trim().slice(0, max)).filter(Boolean).slice(0, n)
 const stripCites = s => String(s || '').replace(/\s*\[p\d+\]/g, '')
+
 const fmtNum = n => Number(n || 0).toLocaleString()
 const withArticle = s => `${/^[aeiou]/i.test(s) ? 'an' : 'a'} ${s}`
 function fmtDate(s) {
   const d = new Date(s)
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// ───────── Markdown hygiene (page text and AI output are untrusted) ─────────
+/**
+ * AI Markdown with raw HTML and images neutralized: every `<` and every `!` that would open an image is
+ * backslash-escaped (unless already escaped), so the renderer shows them as text. Briefs are prose, so this
+ * loses nothing, and a page that prompt-injects the model can't plant forms, pixels or styled markup in the
+ * panel, the stored page record or the user's notes. Idempotent.
+ */
+const inertMd = s => String(s || '').replace(/(\\*)(<|!(?=\[))/g, (m, bs, ch) => (bs.length % 2 ? m : `${bs}\\${ch}`))
+/** Plain text (a page title, a topic) as literal Markdown inline text: lib/workspace.js mdText, plus `~`. */
+const mdText = s => String(s ?? '').replace(/\s+/g, ' ').trim().replace(/([\\[\]*_`<>~])/g, '\\$1')
+const mdUrl = u => String(u ?? '').trim().replace(/[\s()<>]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`)
+
+/** Rendered links open in a new tab with no opener (never inside the panel), and only for web or mail URLs. */
+function hardenLinks(root) {
+  for (const a of root.querySelectorAll('a')) {
+    let ok = false
+    try { ok = /^(https?|mailto):$/.test(new URL(a.getAttribute('href') || '').protocol) } catch { /* relative or invalid */ }
+    if (!ok) { a.replaceWith(...a.childNodes); continue }
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+  }
 }
 
 function cleanEntities(v, n = 12) {
@@ -175,12 +199,12 @@ function cleanEntities(v, n = 12) {
 
 /** Validate an AI brief payload (untrusted) into the stored shape. */
 function cleanBrief(d, mode) {
-  const summary = typeof d?.summary === 'string' ? d.summary.trim().slice(0, 6000) : ''
+  const summary = typeof d?.summary === 'string' ? inertMd(d.summary.trim().slice(0, 6000)) : ''
   if (!summary) throw Object.assign(new Error('Claude returned an empty brief. Try again.'), { code: 'FORMAT' })
   return {
     mode,
     summary,
-    takeaways: strs(d.takeaways, 3, 400),
+    takeaways: strs(d.takeaways, 3, 400).map(inertMd),
     topics: strs(d.topics, 6, 60),
     contentType: CONTENT_TYPES.has(d.contentType) ? d.contentType : 'other',
     entities: cleanEntities(d.entities),
@@ -425,7 +449,8 @@ export function mount(root, ctx) {
 
   function md(text, cls = 'mm-md') {
     const el = h('div', { class: cls })
-    el.innerHTML = ctx.renderMarkdown(text) // DOMPurify-sanitized
+    el.innerHTML = ctx.renderMarkdown(inertMd(text)) // DOMPurify-sanitized; inertMd again at the sink (idempotent)
+    hardenLinks(el)
     linkCitations(el, onCite, { validPids: validPids() })
     return el
   }
@@ -526,8 +551,10 @@ export function mount(root, ctx) {
     let rec = null
     try { rec = await ctx.db.get('pages', p.key) } catch (e) { console.warn('[Master Mind] could not read page record', e) }
     if (my !== epoch) return
-    for (const [m, b] of Object.entries(rec?.briefs || {})) if (MODE_IDS.has(m) && usable(b, p)) briefs[m] = { ...b, entities: cleanEntities(b.entities || rec.entities) }
-    if (!briefs[rec?.brief?.mode] && usable(rec?.brief, p)) briefs[rec.brief.mode] = { ...rec.brief, entities: cleanEntities(rec.entities) }
+    // Stored briefs may predate inertMd (or come from an older version): re-validate them like fresh ones.
+    const restore = (b, ents) => ({ ...b, summary: inertMd(b.summary), takeaways: strs(b.takeaways, 3, 400).map(inertMd), topics: strs(b.topics, 6, 60), entities: cleanEntities(ents) })
+    for (const [m, b] of Object.entries(rec?.briefs || {})) if (MODE_IDS.has(m) && usable(b, p)) briefs[m] = restore(b, b.entities || rec.entities)
+    if (MODE_IDS.has(rec?.brief?.mode) && !briefs[rec.brief.mode] && usable(rec.brief, p)) briefs[rec.brief.mode] = restore(rec.brief, rec.entities)
     const s = ctx.settings
     if (briefs[mode]) showBrief(briefs[mode], true)
     else if (s.autoBrief && p.wordCount >= (Number(s.autoBriefMinWords) || 0)) generate()
@@ -588,11 +615,12 @@ export function mount(root, ctx) {
     setPage(p, { force: true })
   }
 
+  /** The brief as a note: the page title and topics are literal text, the AI prose can't carry raw HTML. */
   function briefMarkdown() {
-    const lines = [`## ${page.title}`, '', stripCites(brief.summary).trim()]
-    if (brief.takeaways.length) lines.push('', '**Key takeaways**', ...brief.takeaways.map(t => `- ${stripCites(t).trim()}`))
-    if (brief.topics.length) lines.push('', `*Topics:* ${brief.topics.join(', ')}`)
-    lines.push('', `Source: [${page.title.replace(/[[\]]/g, '')}](${page.url})`)
+    const lines = [`## ${mdText(page.title)}`, '', inertMd(stripCites(brief.summary)).trim()]
+    if (brief.takeaways.length) lines.push('', '**Key takeaways**', ...brief.takeaways.map(t => `- ${inertMd(stripCites(t)).trim()}`))
+    if (brief.topics.length) lines.push('', `*Topics:* ${brief.topics.map(mdText).join(', ')}`)
+    lines.push('', `Source: [${mdText(page.title || page.url)}](${mdUrl(page.url)})`)
     return lines.join('\n')
   }
 

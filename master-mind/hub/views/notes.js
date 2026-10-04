@@ -1,6 +1,8 @@
 // Knowledge Hub › Notes: the full-size Markdown workspace. #notes?id=<noteId> opens that note.
 import { createWorkspace } from '../../lib/workspace.js'
 
+const MIN_HEIGHT = 420 // below this the page scrolls too, so the editor stays usable in very short windows
+
 export function mount(root, ctx) {
   const head = document.createElement('div')
   head.className = 'view-head'
@@ -14,10 +16,26 @@ export function mount(root, ctx) {
   titles.append(h1, sub)
   head.append(titles)
   const host = document.createElement('div')
-  // Fill the viewport below the title row (#view padding 26 + 40, head ≈ 68): the panes scroll, not the page.
-  host.style.height = 'calc(100vh - 136px)'
-  host.style.minHeight = '540px'
+  host.style.minHeight = `${MIN_HEIGHT}px`
   root.append(head, host)
+
+  // Fill the viewport below the title row so the workspace (list, panes) is the only scroller, never the
+  // page as well. Measured, not assumed: the hub's sidebar becomes an icon rail or a wrapping top bar on
+  // narrower windows, which moves the workspace down by a varying amount.
+  let raf = 0
+  const fit = () => {
+    raf = 0
+    const top = host.getBoundingClientRect().top + scrollY
+    const padBottom = parseFloat(getComputedStyle(root).paddingBottom) || 0
+    host.style.height = `${Math.max(MIN_HEIGHT, Math.floor(innerHeight - top - padBottom))}px`
+  }
+  const refit = () => { if (!raf) raf = requestAnimationFrame(fit) }
+  fit()
+  addEventListener('resize', refit)
+  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(refit) : null
+  ro?.observe(head) // the title row can wrap
+  const side = document.querySelector('.side')
+  if (side) ro?.observe(side) // the top bar (narrow windows) can wrap to more rows
 
   const ws = createWorkspace(host, {
     db: ctx.db,
@@ -38,5 +56,12 @@ export function mount(root, ctx) {
     toast: msg => ctx.toast(msg),
   })
 
-  return { unmount() { ws.destroy() } }
+  return {
+    unmount() {
+      removeEventListener('resize', refit)
+      ro?.disconnect()
+      cancelAnimationFrame(raf)
+      ws.destroy()
+    },
+  }
 }

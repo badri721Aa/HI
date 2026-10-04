@@ -3,7 +3,7 @@
 import { getSettings, setSettings, onSettings, getApiKey, setApiKey, applyAccent, DEFAULT_SETTINGS, DEFAULT_TAGS, ACCENTS, MODELS } from '../../lib/store.js'
 import { testKey } from '../../lib/ai.js'
 import { BRIEF_MODES } from '../../lib/tasks.js'
-import { download } from '../../lib/text.js'
+import { download, normalizeUrl, siteOf } from '../../lib/text.js'
 import { confirmDialog } from './history.js'
 
 const EFFORTS = [
@@ -251,11 +251,13 @@ export function parseBackup(text) {
     if (!Array.isArray(src[s.id])) throw new Error(`"${s.id}" must be a list of records.`)
     const ok = []
     const seen = new Set()
+    const now = Date.now()
     for (const r of src[s.id]) {
       const key = r && typeof r === 'object' && !Array.isArray(r) ? r[s.key] : undefined
-      if (typeof key !== 'string' || !key || seen.has(key) || !validRecord(s.id, r)) { skipped++; continue }
+      const rec = typeof key === 'string' && key && key.length <= (s.id === 'pages' ? MAX_URL : MAX_ID) && !seen.has(key) ? cleanRecord(s.id, r, now) : null
+      if (!rec) { skipped++; continue }
       seen.add(key)
-      ok.push(r)
+      ok.push(rec)
     }
     stores[s.id] = ok
     counts[s.id] = ok.length
@@ -266,15 +268,153 @@ export function parseBackup(text) {
   return { settings, stores, counts, skipped }
 }
 
-function validRecord(store, r) {
-  const str = v => typeof v === 'string'
+// ── backup record normalization ──
+// A backup is untrusted input: every record is rebuilt field by field to the shape the live writers produce
+// (bg/highlights.js clean(), the notes workspace, the Brief tab, bg/history.js), so a hand-edited or hostile file
+// can't plant values the views don't expect (a string where a list belongs, a missing title) or URLs that
+// aren't web pages (file:, data:, chrome:, javascript:). Unknown fields are dropped.
+const MAX_URL = 4096
+const MAX_ID = 200
+const MAX_NOTE_BODY = 20 * 1024 * 1024 // notes may embed a few data-URL images (≤ 1.5 MB each)
+const HL_CONTEXT = 48 // highlight prefix/suffix length (same as bg/highlights.js)
+const txt = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '')
+const when = v => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
+const count = v => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : 0)
+const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v)
+
+/** The URL itself when it is an absolute http(s) URL, else ''. */
+function webUrl(v) {
+  if (typeof v !== 'string' || !v || v.length > MAX_URL) return ''
+  try {
+    const { protocol } = new URL(v)
+    return protocol === 'http:' || protocol === 'https:' ? v : ''
+  } catch { return '' }
+}
+
+/** De-duplicated, trimmed, non-empty strings (other entries dropped); `[]` for anything that isn't a list. */
+function strList(v, max, len) {
+  if (!Array.isArray(v)) return []
+  const out = new Set()
+  for (const x of v) {
+    if (out.size >= max) break
+    const s = typeof x === 'string' ? x.replace(/\s+/g, ' ').trim().slice(0, len) : ''
+    if (s) out.add(s)
+  }
+  return [...out]
+}
+
+/** Note tags, normalized like the workspace's tag input (no leading #, no spaces, ≤ 40 chars, case-insensitive unique). */
+function noteTags(v) {
+  const out = []
+  for (const t of strList(v, 100, 200)) {
+    const tag = t.replace(/^#+/, '').replace(/\s+/g, '-').slice(0, 40)
+    if (tag && !out.some(x => x.toLowerCase() === tag.toLowerCase())) out.push(tag)
+  }
+  return out
+}
+
+/** Note sources: http(s) URLs only, unique, `{url, title}`. */
+function noteSources(v) {
+  if (!Array.isArray(v)) return []
+  const out = []
+  for (const s of v) {
+    const url = isObj(s) ? webUrl(s.url) : ''
+    if (!url || out.some(x => x.url === url)) continue
+    out.push({ url, title: txt(s.title, 300).trim() })
+    if (out.length >= 200) break
+  }
+  return out
+}
+
+function entityList(v, max = 80) {
+  if (!Array.isArray(v)) return []
+  const out = []
+  for (const e of v) {
+    const name = (typeof e === 'string' ? e : isObj(e) ? txt(e.name, 200) : '').replace(/\s+/g, ' ').trim().slice(0, 120)
+    if (!name) continue
+    out.push({ name, type: (isObj(e) && txt(e.type, 40).trim()) || 'other' })
+    if (out.length >= max) break
+  }
+  return out
+}
+
+/** A stored brief ({mode, summary, takeaways, topics, contentType, at, words?, entities?}) or null. */
+function cleanBrief(b, withEntities) {
+  if (!isObj(b) || typeof b.summary !== 'string') return null
+  const out = { mode: txt(b.mode, 40), summary: b.summary.slice(0, 50000), takeaways: strList(b.takeaways, 12, 2000), topics: strList(b.topics, 20, 120), contentType: txt(b.contentType, 60), at: when(b.at) }
+  if (count(b.words)) out.words = count(b.words)
+  if (withEntities && Array.isArray(b.entities)) out.entities = entityList(b.entities)
+  return out
+}
+
+/** Rebuild one backup record for `store`, or return null when it can't be imported safely. */
+function cleanRecord(store, r, now = Date.now()) {
+  if (!isObj(r)) return null
   switch (store) {
-    case 'highlights': return str(r.text) && str(r.url || '') && str(r.pageKey || '')
-    case 'notes': return str(r.title ?? '') && str(r.body ?? '')
-    case 'pages': return str(r.url ?? r.key)
-    case 'history': return str(r.url) && typeof r.ts === 'number'
-    case 'kv': return 'v' in r
-    default: return false
+    case 'highlights': {
+      const url = webUrl(r.url)
+      const pageKey = normalizeUrl(webUrl(r.pageKey) || url)
+      const text = txt(r.text, 20000)
+      if (!/^https?:/i.test(pageKey) || !text.trim()) return null
+      const page = url || pageKey
+      const created = when(r.created) || now
+      return {
+        id: r.id, pageKey, url: page,
+        title: txt(r.title, 500).trim() || siteOf(page) || 'Untitled page',
+        site: txt(r.site, 255).trim() || siteOf(page),
+        text, prefix: txt(r.prefix, 400).slice(-HL_CONTEXT), suffix: txt(r.suffix, 400).slice(0, HL_CONTEXT),
+        tag: txt(r.tag, 80) || 'fact', note: txt(r.note, 10000),
+        created, updated: when(r.updated) || created,
+      }
+    }
+    case 'notes': {
+      if ((r.title != null && typeof r.title !== 'string') || (r.body != null && typeof r.body !== 'string')) return null
+      const body = r.body || ''
+      if (body.length > MAX_NOTE_BODY) return null
+      const created = when(r.created) || now
+      return { id: r.id, title: txt(r.title, 200), body, tags: noteTags(r.tags), sources: noteSources(r.sources), created, updated: when(r.updated) || created, pinned: r.pinned === true }
+    }
+    case 'pages': {
+      if (!webUrl(r.key)) return null // the key is the page's normalized URL
+      const url = webUrl(r.url) || r.key
+      const out = {
+        key: r.key, url, title: txt(r.title, 500), site: txt(r.site, 255).trim() || siteOf(url),
+        visited: when(r.visited), wordCount: count(r.wordCount), readingMin: count(r.readingMin),
+        entities: entityList(r.entities), topics: strList(r.topics, 40, 120), keywords: strList(r.keywords, 60, 80),
+      }
+      const brief = cleanBrief(r.brief, false)
+      if (brief) out.brief = brief
+      if (isObj(r.briefs)) {
+        const briefs = {}
+        for (const [mode, b] of Object.entries(r.briefs).slice(0, 12)) {
+          const c = /^[a-z][a-z0-9_-]{0,29}$/i.test(mode) ? cleanBrief(b, true) : null
+          if (c) briefs[mode] = c
+        }
+        if (Object.keys(briefs).length) out.briefs = briefs
+      }
+      return out
+    }
+    case 'history': {
+      const url = webUrl(r.url)
+      const ts = when(r.ts)
+      if (!url || !ts) return null
+      return {
+        id: r.id, tabId: Number.isSafeInteger(r.tabId) ? r.tabId : -1, url, title: txt(r.title, 500),
+        parentId: typeof r.parentId === 'string' && r.parentId && r.parentId.length <= MAX_ID ? r.parentId : null,
+        ts, transition: txt(r.transition, 40) || 'link',
+      }
+    }
+    case 'kv': {
+      if (!('v' in r)) return null
+      if (r.k !== 'graph-layout') return { k: r.k, v: r.v }
+      // Knowledge-graph positions: {nodes: {id: [x, y, pinned]}}; anything else is dropped.
+      const nodes = {}
+      for (const [id, p] of Object.entries(isObj(r.v?.nodes) ? r.v.nodes : {})) {
+        if (Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]) && id.length <= MAX_URL + 10) nodes[id] = [p[0], p[1], p[2] ? 1 : 0]
+      }
+      return { k: r.k, v: { version: 1, saved: when(r.v?.saved) || now, nodes } }
+    }
+    default: return null
   }
 }
 
@@ -623,18 +763,23 @@ export function mount(root, ctx) {
     if (!validWebhook(url)) return
     flushSoon('hook')
     hookTest.disabled = true
-    setHookResult('busy', 'Sending a test note…')
+    setHookResult('busy', 'Sending a sample note…')
     const ctrl = new AbortController()
     const t = later(() => ctrl.abort(), 12000)
     try {
+      // Exactly the shape Notes › Export › “Send to webhook” posts (lib/workspace.js sendWebhook), so field
+      // mappings built from this sample in Zapier, Make or n8n keep working for every real note.
+      const now = Date.now()
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          event: 'test', app: 'Master Mind', version: chrome.runtime.getManifest().version, sentAt: new Date().toISOString(),
-          note: { id: 'test', title: 'Master Mind webhook test', body: 'If you can read this, notes you send from Master Mind will arrive here.', tags: ['test'], sources: [] },
+          title: 'Master Mind webhook test',
+          body: 'If you can read this, notes you send from Master Mind will arrive here in this same format.',
+          tags: ['test'], sources: [{ url: 'https://example.com/', title: 'Example source' }], created: now, updated: now,
         }),
         signal: ctrl.signal,
+        credentials: 'omit',
       })
       if (!alive) return
       if (res.ok) setHookResult('ok', `Delivered (HTTP ${res.status}).`)
@@ -652,7 +797,7 @@ export function mount(root, ctx) {
   sync.push(() => { if (document.activeElement !== hookInput) { hookInput.value = settings.webhookUrl || ''; hookState() } })
   const notesSec = section('notes', 'Notes', 'Send notes to your own tools (Zapier, Make, n8n, a custom server).',
     el('div', { class: 'sv-field stack' },
-      el('div', { class: 'sv-fl' }, el('label', { class: 'lbl', for: 'sv-hook', text: 'Webhook URL' }), el('p', { class: 'sv-hint', text: 'When you choose “Send to webhook” on a note, it is POSTed here as JSON. Only the notes you send ever leave your browser.' })),
+      el('div', { class: 'sv-fl' }, el('label', { class: 'lbl', for: 'sv-hook', text: 'Webhook URL' }), el('p', { class: 'sv-hint', text: 'When you choose “Send to webhook” on a note, it is POSTed here as JSON: title, body (Markdown), tags, sources, created and updated. “Send test” posts a sample note in exactly that shape. Only the notes you send ever leave your browser.' })),
       el('div', { class: 'mm-row' }, hookInput, hookTest),
       hookResult))
 

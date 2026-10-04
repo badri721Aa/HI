@@ -103,6 +103,7 @@ function el(tag, attrs = {}, ...children) {
 }
 
 const hueOf = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360 }
+const isWeb = u => /^https?:\/\//i.test(u || '')
 const startOfDay = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime() }
 
 function sinceFor(range) {
@@ -197,6 +198,7 @@ export function mount(root, ctx) {
     collapsed: new Set(),
     limit: ROW_BUDGET,
     reqId: 0,
+    loading: 0, // HISTORY_TREE requests in flight
   }
   let alive = true
   const timers = new Set()
@@ -224,6 +226,7 @@ export function mount(root, ctx) {
   async function load({ quiet = false } = {}) {
     const id = ++state.reqId
     if (!quiet) { state.loaded = false; render() }
+    state.loading++
     try {
       const res = await chrome.runtime.sendMessage({ type: 'HISTORY_TREE', since: sinceFor(state.range) })
       if (!alive || id !== state.reqId) return // a newer request (range change) superseded this one
@@ -233,9 +236,76 @@ export function mount(root, ctx) {
     } catch (e) {
       if (!alive || id !== state.reqId) return
       state.error = String(e?.message || e)
+    } finally {
+      state.loading--
     }
     state.loaded = true
     render()
+  }
+
+  /**
+   * Live updates. A single-record put (a page you just opened, a title arriving) is read back on its own and
+   * patched in: a new or moved node re-renders the trail, a title change only rewrites that row. Bulk changes
+   * (import, trim, clear) reload the range.
+   */
+  const dirty = new Set()
+  let reloadAll = false
+  async function applyChanges() {
+    const ids = [...dirty]
+    dirty.clear()
+    if (reloadAll || ids.length > 40 || !state.loaded || state.error || state.loading) {
+      reloadAll = false
+      return load({ quiet: true })
+    }
+    const reqId = state.reqId
+    let recs
+    try { recs = await Promise.all(ids.map(id => ctx.db.get('history', id))) } catch { return load({ quiet: true }) }
+    if (!alive) return
+    if (reqId !== state.reqId || state.loading) return // a reload started meanwhile and will bring these too
+    const since = sinceFor(state.range)
+    const index = new Map(state.nodes.map((n, i) => [n.id, i]))
+    const retitled = []
+    let structural = false
+    ids.forEach((id, k) => {
+      const rec = recs[k]
+      const i = index.get(id)
+      const inRange = !!rec && (rec.ts || 0) >= since
+      if (i === undefined) {
+        if (inRange) { state.nodes.push(rec); structural = true }
+        return
+      }
+      const old = state.nodes[i]
+      if (!inRange) { state.nodes[i] = null; structural = true; return }
+      state.nodes[i] = rec
+      if (rec.url !== old.url || rec.parentId !== old.parentId || rec.ts !== old.ts || rec.tabId !== old.tabId || rec.transition !== old.transition) structural = true
+      else if (rec.title !== old.title) retitled.push([old, rec])
+    })
+    if (structural) {
+      state.nodes = state.nodes.filter(Boolean)
+      for (let i = 1; i < state.nodes.length; i++) {
+        if ((state.nodes[i - 1].ts || 0) > (state.nodes[i].ts || 0)) { state.nodes.sort((a, b) => (a.ts || 0) - (b.ts || 0)); break }
+      }
+      render()
+    } else if (retitled.length) patchTitles(retitled)
+  }
+
+  /** Rewrite just the rows whose title changed (a full render only when a search's matches change). */
+  function patchTitles(pairs) {
+    const terms = state.query.toLowerCase().split(/\s+/).filter(Boolean)
+    const matches = n => terms.every(t => `${n.title || ''} ${n.url}`.toLowerCase().includes(t))
+    if (terms.length && pairs.some(([a, b]) => matches(a) !== matches(b))) return render()
+    for (const [, n] of pairs) {
+      const li = list.querySelector(`.hv-node[data-id="${CSS.escape(n.id)}"]`)
+      if (!li) continue // collapsed away or beyond the row budget: the next render picks it up
+      const title = titleOf(n)
+      const link = li.querySelector(':scope > .hv-row .hv-link')
+      if (link) {
+        link.title = `${title}\n${n.url}\n${new Date(n.ts).toLocaleString()}`
+        link.querySelector('.hv-title')?.replaceChildren(marked(title, terms))
+      }
+      const tw = li.querySelector(':scope > .hv-row .hv-tw')
+      if (tw) tw.setAttribute('aria-label', tw.getAttribute('aria-label').replace(/ opened from [\s\S]*$/, ` opened from ${title}`))
+    }
   }
 
   function setRange(id) {
@@ -387,13 +457,14 @@ export function mount(root, ctx) {
     if (n.parentTab !== undefined && n.parentTab !== n.tabId) meta.append(el('span', { class: 'hv-badge', html: ICON.newtab }, 'New tab'))
     if (n.transition === 'form_submit') meta.append(el('span', { class: 'hv-badge', text: 'Form' }))
 
+    const web = isWeb(n.url) // the trail only records web pages; anything else is never opened
     const link = el('a', {
-      class: 'hv-link', href: n.url, title: `${title}\n${n.url}\n${new Date(n.ts).toLocaleString()}`,
+      class: 'hv-link', href: web ? n.url : '#', title: `${title}\n${n.url}\n${new Date(n.ts).toLocaleString()}`,
     }, el('span', { class: 'hv-title' }, marked(title, terms)), meta)
     link.addEventListener('click', e => {
-      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return
+      if (web && (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey)) return
       e.preventDefault()
-      ctx.openUrl(n.url)
+      if (web) ctx.openUrl(n.url)
     })
 
     const row = el('div', { class: 'hv-row' }, twisty, el('span', { class: 'hv-av', style: `--h:${hueOf(site || n.url)}`, 'aria-hidden': 'true', text: (site || '?').charAt(0).toUpperCase() }), link)
@@ -483,12 +554,19 @@ export function mount(root, ctx) {
     }
   })
 
-  // Live updates while you browse in other tabs (debounced: one refresh per burst).
+  // Live updates while you browse in other tabs: one refresh per burst (700 ms quiet), and never more than
+  // ~2 s behind a steady stream of changes.
   let pending = 0
+  let burstStart = 0
   const offDb = ctx.onDbChange(evt => {
     if (evt?.store !== 'history') return
+    if (evt.op === 'put' && typeof evt.key === 'string' && evt.key) dirty.add(evt.key)
+    else reloadAll = true
+    const now = Date.now()
+    if (!pending) burstStart = now
     clearTimeout(pending)
-    pending = later(() => load({ quiet: true }), 700)
+    timers.delete(pending)
+    pending = later(() => { pending = 0; applyChanges() }, Math.max(0, Math.min(700, burstStart + 2000 - now)))
   })
 
   load()

@@ -16,6 +16,20 @@ body { display: grid; grid-template-columns: 240px 1fr; gap: 0; min-height: 100v
 #view { padding: 26px 30px 40px; min-width: 0; outline: none; }
 .view-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 .view-head h1 { font-size: 22px; }
+/* The router focuses a new view's title so it's read out; it isn't an interactive control. */
+#view h1[tabindex="-1"]:focus { outline: none; }
+/* Mid-size windows: a 240px sidebar would leave views cramped, so it becomes an icon rail. */
+@media (min-width: 761px) and (max-width: 1023px) {
+  body { grid-template-columns: 68px 1fr; }
+  .side { padding: 16px 10px; align-items: stretch; }
+  .brand { justify-content: center; padding: 0; }
+  .brand div, .side footer { display: none; }
+  .nav { gap: 4px; }
+  .nav a { justify-content: center; padding: 10px; }
+  .nav a .mm-icon { width: 18px; height: 18px; }
+  .nav-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+  #view { padding: 22px 24px 36px; }
+}
 @media (max-width: 760px) {
   body { grid-template-columns: 1fr; }
   .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; border-width: 0 0 1px; }

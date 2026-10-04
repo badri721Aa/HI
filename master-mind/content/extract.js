@@ -12,6 +12,7 @@
   const MAX_PARAS = 1500
   const MAX_CHARS = 6000 // per paragraph
   const MAX_SCORED = 6000 // paragraph-like nodes considered when picking the main container
+  const MAX_RETIRED = 5000 // remembered texts of paragraph ids that later extractions dropped
   const PID_RE = /^p\d+$/
 
   // Elements emitted as paragraphs, mapped to the Page tag vocabulary.
@@ -37,9 +38,13 @@
     key: MM.pageKey(), // page identity (no hash): ids reset when it changes
     next: 0, // next fresh paragraph number
     texts: new Map(), // pid → text from the last extraction (reuse ids for unchanged elements)
+    // pid → text for ids a later extraction dropped (the page re-rendered that paragraph). The panel may still
+    // cite them, so MM_SCROLL_TO/MM_GLOW can find the paragraph that now has the same text. Kept until navigation.
+    retired: new Map(),
     els: new Map(), // pid → element from the last extraction
     cache: null, // last Page
-    sig: '', // cheap fingerprint of the main container, for MM.extract() cache checks
+    sig: '', // fingerprint of the main container (text length + child count), for MM.extract() cache checks
+    dirty: true, // something besides our own inline wrappers changed inside the container: re-check sig
     root: null,
     spaNavigated: false,
     urlChangedAt: 0,
@@ -82,11 +87,24 @@
     return !!el.firstElementChild && !!el.querySelector(BLOCKISH)
   }
 
+  // Container-wide reads (textContent of the article wrapper builds a string of the whole page's text) are
+  // memoized for the duration of one extraction: pickRoot, collect and the cache fingerprint share them.
+  let memo = null // {text: Map<Element, number>, links: Map<Element, number>} while run() is extracting
+  function textLen(el) {
+    if (!memo) return el.textContent.length
+    let n = memo.text.get(el)
+    if (n === undefined) memo.text.set(el, (n = el.textContent.length))
+    return n
+  }
+
   function linkLen(el) {
     if (el.localName === 'a') return el.textContent.length
     if (!el.firstElementChild) return 0
-    let n = 0
+    let n = memo?.links.get(el)
+    if (n !== undefined) return n
+    n = 0
     for (const a of el.querySelectorAll('a')) n += a.textContent.length
+    memo?.links.set(el, n)
     return n
   }
 
@@ -169,7 +187,7 @@
     let best = null
     let bestScore = -Infinity
     for (const [el, s] of top) {
-      const tl = el.textContent.length || 1
+      const tl = textLen(el) || 1
       const ld = Math.min(1, linkLen(el) / tl)
       const final = s * (1 - ld)
       if (final > bestScore) { bestScore = final; best = el }
@@ -182,7 +200,7 @@
       const mine = goodLen.get(best) || 0
       const theirs = goodLen.get(p) || 0
       const semantic = p.localName === 'article' || p.localName === 'main' || p.getAttribute('role') === 'main' || p.getAttribute('itemprop') === 'articleBody'
-      const tl = p.textContent.length || 1
+      const tl = textLen(p) || 1
       const ld = linkLen(p) / tl
       if (ld > 0.4 || (useHints && hint(p) < 0)) break
       if (theirs >= mine * 1.25 || (semantic && theirs >= mine)) best = p
@@ -205,14 +223,14 @@
     if (hint(el) < 0 && rootLen) {
       // A junk hint on a small block inside the article (share bar, ad slot, related links) → skip it.
       // A hint on a huge wrapper is likely a false positive ("content-with-sidebar"), so keep it.
-      if (el.textContent.length < rootLen * 0.4) return true
+      if (textLen(el) < rootLen * 0.4) return true
     }
     return !visible(el)
   }
 
   function collect(root, { skipJunk = true } = {}) {
     const out = [] // {el, tag, text} or null (reserved slot that didn't qualify)
-    const rootLen = skipJunk ? root.textContent.length : 0
+    const rootLen = skipJunk ? textLen(root) : 0
     const wholeBody = root === document.body || root === document.documentElement
     let count = 0
 
@@ -359,18 +377,68 @@
   function resetIds() {
     for (const el of document.querySelectorAll('[data-mm-pid]')) el.removeAttribute('data-mm-pid')
     state.texts = new Map()
+    state.retired = new Map()
     state.els = new Map()
     state.next = 0
     state.cache = null
     state.sig = ''
     state.root = null
+    watchRoot(null)
     ldCache = null
   }
 
-  const sigOf = root => (root?.isConnected ? `${location.href}|${root.textContent.length}|${root.childElementCount}` : '')
+  // Page identity is checked separately (state.key), so a hash change doesn't invalidate the cache.
+  const sigOf = root => (root?.isConnected ? `${textLen(root)}|${root.childElementCount}` : '')
+
+  // Cheap cache validation: watch the main container, and only re-measure it (a full textContent read) after
+  // something other than our own inline wrappers changed inside it. Bionic Reading swaps each Text node for an
+  // <mm-bionic> holding the same text and back, and we move nodes in and out of <mm-term>/<mm-mark>/<mm-bionic>.
+  // Anything else (page edits, text splits and merges) marks the container dirty.
+  const OWN_WRAPPERS = new Set(['mm-term', 'mm-mark', 'mm-bionic', 'mm-b'])
+  const ownWrapper = n => n?.nodeType === 1 && OWN_WRAPPERS.has(n.localName)
+  function foreign(r) {
+    if (r.type !== 'childList') return true
+    if (ownWrapper(r.target)) return false
+    const [a, d] = [r.addedNodes, r.removedNodes]
+    if (a.length === 1 && d.length === 1) {
+      const [x, y] = [a[0], d[0]]
+      if ((ownWrapper(x) && y.nodeType === 3) || (ownWrapper(y) && x.nodeType === 3)) return x.textContent !== y.textContent
+    }
+    return !(d.length === 0 && a.length === 1 && ownWrapper(a[0])) // inserting one of our (then filled) wrappers
+  }
+  let rootObserver = null
+  function watchRoot(root) {
+    rootObserver?.disconnect()
+    state.dirty = true
+    if (!root?.isConnected || typeof MutationObserver !== 'function') return
+    rootObserver ||= new MutationObserver(records => {
+      if (state.dirty || !records.some(foreign)) return
+      state.dirty = true
+      rootObserver.disconnect() // the next MM.extract() re-measures and watches again
+    })
+    rootObserver.observe(root, { childList: true, characterData: true, subtree: true })
+    state.dirty = false
+  }
+  /** Is the container possibly changed? Also counts mutations whose observer callback hasn't run yet. */
+  function rootDirty() {
+    if (!state.dirty && rootObserver?.takeRecords().some(foreign)) {
+      state.dirty = true
+      rootObserver.disconnect()
+    }
+    return state.dirty
+  }
 
   function run() {
     if (MM.pageKey() !== state.key) { state.key = MM.pageKey(); state.spaNavigated = true; resetIds() }
+    memo = { text: new Map(), links: new Map() }
+    try {
+      return extractNow()
+    } finally {
+      memo = null
+    }
+  }
+
+  function extractNow() {
     const t0 = performance.now()
     let root = pickRoot()
     let blocks = collect(root)
@@ -409,6 +477,11 @@
       if (els.get(pid) !== el) el.removeAttribute('data-mm-pid')
     }
     for (const [pid, el] of els) if (el.getAttribute('data-mm-pid') !== pid) el.setAttribute('data-mm-pid', pid)
+    for (const [pid, text] of state.texts) if (!texts.has(pid)) state.retired.set(pid, text)
+    for (const pid of state.retired.keys()) {
+      if (state.retired.size <= MAX_RETIRED) break
+      state.retired.delete(pid) // oldest first
+    }
     state.els = els
     state.texts = texts
     state.root = root
@@ -428,6 +501,7 @@
     }
     state.cache = page
     state.sig = sigOf(root)
+    watchRoot(root)
     const ms = performance.now() - t0
     if (ms > 250) console.debug(`[Master Mind] extracted ${paragraphs.length} paragraphs in ${Math.round(ms)}ms`)
     return page
@@ -439,10 +513,14 @@
    * @returns {object} Page (see ARCHITECTURE.md)
    */
   function extract({ force = false } = {}) {
-    if (!force && state.cache && state.key === MM.pageKey() && state.sig && state.sig === sigOf(state.root)) {
+    if (!force && state.cache && state.key === MM.pageKey() && state.root?.isConnected) {
       let intact = true
       for (const el of state.els.values()) if (!el.isConnected) { intact = false; break }
-      if (intact) return state.cache
+      if (intact && !rootDirty()) return state.cache
+      if (intact && state.sig === sigOf(state.root)) {
+        watchRoot(state.root) // re-measured and unchanged: watch again from here
+        return state.cache
+      }
     }
     return run()
   }
@@ -523,17 +601,17 @@ transition:outline-color var(--mm-glow-fade,.7s) ease,outline-offset var(--mm-gl
   }
 
   /**
-   * Element for a paragraph id. If the page re-rendered since the panel's extraction, re-extract once
-   * and find the paragraph with the same text.
+   * Element for a paragraph id. If the page re-rendered that paragraph since the panel's extraction (so the id
+   * is gone, or was retired by a later extraction), find the paragraph that now has the same text.
+   * @param {{page: object|null}} [batch] shares one extraction across several lookups
    */
   function paraEl(pid, batch = null) {
     if (!PID_RE.test(String(pid))) return null
     const el = document.querySelector(`[data-mm-pid="${pid}"]`)
     if (el) return el
-    const oldText = (batch?.texts || state.texts).get(pid)
+    const oldText = state.texts.get(pid) ?? state.retired.get(pid)
     if (!oldText) return null
-    if (batch && !batch.page) batch.page = run()
-    const page = batch ? batch.page : run()
+    const page = batch ? (batch.page ||= extract()) : extract()
     const match = page.paragraphs.find(p => p.text === oldText)
     return match ? state.els.get(match.id) || null : null
   }
@@ -548,7 +626,7 @@ transition:outline-color var(--mm-glow-fade,.7s) ease,outline-offset var(--mm-gl
   }
   MM.glowParas = (pids, opts = {}) => {
     let found = 0
-    const batch = { texts: state.texts, page: null }
+    const batch = { page: null }
     for (const pid of [].concat(pids || []).slice(0, 200)) {
       const el = paraEl(pid, batch)
       if (el) { glowEl(el, opts); found++ }

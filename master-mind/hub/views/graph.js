@@ -1,8 +1,9 @@
 // Knowledge Graph: pages, entities, topics, notes (and optionally sites) on a DPR-aware canvas.
 // Pan by dragging the background, wheel/pinch to zoom around the cursor, drag nodes to pin them
 // (positions persist in kv 'graph-layout'), click for the inspector. The render loop only runs
-// while the simulation is hot or the user is interacting.
-import { buildGraph, ForceSimulation, plainExcerpt } from '../../lib/graph.js'
+// while the layout is moving or the user is interacting. Whole-graph layout runs tick in a worker
+// (see Layout below); new nodes joining a laid-out graph are settled locally without a reheat.
+import { buildGraph, ForceSimulation, plainExcerpt, alphaDecayFor, LINK_TYPES, SIM_WORKER } from '../../lib/graph.js'
 import { download, timeAgo } from '../../lib/text.js'
 
 const TYPE = {
@@ -30,6 +31,12 @@ const LAYOUT_KEY = 'graph-layout'
 const FONT = '"Inter MM", Inter, ui-sans-serif, system-ui, sans-serif'
 const LABEL_FONT = `600 11.5px ${FONT}`
 const LABEL_FONT_BOLD = `700 12.5px ${FONT}`
+const SMALL_GRAPH = 250 // up to this many visible nodes, new nodes reheat the whole (cheap) layout
+const RELAX_MAX = 150 // more new nodes than this (or than 30% of the graph) re-run the whole layout instead
+const MAIN_TICK_MS = 8 // per-frame ticking budget when the layout has to run on the main thread
+const DRAFT_NODES = 1500 // bigger graphs paint a cheap draft (no glows, emphasized labels only) while the layout moves
+const FRAME_MS = 1000 / 60
+const isWeb = u => /^https?:\/\//i.test(u || '')
 
 const ICON = {
   search: '<svg class="mm-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
@@ -244,6 +251,211 @@ function textWidth(text, font) {
   return w
 }
 
+/**
+ * Drives the force layout for the view.
+ *  • Whole-graph runs (first layout, re-layout, filter changes, dragging) tick in a worker (lib/graph.js loaded
+ *    as a module worker) that streams positions back, so even a layout of thousands of nodes leaves the hub, and
+ *    the side panel that shares its renderer's main thread, responsive. Without a worker they tick here, a few
+ *    milliseconds per frame.
+ *  • `relax(movers)` settles a few new nodes synchronously against the fixed rest of the layout.
+ *  • The main thread owns pinned positions: the worker's copy only follows them.
+ * Changes made in one task (new graph, reheat) reach the worker together on the next frame (`flush`).
+ */
+class Layout {
+  constructor(onUpdate, animate) {
+    this.sim = new ForceSimulation([], [])
+    this.onUpdate = onUpdate // schedules a frame
+    this.animate = animate // () => boolean: false under prefers-reduced-motion
+    this.nodes = []
+    this.gen = 0 // bumped by every setGraph; worker messages for an older graph are ignored
+    this.sentGen = -1
+    this.seq = 0 // bumped by every command that changes whether the worker runs; `done` must echo the latest
+    this.running = false // a worker run is in progress (or about to start on the next flush)
+    this.reheatTo = 0
+    this.msg = null // newest positions from the worker, applied on the next frame
+    this.lastMsgAt = 0
+    this.useWorker = typeof Worker === 'function' // false once a worker failed: everything then ticks here
+    this.worker = null // created on the first run (a restored layout never needs one)
+  }
+
+  get hot() { return this.useWorker ? this.running : this.sim.hot }
+  get alpha() { return this.sim.alpha }
+  set alpha(v) { this.sim.alpha = v }
+  get onMainThread() { return !this.useWorker }
+
+  ensureWorker() {
+    if (this.worker || !this.useWorker) return !!this.worker
+    try {
+      this.worker = new Worker(new URL('../../lib/graph.js', import.meta.url), { type: 'module', name: SIM_WORKER })
+      this.worker.onmessage = e => this.receive(e.data)
+      this.worker.onerror = e => { e.preventDefault?.(); this.fallBack() }
+      this.worker.onmessageerror = () => this.fallBack()
+    } catch {
+      this.worker = null
+      this.useWorker = false
+    }
+    return !!this.worker
+  }
+
+  setGraph(nodes, links) {
+    this.sim.opts.alphaDecay = alphaDecayFor(nodes.length, this.sim.opts.alphaMin)
+    this.sim.setGraph(nodes, links) // gives new nodes a spot next to a placed neighbour
+    this.nodes = nodes
+    this.gen++
+    this.msg = null
+    if (!nodes.length) this.stop() // everything filtered out: nothing to lay out
+    else if (this.running) this.onUpdate() // the run in progress continues on the new graph (next flush)
+  }
+
+  /** Keep the layout moving at a temperature of at least `alpha`. */
+  start(alpha = 0) {
+    this.sim.reheat(alpha)
+    if (this.useWorker && this.nodes.length && this.sim.hot && this.ensureWorker()) {
+      this.reheatTo = Math.max(this.reheatTo, alpha)
+      this.running = true
+    }
+    this.onUpdate()
+  }
+
+  /** While a node is dragged the layout stays warm (alphaTarget > 0); 0 lets it cool down again. */
+  target(v) {
+    this.sim.alphaTarget = v
+    if (this.worker && this.running && this.sentGen === this.gen) {
+      this.seq++
+      this.post({ type: 'target', gen: this.gen, seq: this.seq, value: v })
+    }
+  }
+
+  stop() {
+    this.sim.stop()
+    this.msg = null
+    this.reheatTo = 0
+    if (this.worker && this.sentGen !== -1) {
+      this.seq++
+      this.post({ type: 'stop', seq: this.seq })
+    }
+    this.sentGen = -1 // the worker's copy is stale from now on: the next run sends the whole graph again
+    this.running = false
+  }
+
+  /** Mirror a pin, a pinned node's move or an unpin into a running worker. */
+  pin(n) {
+    if (!this.worker || !this.running || this.sentGen !== this.gen || this.nodes[n._i] !== n) return
+    this.post({ type: 'pin', gen: this.gen, i: n._i, fx: n.fx ?? null, fy: n.fy ?? null })
+  }
+
+  setAspect(a) {
+    this.sim.opts.aspect = a
+    if (this.worker && this.running && this.sentGen === this.gen) this.post({ type: 'opts', opts: { aspect: a } })
+  }
+
+  relax(movers, opts) { return this.sim.relax(movers, opts) }
+
+  /** Bring positions up to date for this frame (worker: apply its newest message; main: tick). True if anything moved. */
+  advance() {
+    if (!this.useWorker) {
+      if (!this.sim.hot) return false
+      const animate = this.animate()
+      const total = Math.log(this.sim.opts.alphaMin) / Math.log(1 - this.sim.opts.alphaDecay)
+      const pace = animate ? Math.max(1, Math.ceil(total / 75)) : Infinity
+      const budget = animate ? MAIN_TICK_MS : 14
+      const t0 = performance.now()
+      let n = 0
+      do { this.sim.tick(); n++ } while (this.sim.hot && n < pace && performance.now() - t0 < budget)
+      return true
+    }
+    this.flush()
+    const m = this.msg
+    if (!m) {
+      // A worker that stopped answering mid-run (it never should) must not leave the graph "hot" forever.
+      if (this.running && performance.now() - this.lastMsgAt > 5000) this.fallBack()
+      return false
+    }
+    this.msg = null
+    const p = m.pos
+    const nodes = this.nodes
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i]
+      if (n.fx == null) n.x = p[2 * i]
+      if (n.fy == null) n.y = p[2 * i + 1]
+    }
+    this.sim.alpha = m.alpha
+    if (m.done && m.seq === this.seq) {
+      this.running = false
+      this.sentGen = -1 // positions may change here before the next run (new nodes, drags): that run sends them all
+    }
+    return true
+  }
+
+  /** Hand pending work to the worker: the whole graph when it changed (or a run starts), else a reheat. */
+  flush() {
+    if (!this.worker || !this.running) return
+    if (this.sentGen !== this.gen) this.send()
+    else if (this.reheatTo > 0) {
+      this.seq++
+      this.post({ type: 'reheat', gen: this.gen, seq: this.seq, alpha: this.reheatTo })
+    }
+    this.reheatTo = 0
+  }
+
+  send() {
+    const nodes = this.nodes
+    const buf = new Float64Array(nodes.length * 5)
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i]
+      const pinned = n.fx != null && n.fy != null
+      buf[i * 5] = n.x; buf[i * 5 + 1] = n.y
+      buf[i * 5 + 2] = pinned ? n.fx : NaN; buf[i * 5 + 3] = pinned ? n.fy : NaN
+      buf[i * 5 + 4] = n.r || 6
+    }
+    const L = this.sim.links // already resolved to visible node pairs
+    const links = new Int32Array(L.length * 2)
+    const types = new Uint8Array(L.length)
+    const weights = new Float32Array(L.length)
+    for (let j = 0; j < L.length; j++) {
+      links[j * 2] = L[j].s._i; links[j * 2 + 1] = L[j].t._i
+      types[j] = Math.max(0, LINK_TYPES.indexOf(L[j].type))
+      weights[j] = L[j].link.weight || 1
+    }
+    this.seq++
+    this.post({
+      type: 'graph', gen: this.gen, seq: this.seq, nodes: buf, links, types, weights,
+      opts: { ...this.sim.opts }, alpha: this.sim.alpha, alphaTarget: this.sim.alphaTarget, animate: this.animate(),
+    }, [buf.buffer, links.buffer, types.buffer, weights.buffer])
+    this.sentGen = this.gen
+  }
+
+  post(msg, transfer) {
+    this.lastMsgAt = performance.now() // the watchdog in advance() counts from the last exchange either way
+    try { this.worker.postMessage(msg, transfer || []) } catch { this.fallBack() }
+  }
+
+  receive(m) {
+    if (m?.type !== 'tick' || m.gen !== this.gen || m.gen !== this.sentGen || !this.running) return
+    if (!(m.pos instanceof Float64Array) || m.pos.length !== this.nodes.length * 2) return
+    this.msg = m
+    this.lastMsgAt = performance.now()
+    this.onUpdate()
+  }
+
+  /** The worker failed (or never started): keep laying out on the main thread from where it got to. */
+  fallBack() {
+    if (!this.useWorker) return
+    this.useWorker = false
+    try { this.worker?.terminate() } catch { /* already gone */ }
+    this.worker = null
+    this.msg = null
+    this.sentGen = -1
+    if (this.running) { this.running = false; this.onUpdate() }
+  }
+
+  destroy() {
+    try { this.worker?.terminate() } catch { /* already gone */ }
+    this.worker = null
+    this.running = false
+  }
+}
+
 export function mount(root, ctx) {
   const S = {
     all: { nodes: [], links: [] },
@@ -269,11 +481,17 @@ export function mount(root, ctx) {
     wasHot: false,
     layoutDirty: false,
     loaded: false,
+    inputAt: 0, // last pointer/wheel/key input: frames right after it always paint
   }
-  const sim = new ForceSimulation([], [])
+  const layout = new Layout(() => requestRender(), () => !reducedMotion())
   let alive = true
   let raf = 0
   let anim = null
+  let needsPaint = true
+  let lastPaint = 0 // frame time of the last paint
+  let paintCost = 0 // moving average of what a paint really costs the main thread (ms), raster included
+  let jsCost = 0
+  let measureNext = false
   const timers = new Set()
   const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn() }, ms); timers.add(t); return t }
   const cleanups = []
@@ -361,8 +579,8 @@ export function mount(root, ctx) {
       } else if (pos && Number.isFinite(pos[0]) && Number.isFinite(pos[1])) {
         n.x = pos[0]; n.y = pos[1]
         if (pos[2]) { n.fx = n.x; n.fy = n.y }
-        n.restored = true
       }
+      n.fresh = !Number.isFinite(n.x) // never laid out: placed next to its neighbours once it is on screen
     }
     const links = g.links.map(l => ({ source: byId.get(l.source), target: byId.get(l.target), type: l.type, weight: l.weight }))
     for (const l of links) if (l.type === 'site') l.source.siteLinks = (l.source.siteLinks || 0) + 1
@@ -386,21 +604,41 @@ export function mount(root, ctx) {
     buildTypeChips()
 
     if (init) {
+      layout.stop()
       applyFilters({ reheat: 0 })
-      // Share of on-screen nodes whose saved position was restored (hidden types don't count).
-      const restored = S.nodes.length ? S.nodes.filter(n => n.restored).length / S.nodes.length : 0
-      if (restored >= 0.999) sim.alpha = 0 // exactly as you left it
-      else if (restored > 0) sim.alpha = 0.35
-      else sim.alpha = 1
-      S.autoFit = restored < 0.999
       resize()
+      // On-screen nodes without a saved position (hidden types don't count).
+      const fresh = S.nodes.filter(n => n.fresh)
+      if (!fresh.length) layout.alpha = 0 // exactly as you left it
+      else if (fresh.length === S.nodes.length) layout.alpha = 1 // nothing saved yet: a whole new layout
+      else layout.alpha = settleLocally(fresh) ? 0 : 0.35 // a few new nodes join quietly; many reshape the layout
+      S.autoFit = layout.alpha > 0
       warmUp()
       fit({ animate: false })
+      if (S.physics) layout.start()
     } else {
-      applyFilters({ reheat: structureChanged ? 0.3 : 0 })
+      applyFilters({ reheat: 0 })
+      if (structureChanged) {
+        const fresh = S.nodes.filter(n => n.fresh)
+        // New nodes in a big graph settle locally (even during a run: they then start next to their neighbours).
+        // Small graphs, or big batches, re-run the whole layout as before.
+        if (fresh.length && settleLocally(fresh)) { /* placed */ } else if (S.physics && (fresh.length || S.nodes.length <= SMALL_GRAPH)) layout.start(0.3)
+      }
     }
     if (S.selected) openInspector(S.selected, { focus: false }); else closeInspector({ restoreFocus: false })
     requestRender()
+  }
+
+  /**
+   * Settle new nodes into an existing layout without moving anything else. Returns false when a whole-layout
+   * run fits better: small graphs (cheap, and the rest may need to make room) and big batches of new nodes.
+   */
+  function settleLocally(fresh) {
+    const n = S.nodes.length
+    if (S.physics && (n <= SMALL_GRAPH || fresh.length > Math.min(RELAX_MAX, n * 0.3))) return false
+    layout.relax(fresh)
+    saveLayoutSoon() // the next open then starts cold
+    return true
   }
 
   function showEmpty() {
@@ -462,8 +700,8 @@ export function mount(root, ctx) {
     S.adj = new Map(nodes.map(n => [n, new Set()]))
     for (const l of links) { S.adj.get(l.source).add(l.target); S.adj.get(l.target).add(l.source) }
     S.order = [...nodes].sort((a, b) => b.vdeg - a.vdeg || a.label.localeCompare(b.label))
-    sim.setGraph(nodes, links)
-    if (reheat && S.physics) sim.reheat(reheat)
+    layout.setGraph(nodes, links)
+    if (reheat && S.physics) layout.start(reheat)
     if (S.selected && !set.has(S.selected)) closeInspector({ restoreFocus: false })
     if (S.kb && !set.has(S.kb)) S.kb = null
     let maxDeg = 1
@@ -500,31 +738,47 @@ export function mount(root, ctx) {
   }
 
   // ───────── simulation + render loop ─────────
-  /** Settle most of the layout before the first paint (small graphs settle completely within the budget). */
+  /**
+   * Settle most of the layout before the first paint. Small graphs settle completely within the budget; bigger
+   * ones would only get a few ticks here, blocking the page, so with a worker they settle there from the start.
+   */
   function warmUp(budgetMs = 120) {
-    if (!S.physics || !sim.hot) return
+    const sim = layout.sim
+    if (!S.physics || !sim.hot || (!layout.onMainThread && S.nodes.length > SMALL_GRAPH)) return
     const t0 = performance.now()
     while (sim.hot && sim.alpha > 0.04 && performance.now() - t0 < budgetMs) sim.tick()
   }
 
+  /** Something on screen changed: paint on the next frame. */
   function requestRender() {
+    needsPaint = true
+    requestFrame()
+  }
+  function requestFrame() {
     if (!raf && alive) raf = requestAnimationFrame(frame)
   }
 
   function frame(now) {
     raf = 0
     if (!alive) return
+    if (measureNext) {
+      // Rasterizing the canvas happens after paint() returns, before this frame: count it in.
+      const est = Math.max(jsCost, now - lastPaint - FRAME_MS)
+      paintCost = paintCost ? paintCost * 0.6 + est * 0.4 : est
+      measureNext = false
+    }
     let again = false
-    if (S.physics && sim.hot && S.nodes.length) {
-      const t0 = performance.now()
-      const budget = reducedMotion() ? 14 : 0 // reduced motion: converge in a few frames instead of animating
-      do { sim.tick() } while (budget && sim.hot && performance.now() - t0 < budget)
+    if (S.physics && S.nodes.length && layout.hot) {
+      if (layout.advance()) needsPaint = true
       S.wasHot = true
-      again = sim.hot
-      if (S.autoFit && !S.userMoved && sim.alpha < 0.03) { S.autoFit = false; fit() }
-    } else if (S.wasHot) {
+      if (S.autoFit && !S.userMoved && layout.alpha < 0.03) { S.autoFit = false; fit() }
+      again = layout.hot // keep frames coming while the layout moves (cheap when nothing new arrived)
+    }
+    const running = S.physics && layout.hot
+    if (S.wasHot && !running) {
       S.wasHot = false
       saveLayoutSoon(400) // cooled down: remember the settled layout
+      needsPaint = true // the full-quality paint of the settled layout
     }
     if (anim) {
       const t = clamp((now - anim.t0) / anim.ms, 0, 1)
@@ -532,13 +786,28 @@ export function mount(root, ctx) {
       S.view.x = anim.from.x + (anim.to.x - anim.from.x) * e
       S.view.y = anim.from.y + (anim.to.y - anim.from.y) * e
       S.view.k = anim.from.k + (anim.to.k - anim.from.k) * e
+      needsPaint = true
       if (t >= 1) anim = null; else again = true
     }
-    paint(canvas.getContext('2d'), { width: S.W, height: S.H, scale: S.dpr, view: S.view, interactive: true })
-    syncStageBackground()
-    if (S.kb || S.hover) positionTip()
-    if (again || (S.physics && sim.hot)) requestRender()
-    else if (S.wasHot) requestRender() // one more frame to run the cool-down bookkeeping
+    // While the layout settles on its own, an expensive paint (a huge graph, a slow canvas) runs at a reduced rate,
+    // keeping it to about a third of the main thread; big graphs also paint a cheaper draft (no glows, only the
+    // emphasized labels) until they settle. Input and view animations always paint at once.
+    const interacting = !!(anim || S.drag?.moved || pinch || now - S.inputAt < 250)
+    const gap = running && !interacting && paintCost > 12 ? paintCost * 3 : 0
+    let painted = false
+    if (needsPaint && now - lastPaint >= gap) {
+      const t0 = performance.now()
+      const draft = running && S.nodes.length > DRAFT_NODES
+      paint(canvas.getContext('2d'), { width: S.W, height: S.H, scale: S.dpr, view: S.view, interactive: true, draft })
+      syncStageBackground()
+      if (S.kb || S.hover) positionTip()
+      jsCost = performance.now() - t0
+      lastPaint = now
+      needsPaint = false
+      painted = true
+    } else if (needsPaint) again = true // paint on a later frame
+    if (again) requestFrame()
+    measureNext = painted && again
   }
 
   function syncStageBackground() {
@@ -552,7 +821,7 @@ export function mount(root, ctx) {
    * Draw the graph into `g`. `width/height` are CSS px of the target, `scale` device px per CSS px.
    * interactive=false is used for PNG export (no hover/selection emphasis, opaque background).
    */
-  function paint(g, { width, height, scale, view, interactive }) {
+  function paint(g, { width, height, scale, view, interactive, draft = false }) {
     g.setTransform(scale, 0, 0, scale, 0, 0)
     g.clearRect(0, 0, width, height)
     if (!interactive) {
@@ -613,7 +882,7 @@ export function mount(root, ctx) {
       const t = TYPE[n.type]
       g.globalAlpha = alpha
       const sr = n.r * k
-      if (alpha > 0.5 && sr > 1.2) {
+      if (!draft && alpha > 0.5 && sr > 1.2) {
         const R = n.r * (emph ? 3.1 : 2.4)
         g.drawImage(sprite(n.type), n.x - R, n.y - R, R * 2, R * 2)
       }
@@ -657,7 +926,7 @@ export function mount(root, ctx) {
 
     // ── labels, in screen space so they stay crisp ──
     g.setTransform(scale, 0, 0, scale, 0, 0)
-    const labels = placeLabels(view, width, height, { interactive, focus, nb, matches, dimmed, visible })
+    const labels = placeLabels(view, width, height, { interactive, focus, nb, matches, dimmed, visible, draft })
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.lineJoin = 'round'
@@ -672,7 +941,7 @@ export function mount(root, ctx) {
   }
 
   /** Greedy, priority-ordered label placement with overlap rejection. */
-  function placeLabels(view, width, height, { interactive, focus, nb, matches, dimmed, visible }) {
+  function placeLabels(view, width, height, { interactive, focus, nb, matches, dimmed, visible, draft = false }) {
     const { k } = view
     const cands = []
     for (const n of S.nodes) {
@@ -682,7 +951,7 @@ export function mount(root, ctx) {
       if (interactive && n === focus) pri = 1e6
       else if (interactive && n === S.selected) pri = 9e5
       else if (interactive && n === S.best) pri = 8e5
-      else if (dim) continue
+      else if (dim || draft) continue
       else if (nb?.has(n)) pri = 5e5 + n.vdeg
       else if (matches?.has(n)) pri = 4e5 + n.vdeg
       else if (!interactive) pri = n.vdeg * 10 + (n.type === 'topic' || n.type === 'note' ? 5 : 0)
@@ -716,7 +985,7 @@ export function mount(root, ctx) {
       return false
     }
     // Bright node discs are obstacles (faded ones may sit under a label).
-    if (S.nodes.length <= 3000) {
+    if (S.nodes.length <= 3000 && !draft) {
       for (const n of S.nodes) {
         if (!visible(n) || dimmed(n)) continue
         const sx = n.x * k + view.x, sy = n.y * k + view.y, sr = Math.max(2, n.r * k)
@@ -793,7 +1062,7 @@ export function mount(root, ctx) {
     // Keep the centre of the graph steady while the stage resizes.
     if (S.W) { S.view.x += (W - S.W) / 2; S.view.y += (H - S.H) / 2 }
     S.W = W; S.H = H; S.dpr = dpr
-    sim.opts.aspect = clamp(W / H, 0.6, 2.4) // lay out wide on wide stages
+    layout.setAspect(clamp(W / H, 0.6, 2.4)) // lay out wide on wide stages
     canvas.width = Math.round(W * dpr)
     canvas.height = Math.round(H * dpr)
     canvas.style.width = `${W}px`
@@ -836,6 +1105,7 @@ export function mount(root, ctx) {
 
   canvas.addEventListener('pointerdown', e => {
     if (e.button !== 0 && e.pointerType === 'mouse') return
+    S.inputAt = performance.now()
     canvas.setPointerCapture(e.pointerId)
     const [x, y] = local(e)
     pointers.set(e.pointerId, { x, y })
@@ -876,7 +1146,7 @@ export function mount(root, ctx) {
       if (!gesture.moved) {
         gesture.moved = true
         canvas.classList.add('drag')
-        if (gesture.type === 'node' && S.physics) { sim.alphaTarget = 0.25; sim.reheat(0.25) }
+        if (gesture.type === 'node' && S.physics) { layout.target(0.25); layout.start(0.25) }
       }
       if (gesture.type === 'pan') {
         S.view.x = gesture.vx + dx
@@ -886,7 +1156,8 @@ export function mount(root, ctx) {
         const n = gesture.node
         const [wx, wy] = toWorld(x, y)
         n.fx = wx; n.fy = wy
-        if (!S.physics || !sim.hot) { n.x = wx; n.y = wy; n.vx = 0; n.vy = 0 }
+        n.x = wx; n.y = wy; n.vx = 0; n.vy = 0 // the pointer owns this node: no waiting for the next tick
+        layout.pin(n)
       }
       requestRender()
       return
@@ -903,9 +1174,10 @@ export function mount(root, ctx) {
 
   function endNodeDrag(gst) {
     const n = gst.node
-    sim.alphaTarget = 0
+    layout.target(0)
     if (gst.moved) {
       n.fx = n.x; n.fy = n.y // stays pinned where you dropped it
+      layout.pin(n)
       S.layoutDirty = true
       saveLayoutSoon()
     }
@@ -936,11 +1208,12 @@ export function mount(root, ctx) {
   })
   canvas.addEventListener('dblclick', e => {
     const n = hit(...local(e))
-    if (n?.type === 'page') ctx.openUrl(n.data.url)
+    if (n?.type === 'page') openPage(n.data.url)
     else if (n?.type === 'note') openNote(n)
   })
   canvas.addEventListener('wheel', e => {
     e.preventDefault()
+    S.inputAt = performance.now()
     const [x, y] = local(e)
     // ctrlKey = trackpad pinch: much finer deltas
     const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.012 : 0.0016) * (e.deltaMode === 1 ? 16 : 1))
@@ -950,6 +1223,7 @@ export function mount(root, ctx) {
 
   // ───────── keyboard ─────────
   canvas.addEventListener('keydown', e => {
+    S.inputAt = performance.now()
     const step = e.shiftKey ? 180 : 60
     const key = e.key
     if (key.startsWith('Arrow')) {
@@ -1030,6 +1304,11 @@ export function mount(root, ctx) {
   }
 
   function openNote(n) { ctx.navigate('notes', `id=${encodeURIComponent(n.data.noteId)}`) }
+  /** Pages open in a new tab; only web addresses (stored data may be imported, so never trust the scheme). */
+  function openPage(url) {
+    if (isWeb(url)) ctx.openUrl(url)
+    else ctx.toast('Only web pages (http and https) can be opened from the graph.')
+  }
 
   function neighbors(n, type) {
     return [...(S.allAdj.get(n) || new Map()).keys()].filter(m => m.type === type)
@@ -1037,7 +1316,7 @@ export function mount(root, ctx) {
 
   function pageItem(p) {
     const site = p.data.site || ''
-    const go = el('button', { type: 'button', class: 'go', title: p.data.url, onclick: () => ctx.openUrl(p.data.url) },
+    const go = el('button', { type: 'button', class: 'go', title: p.data.url, onclick: () => openPage(p.data.url) },
       el('span', { class: 'gv-av', style: `--h:${hueOf(site)}`, 'aria-hidden': 'true', text: (site || '?').charAt(0).toUpperCase() }),
       el('span', { class: 'tx' }, el('b', { text: p.label }), el('small', { text: [site, p.data.visited ? timeAgo(p.data.visited) : ''].filter(Boolean).join(' · ') })),
       el('span', { html: ICON.open.replace('<svg', '<svg class="ext"') }))
@@ -1083,7 +1362,7 @@ export function mount(root, ctx) {
       b.append(meta)
       if (d.summary) b.append(el('p', { class: 'summary', text: plainExcerpt(d.summary, 320) }))
       b.append(el('div', { class: 'acts' },
-        el('button', { type: 'button', class: 'mm-btn primary sm', html: ICON.open, onclick: () => ctx.openUrl(d.url) }, 'Open page'),
+        el('button', { type: 'button', class: 'mm-btn primary sm', html: ICON.open, onclick: () => openPage(d.url) }, 'Open page'),
         el('button', { type: 'button', class: 'mm-btn sm', html: ICON.locate, onclick: () => centerOn(n, { minK: 1.2 }) }, 'Center')))
       const topics = neighbors(n, 'topic')
       const ents = neighbors(n, 'entity')
@@ -1204,17 +1483,20 @@ export function mount(root, ctx) {
   function setPhysics(on) {
     S.physics = on
     physics.checked = on
-    if (on) sim.reheat(0.3)
-    else saveLayoutSoon(300)
+    if (on) layout.start(0.3)
+    else { layout.stop(); saveLayoutSoon(300) }
     requestRender()
   }
   relayoutBtn.addEventListener('click', relayout)
   function relayout() {
+    layout.stop()
     for (const n of S.all.nodes) { n.fx = null; n.fy = null; n.x = undefined; n.y = undefined; n.vx = 0; n.vy = 0 }
-    sim.setGraph(S.nodes, S.links)
-    sim.alpha = 1
-    if (!S.physics) setPhysics(true)
+    layout.setGraph(S.nodes, S.links)
+    layout.alpha = 1
+    S.physics = true
+    physics.checked = true
     warmUp()
+    layout.start()
     S.userMoved = false
     S.autoFit = true
     fit({ animate: false })
@@ -1368,7 +1650,7 @@ export function mount(root, ctx) {
     value: {
       snapshot: () => ({
         view: { ...S.view },
-        hot: S.physics && sim.hot,
+        hot: S.physics && layout.hot,
         selected: S.selected?.id || null,
         best: S.best?.id || null,
         matches: S.matches?.size || 0,
@@ -1385,6 +1667,7 @@ export function mount(root, ctx) {
   return {
     unmount() {
       alive = false
+      layout.destroy()
       if (raf) cancelAnimationFrame(raf)
       raf = 0
       for (const t of timers) clearTimeout(t)

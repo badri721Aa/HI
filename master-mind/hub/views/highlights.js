@@ -80,7 +80,7 @@ const STYLES = `
 .hlv-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .hlv-tag{position:relative;display:inline-flex;align-items:center;gap:6px;font:650 12px/1 var(--mm-font);color:var(--mm-heading);background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);border-radius:999px;padding:5px 8px 5px 9px;cursor:pointer;transition:box-shadow .15s}
 .hlv-tag:hover{box-shadow:0 0 14px color-mix(in srgb,var(--c) 30%,transparent)}
-.hlv-tag svg{width:13px;height:13px;color:var(--mm-fg-2)}
+.hlv-tag svg{width:13px;height:13px;flex:none;color:var(--mm-fg-2);fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .hlv-time{font-size:12px;color:var(--mm-muted)}
 .hlv-quote{margin:8px 0 0;padding:9px 14px;border-left:3px solid var(--c);border-radius:0 10px 10px 0;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 11%,transparent),color-mix(in srgb,var(--c) 3%,transparent));color:var(--mm-fg);font-size:14px;line-height:1.62;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:-6px 0 14px -10px var(--c)}
 .hlv-quote.clamp{display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden}
@@ -103,7 +103,7 @@ const STYLES = `
 @keyframes hlv-in{from{opacity:0;transform:translateY(-4px)}}
 .hlv-menu button{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:none;color:var(--mm-fg);font:600 13px/1.2 var(--mm-font);cursor:pointer;text-align:left}
 .hlv-menu button:hover,.hlv-menu button:focus-visible{background:rgba(255,255,255,.07);outline:none}
-.hlv-menu button svg{width:14px;height:14px;margin-left:auto;color:var(--mm-accent)}
+.hlv-menu button svg{width:14px;height:14px;flex:none;margin-left:auto;color:var(--mm-accent);fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 .hlv-menu button[aria-checked="false"] svg{visibility:hidden}
 .hlv-showmore{display:flex;justify-content:center;padding:4px 0 8px}
 .hlv-emptybox{padding:46px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}

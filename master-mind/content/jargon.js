@@ -14,9 +14,21 @@
   const ACCENT = { cyan: '#22D3EE', violet: '#A78BFA', lime: '#A3E635', pink: '#F472B6', amber: '#FBBF24' }
   const KINDS = new Set(['acronym', 'technical', 'entity', 'foreign', 'historical', 'other'])
   const WORD = '[\\p{L}\\p{N}_]'
+  // Terms are matched in each paragraph's text as a whole, not Text node by Text node: other features split
+  // words across elements (Bionic Reading turns "electrolyte" into <mm-b>elec</mm-b>trolyte, highlights can
+  // start mid-word) and pages put <em>/<b> inside terms.
+  /** Elements that end a run of text (a term never spans them); their content is skipped. */
+  const BREAK = 'mm-term,mm-host,[data-mm-host],[contenteditable]:not([contenteditable="false"]),script,style,noscript,template,textarea,select,option,input,button,svg,math,iframe,object,embed,video,audio,canvas,img,picture,br,hr'
+  /** Block containers: text in different blocks belongs to different runs. */
+  const BLOCK = 'address,article,aside,blockquote,dd,details,div,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,li,main,nav,ol,p,pre,section,summary,table,tbody,td,tfoot,th,thead,tr,ul'
+  /** Inline elements an underline may enclose whole: formatting and our own wrappers, never links or controls. */
+  const ENCLOSE = 'abbr,b,bdi,bdo,big,cite,code,data,del,dfn,em,font,i,ins,kbd,mark,q,s,samp,small,span,strong,sub,sup,time,tt,u,var,wbr,mm-b,mm-bionic,mm-mark'
+  const INTERACTIVE = '[tabindex],[role="button"],[role="link"]' // e.g. a highlight's focusable first <mm-mark>
+  const NOT_ENCLOSE = `:not(${ENCLOSE}),${INTERACTIVE}`
 
   let terms = [] // [{term, definition, related, kind, pronunciation}]
   let listening = false
+  let navGen = 0 // bumps on navigation to another page, so an apply still in flight doesn't mark up the new one
 
   const accent = () => ACCENT[MM.settings.accent] || ACCENT.cyan
   const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -24,10 +36,12 @@
 
   // ───────── page style: only our own tag ─────────
   function ensurePageStyle() {
+    // The last rule keeps Bionic Reading's bold word starts bold when a term encloses them.
     const css = `mm-term[data-mm-term]{cursor:help;border-radius:3px;transition:background-color .15s ease}
 mm-term[data-mm-term]:hover,mm-term[data-mm-term][aria-expanded="true"]{background-color:color-mix(in srgb,var(--mm-term-c,#22D3EE) 16%,transparent)}
 mm-term[data-mm-term]:focus-visible{outline:2px solid var(--mm-term-c,#22D3EE);outline-offset:2px}
-@media (prefers-reduced-motion:reduce){mm-term[data-mm-term]{transition:none}}`
+@media (prefers-reduced-motion:reduce){mm-term[data-mm-term]{transition:none}}
+mm-term[data-mm-term]>mm-b{display:inline;font-weight:700}`
     let s = document.getElementById('mm-page-style-jargon')
     if (!s) {
       s = document.createElement('style')
@@ -57,50 +71,143 @@ mm-term[data-mm-term]:focus-visible{outline:2px solid var(--mm-term-c,#22D3EE);o
     return out
   }
 
-  function textNodesIn(el) {
-    const nodes = []
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+  /**
+   * A paragraph element's text as runs of inline text (split at blocks, line breaks and embedded content),
+   * each with the Text nodes it is made of and where each one starts in `text`.
+   * @returns {{text: string, nodes: Text[], starts: number[]}[]}
+   */
+  function runsOf(el) {
+    const runs = []
+    if (el.isContentEditable) return runs
+    const blockOf = new Map() // parent element → its block container
+    let run = null
+    let block = null
+    let brk = true
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
       acceptNode(n) {
-        if (!n.nodeValue || n.nodeValue.length < 2) return NodeFilter.FILTER_REJECT
-        const p = n.parentElement
-        if (!p || p.closest('mm-term,mm-host,script,style,textarea,select,option') || p.isContentEditable) return NodeFilter.FILTER_REJECT
-        return NodeFilter.FILTER_ACCEPT
+        if (n.nodeType === 3) return n.length ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+        // A nested paragraph (its own data-mm-pid) is matched on its own.
+        if (n.matches(BREAK) || n.hasAttribute('data-mm-pid')) { brk = true; return NodeFilter.FILTER_REJECT }
+        return NodeFilter.FILTER_SKIP
       },
     })
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n)
-    return nodes
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const p = n.parentElement
+      let b = blockOf.get(p)
+      if (b === undefined) blockOf.set(p, (b = p.closest(BLOCK)))
+      if (brk || b !== block || !run) { run = { text: '', nodes: [], starts: [] }; runs.push(run) }
+      brk = false
+      block = b
+      run.starts.push(run.text.length)
+      run.nodes.push(n)
+      run.text += n.data
+    }
+    return runs.filter(r => r.text.length >= 2)
+  }
+
+  /** The Text nodes and offsets where run positions s (inclusive) and e (exclusive) fall. */
+  function locate(run, s, e) {
+    const last = (x, strict) => { // index of the last node starting at (or, when strict, before) x
+      let lo = 0, hi = run.starts.length - 1, ans = 0
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1
+        if (strict ? run.starts[mid] < x : run.starts[mid] <= x) { ans = mid; lo = mid + 1 } else hi = mid - 1
+      }
+      return ans
+    }
+    const a = last(s, false)
+    const b = last(e, true)
+    return { sNode: run.nodes[a], sOff: s - run.starts[a], eNode: run.nodes[b], eOff: e - run.starts[b] }
+  }
+
+  const isGap = n => n.nodeType === 8 || (n.nodeType === 3 && !n.length) // comments, empty text
+  const sibling = (n, dir) => {
+    let x = dir < 0 ? n.previousSibling : n.nextSibling
+    while (x && isGap(x)) x = dir < 0 ? x.previousSibling : x.nextSibling
+    return x
+  }
+  const enclosable = n => n.nodeType !== 1 || (!n.matches(NOT_ENCLOSE) && !n.querySelector(NOT_ENCLOSE))
+
+  /**
+   * Where the <mm-term> for a match goes: siblings [first..last] under one parent that hold exactly the matched
+   * text once the edge Text nodes are split. Climbs out of inline wrappers the match covers whole (bionic
+   * <mm-b>, <em>…). Null when it would cut an element in two or swallow a link or control.
+   */
+  function planWrap(h) {
+    const { sNode, sOff, eNode, eOff } = h
+    if (!sNode.parentNode || !eNode.parentNode) return null
+    if (sNode === eNode) return { parent: sNode.parentNode, first: sNode, last: sNode }
+    const up = new Set()
+    for (let n = sNode.parentNode; n; n = n.parentNode) up.add(n)
+    let parent = eNode.parentNode
+    while (parent && !up.has(parent)) parent = parent.parentNode
+    if (!parent) return null
+    let first = sNode
+    if (first.parentNode !== parent && sOff > 0) return null
+    while (first.parentNode !== parent) {
+      if (sibling(first, -1)) return null // the wrapper starts before the match
+      first = first.parentNode
+    }
+    let last = eNode
+    if (last.parentNode !== parent && eOff < eNode.length) return null
+    while (last.parentNode !== parent) {
+      if (sibling(last, 1)) return null // the wrapper goes on after the match
+      last = last.parentNode
+    }
+    for (let n = first; n; n = n.nextSibling) {
+      if (!enclosable(n)) return null
+      if (n === last) return { parent, first, last }
+    }
+    return null
   }
 
   /**
    * Find the first occurrences of each term in document order. Whole-word, case-sensitive first;
-   * a term with no exact match falls back to case-insensitive matching.
-   * @returns {{node: Text, start: number, end: number, index: number}[]}
+   * a term with no exact match falls back to case-insensitive matching. Only occurrences we can
+   * underline cleanly count.
+   * @param {Element[]} els paragraph elements in document order
+   * @returns {{run: object, s: number, e: number, index: number, sNode: Text, sOff: number, eNode: Text, eOff: number}[]}
    */
-  function findMatches(nodes, list) {
+  function findMatches(els, list) {
     const hits = []
     const counts = new Array(list.length).fill(0)
-    const taken = new Map() // node → [[start, end]]
-    const overlaps = (node, s, e) => (taken.get(node) || []).some(([a, b]) => s < b && e > a)
+    const cache = new Map() // element → runs (built lazily, numbered in document order)
+    let seq = 0
+    const runsFor = el => {
+      let runs = cache.get(el)
+      if (!runs) {
+        runs = runsOf(el)
+        for (const r of runs) { r.seq = seq++; r.taken = [] }
+        cache.set(el, runs)
+      }
+      return runs
+    }
     const pass = (indices, flags) => {
       if (!indices.length) return
-      const byKey = new Map(indices.map(i => [flags.includes('i') ? list[i].term.toLowerCase() : list[i].term, i]))
-      const alts = indices.map(i => list[i].term).sort((a, b) => b.length - a.length).map(escRe).join('|')
+      const key = s => { const k = s.replace(/\s+/g, ' '); return flags ? k.toLowerCase() : k }
+      const byKey = new Map(indices.map(i => [key(list[i].term), i]))
+      // Any whitespace between the words of a multi-word term (line breaks in the HTML, &nbsp;).
+      const alts = indices.map(i => list[i].term).sort((a, b) => b.length - a.length).map(t => escRe(t).replace(/ /g, '\\s+')).join('|')
       const re = new RegExp(`(?<!${WORD})(?:${alts})(?!${WORD})`, `g${flags}u`)
       let remaining = indices.length
-      for (const node of nodes) {
+      for (const el of els) {
         if (!remaining) break
-        const text = node.nodeValue
-        re.lastIndex = 0
-        for (let m; (m = re.exec(text));) {
-          const i = byKey.get(flags.includes('i') ? m[0].toLowerCase() : m[0])
-          if (i === undefined || counts[i] >= MAX_PER_TERM) continue
-          const s = m.index
-          const e = s + m[0].length
-          if (overlaps(node, s, e)) continue
-          counts[i]++
-          if (counts[i] === MAX_PER_TERM) remaining--
-          hits.push({ node, start: s, end: e, index: i })
-          ;(taken.get(node) || taken.set(node, []).get(node)).push([s, e])
+        for (const run of runsFor(el)) {
+          if (!remaining) break
+          re.lastIndex = 0
+          for (let m; (m = re.exec(run.text));) {
+            const i = byKey.get(key(m[0]))
+            if (i === undefined || counts[i] >= MAX_PER_TERM) continue
+            const s = m.index
+            const e = s + m[0].length
+            if (run.taken.some(([a, b]) => s < b && e > a)) continue
+            const hit = { run, s, e, index: i, ...locate(run, s, e) }
+            if (!planWrap(hit)) continue
+            counts[i]++
+            if (counts[i] === MAX_PER_TERM) remaining--
+            hits.push(hit)
+            run.taken.push([s, e])
+          }
         }
       }
     }
@@ -109,47 +216,72 @@ mm-term[data-mm-term]:focus-visible{outline:2px solid var(--mm-term-c,#22D3EE);o
     return hits
   }
 
-  function wrap(hits) {
-    const color = accent()
-    const byNode = new Map()
-    for (const h of hits) (byNode.get(h.node) || byNode.set(h.node, []).get(h.node)).push(h)
-    let n = 0
-    for (const [node, list] of byNode) {
-      list.sort((a, b) => b.start - a.start) // right to left keeps earlier offsets valid
-      for (const h of list) {
-        if (!node.parentNode) break
-        if (h.end < node.length) node.splitText(h.end)
-        const mid = h.start > 0 ? node.splitText(h.start) : node
-        const t = terms[h.index]
-        const el = document.createElement('mm-term')
-        el.dataset.mmTerm = String(h.index)
-        el.tabIndex = 0
-        el.setAttribute('role', 'button')
-        el.setAttribute('aria-expanded', 'false')
-        el.setAttribute('aria-description', `${t.kind === 'acronym' ? 'Acronym' : 'Term'}: ${t.definition}`)
-        el.style.cssText = `text-decoration:underline dotted ${color};text-decoration-thickness:2px;text-underline-offset:3px;text-decoration-skip-ink:none;--mm-term-c:${color}`
-        mid.replaceWith(el)
-        el.appendChild(mid)
-        n++
-      }
+  function wrapHit(h, color) {
+    const plan = planWrap(h)
+    if (!plan) return null
+    let { first, last } = plan
+    if (h.sNode === h.eNode) {
+      if (h.eOff < h.sNode.length) h.sNode.splitText(h.eOff)
+      first = last = h.sOff > 0 ? h.sNode.splitText(h.sOff) : h.sNode
+    } else {
+      if (first === h.sNode && h.sOff > 0) first = h.sNode.splitText(h.sOff)
+      if (last === h.eNode && h.eOff < h.eNode.length) h.eNode.splitText(h.eOff)
     }
-    return n
+    const t = terms[h.index]
+    const el = document.createElement('mm-term')
+    el.dataset.mmTerm = String(h.index)
+    el.tabIndex = 0
+    el.setAttribute('role', 'button')
+    el.setAttribute('aria-expanded', 'false')
+    el.setAttribute('aria-description', `${t.kind === 'acronym' ? 'Acronym' : 'Term'}: ${t.definition}`)
+    el.style.cssText = `text-decoration:underline dotted ${color};text-decoration-thickness:2px;text-underline-offset:3px;text-decoration-skip-ink:none;--mm-term-c:${color}`
+    plan.parent.insertBefore(el, first)
+    for (let n = first, next; n; n = next) {
+      next = n === last ? null : n.nextSibling
+      el.appendChild(n)
+    }
+    return el
   }
 
+  /** Underline normalized terms on the page (replacing any current ones). Returns the number of underlines. */
   function apply(list) {
     clear()
-    terms = normalizeTerms(list)
+    terms = list
     if (!terms.length) return 0
     const paras = (MM.paraEls ? MM.paraEls() : [...document.querySelectorAll('[data-mm-pid]')].map(el => ({ el, tag: el.localName })))
       .filter(p => p.el?.isConnected && p.tag !== 'pre' && !/^h\d$/.test(p.tag))
-    const nodes = []
-    for (const p of paras) nodes.push(...textNodesIn(p.el))
-    const hits = findMatches(nodes, terms)
+    const hits = findMatches(paras.map(p => p.el), terms)
     if (!hits.length) return 0
     ensurePageStyle()
-    const applied = wrap(hits)
-    listen(true)
-    return applied
+    const color = accent()
+    // Last match first: splitting a Text node keeps the part before the split in place, so the node
+    // references of earlier matches stay valid.
+    hits.sort((a, b) => b.run.seq - a.run.seq || b.s - a.s)
+    let n = 0
+    for (const h of hits) if (wrapHit(h, color)) n++
+    if (n) listen(true)
+    return n
+  }
+
+  /**
+   * Run fn on the page without Bionic Reading's word splitting (content/reader.js), then turn it back on.
+   * Bionic then re-wraps the text inside our <mm-term>s: the same DOM as underlining before bionic, which
+   * bionic restores exactly when it's switched off later. (Matching works across its <mm-b> tags anyway,
+   * in case it can't be paused.)
+   */
+  async function withoutBionic(fn) {
+    const bio = MM.bionic
+    let paused = false
+    if (bio?.isOn?.()) {
+      try { await bio.set(false); paused = true } catch (e) { console.warn('[Master Mind] could not pause bionic reading', e) }
+    }
+    try {
+      return fn()
+    } finally {
+      if (paused && !bio.isOn()) {
+        try { await bio.set(true) } catch (e) { console.warn('[Master Mind] could not restore bionic reading', e) }
+      }
+    }
   }
 
   function clear() {
@@ -444,15 +576,29 @@ mm-term[data-mm-term]:focus-visible{outline:2px solid var(--mm-term-c,#22D3EE);o
   }
 
   // ───────── handlers ─────────
-  MM.on('MM_JARGON_APPLY', ({ terms: list }) => {
-    const applied = apply(list)
+  // Apply can wait on bionic reading, so applies and clears run one at a time, in the order they arrive.
+  let queue = Promise.resolve()
+  const serial = fn => {
+    const p = queue.then(fn)
+    queue = p.catch(() => {})
+    return p
+  }
+
+  MM.on('MM_JARGON_APPLY', ({ terms: raw }) => serial(async () => {
+    const list = normalizeTerms(raw)
+    const gen = navGen
+    const applied = list.length ? await withoutBionic(() => (gen === navGen ? apply(list) : 0)) : apply(list)
     const idx = new Set([...document.querySelectorAll('mm-term[data-mm-term]')].map(el => Number(el.dataset.mmTerm)))
     return { ok: true, applied, found: [...idx].map(i => terms[i]?.term).filter(Boolean) }
-  })
-  MM.on('MM_JARGON_CLEAR', () => ({ ok: true, removed: clear() }))
+  }))
+  MM.on('MM_JARGON_CLEAR', () => serial(() => ({ ok: true, removed: clear() })))
 
-  // Terms belong to the page they were found on.
-  MM.events.on('urlchange', () => { if (terms.length) clear() })
+  // Terms belong to the page they were found on (a hash change stays on the same page).
+  MM.events.on('urlchange', ({ from, to } = {}) => {
+    if (from && to && MM.pageKey(from) === MM.pageKey(to)) return
+    navGen++
+    if (terms.length) clear()
+  })
   MM.events.on('settings', () => {
     const c = accent()
     for (const el of document.querySelectorAll('mm-term[data-mm-term]')) {

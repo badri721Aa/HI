@@ -5,6 +5,56 @@
   try { if (globalThis.MM?.alive?.()) { globalThis.MM.__skip = true; return } } catch { /* orphaned */ }
   document.querySelectorAll('[data-mm-host]').forEach(el => el.remove())
 
+  // ───────── trust boundary ─────────
+  // The page shares our DOM: it can dispatch synthetic events at window/document or at our own
+  // controls (e.g. host.shadowRoot.querySelector('button').click()) to drive Master Mind without the
+  // user. So every listener our content scripts add for user actions ignores untrusted events, except
+  // the ones our own code dispatches (el.click(), el.dispatchEvent()) from this isolated world.
+  // Only this world's prototypes are patched: the page's own listeners and DOM APIs are untouched.
+  const TRUST = Symbol.for('master-mind.trust')
+  if (!EventTarget.prototype[TRUST]) {
+    const ACTIONS = new Set(['click', 'dblclick', 'auxclick', 'contextmenu', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'keydown', 'keyup', 'keypress', 'submit'])
+    const P = EventTarget.prototype
+    const add = P.addEventListener
+    const remove = P.removeEventListener
+    const dispatch = P.dispatchEvent
+    const nativeClick = HTMLElement.prototype.click
+    const ours = new WeakSet() // events our code is dispatching right now
+    let clicking = null // element our code is calling .click() on right now
+    const trusted = e => e.isTrusted !== false || ours.has(e) || (clicking !== null && e.type === 'click' && e.composedPath()[0] === clicking)
+    const wrapped = new WeakMap()
+    const guard = fn => {
+      let w = wrapped.get(fn)
+      if (!w) {
+        w = function (e) {
+          if (!trusted(e)) return
+          return typeof fn === 'function' ? fn.call(this, e) : fn.handleEvent(e)
+        }
+        wrapped.set(fn, w)
+      }
+      return w
+    }
+    P.addEventListener = function (type, fn, opts) {
+      return add.call(this, type, fn && ACTIONS.has(type) ? guard(fn) : fn, opts)
+    }
+    P.removeEventListener = function (type, fn, opts) {
+      return remove.call(this, type, fn && ACTIONS.has(type) ? wrapped.get(fn) || fn : fn, opts)
+    }
+    P.dispatchEvent = function (e) {
+      ours.add(e)
+      try { return dispatch.call(this, e) } finally { ours.delete(e) }
+    }
+    HTMLElement.prototype.click = function () {
+      const prev = clicking
+      clicking = this
+      try { return nativeClick.call(this) } finally { clicking = prev }
+    }
+    Object.defineProperty(P, TRUST, { value: Object.freeze({ trusted, add, ACTIONS }) })
+  }
+  const trust = EventTarget.prototype[TRUST]
+  /** Stops untrusted user-action events inside our UI before any handler (including on* properties) or default action runs. */
+  const blockUntrusted = e => { if (!trust.trusted(e)) { e.stopImmediatePropagation(); e.preventDefault() } }
+
   const handlers = new Map()
   const events = new Map()
   const hosts = new Map()
@@ -44,7 +94,13 @@
      * @returns {{host: HTMLElement, root: ShadowRoot, layer: HTMLDivElement}}
      */
     shadow(id, css = '') {
-      if (hosts.has(id)) return hosts.get(id)
+      ensureFonts()
+      const known = hosts.get(id)
+      if (known) {
+        // Some sites swap <body> on navigation (Turbo, SPA routers), which drops our hosts: put it back.
+        if (!known.host.isConnected) (document.body || document.documentElement).appendChild(known.host)
+        return known
+      }
       const host = document.createElement('mm-host')
       host.dataset.mmHost = id
       host.style.cssText = 'all:initial;position:absolute;top:0;left:0;width:0;height:0;z-index:2147483646;'
@@ -57,6 +113,7 @@
       const layer = document.createElement('div')
       layer.className = 'mm-root layer'
       root.append(link, style, layer)
+      for (const type of trust.ACTIONS) trust.add.call(root, type, blockUntrusted, true)
       ;(document.body || document.documentElement).appendChild(host)
       MM.applyAccent(host)
       // Keep page shortcuts from swallowing keystrokes typed into our UI.
@@ -122,11 +179,18 @@
     escape: s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
     /** True for nodes that belong to Master Mind's own UI. */
     isOwn: node => !!(node && (node.nodeType === 1 ? node : node.parentElement)?.closest?.('[data-mm-host],mm-host')),
+    /** False for synthetic events the page dispatched (listeners for user actions already skip those). */
+    trusted: e => trust.trusted(e),
   }
   globalThis.MM = MM
 
-  // Fonts must be declared at document scope to be usable inside shadow roots.
-  if (!document.getElementById('mm-fonts')) {
+  /**
+   * Fonts must be declared at document scope to be usable inside shadow roots. Declared lazily, with
+   * the first Master Mind UI on the page: a new @font-face makes Chrome re-lay out the whole document
+   * (hundreds of ms on very long pages), which pages where Master Mind never shows UI shouldn't pay.
+   */
+  function ensureFonts() {
+    if (document.getElementById('mm-fonts')) return // a <head> swap can drop it: then it's added again
     const f = document.createElement('style')
     f.id = 'mm-fonts'
     const u = p => chrome.runtime.getURL(p)
@@ -135,6 +199,7 @@
 @font-face{font-family:"JetBrains Mono MM";src:url("${u('vendor/fonts/jetbrains-mono-latin-wght-normal.woff2')}") format("woff2-variations");font-weight:100 800;font-display:swap}`
     ;(document.head || document.documentElement).appendChild(f)
   }
+  MM.ensureFonts = ensureFonts
 
   // Settings (synced preferences) stay live.
   const loadSettings = () => chrome.storage.sync.get('settings').then(r => {

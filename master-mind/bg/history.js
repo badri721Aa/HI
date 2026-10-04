@@ -8,6 +8,11 @@
 //
 // The per-tab "current node" map lives in chrome.storage.session because the service worker restarts.
 // Records: { id, tabId, url, title, parentId, ts, transition } in the IndexedDB `history` store.
+//
+// Titles: a node takes the page's first real title right away. Changes during the first moments on a page
+// ("Loading…" → the real title, SPA routes renaming themselves) are applied at most every few seconds, and after
+// that the title is settled: unread counters, timers and "New message!" flashes don't rewrite the trail (every
+// write is broadcast to every open extension view).
 import { db, uid } from '../lib/db.js'
 
 const MAX_NODES = 5000
@@ -16,6 +21,8 @@ const ROOT_TRANSITIONS = new Set(['typed', 'generated', 'keyword', 'keyword_gene
 const IGNORED_TRANSITIONS = new Set(['reload', 'auto_subframe', 'manual_subframe'])
 const CLIENT_REDIRECT_MS = 5000
 const OPENER_TTL_MS = 10 * 60 * 1000
+const TITLE_SETTLE_MS = 10 * 1000 // after this long on a page its title no longer changes in the trail
+const TITLE_THROTTLE_MS = 2000 // at most one title write per node per this long while it may still change
 const WEB = { url: [{ schemes: ['http', 'https'] }] }
 
 const isWeb = u => /^https?:\/\//i.test(u || '')
@@ -25,6 +32,7 @@ const sameDoc = (a, b) => docUrl(a) === docUrl(b)
 let state = null // { tabs: {[tabId]: {id, url, ts}}, openers: {[tabId]: {nodeId, ts}}, pending: {[tabId]: {url, transition, qualifiers, ts}} }
 let queue = Promise.resolve()
 let started = false
+const titles = new Map() // node id → {at: last write (ms), title: pending title, timer} for nodes whose title may still change
 
 async function load() {
   if (!state) {
@@ -146,11 +154,53 @@ async function onTabUpdated(tabId, change, tab) {
   const title = change.title || tab?.title
   const cur = st.tabs[tabId]
   if (!title || !cur || !sameDoc(tab?.url, cur.url) || placeholderTitle(title, cur.url)) return
+  const known = titles.get(cur.id)
+  if (known?.settled) return // fast path for ticking titles: no IndexedDB read either
   const node = await db.get('history', cur.id)
-  if (node && node.title !== title) {
-    node.title = title
-    await db.put('history', node)
+  if (!node) return
+  if (node.title === title) { if (known) known.title = ''; return } // back to the stored title: drop a pending one
+  const now = Date.now()
+  if (node.title && !placeholderTitle(node.title, node.url)) {
+    // The node already has a real title: only early changes count, and those are throttled.
+    if (now - node.ts > TITLE_SETTLE_MS) { settleTitle(node.id); return }
+    const t = known || { at: 0 }
+    titles.set(node.id, t)
+    t.title = title
+    const wait = t.at + TITLE_THROTTLE_MS - now
+    if (wait > 0) {
+      t.timer ||= setTimeout(() => { t.timer = 0; enqueue(() => flushTitle(node.id)) }, wait)
+      return
+    }
   }
+  await writeTitle(node, title)
+}
+
+async function writeTitle(node, title) {
+  const t = titles.get(node.id) || { at: 0 }
+  clearTimeout(t.timer)
+  t.timer = 0
+  t.at = Date.now()
+  t.title = ''
+  titles.set(node.id, t)
+  if (titles.size > 200) for (const id of [...titles.keys()].slice(0, 100)) if (!titles.get(id).timer) titles.delete(id)
+  node.title = title
+  await db.put('history', node)
+}
+
+/** Trailing write of the last title seen while a node's title was being throttled. */
+async function flushTitle(id) {
+  const t = titles.get(id)
+  if (!t?.title) return
+  const node = await db.get('history', id) // gone after HISTORY_CLEAR or a trim: nothing to do
+  if (!node || node.title === t.title) { t.title = ''; return }
+  await writeTitle(node, t.title)
+}
+
+/** Ignore this node's later title changes (a write already throttled from before still lands). */
+function settleTitle(id) {
+  const t = titles.get(id)
+  if (t) t.settled = true
+  else titles.set(id, { settled: true, at: 0 })
 }
 
 async function onTabRemoved(tabId) {
@@ -176,13 +226,18 @@ export const handlers = {
   async HISTORY_TREE({ since } = {}) {
     await queue
     const from = Number(since) || 0
-    const nodes = (await db.all('history')).filter(n => (n.ts || 0) >= from).sort((a, b) => a.ts - b.ts)
+    // A time range reads only its slice of the `ts` index (already in ts order) instead of the whole store.
+    const nodes = from > 0
+      ? await db.by('history', 'ts', IDBKeyRange.lowerBound(from))
+      : (await db.all('history')).sort((a, b) => (a.ts || 0) - (b.ts || 0))
     return { ok: true, nodes }
   },
   /** Wipe the whole research trail and forget every tab's position in it. */
   async HISTORY_CLEAR() {
     await enqueue(async () => {
       await db.clear('history')
+      for (const t of titles.values()) clearTimeout(t.timer)
+      titles.clear()
       const st = await load()
       st.tabs = {}
       st.openers = {}

@@ -2,7 +2,11 @@
 // Pure ES module (no DOM): usable from extension pages, workers and the service worker.
 //
 //   buildGraph({pages, notes, highlights}, opts) → {nodes, links}
-//   new ForceSimulation(nodes, links, opts) → .tick(), .reheat(), .pin(), .unpin(), .hot
+//   new ForceSimulation(nodes, links, opts) → .tick(), .relax(movers), .reheat(), .pin(), .unpin(), .hot
+//   alphaDecayFor(nodeCount) → cooling rate that keeps big layouts to a bounded number of ticks
+//
+// The same file is also the hub's layout worker: `new Worker(url of lib/graph.js, {type: 'module', name: SIM_WORKER})`
+// runs the simulation off the main thread and streams positions back (see startLayoutWorker below).
 //
 // Node:  { id, type: 'page'|'entity'|'topic'|'note'|'site', label, degree, data }
 // Link:  { source, target, type: 'mentions'|'about'|'cites'|'wiki'|'related'|'tagged'|'site', weight }
@@ -333,6 +337,62 @@ export class QuadTree {
 const LINK_DISTANCE = { mentions: 64, about: 76, cites: 84, wiki: 90, related: 120, tagged: 96, site: 58 }
 
 /**
+ * Cooling rate for a graph of `n` nodes. Up to 1000 nodes a layout gets d3's 300 ticks; bigger ones get
+ * proportionally fewer (never below 150), so a first layout of thousands of nodes takes seconds, not a minute.
+ */
+export function alphaDecayFor(n, alphaMin = 0.002) {
+  const ticks = n <= 1000 ? 300 : Math.max(150, Math.round(300 * Math.sqrt(1000 / n)))
+  return 1 - Math.pow(alphaMin, 1 / ticks)
+}
+
+/** Barnes-Hut repulsion on `n` from every body in `tree` (skipping `n` itself). */
+function treeCharge(tree, n, alpha, theta2, dMax2, stack) {
+  stack.length = 0
+  stack.push(tree.root)
+  while (stack.length) {
+    const q = stack.pop()
+    if (!q.charge) continue
+    let dx = q.cx - n.x, dy = q.cy - n.y
+    let l = dx * dx + dy * dy
+    const w = q.size
+    if (q.kids && (w * w) / theta2 < l) {
+      // Far enough: treat the whole cell as one body.
+      if (l < dMax2) {
+        if (l < 1) l = Math.sqrt(l)
+        const f = q.charge * alpha / l
+        n.vx += dx * f; n.vy += dy * f
+      }
+      continue
+    }
+    if (q.kids) {
+      for (const c of q.kids) if (c) stack.push(c)
+      continue
+    }
+    for (const m of q.items) {
+      if (m === n) continue
+      dx = m.x - n.x; dy = m.y - n.y
+      if (!dx && !dy) { dx = jiggle(); dy = jiggle() }
+      l = dx * dx + dy * dy
+      if (l > dMax2) continue
+      if (l < 1) l = Math.sqrt(l)
+      const f = m.charge * alpha / l
+      n.vx += dx * f; n.vy += dy * f
+    }
+  }
+}
+
+/** Exact repulsion on `a` from `b` (one direction only). */
+function pairCharge(a, b, alpha, dMax2) {
+  let dx = b.x - a.x, dy = b.y - a.y
+  if (!dx && !dy) { dx = jiggle(); dy = jiggle() }
+  let l = dx * dx + dy * dy
+  if (l > dMax2) return
+  if (l < 1) l = Math.sqrt(l)
+  const f = b.charge * alpha / l
+  a.vx += dx * f; a.vy += dy * f
+}
+
+/**
  * Velocity-Verlet style force simulation (d3-force semantics):
  * many-body repulsion (exact for small graphs, Barnes-Hut beyond `bhThreshold` nodes),
  * link springs, gravity toward the centre, collision, alpha cooling and pinning via fx/fy.
@@ -446,6 +506,111 @@ export class ForceSimulation {
     return this.alpha
   }
 
+  /**
+   * Settle only `movers` (typically nodes that just appeared) while every other node stays exactly where it is.
+   * Each iteration costs O(movers · log n) instead of a full tick, so a handful of new nodes find their place
+   * in a few milliseconds without reheating (and visibly reshuffling) the whole layout. Pinned movers stay put.
+   * Returns the number of iterations run (`budgetMs` caps the wall time).
+   */
+  relax(movers, { iterations = 120, alpha = 0.5, budgetMs = 60 } = {}) {
+    const moving = new Set(movers.filter(n => n.fx == null && n.fy == null && this.nodes[n._i] === n))
+    if (!moving.size) return 0
+    const { theta, distanceMax, gravity, cx, cy, aspect, collidePadding: pad, collideStrength, velocityDecay, maxVelocity, alphaMin } = this.opts
+    const fixed = this.nodes.filter(n => !moving.has(n))
+    const mv = [...moving]
+    const links = this.links.filter(L => moving.has(L.s) || moving.has(L.t))
+    const dMax2 = distanceMax * distanceMax
+    const theta2 = theta * theta
+    const tree = fixed.length > this.opts.bhThreshold ? new QuadTree(fixed) : null
+    // Fixed nodes don't move: one collision grid for them, a tiny one for the movers each iteration.
+    let maxR = 1
+    for (const n of this.nodes) if ((n.r || 6) > maxR) maxR = n.r || 6
+    const cell = (maxR + pad) * 2
+    const key = (ix, iy) => ix * 131071 + iy
+    const grid = new Map()
+    for (const n of fixed) {
+      const k = key(Math.floor(n.x / cell), Math.floor(n.y / cell))
+      const arr = grid.get(k)
+      if (arr) arr.push(n); else grid.set(k, [n])
+    }
+    const stack = []
+    const decay = Math.pow(alphaMin / alpha, 1 / iterations)
+    const keep = 1 - velocityDecay
+    const t0 = performance.now()
+    let a = alpha, it = 0
+    for (const n of mv) { n.vx = 0; n.vy = 0 }
+    while (it < iterations) {
+      it++
+      // links (only the moving end is pushed)
+      for (const L of links) {
+        const { s, t } = L
+        let dx = t.x + t.vx - s.x - s.vx
+        let dy = t.y + t.vy - s.y - s.vy
+        if (!dx && !dy) { dx = jiggle(); dy = jiggle() }
+        const d0 = Math.sqrt(dx * dx + dy * dy)
+        const f = (d0 - L.distance) / d0 * a * L.strength
+        dx *= f; dy *= f
+        if (moving.has(t)) { t.vx -= dx * L.bias; t.vy -= dy * L.bias }
+        if (moving.has(s)) { s.vx += dx * (1 - L.bias); s.vy += dy * (1 - L.bias) }
+      }
+      // charge: fixed bodies (Barnes-Hut when there are many) and the other movers (exact)
+      const kx = gravity * a * Math.min(1, 1 / aspect), ky = gravity * a * Math.max(1, aspect)
+      for (const n of mv) {
+        if (tree) treeCharge(tree, n, a, theta2, dMax2, stack)
+        else for (const m of fixed) pairCharge(n, m, a, dMax2)
+        for (const m of mv) if (m !== n) pairCharge(n, m, a, dMax2)
+        n.vx += (cx - n.x) * kx
+        n.vy += (cy - n.y) * ky
+      }
+      // collisions against fixed nodes (they absorb nothing) and between movers
+      for (let i = 0; i < mv.length; i++) {
+        const n = mv[i]
+        const rn = (n.r || 6) + pad
+        const px = n.x + n.vx, py = n.y + n.vy
+        const gx = Math.floor(px / cell), gy = Math.floor(py / cell)
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            for (const m of grid.get(key(gx + ox, gy + oy)) || []) {
+              const r = rn + (m.r || 6) + pad
+              let dx = px - m.x, dy = py - m.y
+              let l = dx * dx + dy * dy
+              if (l >= r * r) continue
+              if (!dx && !dy) { dx = jiggle(); dy = jiggle(); l = dx * dx + dy * dy }
+              l = Math.sqrt(l)
+              const f = (r - l) / l * collideStrength
+              n.vx += dx * f; n.vy += dy * f
+            }
+          }
+        }
+        for (let j = i + 1; j < mv.length; j++) {
+          const m = mv[j]
+          const rm = (m.r || 6) + pad
+          const r = rn + rm
+          let dx = px - (m.x + m.vx), dy = py - (m.y + m.vy)
+          let l = dx * dx + dy * dy
+          if (l >= r * r) continue
+          if (!dx && !dy) { dx = jiggle(); dy = jiggle(); l = dx * dx + dy * dy }
+          l = Math.sqrt(l)
+          const f = (r - l) / l * collideStrength
+          const w = rm * rm / (rn * rn + rm * rm)
+          dx *= f; dy *= f
+          n.vx += dx * w; n.vy += dy * w
+          m.vx -= dx * (1 - w); m.vy -= dy * (1 - w)
+        }
+      }
+      for (const n of mv) {
+        n.vx *= keep; n.vy *= keep
+        if (n.vx > maxVelocity) n.vx = maxVelocity; else if (n.vx < -maxVelocity) n.vx = -maxVelocity
+        if (n.vy > maxVelocity) n.vy = maxVelocity; else if (n.vy < -maxVelocity) n.vy = -maxVelocity
+        n.x += n.vx; n.y += n.vy
+      }
+      a *= decay
+      if (performance.now() - t0 > budgetMs) break
+    }
+    for (const n of mv) { n.vx = 0; n.vy = 0 }
+    return it
+  }
+
   forceLinks() {
     const alpha = this.alpha
     for (const L of this.links) {
@@ -488,40 +653,7 @@ export class ForceSimulation {
     const tree = new QuadTree(nodes)
     const theta2 = theta * theta
     const stack = []
-    for (const n of nodes) {
-      stack.length = 0
-      stack.push(tree.root)
-      while (stack.length) {
-        const q = stack.pop()
-        if (!q.charge) continue
-        let dx = q.cx - n.x, dy = q.cy - n.y
-        let l = dx * dx + dy * dy
-        const w = q.size
-        if (q.kids && (w * w) / theta2 < l) {
-          // Far enough: treat the whole cell as one body.
-          if (l < dMax2) {
-            if (l < 1) l = Math.sqrt(l)
-            const f = q.charge * alpha / l
-            n.vx += dx * f; n.vy += dy * f
-          }
-          continue
-        }
-        if (q.kids) {
-          for (const c of q.kids) if (c) stack.push(c)
-          continue
-        }
-        for (const m of q.items) {
-          if (m === n) continue
-          dx = m.x - n.x; dy = m.y - n.y
-          if (!dx && !dy) { dx = jiggle(); dy = jiggle() }
-          l = dx * dx + dy * dy
-          if (l > dMax2) continue
-          if (l < 1) l = Math.sqrt(l)
-          const f = m.charge * alpha / l
-          n.vx += dx * f; n.vy += dy * f
-        }
-      }
-    }
+    for (const n of nodes) treeCharge(tree, n, alpha, theta2, dMax2, stack)
   }
 
   forceGravity() {
@@ -597,3 +729,101 @@ export class ForceSimulation {
 }
 
 function jiggle() { return (Math.random() - 0.5) * 1e-6 }
+
+// ───────────────────────── layout worker ─────────────────────────
+//
+// The hub's Knowledge Graph runs every whole-graph simulation here, on a worker thread, so a layout of thousands
+// of nodes never blocks the hub (or the side panel, which shares its renderer's main thread).
+//
+// main → worker:
+//   {type: 'graph', gen, seq, nodes: Float64Array [x, y, fx, fy, r]·n (NaN = not pinned),
+//    links: Int32Array [s, t]·m, types: Uint8Array (LINK_TYPES index), weights: Float32Array,
+//    opts, alpha, alphaTarget, animate}                                    (re)start a run on this graph
+//   {type: 'reheat', gen, seq, alpha} · {type: 'target', gen, seq, value} · {type: 'stop', seq}
+//   {type: 'pin', gen, i, fx, fy} (null = unpin) · {type: 'opts', opts}
+// worker → main:
+//   {type: 'tick', gen, seq, alpha, done, pos: Float64Array [x, y]·n}       latest positions; done = cooled down
+export const SIM_WORKER = 'mm-graph-layout'
+const SLICE_MS = 12 // ticking per slice before positions are posted (animated runs)
+const FRAME_MS = 16
+const ANIMATED_FRAMES = 75 // an animated full run settles over about this many frames
+
+export function startLayoutWorker(scope) {
+  let sim = null
+  let gen = -1
+  let seq = 0
+  let timer = 0
+  let animate = true
+  let pace = 4
+  let lastPost = 0
+  const post = done => {
+    const pos = new Float64Array(sim.nodes.length * 2)
+    for (let i = 0; i < sim.nodes.length; i++) { pos[2 * i] = sim.nodes[i].x; pos[2 * i + 1] = sim.nodes[i].y }
+    scope.postMessage({ type: 'tick', gen, seq, alpha: sim.alpha, done, pos }, [pos.buffer])
+    lastPost = performance.now()
+  }
+  const schedule = ms => { if (!timer) timer = setTimeout(loop, ms) }
+  const cancel = () => { clearTimeout(timer); timer = 0 }
+  function loop() {
+    timer = 0
+    if (!sim) return
+    const t0 = performance.now()
+    if (sim.hot) {
+      // While a node is dragged (alphaTarget > 0) a couple of ticks per frame, like an on-screen simulation.
+      const maxTicks = !animate ? Infinity : sim.alphaTarget > 0 ? 2 : pace
+      let n = 0
+      do { sim.tick(); n++ } while (sim.hot && n < maxTicks && performance.now() - t0 < (animate ? SLICE_MS : 50))
+    }
+    const done = !sim.hot
+    if (done || animate || performance.now() - lastPost > 250) post(done)
+    if (!done) schedule(animate ? Math.max(0, FRAME_MS - (performance.now() - t0)) : 0)
+  }
+  scope.onmessage = ({ data: m }) => {
+    if (!m || typeof m !== 'object') return
+    if (m.type === 'graph') {
+      cancel()
+      const nodes = []
+      for (let i = 0, a = m.nodes; i < a.length; i += 5) {
+        const pinned = !Number.isNaN(a[i + 2])
+        nodes.push({ id: i / 5, x: a[i], y: a[i + 1], vx: 0, vy: 0, fx: pinned ? a[i + 2] : null, fy: pinned ? a[i + 3] : null, r: a[i + 4] })
+      }
+      const links = []
+      for (let j = 0; j < m.links.length; j += 2) links.push({ source: nodes[m.links[j]], target: nodes[m.links[j + 1]], type: LINK_TYPES[m.types[j / 2]], weight: m.weights[j / 2] })
+      sim = new ForceSimulation(nodes, links, m.opts)
+      sim.alpha = m.alpha
+      sim.alphaTarget = m.alphaTarget
+      gen = m.gen
+      seq = m.seq
+      animate = m.animate !== false
+      const total = Math.log(sim.opts.alphaMin) / Math.log(1 - sim.opts.alphaDecay)
+      pace = Math.max(1, Math.ceil(total / ANIMATED_FRAMES))
+      schedule(0)
+    } else if (m.type === 'stop') {
+      cancel()
+      seq = m.seq
+      sim?.stop()
+    } else if (!sim || (m.gen !== undefined && m.gen !== gen)) {
+      // a command for a graph this worker no longer has
+    } else if (m.type === 'reheat') {
+      seq = m.seq
+      sim.reheat(m.alpha)
+      schedule(0)
+    } else if (m.type === 'target') {
+      seq = m.seq
+      sim.alphaTarget = m.value
+      schedule(0)
+    } else if (m.type === 'pin') {
+      const n = sim.nodes[m.i]
+      if (!n) return
+      n.fx = m.fx
+      n.fy = m.fy
+      if (m.fx != null) { n.x = m.fx; n.y = m.fy; n.vx = 0; n.vy = 0 }
+    } else if (m.type === 'opts') {
+      Object.assign(sim.opts, m.opts)
+    }
+  }
+}
+
+if (typeof DedicatedWorkerGlobalScope !== 'undefined' && globalThis instanceof DedicatedWorkerGlobalScope && globalThis.name === SIM_WORKER) {
+  startLayoutWorker(globalThis)
+}

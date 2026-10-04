@@ -9,10 +9,52 @@ import * as sounds from './bg/sounds.js'
 
 const MODULES = [highlights, history, tabs, ocr, sounds]
 export const CONTENT_FILES = ['content/core.js', 'content/extract.js', 'content/jargon.js', 'content/highlight.js', 'content/reader.js', 'content/ocr.js']
+const HUB_VIEWS = ['highlights', 'notes', 'graph', 'history', 'settings']
+const EXT_ORIGIN = chrome.runtime.getURL('')
+
+// ───────── trust boundary ─────────
+// Content scripts run inside web pages' renderer processes, so they're the least trusted part of the
+// extension. The API key (storage.local) is for extension pages and this worker only.
+chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' }).catch(() => {})
+
+/** True for messages from our own pages (side panel, hub, offscreen), false for content scripts. */
+const fromExtensionPage = sender => sender?.id === chrome.runtime.id && String(sender.url || '').startsWith(EXT_ORIGIN)
+/** The only messages a content script may send. The rest (SEND_TO_TAB, HL_ALL, HISTORY_*, TABS_*, SOUND_*…) need an extension page. */
+const CONTENT_MESSAGES = new Set(['MM_PAGE_CHANGED', 'OPEN_PANEL', 'OPEN_HUB', 'HL_LIST', 'HL_SAVE', 'HL_DELETE', 'OCR_CAPTURE', 'OCR_CANCEL', 'OCR_SAVE_NOTE'])
+
+// ───────── keep the worker alive while work is in flight ─────────
+// Chrome stops an idle extension service worker after ~30 s, and an open port or a pending fetch
+// doesn't count as activity: only extension API calls and events do. An AI task can easily stream
+// for longer than that while sending nothing back (schema tasks such as 'translate' or 'groupTabs'),
+// so tick a cheap extension API every 20 s while any message handler or AI port task is running.
+let inFlight = 0
+let ticker = 0
+const MAX_KEEPALIVE = 15 * 60e3 // never pin the worker forever on a handler that hangs
+function keepAlive(promise) {
+  if (inFlight++ === 0) ticker = setInterval(() => { chrome.runtime.getPlatformInfo().catch(() => {}) }, 20e3)
+  let released = false
+  const release = () => {
+    if (released) return
+    released = true
+    clearTimeout(cap)
+    if (--inFlight === 0) { clearInterval(ticker); ticker = 0 }
+  }
+  const cap = setTimeout(release, MAX_KEEPALIVE)
+  promise.then(release, release)
+  return promise
+}
 
 // ───────── message router ─────────
 const handlers = {
-  async OPEN_HUB({ view = 'highlights', params = '' }) {
+  async OPEN_HUB({ view = 'highlights', params = '' }, sender) {
+    if (!HUB_VIEWS.includes(view)) view = 'highlights'
+    params = String(params || '')
+    if (!fromExtensionPage(sender)) {
+      // A web page's content script may only point at a record (id) or a search (q).
+      const allowed = new URLSearchParams()
+      for (const [k, v] of new URLSearchParams(params)) if (k === 'id' || k === 'q') allowed.set(k, v.slice(0, 500))
+      params = allowed.toString()
+    }
     const url = chrome.runtime.getURL(`hub/index.html#${view}${params ? `?${params}` : ''}`)
     const [existing] = await chrome.tabs.query({ url: chrome.runtime.getURL('hub/index.html') + '*' })
     if (existing) {
@@ -34,8 +76,11 @@ for (const m of MODULES) Object.assign(handlers, m.handlers || {})
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   const fn = handlers[msg?.type]
   if (!fn) return false
-  Promise.resolve()
-    .then(() => fn(msg, sender))
+  if (!fromExtensionPage(sender) && !CONTENT_MESSAGES.has(msg.type)) {
+    reply({ ok: false, error: `${msg.type} is only available to Master Mind's own pages.` })
+    return false
+  }
+  keepAlive(Promise.resolve().then(() => fn(msg, sender)))
     .then(v => reply(v ?? { ok: true }), e => reply({ ok: false, error: String(e?.message || e) }))
   return true
 })
@@ -49,10 +94,10 @@ chrome.runtime.onConnect.addListener(port => {
   port.onMessage.addListener(async msg => {
     if (msg.type === 'stop') return ctrl.abort()
     try {
-      const result = await runTask(msg.task, msg.input, {
+      const result = await keepAlive(runTask(msg.task, msg.input, {
         signal: ctrl.signal,
         onText: text => { try { port.postMessage({ type: 'delta', text }) } catch { ctrl.abort() } },
-      })
+      }))
       port.postMessage({ type: 'done', result })
     } catch (e) {
       try { port.postMessage({ type: 'error', code: e.code || 'API', message: e.message }) } catch { /* port closed */ }
@@ -97,7 +142,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'mm-ask') {
     await chrome.sidePanel.open({ tabId: tab.id }).catch(() => {})
     // The panel picks this up on load (or live via storage.onChanged).
-    await chrome.storage.session.set({ pendingAsk: { question: `Explain this in context: "${info.selectionText}"`, tabId: tab.id, ts: Date.now() } })
+    // Addressed to this tab: only the panel following it answers (one panel per window).
+    await chrome.storage.session.set({ pendingAsk: { id: crypto.randomUUID(), question: `Explain this in context: "${info.selectionText}"`, tabId: tab.id, ts: Date.now() } })
   }
 })
 

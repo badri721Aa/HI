@@ -21,6 +21,7 @@
   const CTX = 48 // chars of surrounding text kept for re-anchoring
   const MAX_CHARS = 20000
   const RETRY_LIMIT = 15 // observer-driven re-anchor attempts per page
+  const RETRY_MAX_GAP = 20000 // longest wait between two of them (ms)
   const LOST_LIMIT = 8 // times we re-anchor highlights the page's own re-render removed
   const CHUNK = 150 // text nodes wrapped per task when a highlight spans many nodes
   const AMBER = '#FBBF24'
@@ -162,7 +163,7 @@
       pos += t.length
       ws = t.charCodeAt(t.length - 1) === 32
     }
-    return { root, text: parts.join(''), entries, blockOf }
+    return { root, text: parts.join(''), entries, blockOf, lower: undefined }
   }
 
   /** DOM offset of the character emitted at normalized position p within entry e, or -1. */
@@ -303,8 +304,9 @@
     let hits = find(T, q)
     let hay = T, pre = prefix, suf = suffix
     if (!hits.length) { // case differences (text-transform in source, edited capitalization)
-      const lower = T.toLowerCase()
-      if (lower.length === T.length) { hits = find(lower, q.toLowerCase()); hay = lower; pre = prefix.toLowerCase(); suf = suffix.toLowerCase() }
+      if (idx.lower === undefined) { const l = T.toLowerCase(); idx.lower = l.length === T.length ? l : null } // once per index
+      const lower = idx.lower
+      if (lower) { hits = find(lower, q.toLowerCase()); hay = lower; pre = prefix.toLowerCase(); suf = suffix.toLowerCase() }
     }
     if (!hits.length) return null
     let best = hits[0], bestScore = -1
@@ -397,7 +399,11 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
     quiet()
   }
 
-  /** Style, accessibility and the Quick-Note pin for a rendered highlight. */
+  /**
+   * Style, accessibility and the Quick-Note pin for a rendered highlight. Marks and pins sit in the page's own DOM,
+   * where the site's scripts can read every attribute, so their labels carry only what the page already has (its
+   * own text) plus the tag. Never the note: the pin's label is generic and the note shows only in our Shadow DOM.
+   */
   function decorate(it) {
     const tag = tagInfo(it.rec.tag)
     it.marks.forEach((m, i) => {
@@ -416,9 +422,9 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
         pin.dataset.mmPin = it.rec.id
         pin.tabIndex = 0
         pin.setAttribute('role', 'button')
+        pin.setAttribute('aria-label', 'Quick-Note. Press Enter to read it.')
         pin.style.cssText = PIN_CSS
       }
-      pin.setAttribute('aria-label', `Quick note: ${it.rec.note.slice(0, 80)}`)
       if (pin.previousSibling !== last) last.after(pin)
       it.pin = pin
     } else if (pin) { pin.remove(); it.pin = null }
@@ -426,10 +432,21 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
   }
 
   // ───────── state ─────────
+  let probes = null // lowercase quotes of the unresolved highlights, for mayAnchor(); rebuilt when the set changes
+  /** id → rec of highlights not (yet) found on the page. Any change drops the cached probes. */
+  class Unresolved extends Map {
+    set(k, v) { probes = null; return super.set(k, v) }
+    delete(k) { probes = null; return super.delete(k) }
+    clear() { probes = null; super.clear() }
+  }
   const items = new Map() // id → { rec, marks, pin }
-  const unresolved = new Map() // id → rec
+  const unresolved = new Unresolved()
   let gen = 0
-  let attempts = 0
+  let attempts = 0 // observer-driven re-anchor passes since the unresolved set last gained a highlight
+  let lastTry = 0 // when the last of those passes ran (they back off exponentially)
+  const tried = new Map() // id → quote of the unresolved highlights a full anchoring pass already missed on this page
+  let textDirty = false // page text that could complete an unresolved quote arrived since the last pass
+  let lostDirty = false // nodes were removed since the last check: some of our marks may be gone
   let lostBudget = LOST_LIMIT
   let seq = 0
   let chain = Promise.resolve()
@@ -440,6 +457,7 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
     const it = items.get(id)
     if (it) { unwrapMarks(it.marks); it.pin?.remove(); items.delete(id) }
     unresolved.delete(id)
+    tried.delete(id)
     if (pop.id === id) closePopover()
     if (noteCard.id === id) closeNote()
     ensureObserver()
@@ -449,6 +467,8 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
   /** Anchor every unresolved highlight against one index; wrap later ones first so earlier positions stay valid. */
   async function anchorPending(my) {
     if (!unresolved.size || !document.body) return 0
+    textDirty = false // the index below sees every change made so far
+    for (const [id, rec] of unresolved) tried.set(id, rec.text)
     let idx = buildIndex()
     const found = []
     for (const rec of unresolved.values()) {
@@ -468,6 +488,7 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
       const it = { rec: f.rec, marks, pin: null }
       items.set(f.rec.id, it)
       unresolved.delete(f.rec.id)
+      tried.delete(f.rec.id)
       decorate(it)
       placed++
     }
@@ -479,7 +500,7 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
   async function render(list, my) {
     const incoming = new Map(list.map(r => [r.id, r]))
     for (const id of [...items.keys()]) if (!incoming.has(id)) removeLocal(id)
-    for (const id of [...unresolved.keys()]) if (!incoming.has(id)) unresolved.delete(id)
+    for (const id of [...unresolved.keys()]) if (!incoming.has(id)) { unresolved.delete(id); tried.delete(id) }
     for (const [id, rec] of incoming) {
       const it = items.get(id)
       if (!it) { unresolved.set(id, rec); continue }
@@ -492,8 +513,14 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
         if (noteCard.id === id && !noteCard.dirty) renderNote()
       }
     }
-    attempts = 0
-    await anchorPending(my)
+    // A full pass only for highlights that haven't had one (first load, new or re-quoted ones). Refreshes that bring
+    // nothing new (a tag edit in another tab, a settings import) leave stale ones to the observer's backed-off retries.
+    if ([...unresolved].some(([id, rec]) => tried.get(id) !== rec.text)) {
+      attempts = 0
+      lastTry = 0
+      await anchorPending(my)
+    }
+    ensureObserver()
   }
 
   let ready = Promise.resolve()
@@ -512,34 +539,94 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
   }
 
   // ───────── late content / lost marks (throttled MutationObserver) ─────────
+  // Re-anchoring rebuilds the whole-document index, which costs real time on very long pages, so a retry runs only
+  // when the mutations brought text that could complete an unresolved quote (not a ticking clock or a counter),
+  // never while the tab is hidden, and with an exponential backoff (0.7 s, 1.4 s, 2.8 s … 20 s) up to RETRY_LIMIT.
+  // Checking for lost marks (the page re-rendered over them) is cheap and stays prompt.
   let observer = null
   let checkTimer = 0
+  let waitingVisible = false
   function quiet() { observer?.takeRecords() } // drop records caused by our own writes
   function ensureObserver() {
     const need = items.size > 0 || unresolved.size > 0
     if (need && !observer && document.body) {
-      observer = new MutationObserver(() => { if (!checkTimer) checkTimer = setTimeout(runCheck, 700) })
+      observer = new MutationObserver(onMutations)
       observer.observe(document.body, { childList: true, subtree: true, characterData: true })
-    } else if (!need && observer) { observer.disconnect(); observer = null; clearTimeout(checkTimer); checkTimer = 0 }
+    } else if (!need && observer) {
+      observer.disconnect(); observer = null; clearTimeout(checkTimer); checkTimer = 0
+      textDirty = lostDirty = false
+    }
   }
+  const schedule = ms => { if (!checkTimer) checkTimer = setTimeout(runCheck, ms) }
+  const backoff = () => Math.min(RETRY_MAX_GAP, 700 * 2 ** attempts)
+
+  /**
+   * Could `s`, text that just appeared on the page, complete one of the unresolved quotes? A new match has to
+   * overlap the new text, so the text holds the quote's first or last 3 characters, or the quote holds the text.
+   * (The only miss is an overlap shorter than 3 characters at the very edge of the new text.)
+   */
+  function mayAnchor(s) {
+    if (!s || !/\S/.test(s)) return false
+    probes ||= [...unresolved.values()].map(r => norm(r.text).toLowerCase()).filter(Boolean).map(q => ({ q, a: q.slice(0, 3), b: q.slice(-3) }))
+    const t = norm(s).toLowerCase()
+    return probes.some(p => t.includes(p.a) || t.includes(p.b) || p.q.includes(t))
+  }
+
+  function onMutations(records) {
+    for (const r of records) {
+      if (r.type === 'childList') {
+        if (r.removedNodes.length && items.size) lostDirty = true
+        if (textDirty || !unresolved.size || !r.addedNodes.length || MM.isOwn(r.target)) continue
+        for (const n of r.addedNodes) {
+          if (n.nodeType === 1 && (n.localName === 'mm-host' || n.hasAttribute('data-mm-host'))) continue
+          if ((n.nodeType === 1 || n.nodeType === 3) && mayAnchor(n.textContent)) { textDirty = true; break }
+        }
+      } else if (!textDirty && unresolved.size && !MM.isOwn(r.target) && mayAnchor(r.target.data)) textDirty = true
+    }
+    if (lostDirty || textDirty) schedule(700)
+  }
+
+  function whenVisible() {
+    if (waitingVisible) return
+    waitingVisible = true
+    const onVis = () => {
+      if (document.hidden) return
+      document.removeEventListener('visibilitychange', onVis)
+      waitingVisible = false
+      schedule(700)
+    }
+    document.addEventListener('visibilitychange', onVis)
+  }
+
   function runCheck() {
     checkTimer = 0
     if (!MM.alive()) { observer?.disconnect(); observer = null; return }
     const my = gen
     exclusive(async () => {
-      if (my !== gen) return
-      let lost = 0
-      for (const [id, it] of [...items]) {
-        if (it.marks.every(m => m.isConnected)) continue
-        unwrapMarks(it.marks.filter(m => m.isConnected))
-        it.pin?.remove()
-        items.delete(id)
-        unresolved.set(id, it.rec)
-        lost++
+      if (my !== gen) { if (lostDirty || textDirty) schedule(700); return } // a restore ran meanwhile: check again after it
+      if (lostDirty) {
+        lostDirty = false
+        let lost = 0
+        for (const [id, it] of [...items]) {
+          if (it.marks.every(m => m.isConnected)) continue
+          unwrapMarks(it.marks.filter(m => m.isConnected))
+          it.pin?.remove()
+          items.delete(id)
+          unresolved.set(id, it.rec)
+          lost++
+        }
+        // The page re-rendered over our marks and its text is likely back: re-anchor (right away, within a budget).
+        if (lost) {
+          textDirty = true
+          if (lostBudget > 0) { lostBudget--; attempts = Math.min(attempts, RETRY_LIMIT - 3); lastTry = 0 }
+        }
       }
-      if (lost && lostBudget > 0) { lostBudget--; attempts = Math.min(attempts, RETRY_LIMIT - 3) }
-      if (unresolved.size && attempts < RETRY_LIMIT) {
+      if (unresolved.size && textDirty && attempts < RETRY_LIMIT) {
+        if (document.hidden) return whenVisible()
+        const wait = lastTry + backoff() - Date.now()
+        if (wait > 0) return schedule(wait)
         attempts++
+        lastTry = Date.now()
         const run = () => anchorPending(my)
         if (globalThis.requestIdleCallback) await new Promise(r => requestIdleCallback(() => run().then(r, r), { timeout: 1200 }))
         else await run()
@@ -593,10 +680,15 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
       items.set(saved.id, it)
       decorate(it)
       ensureObserver()
+      if (res.incognito && !incognitoHinted) { // kept in memory by the background, never written to disk
+        incognitoHinted = true
+        MM.toast('Incognito: highlights made here are kept only until you close Incognito.', 4200)
+      }
       return { ok: true, id: saved.id }
     })
   }
   function fail(msg) { MM.toast(msg); return { ok: false, error: msg } }
+  let incognitoHinted = false
 
   async function saveFields(id, patch) {
     const it = items.get(id)
@@ -632,15 +724,18 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
     await chain
     let it = items.get(id)
     let relisted = false
+    let searched = false
     const deadline = Date.now() + 5000
     while (!it && Date.now() < deadline) {
       if (!unresolved.has(id)) {
         if (relisted) break // not a highlight of this page (deleted, or another URL)
         relisted = true
+        searched = true // the restore searched for it (a newly listed highlight gets a full pass)
         await restore().catch(() => 0)
-      } else {
+      } else if (!searched || textDirty) { // once now, then again only when new text arrives (late content)
+        searched = true
         const my = gen
-        await exclusive(() => anchorPending(my)) // late content may have arrived since the last pass
+        await exclusive(() => anchorPending(my))
       }
       it = items.get(id)
       if (!it && unresolved.has(id)) await sleep(400)
@@ -672,9 +767,10 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
   .it.tool{background:rgba(32,37,54,.96);color:var(--c);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 0 12px color-mix(in srgb,var(--c) 22%,transparent)}
   .it.tool:hover,.it.tool.on{box-shadow:inset 0 0 0 1.5px var(--c),0 0 20px color-mix(in srgb,var(--c) 55%,transparent)}
   .it:focus-visible,.core:focus-visible{outline:2px solid #fff;outline-offset:3px;border-radius:50%}
-  .cap{position:absolute;left:0;transform:translateX(-50%);display:flex;align-items:center;gap:7px;white-space:nowrap;padding:7px 12px;border-radius:999px;background:rgba(18,21,31,.94);border:1px solid var(--mm-border-strong,rgba(255,255,255,.16));color:var(--mm-fg,#ECEFF7);font:600 12px/1 var(--mm-font);box-shadow:0 10px 30px rgba(0,0,0,.45);opacity:0;transition:opacity .2s ease .06s;pointer-events:none}
+  .cap{position:absolute;left:0;transform:translateX(-50%);display:flex;align-items:center;gap:7px;white-space:nowrap;max-width:calc(100vw - 16px);box-sizing:border-box;padding:7px 12px;border-radius:999px;background:rgba(18,21,31,.94);border:1px solid var(--mm-border-strong,rgba(255,255,255,.16));color:var(--mm-fg,#ECEFF7);font:600 12px/1 var(--mm-font);box-shadow:0 10px 30px rgba(0,0,0,.45);opacity:0;transition:opacity .2s ease .06s;pointer-events:none}
   .ring.open .cap{opacity:1}
-  .cap .d{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+  .cap .d{flex:none;width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+  .cap .n{min-width:0;overflow:hidden;text-overflow:ellipsis}
   .cap .k{color:var(--mm-muted,#7D8498);font-weight:500}
   .cap kbd{font:600 10px/1 var(--mm-mono);padding:2px 5px;border-radius:5px;border:1px solid var(--mm-border-strong,rgba(255,255,255,.16));color:var(--mm-fg-2,#B6BCCC);background:rgba(255,255,255,.04)}
   .panel{position:fixed;width:304px;max-width:calc(100vw - 24px);padding:12px;border-radius:14px;display:flex;flex-direction:column;gap:10px;background:rgba(18,21,31,.92);border:1px solid var(--mm-border-strong,rgba(255,255,255,.16));-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 30px rgba(251,191,36,.08);animation:pin .18s cubic-bezier(.2,.8,.2,1)}
@@ -751,9 +847,25 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
     // Keep the page selection: clicks inside the menu must not move focus or collapse it.
     ring.addEventListener('mousedown', e => e.preventDefault())
     layer.replaceChildren(ring)
-    Object.assign(menu, { open: true, mode: 'ring', range: range.cloneRange(), text: range.toString(), els, defs, active: -1, prevFocus: document.activeElement, openedAt: Date.now(), x: anchor.x, top: anchor.top, bottom: anchor.bottom, ring, cap, layer })
+    Object.assign(menu, { open: true, mode: 'ring', range: range.cloneRange(), text: range.toString(), els, defs, active: -1, prevFocus: document.activeElement, openedAt: Date.now(), x: anchor.x, top: anchor.top, bottom: anchor.bottom, ring, cap, layer, cx, cy, R })
     setActive(-1, false)
+    capObserver?.disconnect()
+    capObserver?.observe(cap) // its width changes with the hovered item's label, and once our font has loaded
     requestAnimationFrame(() => requestAnimationFrame(() => ring.classList.add('open')))
+  }
+
+  const capObserver = globalThis.ResizeObserver ? new ResizeObserver(() => positionCap()) : null
+  /** The caption pill is centered under the ring, which can sit near an edge: keep the pill 8px inside the viewport. */
+  function positionCap() {
+    const { cap, cx, cy, R } = menu
+    if (!cap?.isConnected) return
+    const vw = document.documentElement.clientWidth || innerWidth
+    const vh = document.documentElement.clientHeight || innerHeight
+    const M = 8
+    const w = cap.offsetWidth, ht = cap.offsetHeight
+    const left = Math.min(Math.max(cx - w / 2, M), Math.max(M, vw - M - w))
+    cap.style.left = `${Math.round(left + w / 2 - cx)}px` // relative to the ring's center (the pill is translateX(-50%))
+    cap.style.top = `${Math.round(Math.max(M - cy, Math.min(R + 31, vh - M - ht - cy)))}px`
   }
 
   function setActive(i, focus) {
@@ -763,10 +875,11 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
     if (!cap) return
     const d = menu.defs[i]
     if (d) {
-      cap.replaceChildren(h('span', { class: 'd', style: `--c:${d.color}` }), h('span', { text: d.kind === 'tag' ? d.label : d.label }))
+      cap.replaceChildren(h('span', { class: 'd', style: `--c:${d.color}` }), h('span', { class: 'n', text: d.label }))
     } else {
       cap.replaceChildren(h('span', { text: 'Highlight' }), h('span', { class: 'k', text: '·' }), h('kbd', { text: 'Tab' }), h('kbd', { text: '←→' }), h('kbd', { text: 'Esc' }))
     }
+    positionCap()
     if (focus && menu.els[i]) menu.els[i].focus({ preventScroll: true })
   }
 
@@ -774,6 +887,7 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
     if (!menu.open) return
     const wasFocusInside = menu.layer && menu.layer.getRootNode().activeElement
     clearPending()
+    capObserver?.disconnect()
     menu.open = false
     menu.mode = ''
     menu.layer?.replaceChildren()
@@ -901,6 +1015,8 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
   .pop,.nc{position:fixed;max-width:calc(100vw - 24px);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);animation:cin .18s cubic-bezier(.2,.8,.2,1)}
   @keyframes cin{from{opacity:0;transform:translateY(5px) scale(.98)}}
   .pop{width:304px;padding:12px;border-radius:14px;display:flex;flex-direction:column;gap:11px;background:rgba(18,21,31,.93);border:1px solid var(--mm-border-strong,rgba(255,255,255,.16));box-shadow:0 18px 50px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05),0 0 26px color-mix(in srgb,var(--c) 14%,transparent)}
+  .pop:focus{outline:none}
+  .pop:focus-visible{outline:2px solid var(--c);outline-offset:2px}
   .hd{display:flex;align-items:center;gap:8px;min-width:0}
   .hd .d{width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c);flex:none}
   .hd b{color:var(--mm-heading,#F7F8FC);font:700 13px/1.2 var(--mm-font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -936,9 +1052,37 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
   .undo{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:7px 7px 7px 14px;border-radius:12px;background:rgba(26,30,44,.94);border:1px solid var(--mm-border-strong,rgba(255,255,255,.16));-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 10px 40px rgba(0,0,0,.45);font:600 13px/1.2 var(--mm-font);color:var(--mm-fg,#ECEFF7);animation:uin .2s cubic-bezier(.2,.8,.2,1)}
   @keyframes uin{from{opacity:0;transform:translate(-50%,6px)}}`
 
-  const pop = { id: null, el: null, anchor: null, rectIndex: 0, byKeyboard: false, timer: 0, dirty: false, editing: false }
+  const pop = { id: null, el: null, anchor: null, rectIndex: 0, timer: 0, dirty: false, editing: false }
 
   function markRects(el) { return [...el.getClientRects()].filter(r => r.width || r.height) }
+
+  /** Focusable controls of a card, in tab order. */
+  const tabbables = el => [...el.querySelectorAll('button:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x => x.getClientRects().length)
+
+  /**
+   * Our cards (the highlight popover, the Quick-Note card) are non-modal dialogs whose host sits at the end of
+   * <body>, far from the mark or pin they belong to. To keep keyboard and screen-reader users in their place, they
+   * behave as if they followed that element in the reading order: Shift+Tab before the first control goes back to
+   * it, and Tab past the last control closes the card and continues from it to whatever comes next on the page.
+   * `leave()` closes the card and focuses that element; for Tab the browser's default move then starts from it.
+   */
+  function tabOut(e, el, leave) {
+    if (e.key !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return
+    const list = tabbables(el)
+    const active = el.getRootNode().activeElement
+    if (e.shiftKey ? active === el || active === list[0] : active === list[list.length - 1]) {
+      if (e.shiftKey) e.preventDefault()
+      leave()
+    }
+  }
+
+  /** Move focus into the open popover: the current tag for keyboard / screen-reader use, the dialog itself for a pointer. */
+  function focusPopover(onTag) {
+    const el = pop.el
+    if (!el) return
+    const target = onTag ? el.querySelector('.dot[aria-pressed="true"]') || tabbables(el)[0] || el : el
+    target.focus({ preventScroll: true })
+  }
 
   function openPopover(id, markEl, { byKeyboard = false, point = null } = {}) {
     const it = items.get(id)
@@ -952,9 +1096,9 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
       let bestD = Infinity
       rects.forEach((r, i) => { const d = Math.abs((r.top + r.bottom) / 2 - point.y) + (point.x < r.left ? r.left - point.x : point.x > r.right ? point.x - r.right : 0); if (d < bestD) { bestD = d; ri = i } })
     }
-    Object.assign(pop, { id, anchor: markEl, rectIndex: ri, byKeyboard, dirty: false, editing: !!it.rec.note })
+    Object.assign(pop, { id, anchor: markEl, rectIndex: ri, dirty: false, editing: !!it.rec.note })
     renderPopover()
-    if (byKeyboard) pop.el?.querySelector('.dot[aria-pressed="true"]')?.focus({ preventScroll: true })
+    focusPopover(byKeyboard)
   }
 
   function renderPopover() {
@@ -965,9 +1109,12 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
     const tag = tagInfo(rec.tag)
     const prevTa = pop.el?.querySelector('.ta')
     const keepDraft = pop.dirty && prevTa ? prevTa.value : null
-    const hadFocus = pop.el && layer.getRootNode().activeElement && pop.el.contains(layer.getRootNode().activeElement) ? layer.getRootNode().activeElement.className : ''
+    // Re-rendering replaces the card: keep focus on the same control (or at least inside the dialog).
+    const active = layer.getRootNode().activeElement
+    const hadFocus = !active || !pop.el?.contains(active) ? null
+      : active === pop.el ? 'self' : active.classList.contains('dot') ? 'dot' : active.classList.contains('ta') ? 'ta' : active.dataset.k || 'self'
 
-    const close = h('button', { type: 'button', class: 'x', 'aria-label': 'Close', html: ICON.close })
+    const close = h('button', { type: 'button', class: 'x', 'aria-label': 'Close', 'data-k': 'close', html: ICON.close })
     close.addEventListener('click', () => closePopover(true))
     const dots = h('div', { class: 'dots', role: 'group', 'aria-label': 'Change tag' })
     for (const t of getTags()) {
@@ -998,38 +1145,37 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
       requestAnimationFrame(() => autosize(ta))
     } else {
       pop.commit = null
-      const add = h('button', { type: 'button', class: 'mm-btn ghost sm add', html: ICON.plus })
+      const add = h('button', { type: 'button', class: 'mm-btn ghost sm add', 'data-k': 'add', html: ICON.plus })
       add.append('Add a note')
       add.addEventListener('click', () => { pop.editing = true; renderPopover(); pop.el?.querySelector('.ta')?.focus() })
       noteBox = add
     }
-    const copy = h('button', { type: 'button', class: 'mm-btn sm act', html: ICON.copy })
+    const copy = h('button', { type: 'button', class: 'mm-btn sm act', 'data-k': 'copy', html: ICON.copy })
     copy.append('Copy')
     copy.addEventListener('click', async () => { const ok = await copyText(rec.text, layer); MM.toast(ok ? 'Copied to clipboard' : 'Couldn’t copy the text.') })
-    const hub = h('button', { type: 'button', class: 'mm-btn ghost sm act', title: 'Open in the Knowledge Hub', html: ICON.hub })
+    const hub = h('button', { type: 'button', class: 'mm-btn ghost sm act', 'data-k': 'hub', title: 'Open in the Knowledge Hub', html: ICON.hub })
     hub.append('Hub')
-    hub.addEventListener('click', () => { MM.send('OPEN_HUB', { view: 'highlights', params: `id=${encodeURIComponent(rec.id)}` }); closePopover() })
-    const del = h('button', { type: 'button', class: 'mm-btn danger sm act', html: ICON.trash })
+    hub.addEventListener('click', () => { MM.send('OPEN_HUB', { view: 'highlights', params: `id=${encodeURIComponent(rec.id)}` }); closePopover(true) })
+    const del = h('button', { type: 'button', class: 'mm-btn danger sm act', 'data-k': 'del', html: ICON.trash })
     del.append('Delete')
-    del.addEventListener('click', async () => { const id = rec.id; const kb = pop.byKeyboard; const anchorNext = pop.anchor; closePopover(); await deleteHighlight(id); if (kb && anchorNext && !anchorNext.isConnected) document.body?.focus?.() })
+    // Focus goes back to the mark before it's unwrapped, so the next Tab continues from where the highlight was.
+    del.addEventListener('click', () => { const id = rec.id; closePopover(true); deleteHighlight(id).catch(() => {}) })
 
-    const el = h('div', { class: 'pop', role: 'dialog', 'aria-label': `Highlight options: ${tag.name}`, style: `--c:${tag.color}` },
+    const el = h('div', { class: 'pop', role: 'dialog', tabindex: '-1', 'aria-label': `Highlight options: ${tag.name}`, style: `--c:${tag.color}` },
       h('div', { class: 'hd' }, h('span', { class: 'd' }), h('b', { text: tag.name }), h('span', { class: 'when', text: `· ${timeAgo(rec.created)}` }), h('span', { class: 'sp' }), close),
       dots, noteBox,
       h('div', { class: 'acts' }, copy, hub, h('span', { class: 'sp' }), del))
     el.addEventListener('keydown', e => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); (pop.commit ? pop.commit() : Promise.resolve()).then(() => closePopover(true)) }
-    })
-    el.addEventListener('focusout', e => {
-      if (pop.byKeyboard && e.relatedTarget && !el.contains(e.relatedTarget)) closePopover()
+      else tabOut(e, el, () => closePopover(true))
     })
     if (pop.el?.isConnected) pop.el.replaceWith(el)
     else layer.append(el)
     pop.el = el
     positionPopover()
     if (hadFocus) {
-      const sel = hadFocus.includes('ta') ? '.ta' : hadFocus.includes('dot') ? '.dot[aria-pressed="true"]' : null
-      if (sel) el.querySelector(sel)?.focus({ preventScroll: true })
+      const sel = hadFocus === 'self' ? null : hadFocus === 'dot' ? '.dot[aria-pressed="true"]' : hadFocus === 'ta' ? '.ta' : `[data-k="${hadFocus}"]`
+      ;((sel && el.querySelector(sel)) || el).focus({ preventScroll: true })
     }
   }
 
@@ -1124,7 +1270,10 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
       h('div', { class: 'nf' }, status, h('span', {}, h('kbd', { text: 'Ctrl' }), ' ', h('kbd', { text: 'Enter' }))))
     el.addEventListener('mouseenter', () => clearTimeout(noteCard.hideTimer))
     el.addEventListener('mouseleave', scheduleNoteHide)
-    el.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); save(); closeNote(false, true) } })
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); save(); closeNote(false, true) }
+      else tabOut(e, el, () => closeNote(false, true))
+    })
     if (noteCard.el?.isConnected) noteCard.el.replaceWith(el)
     else layer.append(el)
     noteCard.el = el
@@ -1213,7 +1362,16 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
     const sel = getSelection()
     if (sel && !sel.isCollapsed && norm(sel.toString())) return // the user was selecting, not clicking
     if (mark.closest('a[href],button,[role="button"]:not(mm-mark),label,summary')) return // let links and controls work
-    openPopover(mark.dataset.mmHl, mark, { point: { x: e.clientX, y: e.clientY } })
+    // detail 0: activated without a pointer (keyboard, or a screen reader's click), so focus lands on a control.
+    openPopover(mark.dataset.mmHl, mark, { point: { x: e.clientX, y: e.clientY }, byKeyboard: e.detail === 0 })
+  }
+
+  /** Focus moving anywhere outside the popover and its mark (Shift+Tab, a page script, an iframe) closes it. */
+  function onFocusIn(e) {
+    if (!pop.el || !e.isTrusted) return
+    const t = e.target
+    if (MM.isOwn(t) || (t?.localName === 'mm-mark' && t.dataset.mmHl === pop.id)) return
+    closePopover()
   }
 
   function onKeyDown(e) {
@@ -1239,6 +1397,11 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
     if ((e.key === 'Enter' || e.key === ' ') && !e.ctrlKey && !e.altKey && !e.metaKey) {
       if (t?.localName === 'mm-pin' && t.dataset.mmPin) { e.preventDefault(); openNote(t, { pinned: true, focus: true }); return }
       if (t?.localName === 'mm-mark' && t.dataset.mmHl && items.has(t.dataset.mmHl)) { e.preventDefault(); openPopover(t.dataset.mmHl, t, { byKeyboard: true }); return }
+    }
+    // An open popover sits right after its mark in the reading order: Tab from the mark goes into it.
+    if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && pop.el && !MM.isOwn(t)) {
+      const ae = document.activeElement
+      if (!ae || ae === document.body || (ae.localName === 'mm-mark' && ae.dataset.mmHl === pop.id)) { e.preventDefault(); focusPopover(true); return }
     }
     if (e.key === 'Escape') {
       if (pop.el) { e.preventDefault(); closePopover(true) }
@@ -1284,6 +1447,7 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
   addEventListener('mousedown', onMouseDown, true)
   addEventListener('click', onClick, true)
   addEventListener('keydown', onKeyDown, true)
+  document.addEventListener('focusin', onFocusIn, true)
   document.addEventListener('mouseover', onOver, { passive: true })
   document.addEventListener('mouseout', onOut, { passive: true })
   addEventListener('scroll', onScroll, { capture: true, passive: true })
@@ -1333,7 +1497,9 @@ mm-pin[data-mm-pin]:hover,mm-pin[data-mm-pin]:focus-visible{filter:brightness(1.
       for (const it of items.values()) { unwrapMarks(it.marks); it.pin?.remove() }
       items.clear()
       unresolved.clear()
+      tried.clear()
       attempts = 0
+      lastTry = 0
       lostBudget = LOST_LIMIT
       ensureObserver()
     })

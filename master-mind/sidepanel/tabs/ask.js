@@ -114,7 +114,16 @@ const CSS = `
 .ask-send.stop { background: color-mix(in srgb, var(--mm-red) 16%, transparent); color: var(--mm-red); border-color: color-mix(in srgb, var(--mm-red) 45%, transparent); box-shadow: 0 0 16px color-mix(in srgb, var(--mm-red) 22%, transparent); }
 .ask-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; min-height: 22px; font-size: 11px; color: var(--mm-muted); }
 .ask-foot kbd { font-size: 10px; padding: 0 5px; }
-.ask-foot .mm-btn { padding: 4px 8px; font-size: 11.5px; }
+/* The hint is two unbreakable segments on a single clipped row, so it never wraps into an orphan
+   whatever the panel width, zoom or font. Flow order puts "Shift+Enter new line" first (order:-1)
+   and row-reverse paints it on the right, so the visual order still reads "Enter to send · Shift+Enter
+   new line". When both don't fit (e.g. ~320px with "New chat" shown), "Enter to send" wraps onto the
+   second flex line, which the fixed height clips away. It stays in the DOM, so the textarea's
+   aria-describedby still reads both shortcuts. */
+.ask-hint { flex: 1 1 auto; min-width: 0; height: 20px; overflow: hidden; display: flex; flex-flow: row-reverse wrap; justify-content: flex-end; align-items: center; column-gap: .45em; }
+.ask-hint-seg { flex: 0 1 auto; min-width: 0; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask-hint-line { order: -1; }
+.ask-foot .mm-btn { flex: none; padding: 4px 8px; font-size: 11.5px; }
 .ask-foot .mm-btn svg { width: 13px; height: 13px; }
 @media (prefers-reduced-motion: reduce) { .ask-sugg:hover, .ask-sugg:hover .go { transform: none; } }
 `
@@ -276,7 +285,12 @@ export function mount(root, ctx) {
   const foot = h('div', 'ask-foot')
   const hint = h('span', 'ask-hint')
   hint.id = 'ask-hint'
-  hint.append(h('kbd', null, 'Enter'), ' to send · ', h('kbd', null, 'Shift'), '+', h('kbd', null, 'Enter'), ' new line')
+  // Two atomic segments; when the foot is tight only the less obvious Shift+Enter one stays visible (see .ask-hint CSS).
+  const sendSeg = h('span', 'ask-hint-seg ask-hint-send')
+  sendSeg.append(h('kbd', null, 'Enter'), ' to send · ')
+  const lineSeg = h('span', 'ask-hint-seg ask-hint-line')
+  lineSeg.append(h('kbd', null, 'Shift'), '+', h('kbd', null, 'Enter'), ' new line')
+  hint.append(sendSeg, lineSeg)
   const clearBtn = button('mm-btn ghost sm', 'plus', 'New chat', { title: 'Clear this conversation' })
   foot.append(hint, clearBtn)
   dock.append(chipRow, form, foot)

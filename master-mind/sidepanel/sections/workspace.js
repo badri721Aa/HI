@@ -21,46 +21,48 @@ const ICONS = {
   chevron: ['M6 9l6 6 6-6'],
 }
 
+// Everything here is namespaced `bw-*` (style id `mm-bw-style`): the Notes editor (lib/workspace.js) owns `.ws-*` and
+// `#mm-ws-style` in this same document, and sharing either would leave one of the two UIs unstyled or restyled.
 const STYLE = `
-.ws{display:flex;flex-direction:column;gap:12px}
-.ws-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.ws-head h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mm-fg-2)}
-.ws-block{display:flex;flex-direction:column;gap:10px}
-.ws-sub{display:flex;align-items:flex-start;gap:10px}
-.ws-sub .ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;color:var(--c,var(--mm-accent));
+.bw{display:flex;flex-direction:column;gap:12px}
+.bw-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.bw-head h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mm-fg-2)}
+.bw-block{display:flex;flex-direction:column;gap:10px}
+.bw-sub{display:flex;align-items:flex-start;gap:10px}
+.bw-sub .ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;color:var(--c,var(--mm-accent));
   background:color-mix(in srgb,var(--c,var(--mm-accent)) 11%,transparent);border:1px solid color-mix(in srgb,var(--c,var(--mm-accent)) 26%,transparent)}
-.ws-sub .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.ws-sub h3{font-size:13.5px}
-.ws-sub p{margin:0;line-height:1.45}
-.ws-actions{display:flex;gap:8px;flex-wrap:wrap}
-.ws-actions .grow{flex:1 1 auto}
-.ws-actions .mm-btn{padding:9px 12px}
-.ws-meta{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mm-muted);min-height:16px}
-.ws-meta b{color:var(--mm-fg-2);font-weight:650;font-variant-numeric:tabular-nums}
-.ws-groups{list-style:none;margin:0;padding:4px;display:flex;flex-direction:column;gap:2px;border-radius:12px;background:rgba(0,0,0,.22);border:1px solid var(--mm-border)}
-.ws-groups:empty{display:none}
-.ws-group{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 10px;border-radius:9px;transition:background .15s}
-.ws-group:hover{background:rgba(255,255,255,.04)}
-.ws-group .mm-dot{width:9px;height:9px}
-.ws-group .name{flex:1;min-width:0;font-weight:600;font-size:13px;color:var(--mm-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ws-group .name.unnamed{color:var(--mm-muted);font-style:italic;font-weight:500}
-.ws-group .count{font:600 11px/1 var(--mm-mono);color:var(--mm-fg-2);padding:4px 7px;border-radius:99px;background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);white-space:nowrap}
-.ws-group .mm-btn.icon svg{transition:transform .2s var(--mm-ease)}
-.ws-group .mm-btn[aria-expanded="false"] svg{transform:rotate(-90deg)}
-.ws-group[data-collapsed="true"] .name{color:var(--mm-fg-2)}
-.ws-status{font-size:12.5px;color:var(--mm-fg-2);display:flex;align-items:center;gap:8px}
-.ws-status:empty{display:none}
-.ws-status .mm-icon{width:14px;height:14px;color:var(--mm-lime)}
-.ws-skel{display:flex;flex-direction:column;gap:7px;padding:8px 10px;border-radius:12px;border:1px solid var(--mm-border)}
-.ws-skel .mm-skeleton{height:12px}
-.ws-msg:empty{display:none}
-.ws .mm-btn[aria-busy="true"]:disabled{opacity:.92;cursor:progress}
-.ws .mm-btn.primary .mm-spinner{border-color:rgba(6,8,13,.22);border-top-color:#06080D}
-.ws .mm-divider{margin:2px 0}
-.ws-key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
-.ws-note{font-size:12px;color:var(--mm-muted);padding:8px 10px;border-radius:var(--mm-radius-sm);border:1px dashed var(--mm-border-strong)}
-.ws-hub{display:flex;align-items:center;gap:10px}
-.ws-hub .txt{flex:1;min-width:0}
+.bw-sub .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.bw-sub h3{font-size:13.5px}
+.bw-sub p{margin:0;line-height:1.45}
+.bw-actions{display:flex;gap:8px;flex-wrap:wrap}
+.bw-actions .grow{flex:1 1 auto}
+.bw-actions .mm-btn{padding:9px 12px}
+.bw-meta{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mm-muted);min-height:16px}
+.bw-meta b{color:var(--mm-fg-2);font-weight:650;font-variant-numeric:tabular-nums}
+.bw-groups{list-style:none;margin:0;padding:4px;display:flex;flex-direction:column;gap:2px;border-radius:12px;background:rgba(0,0,0,.22);border:1px solid var(--mm-border)}
+.bw-groups:empty{display:none}
+.bw-group{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 10px;border-radius:9px;transition:background .15s}
+.bw-group:hover{background:rgba(255,255,255,.04)}
+.bw-group .mm-dot{width:9px;height:9px}
+.bw-group .name{flex:1;min-width:0;font-weight:600;font-size:13px;color:var(--mm-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bw-group .name.unnamed{color:var(--mm-muted);font-style:italic;font-weight:500}
+.bw-group .count{font:600 11px/1 var(--mm-mono);color:var(--mm-fg-2);padding:4px 7px;border-radius:99px;background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);white-space:nowrap}
+.bw-group .mm-btn.icon svg{transition:transform .2s var(--mm-ease)}
+.bw-group .mm-btn[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.bw-group[data-collapsed="true"] .name{color:var(--mm-fg-2)}
+.bw-status{font-size:12.5px;color:var(--mm-fg-2);display:flex;align-items:center;gap:8px}
+.bw-status:empty{display:none}
+.bw-status .mm-icon{width:14px;height:14px;color:var(--mm-lime)}
+.bw-skel{display:flex;flex-direction:column;gap:7px;padding:8px 10px;border-radius:12px;border:1px solid var(--mm-border)}
+.bw-skel .mm-skeleton{height:12px}
+.bw-msg:empty{display:none}
+.bw .mm-btn[aria-busy="true"]:disabled{opacity:.92;cursor:progress}
+.bw .mm-btn.primary .mm-spinner{border-color:rgba(6,8,13,.22);border-top-color:#06080D}
+.bw .mm-divider{margin:2px 0}
+.bw-key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.bw-note{font-size:12px;color:var(--mm-muted);padding:8px 10px;border-radius:var(--mm-radius-sm);border:1px dashed var(--mm-border-strong)}
+.bw-hub{display:flex;align-items:center;gap:10px}
+.bw-hub .txt{flex:1;min-width:0}
 `
 
 function h(tag, props = {}, ...kids) {
@@ -99,9 +101,9 @@ function friendly(e) {
 }
 
 export function mount(root, ctx) {
-  if (!document.getElementById('mm-ws-style')) document.head.appendChild(h('style', { id: 'mm-ws-style' }, STYLE))
-  root.classList.add('ws')
-  root.setAttribute('aria-labelledby', 'ws-title')
+  if (!document.getElementById('mm-bw-style')) document.head.appendChild(h('style', { id: 'mm-bw-style' }, STYLE))
+  root.classList.add('bw')
+  root.setAttribute('aria-labelledby', 'bw-title')
 
   let alive = true
   let grouping = false
@@ -112,9 +114,9 @@ export function mount(root, ctx) {
   const countEl = h('span', {}, 'Checking this window…')
   const groupLabel = h('span', {}, 'Group my tabs')
   const groupIcon = h('span', { style: 'display:contents' }, icon('sparkle'))
-  const groupBtn = h('button', { type: 'button', class: 'mm-btn primary grow', 'aria-describedby': 'ws-count' }, groupIcon, groupLabel)
+  const groupBtn = h('button', { type: 'button', class: 'mm-btn primary grow', 'aria-describedby': 'bw-count' }, groupIcon, groupLabel)
   const ungroupBtn = h('button', { type: 'button', class: 'mm-btn', disabled: true }, icon('ungroup'), 'Ungroup all')
-  const status = h('div', { class: 'ws-status', role: 'status', 'aria-live': 'polite' })
+  const status = h('div', { class: 'bw-status', role: 'status', 'aria-live': 'polite' })
   let statusTimer = 0
   /** Show the outcome of the last action for a while, then get out of the way. */
   function setStatus(...kids) {
@@ -122,46 +124,46 @@ export function mount(root, ctx) {
     clearTimeout(statusTimer)
     if (kids.length) statusTimer = setTimeout(() => status.replaceChildren(), 9000)
   }
-  const list = h('ul', { class: 'ws-groups', 'aria-label': 'Tab groups in this window' })
-  const groupMsg = h('div', { class: 'ws-msg' })
-  const skeleton = h('div', { class: 'ws-skel', hidden: true, 'aria-hidden': 'true' },
+  const list = h('ul', { class: 'bw-groups', 'aria-label': 'Tab groups in this window' })
+  const groupMsg = h('div', { class: 'bw-msg' })
+  const skeleton = h('div', { class: 'bw-skel', hidden: true, 'aria-hidden': 'true' },
     h('div', { class: 'mm-skeleton', style: 'width:70%' }), h('div', { class: 'mm-skeleton', style: 'width:52%' }), h('div', { class: 'mm-skeleton', style: 'width:61%' }))
 
-  const groupingBlock = h('div', { class: 'ws-block' },
-    h('div', { class: 'ws-sub', style: '--c:var(--mm-violet)' },
+  const groupingBlock = h('div', { class: 'bw-block' },
+    h('div', { class: 'bw-sub', style: '--c:var(--mm-violet)' },
       h('span', { class: 'ico' }, icon('group')),
       h('div', { class: 'txt' },
         h('h3', {}, 'Smart Tab Grouping'),
         h('p', { class: 'mm-muted mm-small' }, 'Claude sorts this window’s ungrouped tabs into colored groups by topic.'))),
-    h('div', { class: 'ws-actions' }, groupBtn, ungroupBtn),
-    h('div', { class: 'ws-meta', id: 'ws-count' }, countEl),
+    h('div', { class: 'bw-actions' }, groupBtn, ungroupBtn),
+    h('div', { class: 'bw-meta', id: 'bw-count' }, countEl),
     status, groupMsg, skeleton, list)
 
   // ───────── Capture text ─────────
   const ocrBtn = h('button', { type: 'button', class: 'mm-btn grow', 'aria-keyshortcuts': 'Alt+Shift+O' }, icon('scan'), 'Capture text from screen')
-  const ocrNote = h('div', { class: 'ws-note', hidden: true })
-  const ocrMsg = h('div', { class: 'ws-msg' })
-  const ocrBlock = h('div', { class: 'ws-block' },
-    h('div', { class: 'ws-sub', style: '--c:var(--mm-cyan)' },
+  const ocrNote = h('div', { class: 'bw-note', hidden: true })
+  const ocrMsg = h('div', { class: 'bw-msg' })
+  const ocrBlock = h('div', { class: 'bw-block' },
+    h('div', { class: 'bw-sub', style: '--c:var(--mm-cyan)' },
       h('span', { class: 'ico' }, icon('scan')),
       h('div', { class: 'txt' },
         h('h3', {}, 'Screen text capture'),
         h('p', { class: 'mm-muted mm-small' }, 'Drag over any part of the page (images, charts, video frames, canvas) and Claude transcribes the text.'))),
-    h('div', { class: 'ws-actions' }, ocrBtn),
-    h('div', { class: 'ws-meta' }, h('span', { class: 'ws-key' }, 'Shortcut ', h('kbd', {}, 'Alt'), '+', h('kbd', {}, 'Shift'), '+', h('kbd', {}, 'O'))),
+    h('div', { class: 'bw-actions' }, ocrBtn),
+    h('div', { class: 'bw-meta' }, h('span', { class: 'bw-key' }, 'Shortcut ', h('kbd', {}, 'Alt'), '+', h('kbd', {}, 'Shift'), '+', h('kbd', {}, 'O'))),
     ocrNote, ocrMsg)
 
   // ───────── Highlight Hub ─────────
   const hlCount = h('p', { class: 'mm-muted mm-small' }, 'Every passage you highlight, across every site, in one place.')
   const hubBtn = h('button', { type: 'button', class: 'mm-btn sm' }, 'Open', icon('arrow'))
   hubBtn.setAttribute('aria-label', 'Open the Highlight Hub')
-  const hubBlock = h('div', { class: 'ws-hub ws-sub', style: '--c:var(--mm-lime)' },
+  const hubBlock = h('div', { class: 'bw-hub bw-sub', style: '--c:var(--mm-lime)' },
     h('span', { class: 'ico' }, icon('marker')),
     h('div', { class: 'txt' }, h('h3', {}, 'Highlight Hub'), hlCount),
     hubBtn)
 
   root.replaceChildren(
-    h('div', { class: 'ws-head' }, h('h2', { id: 'ws-title' }, 'Browser workspace')),
+    h('div', { class: 'bw-head' }, h('h2', { id: 'bw-title' }, 'Browser workspace')),
     groupingBlock, h('hr', { class: 'mm-divider' }), ocrBlock, h('hr', { class: 'mm-divider' }), hubBlock)
 
   // ───────── live window state ─────────
@@ -214,7 +216,7 @@ export function mount(root, ctx) {
         try { await chrome.tabGroups.update(g.id, { collapsed: !g.collapsed }) } catch (e) { ctx.toast(friendly(e)) }
         scheduleRefresh()
       })
-      return h('li', { class: 'ws-group', style: `--c:${c}`, 'data-color': g.color, 'data-collapsed': String(!!g.collapsed), 'data-group-id': g.id },
+      return h('li', { class: 'bw-group', style: `--c:${c}`, 'data-color': g.color, 'data-collapsed': String(!!g.collapsed), 'data-group-id': g.id },
         h('span', { class: 'mm-dot', 'aria-hidden': 'true' }),
         h('span', { class: `name${name ? '' : ' unnamed'}` }, name || 'Unnamed group'),
         h('span', { class: 'count' }, plural(g.count, 'tab')),

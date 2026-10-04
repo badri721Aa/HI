@@ -13,6 +13,9 @@
   },
   "side_panel": { "default_path": "sidepanel/index.html" },
   "background": { "service_worker": "background.js", "type": "module" },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; img-src 'self' data: blob:; media-src 'self' data: blob:"
+  },
   "permissions": [
     "sidePanel",
     "storage",

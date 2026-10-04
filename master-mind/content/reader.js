@@ -813,10 +813,7 @@
     else { T.pos = at; T.resumeAt = at; markPara(q); showWord(q, at, at + wordLen(text, at)) }
   }
 
-  function notify(msg) {
-    if (R.open && R.ui) rdToast(msg)
-    else MM.toast(msg, 4200)
-  }
+  const notify = msg => MM.toast(msg, 4200) // shown in the reader while it's open (see MM.toast below)
 
   // ───────── reader UI ─────────
   const READER_CSS = `
@@ -828,8 +825,8 @@
   background:var(--rd-glow),var(--rd-bg);animation:rd-in .26s var(--mm-ease) both}
 .rd[data-theme="slate"]{--rd-bg:#1B202A;--rd-fg:#D2D8E3;--rd-heading:#F1F4F9;--rd-muted:#8E98AA;--rd-quote:#B5BECD;--rd-bar:rgba(38,45,59,.84);--rd-line:rgba(255,255,255,.09);--rd-code:rgba(0,0,0,.26);
   --rd-glow:radial-gradient(1000px 520px at 50% -22%,rgba(148,163,184,.12),transparent 65%)}
-.rd[data-theme="sepia"]{--rd-bg:#F4ECD8;--rd-fg:#5B4636;--rd-heading:#3B2A1E;--rd-muted:#8A725F;--rd-quote:#6B5442;--rd-accent:#A0522D;--rd-bar:rgba(248,242,228,.84);--rd-line:rgba(91,70,54,.16);--rd-code:rgba(91,70,54,.07);--rd-glow:none;
-  --mm-fg:#3B2A1E;--mm-fg-2:#5B4636;--mm-muted:#8A725F;--mm-heading:#3B2A1E;--mm-border:rgba(91,70,54,.15);--mm-border-strong:rgba(91,70,54,.28);--mm-accent:#A0522D;--mm-accent-2:#C9733B;--mm-bg-2:#F4ECD8;--mm-glass-strong:rgba(250,245,233,.97);--mm-red:#B4321F;--mm-shadow:0 14px 40px rgba(60,40,20,.18)}
+.rd[data-theme="sepia"]{--rd-bg:#F4ECD8;--rd-fg:#5B4636;--rd-heading:#3B2A1E;--rd-muted:#74604F;--rd-quote:#6B5442;--rd-accent:#A0522D;--rd-bar:rgba(248,242,228,.84);--rd-line:rgba(91,70,54,.16);--rd-code:rgba(91,70,54,.07);--rd-glow:none;
+  --mm-fg:#3B2A1E;--mm-fg-2:#5B4636;--mm-muted:#74604F;--mm-heading:#3B2A1E;--mm-border:rgba(91,70,54,.15);--mm-border-strong:rgba(91,70,54,.28);--mm-accent:#A0522D;--mm-accent-2:#C9733B;--mm-bg-2:#F4ECD8;--mm-glass-strong:rgba(250,245,233,.97);--mm-red:#B4321F;--mm-shadow:0 14px 40px rgba(60,40,20,.18)}
 .rd[data-theme="paper"]{--rd-bg:#FBFBF8;--rd-fg:#2B2E36;--rd-heading:#111318;--rd-muted:#6A7080;--rd-quote:#454B57;--rd-accent:#0E7490;--rd-bar:rgba(255,255,255,.82);--rd-line:rgba(15,20,30,.1);--rd-code:rgba(15,20,30,.045);--rd-glow:none;
   --mm-fg:#1D2027;--mm-fg-2:#3D424D;--mm-muted:#6A7080;--mm-heading:#111318;--mm-border:rgba(15,20,30,.1);--mm-border-strong:rgba(15,20,30,.2);--mm-accent:#0E7490;--mm-accent-2:#6D28D9;--mm-bg-2:#FFFFFF;--mm-glass-strong:rgba(255,255,255,.97);--mm-red:#B42318;--mm-shadow:0 14px 40px rgba(15,20,30,.14)}
 .rd[data-theme="contrast"]{--rd-bg:#000;--rd-fg:#FFF;--rd-heading:#FFF;--rd-muted:#E2E2E2;--rd-quote:#FFF;--rd-accent:#FFE500;--rd-bar:rgba(0,0,0,.94);--rd-line:rgba(255,255,255,.55);--rd-code:#0E0E0E;--rd-glow:none;
@@ -1004,7 +1001,9 @@ mm-b{display:inline;font-weight:700;color:var(--rd-heading)}
       return R.ui
     }
     const { host, root, layer } = MM.shadow('reader', READER_CSS)
-    host.style.zIndex = '2147483647' // above page chrome that uses the max z-index
+    // Above page chrome that uses the max z-index. That also puts it above Master Mind's other page UI, so the
+    // reader hands over to that UI when it takes focus (onFocusIn) and shows page toasts itself (MM.toast below).
+    host.style.zIndex = '2147483647'
     const ui = { host, root, layer }
 
     const wrap = h('div', { class: 'rd', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Focus reader', hidden: true })
@@ -1103,14 +1102,41 @@ mm-b{display:inline;font-weight:700;color:var(--rd-heading)}
     syncBioUi()
     return ui
   }
-  function trapFocus(e) {
-    if (e.key !== 'Tab') return
+  /**
+   * Tab order inside the reader, as one cycle: article → toolbar (the open typography popover right after its Aa
+   * button) → controls inside the article (translation status actions, wide code blocks and tables, "Back to page")
+   * → article. Focus starts on the article, so the first Tab reaches the toolbar. DOM order would instead go from the
+   * article straight into its own end-of-article button, scrolling to the end and losing the reading position.
+   */
+  const TABBABLE = 'button,select,input,textarea,a[href],[tabindex],pre,.tbl'
+  function tabStops() {
     const ui = R.ui
-    const items = [...ui.wrap.querySelectorAll('button,select,input,[tabindex="0"]')]
-      .filter(el => !el.disabled && !el.closest('[hidden]') && el.getClientRects().length)
-    if (!items.length) return
-    const i = items.indexOf(ui.root.activeElement)
-    if (e.shiftKey && i <= 0) { e.preventDefault(); items[items.length - 1].focus() } else if (!e.shiftKey && (i === items.length - 1 || i < 0)) { e.preventDefault(); items[0].focus() }
+    const tabbable = el => {
+      // Chrome lets the keyboard focus a code block or table that scrolls sideways (it has no tabindex of its own).
+      if (!el.hasAttribute('tabindex') && el.matches('pre,.tbl')) return el.scrollWidth > el.clientWidth + 1
+      return el.tabIndex >= 0 && !el.disabled
+    }
+    const within = box => [...box.querySelectorAll(TABBABLE)].filter(el => tabbable(el) && !el.closest('[hidden]') && el.getClientRects().length > 0)
+    const bar = within(ui.bar)
+    if (R.popOpen) bar.splice(bar.indexOf(ui.aa) + 1, 0, ...within(ui.pop))
+    return [ui.scroller, ...bar, ...within(ui.doc)]
+  }
+  function trapFocus(e) {
+    if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return
+    const ui = R.ui
+    const stops = tabStops()
+    const n = stops.length
+    const dir = e.shiftKey ? -1 : 1
+    let i = stops.indexOf(ui.root.activeElement)
+    // Nothing focused (e.g. after a click on the toolbar's background): continue between the article and the toolbar.
+    if (i < 0) i = e.shiftKey ? 1 : 0
+    e.preventDefault()
+    for (let k = 1; k <= n; k++) {
+      const el = stops[(((i + dir * k) % n) + n) % n]
+      // Only controls inside the article need scrolling into view; the toolbar and popover are always on screen.
+      el.focus({ preventScroll: !ui.doc.contains(el) })
+      if (ui.root.activeElement === el) return
+    }
   }
 
   function onGlobalKey(e) {
@@ -1119,6 +1145,17 @@ mm-b{display:inline;font-weight:700;color:var(--rd-heading)}
     e.stopPropagation()
     if (R.popOpen) closePop(true)
     else closeReader()
+  }
+
+  /**
+   * Another Master Mind tool opened over the page while the reader is up (e.g. text capture from the shortcut,
+   * the context menu or the side panel) and took focus. Its UI sits under the reader, so the reader steps aside
+   * at once, leaving focus with that tool.
+   */
+  function onFocusIn(e) {
+    const t = e.target // focus inside a shadow root arrives here retargeted to its host
+    if (!R.open || !R.ui || t === R.ui.host || !MM.isOwn(t)) return
+    closeReader({ handOff: true })
   }
 
   function openPop() {
@@ -1221,13 +1258,13 @@ mm-b{display:inline;font-weight:700;color:var(--rd-heading)}
     }
   }
 
-  function rdToast(msg) {
+  function rdToast(msg, ms = 2400) {
     const t = R.ui?.toast
     if (!t) return
     t.textContent = msg
     t.hidden = false
     clearTimeout(R.toastTimer)
-    R.toastTimer = setTimeout(() => { t.hidden = true }, 4200)
+    R.toastTimer = setTimeout(() => { t.hidden = true }, ms)
   }
 
   function syncTtsUi() {
@@ -1588,11 +1625,15 @@ mm-b{display:inline;font-weight:700;color:var(--rd-heading)}
     ui.progressFill.style.transform = 'scaleX(0)'
     renderLoading()
     lockScroll()
+    // The other way round: a text-capture overlay still up would sit invisibly under the reader and keep taking
+    // keys (Enter would capture the reader), so cancel it first. That also gives focus back to the page element.
+    if (MM.ocr?.isOpen?.()) MM.ocr.cancel()
     const active = document.activeElement
     R.prevFocus = active && active !== document.body && !MM.isOwn(active) ? active : null
     addEventListener('keydown', onGlobalKey, true)
     ui.scroller.scrollTop = 0
     ui.scroller.focus({ preventScroll: true })
+    addEventListener('focusin', onFocusIn, true) // after focusing the reader itself
     broadcastReader()
     await sleep(16) // let the shell paint before extraction work
     if (gen !== R.gen) return
@@ -1608,7 +1649,8 @@ mm-b{display:inline;font-weight:700;color:var(--rd-heading)}
     ttsRetarget()
   }
 
-  function closeReader() {
+  /** handOff: another Master Mind UI just took focus over the page, so vanish at once and leave focus with it. */
+  function closeReader({ handOff = false } = {}) {
     if (!R.open) return
     R.open = false
     R.gen++
@@ -1619,6 +1661,7 @@ mm-b{display:inline;font-weight:700;color:var(--rd-heading)}
     closePop(false)
     unlockScroll()
     removeEventListener('keydown', onGlobalKey, true)
+    removeEventListener('focusin', onFocusIn, true)
     const ui = R.ui
     const finish = () => {
       if (R.open) return
@@ -1631,11 +1674,13 @@ mm-b{display:inline;font-weight:700;color:var(--rd-heading)}
       BIO.reader = []
       BIO.rgen++
     }
-    if (reduceMotion()) finish()
+    if (handOff || reduceMotion()) finish()
     else { ui.wrap.classList.add('closing'); setTimeout(finish, 170) }
     // Return focus to where it was on the page.
-    if (ui.root.activeElement) ui.root.activeElement.blur()
-    if (R.prevFocus?.isConnected) { try { R.prevFocus.focus({ preventScroll: true }) } catch { /* not focusable */ } }
+    if (!handOff) {
+      if (ui.root.activeElement) ui.root.activeElement.blur()
+      if (R.prevFocus?.isConnected) { try { R.prevFocus.focus({ preventScroll: true }) } catch { /* not focusable */ } }
+    }
     R.prevFocus = null
     ttsRetarget()
     broadcastReader()
@@ -1747,8 +1792,13 @@ mm-b{display:inline;font-weight:700;color:var(--rd-heading)}
   })
   addEventListener('pageshow', e => { if (e.persisted) { broadcastReader(); broadcastTts(true) } })
 
+  // MM.toast draws in a page-level host, which the open reader covers (see ensureUI). While the reader is open,
+  // every module's toasts (e.g. the highlight shortcut's "Select some text…") show in the reader's own toast.
+  const pageToast = MM.toast
+  MM.toast = (msg, ms) => (R.open && R.ui ? rdToast(msg, ms) : pageToast.call(MM, msg, ms))
+
   // ───────── helpers for other content modules ─────────
-  MM.reader = { open: openReader, close: closeReader, isOpen: () => R.open, translate: setTranslate }
+  MM.reader = { open: openReader, close: () => closeReader(), isOpen: () => R.open, translate: setTranslate }
   MM.bionic = { set: setBionic, isOn: () => BIO.on }
   MM.tts = { play: ttsPlay, pause: ttsPause, resume: ttsResume, stop: ttsStop, setRate, state: ttsInfo }
 })()

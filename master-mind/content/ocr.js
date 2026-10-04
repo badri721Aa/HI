@@ -124,7 +124,7 @@
     if (ov) return
     closeCard()
     prevFocus = document.activeElement
-    const { layer } = MM.shadow('ocr-overlay', OVERLAY_CSS)
+    const { root, layer } = MM.shadow('ocr-overlay', OVERLAY_CSS)
     const sel = h('div', { class: 'sel' }, h('i'), h('i'), h('i'), h('i'))
     const size = h('div', { class: 'size', 'aria-hidden': 'true' })
     const gx = h('div', { class: 'gx' })
@@ -207,9 +207,21 @@
     }
     const onCancelPointer = () => { start = null; el.classList.remove('dragging') }
     const onWheel = e => { if (start) e.preventDefault() }
+    /** aria-modal: Tab / Shift+Tab cycle through the overlay's buttons and never walk into the page underneath
+     *  (a Tab press also brings focus back in if a page script moved it out while the overlay is up). */
+    const trapTab = e => {
+      const items = [...el.querySelectorAll('button')].filter(b => !b.disabled && b.getClientRects().length)
+      if (!items.length) return
+      e.preventDefault()
+      e.stopPropagation()
+      const i = items.indexOf(root.activeElement)
+      const next = e.shiftKey ? items[i <= 0 ? items.length - 1 : i - 1] : items[i < 0 || i === items.length - 1 ? 0 : i + 1]
+      next.focus({ preventScroll: true })
+    }
     const onKey = e => {
       const target = e.composedPath?.()[0] || e.target
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelOverlay() }
+      else if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey) trapTab(e)
       else if (e.key === 'Enter' && !target?.closest?.('button')) { e.preventDefault(); e.stopPropagation(); finish({ x: 0, y: 0, w: innerWidth, h: innerHeight }) }
     }
     const onBlurWin = () => { if (start) onCancelPointer() }

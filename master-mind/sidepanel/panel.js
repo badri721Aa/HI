@@ -4,7 +4,7 @@ import { getSettings, onSettings, getApiKey, applyAccent } from '../lib/store.js
 import { db, uid } from '../lib/db.js'
 import { runTask } from '../lib/ai.js'
 import { renderMarkdown, escapeHtml } from '../vendor/markdown.js'
-import { siteOf } from '../lib/text.js'
+import { siteOf, normalizeUrl } from '../lib/text.js'
 
 const CONTENT_FILES = ['content/core.js', 'content/extract.js', 'content/jargon.js', 'content/highlight.js', 'content/reader.js', 'content/ocr.js']
 const TABS = ['brief', 'ask', 'analyze', 'notes', 'tools']
@@ -19,6 +19,9 @@ const pageSubs = new Set()
 const bus = new Map()
 const pendingEvents = new Map()
 const mounted = new Map()
+/** Bus events that carry a user command, so they wait for the (lazily mounted) tab that handles them. */
+const QUEUED_EVENTS = new Set(['ask', 'insert-note'])
+const MAX_QUEUED = 20
 
 // ───────── ctx: the API every tab module gets ─────────
 const ctx = {
@@ -31,7 +34,7 @@ const ctx = {
   /** Extract (or return cached) page content from the active tab. Null if the page can't be read. */
   async getPage({ force = false } = {}) {
     if (!currentTab) return null
-    if (page && !force && page.url === currentTab.url) return page
+    if (page && !force && !loadingDoc && (page.url === currentTab.url || (!refreshTimer && page.key === normalizeUrl(currentTab.url)))) return page
     return extract(force)
   },
   /** Subscribe to page changes: cb(page|null). Returns unsubscribe. */
@@ -52,8 +55,10 @@ const ctx = {
   toast,
   /**
    * Panel-wide event bus: ctx.on('insert-note', fn) / ctx.emit('insert-note', {markdown}).
-   * Tabs mount lazily, so events emitted before anyone listens are queued and delivered
-   * to the first subscriber (e.g. "Save to notes" before the Notes tab was ever opened).
+   * Tabs mount lazily, so a command emitted before its tab listens ('ask', 'insert-note': e.g. "Save to
+   * notes" before the Notes tab was ever opened) is queued for the first subscriber. Any other event
+   * nobody listens to ('brief-ready', 'jargon-ready') is dropped: it describes the moment it was sent
+   * (and 'brief-ready' holds a whole Page), so replaying it later would only deliver stale data.
    */
   on(name, fn) {
     ;(bus.get(name) || bus.set(name, new Set()).get(name)).add(fn)
@@ -63,8 +68,12 @@ const ctx = {
   },
   emit(name, data) {
     const subs = bus.get(name)
-    if (subs?.size) for (const fn of subs) fn(data)
-    else (pendingEvents.get(name) || pendingEvents.set(name, []).get(name)).push(data)
+    if (subs?.size) { for (const fn of [...subs]) fn(data); return }
+    if (!QUEUED_EVENTS.has(name)) return
+    const queue = pendingEvents.get(name) || pendingEvents.set(name, []).get(name)
+    if (name === 'ask') queue.length = 0 // only the latest question is still wanted
+    queue.push(data)
+    if (queue.length > MAX_QUEUED) queue.shift()
   },
   /** Friendly inline error/empty rendering for AI failures (handles NO_KEY). */
   errorBox(err) {
@@ -86,67 +95,182 @@ async function inject(tabId) {
   await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_FILES })
 }
 
-let extracting = null
+const readable = tab => !!tab?.id && /^https?:|^file:/.test(tab.url || '')
+
+let extracting = null // in-flight extraction: {tabId, promise}
+let extractSeq = 0
+/**
+ * Read the page in the followed tab. `force` re-reads it from scratch; otherwise the content script
+ * may answer from its cache when the page's main content hasn't changed (same ids either way).
+ */
 async function extract(force) {
   const tab = currentTab
-  if (!tab?.id || !/^https?:|^file:/.test(tab.url || '')) {
+  if (!readable(tab)) {
     page = null
     pageError = 'Master Mind works on regular web pages. This page is protected by Chrome.'
     return null
   }
-  if (extracting && !force) return extracting
+  if (extracting && !force && extracting.tabId === tab.id) return extracting.promise
+  const my = ++extractSeq
+  const msg = { type: 'MM_EXTRACT', force: !!force }
   setBusy(true)
-  extracting = (async () => {
+  const promise = (async () => {
+    let res, err = null
     try {
-      let res
-      try { res = await chrome.tabs.sendMessage(tab.id, { type: 'MM_EXTRACT' }) } catch {
+      try { res = await chrome.tabs.sendMessage(tab.id, msg) } catch {
         await inject(tab.id)
-        res = await chrome.tabs.sendMessage(tab.id, { type: 'MM_EXTRACT' })
+        res = await chrome.tabs.sendMessage(tab.id, msg)
       }
-      if (currentTab?.id !== tab.id) return page // tab switched mid-flight
       if (!res?.paragraphs) throw new Error(res?.error || 'Could not read this page.')
+    } catch (e) { err = e }
+    if (currentTab?.id !== tab.id) return page // tab switched mid-flight
+    if (my !== extractSeq) return err ? null : res // a newer read owns the shared state; still answer this caller
+    if (err) {
+      page = null
+      pageError = /Cannot access|cannot be scripted|chrome-extension|webstore/i.test(String(err?.message))
+        ? 'Chrome doesn’t allow extensions to read this page.'
+        : `Couldn’t read this page: ${err?.message || err}`
+    } else {
       page = res
       pageError = null
-    } catch (e) {
-      page = null
-      pageError = /Cannot access|cannot be scripted|chrome-extension|webstore/i.test(String(e?.message))
-        ? 'Chrome doesn’t allow extensions to read this page.'
-        : `Couldn’t read this page: ${e?.message || e}`
-    } finally {
-      setBusy(false)
-      extracting = null
     }
     return page
   })()
-  return extracting
+  extracting = { tabId: tab.id, promise }
+  promise.finally(() => {
+    if (extracting?.promise === promise) extracting = null
+    if (my === extractSeq) setBusy(false)
+  })
+  return promise
 }
 
 function setBusy(b) { $('#refreshBtn').classList.toggle('spin', b) }
 
+/** Header subtitle for the followed tab: the site, or a plain label for pages that aren't websites. */
+function siteLabel(url) {
+  if (/^https?:/i.test(url)) return siteOf(url)
+  if (/^file:/i.test(url)) return 'Local file'
+  if (url.startsWith(chrome.runtime.getURL(''))) return 'Master Mind'
+  return url ? 'Browser page' : ''
+}
+
 function renderHeader() {
   $('#pageTitle').textContent = currentTab?.title || 'Master Mind'
-  const site = siteOf(currentTab?.url || '')
+  const site = siteLabel(currentTab?.url || '')
   $('#pageSite').textContent = page ? `${site} · ${page.wordCount.toLocaleString()} words · ${page.readingMin} min read` : site || 'Open a web page to begin'
 }
 
-const notifyPage = (() => {
-  let t
-  return () => {
-    clearTimeout(t)
-    t = setTimeout(async () => {
-      await extract(true)
-      renderHeader()
-      for (const fn of pageSubs) { try { fn(page) } catch (e) { console.error(e) } }
-      for (const m of mounted.values()) { try { m?.onPage?.(page) } catch (e) { console.error(e) } }
-    }, 350)
-  }
-})()
+// ───────── keeping the page fresh ─────────
+// What each change costs: a tab switch, a new document (load, reload, back/forward) or the refresh
+// button re-reads the page and tells every tab module. A same-document URL change (SPA route,
+// scroll-spy hash, ?page=N) waits until the URL stops changing; modules hear about it only when the
+// page actually differs from what they last got, so URL churn alone doesn't re-run briefs or writes.
+let shownPage = null // the Page last delivered to the tab modules
+let loadingDoc = false // a new document committed in the followed tab and hasn't been read yet
+let refreshTimer = 0
+let refreshOpts = null
+let lazySince = 0
+let lazyRanAt = 0
+let refreshSeq = 0
+const LAZY_MIN_GAP = 4000 // URL churn (infinite scroll, scroll-spy) re-reads the page at most this often
 
-async function setActiveTab(tab) {
-  const changed = tab?.id !== currentTab?.id || tab?.url !== currentTab?.url
-  currentTab = tab
+const samePage = (a, b) => a === b || (!!a && !!b && a.key === b.key && a.title === b.title &&
+  a.paragraphs.length === b.paragraphs.length && a.paragraphs.every((p, i) => p.id === b.paragraphs[i].id && p.text === b.paragraphs[i].text))
+
+async function refreshPage({ force = false, always = false } = {}) {
+  const my = ++refreshSeq
+  const prev = shownPage
+  const p = await extract(force)
+  if (my !== refreshSeq) return // a newer refresh owns the result
+  if (!always && samePage(p, prev)) {
+    if (prev) page = prev // keep the object the modules already hold
+    renderHeader()
+    return
+  }
+  shownPage = p
   renderHeader()
-  if (changed) { page = null; notifyPage() }
+  for (const fn of pageSubs) { try { fn(p) } catch (e) { console.error(e) } }
+  for (const m of mounted.values()) { try { m?.onPage?.(p) } catch (e) { console.error(e) } }
+}
+
+function runRefresh() {
+  const opts = refreshOpts
+  if (!opts?.always) lazyRanAt = Date.now()
+  clearTimeout(refreshTimer)
+  refreshTimer = 0
+  refreshOpts = null
+  lazySince = 0
+  return refreshPage(opts || {})
+}
+
+function cancelRefresh() {
+  clearTimeout(refreshTimer)
+  refreshTimer = 0
+  refreshOpts = null
+  lazySince = 0
+}
+
+/** Re-read the page shortly and deliver it to every module (tab switch, new document, refresh button). */
+function refreshSoon({ force = false } = {}) {
+  clearTimeout(refreshTimer)
+  refreshOpts = { force: force || !!refreshOpts?.force, always: true }
+  lazySince = 0
+  refreshTimer = setTimeout(runRefresh, 350)
+}
+
+/**
+ * Re-read the page once things settle: debounced by `delay`, but at most `maxWait` after the first
+ * request and never sooner than LAZY_MIN_GAP after the previous lazy re-read. Modules are told only
+ * if the page changed. A pending refreshSoon() already covers it.
+ */
+function refreshLazy(delay, maxWait = Infinity) {
+  if (refreshOpts?.always) return
+  const now = Date.now()
+  if (!lazySince) lazySince = now
+  clearTimeout(refreshTimer)
+  refreshOpts = { force: false, always: false }
+  const due = Math.max(Math.min(now + delay, lazySince + maxWait), lazyRanAt + LAZY_MIN_GAP)
+  refreshTimer = setTimeout(runRefresh, Math.max(0, due - now))
+}
+
+/** The followed tab switched to another tab (or the panel just opened). */
+function setActiveTab(tab) {
+  const switched = tab?.id !== currentTab?.id
+  const moved = !switched && tab?.url !== currentTab?.url
+  currentTab = tab
+  if (switched) {
+    loadingDoc = false
+    page = null
+    pageError = null
+    refreshSoon({ force: true })
+  } else if (moved) urlChanged(tab.url)
+  renderHeader()
+}
+
+/** Same document, new URL (history.pushState/replaceState, #hash). */
+function urlChanged(url) {
+  if (loadingDoc || !url) return // part of a document load: read when it's ready
+  const key = normalizeUrl(url)
+  // Same page (hash or tracking params only): re-read once the URL stops changing (scroll-spy hashes).
+  if (key === (shownPage?.key ?? page?.key)) refreshLazy(1500)
+  // A new route: give the view a moment to render, and don't chase URLs that change continuously.
+  else refreshLazy(1000, 6000)
+}
+
+/** A new document committed in the followed tab (navigation, reload, back/forward): the old Page is gone. */
+function documentCommitted() {
+  loadingDoc = true
+  cancelRefresh()
+  page = null
+  pageError = null
+  renderHeader()
+}
+
+/** The followed tab's document is ready (DOMContentLoaded / load / error page). */
+function documentReady({ loaded = false } = {}) {
+  if (loadingDoc) { loadingDoc = false; refreshSoon({ force: true }) }
+  // Fully loaded after an earlier read: pick up late-rendered content (modules hear only if it changed).
+  else if (loaded) refreshLazy(300)
 }
 
 // ───────── tabs UI ─────────
@@ -193,7 +317,7 @@ function toast(msg, ms = 2200) {
   toastTimer = setTimeout(() => { el.hidden = true }, ms)
 }
 
-$('#refreshBtn').addEventListener('click', () => notifyPage())
+$('#refreshBtn').addEventListener('click', () => refreshSoon({ force: true }))
 $('#hubBtn').addEventListener('click', () => ctx.openHub('graph'))
 $('#settingsBtn').addEventListener('click', () => ctx.openHub('settings'))
 $('#noKeyBtn').addEventListener('click', () => ctx.openHub('settings'))
@@ -207,30 +331,50 @@ applyAccent(document.documentElement, settings.accent)
 // ───────── follow the active tab in this window ─────────
 // ?tabId=N pins the panel to one tab (used when the panel is opened as a normal page, e.g. in tests).
 const pinnedTabId = Number(new URLSearchParams(location.search).get('tabId')) || null
+const following = tabId => tabId != null && tabId === currentTab?.id
 chrome.tabs.onActivated.addListener(async ({ tabId, windowId: w }) => {
   if (pinnedTabId || w !== windowId) return
   setActiveTab(await chrome.tabs.get(tabId))
 })
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
-  if (tabId !== currentTab?.id) return
-  if (info.title) { currentTab = tab; renderHeader() }
-  if (info.status === 'complete' || info.url) setActiveTab(tab)
+  if (!following(tabId)) return
+  const moved = !!info.url && info.url !== currentTab.url
+  currentTab = tab
+  if (info.title || info.url) renderHeader()
+  // A cross-document navigation reports its URL here first; webNavigation.onCommitted then takes over.
+  if (moved) urlChanged(tab.url)
+  // Only finishes a pending document load: 'complete' also follows every pushState and #hash change.
+  if (info.status === 'complete') documentReady()
 })
+// Documents, not URLs: a reload keeps the URL but replaces the document (and every paragraph id in it).
+const mainFrame = d => d.frameId === 0 && following(d.tabId) && d.documentLifecycle !== 'prerender'
+chrome.webNavigation.onCommitted.addListener(d => { if (mainFrame(d)) documentCommitted() })
+chrome.webNavigation.onDOMContentLoaded.addListener(d => { if (mainFrame(d)) documentReady() })
+chrome.webNavigation.onCompleted.addListener(d => { if (mainFrame(d)) documentReady({ loaded: true }) })
+chrome.webNavigation.onErrorOccurred.addListener(d => { if (mainFrame(d)) documentReady() })
+chrome.webNavigation.onHistoryStateUpdated.addListener(d => { if (mainFrame(d)) urlChanged(d.url) })
+chrome.webNavigation.onReferenceFragmentUpdated.addListener(d => { if (mainFrame(d)) urlChanged(d.url) })
 chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (msg?.type === 'MM_PAGE_CHANGED' && sender.tab?.id === currentTab?.id) {
+  if (msg?.type === 'MM_PAGE_CHANGED' && following(sender.tab?.id) && typeof msg.url === 'string') {
     currentTab = { ...currentTab, url: msg.url }
-    page = null
-    notifyPage()
+    urlChanged(msg.url)
   }
 })
 
-// "Ask Master Mind about…" from the context menu.
+// "Ask Master Mind about…" from the context menu. It's addressed to one tab: only the panel following
+// that tab answers it (every open panel, one per window, sees the storage change).
+let claimedAsk = null
 async function consumePendingAsk() {
-  const { pendingAsk } = await chrome.storage.session.get('pendingAsk')
-  if (!pendingAsk || Date.now() - pendingAsk.ts > 60e3) return
-  await chrome.storage.session.remove('pendingAsk')
+  const { pendingAsk: p } = await chrome.storage.session.get('pendingAsk')
+  if (!p || Date.now() - p.ts > 60e3 || !following(p.tabId)) return
+  const id = p.id ?? p.ts
+  if (claimedAsk === id) return // the boot check and the change listener both saw it
+  claimedAsk = id
+  // Remove it unless a newer request replaced it meanwhile.
+  const { pendingAsk: now } = await chrome.storage.session.get('pendingAsk')
+  if ((now?.id ?? now?.ts) === id) await chrome.storage.session.remove('pendingAsk')
   await showTab('ask')
-  ctx.emit('ask', { question: pendingAsk.question })
+  ctx.emit('ask', { question: p.question })
 }
 chrome.storage.onChanged.addListener((c, area) => { if (area === 'session' && c.pendingAsk?.newValue) consumePendingAsk() })
 
@@ -238,7 +382,7 @@ chrome.storage.onChanged.addListener((c, area) => { if (area === 'session' && c.
 const active = pinnedTabId
   ? await chrome.tabs.get(pinnedTabId).catch(() => null)
   : (await chrome.tabs.query({ active: true, windowId }))[0]
-await setActiveTab(active)
+setActiveTab(active)
 checkKey()
 let startTab = 'brief'
 try { startTab = localStorage.getItem('mm-tab') || 'brief' } catch { /* ignore */ }
