@@ -1,4 +1,4 @@
-html, body { height: 100%; }
+html { min-height: 100%; }
 body { display: grid; grid-template-columns: 240px 1fr; gap: 0; min-height: 100vh; }
 .skip { position: absolute; left: -999px; top: 8px; z-index: 10; }
 .skip:focus { left: 8px; }
