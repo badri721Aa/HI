@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Master Mind: AI Research & Knowledge Workspace",
+  "short_name": "Master Mind",
+  "version": "1.0.0",
+  "description": "Your browser's second brain: instant briefs, page-grounded Q&A with citations, highlights, notes, knowledge graph and focus reading. By Abdullah Masoud.",
+  "author": "Abdullah Masoud",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "Open Master Mind",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+  },
+  "side_panel": { "default_path": "sidepanel/index.html" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "scripting",
+    "activeTab",
+    "tabs",
+    "tabGroups",
+    "contextMenus",
+    "webNavigation",
+    "offscreen"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content/core.js", "content/extract.js", "content/jargon.js", "content/highlight.js", "content/reader.js", "content/ocr.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["lib/tokens.css", "vendor/fonts/*", "icons/*"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ],
+  "commands": {
+    "_execute_action": { "suggested_key": { "default": "Alt+Shift+M" }, "description": "Open the Master Mind side panel" },
+    "highlight-selection": { "suggested_key": { "default": "Alt+Shift+H" }, "description": "Highlight the selected text" },
+    "toggle-reader": { "suggested_key": { "default": "Alt+Shift+R" }, "description": "Toggle Focus Reading Mode" },
+    "capture-text": { "suggested_key": { "default": "Alt+Shift+O" }, "description": "Capture text from a screen region (OCR)" }
+  }
+}

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Master Mind · Knowledge Hub</title>
+  <link rel="icon" href="../icons/icon32.png">
+  <link rel="stylesheet" href="../lib/tokens.css">
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="../vendor/hljs-dark.css">
+  <link rel="stylesheet" href="hub.css">
+</head>
+<body class="mm-page mm-root">
+  <a class="skip" href="#view">Skip to content</a>
+  <aside class="side mm-glass" aria-label="Hub navigation">
+    <div class="brand">
+      <img src="../icons/logo.svg" alt="">
+      <div><b>Master Mind</b><span class="mm-muted mm-small">Knowledge Hub</span></div>
+    </div>
+    <nav class="nav">
+      <a href="#highlights" data-view="highlights"><svg class="mm-icon" viewBox="0 0 24 24"><path d="M9 11l-6 6v3h3l6-6M22 3l-9 9-3-3 9-9z"/></svg>Highlights</a>
+      <a href="#notes" data-view="notes"><svg class="mm-icon" viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4zM8 10h8M8 14h8M8 18h5"/></svg>Notes</a>
+      <a href="#graph" data-view="graph"><svg class="mm-icon" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="7" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.2 7.2l7.6-.2M7.2 8.2l3.8 7.6M16.9 9.2l-3.6 6.8"/></svg>Knowledge Graph</a>
+      <a href="#history" data-view="history"><svg class="mm-icon" viewBox="0 0 24 24"><path d="M6 3v6a3 3 0 0 0 3 3h6a3 3 0 0 1 3 3v6M6 21v-4M18 3v4"/><circle cx="6" cy="15" r="2"/><circle cx="18" cy="9" r="2"/></svg>Research Trail</a>
+      <a href="#settings" data-view="settings"><svg class="mm-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</a>
+    </nav>
+    <footer class="mm-muted mm-small">v<span id="ver"></span> · by <b class="mm-gradient-text">Abdullah Masoud</b></footer>
+  </aside>
+  <main id="view" tabindex="-1" aria-live="polite"></main>
+  <script type="module" src="hub.js"></script>
+</body>
+</html>
