@@ -208,7 +208,6 @@ export function mount(root, ctx) {
   let convKey = null // page key the current conversation belongs to
   let run = null // { turn, ctrl }
   let seq = 0
-  let notesReady = false
   let savedScroll = null
 
   // ───────── static layout ─────────
@@ -462,25 +461,10 @@ export function mount(root, ctx) {
     }
   }
 
-  // The Notes tab mounts lazily; make sure it exists (so it is listening) before emitting to it.
-  async function ensureNotesListening() {
-    if (notesReady) return
-    const notesPanel = document.getElementById('panel-notes')
-    if (notesPanel && !notesPanel.childElementCount) {
-      const focused = document.activeElement
-      const top = scroller.scrollTop
-      await ctx.showTab('notes')
-      await ctx.showTab('ask')
-      scroller.scrollTop = top
-      if (focused && root.contains(focused)) focused.focus({ preventScroll: true })
-    }
-    notesReady = true
-  }
-
+  // The panel keeps the Notes tab mounted (and queues bus events), so emitting is enough.
   async function saveToNotes(turn, btn) {
     const markdown = `**Q: ${turn.q.replace(/\s+/g, ' ').trim()}**\n\n${plainRefs(turn.a).trim()}\n`
     try {
-      await ensureNotesListening()
       ctx.emit('insert-note', { markdown, source: turn.source || { url: ctx.tab?.url || '', title: ctx.tab?.title || '' } })
       flash(btn, 'Saved')
       ctx.toast('Saved to notes')

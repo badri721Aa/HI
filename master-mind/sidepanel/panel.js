@@ -17,6 +17,7 @@ let pageError = null // string when the page can't be read (chrome:// etc.)
 let windowId = (await chrome.windows.getCurrent()).id
 const pageSubs = new Set()
 const bus = new Map()
+const pendingEvents = new Map()
 const mounted = new Map()
 
 // ───────── ctx: the API every tab module gets ─────────
@@ -49,9 +50,22 @@ const ctx = {
   showTab,
   openHub(view = 'highlights', params = '') { return chrome.runtime.sendMessage({ type: 'OPEN_HUB', view, params }) },
   toast,
-  /** Panel-wide event bus: ctx.on('insert-note', fn) / ctx.emit('insert-note', {markdown}). */
-  on(name, fn) { (bus.get(name) || bus.set(name, new Set()).get(name)).add(fn); return () => bus.get(name)?.delete(fn) },
-  emit(name, data) { for (const fn of bus.get(name) || []) fn(data) },
+  /**
+   * Panel-wide event bus: ctx.on('insert-note', fn) / ctx.emit('insert-note', {markdown}).
+   * Tabs mount lazily, so events emitted before anyone listens are queued and delivered
+   * to the first subscriber (e.g. "Save to notes" before the Notes tab was ever opened).
+   */
+  on(name, fn) {
+    ;(bus.get(name) || bus.set(name, new Set()).get(name)).add(fn)
+    const queued = pendingEvents.get(name)
+    if (queued) { pendingEvents.delete(name); for (const d of queued) fn(d) }
+    return () => bus.get(name)?.delete(fn)
+  },
+  emit(name, data) {
+    const subs = bus.get(name)
+    if (subs?.size) for (const fn of subs) fn(data)
+    else (pendingEvents.get(name) || pendingEvents.set(name, []).get(name)).push(data)
+  },
   /** Friendly inline error/empty rendering for AI failures (handles NO_KEY). */
   errorBox(err) {
     const box = document.createElement('div')
@@ -136,6 +150,17 @@ async function setActiveTab(tab) {
 }
 
 // ───────── tabs UI ─────────
+const mounting = new Map()
+/** Mount a tab module without showing it (idempotent). */
+function mountTab(name) {
+  if (!mounting.has(name)) {
+    mounting.set(name, import(`./tabs/${name}.js`).then(mod => {
+      mounted.set(name, mod.mount($(`#panel-${name}`), ctx) || {})
+    }))
+  }
+  return mounting.get(name)
+}
+
 async function showTab(name) {
   if (!TABS.includes(name)) return
   for (const t of TABS) {
@@ -144,11 +169,7 @@ async function showTab(name) {
     btn.tabIndex = t === name ? 0 : -1
     $(`#panel-${t}`).hidden = t !== name
   }
-  if (!mounted.has(name)) {
-    mounted.set(name, null)
-    const mod = await import(`./tabs/${name}.js`)
-    mounted.set(name, mod.mount($(`#panel-${name}`), ctx) || {})
-  }
+  await mountTab(name)
   mounted.get(name)?.onShow?.()
   try { localStorage.setItem('mm-tab', name) } catch { /* ignore */ }
 }
@@ -223,3 +244,5 @@ let startTab = 'brief'
 try { startTab = localStorage.getItem('mm-tab') || 'brief' } catch { /* ignore */ }
 await showTab(TABS.includes(startTab) ? startTab : 'brief')
 consumePendingAsk()
+// Notes receives "Save to notes" from other tabs, so it's always listening (mounted hidden).
+mountTab('notes')
