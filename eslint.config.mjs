@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Minified third-party bundle for the StudyPilot extension.
+    "study-extension/vendor/**",
   ]),
 ]);
 

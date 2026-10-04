@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyPilot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <img class="logo" src="icons/logo.svg" alt="">
+      <div class="brand">
+        <b>StudyPilot</b>
+        <small id="greeting">Let's get it done</small>
+      </div>
+      <button id="syncBtn" class="icon-btn" title="Sync Google Classroom (R)" aria-label="Sync Google Classroom">
+        <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.9-3.9M4 4v4h4M4 13a8 8 0 0 0 14.9 3.9M20 20v-4h-4"/></svg>
+      </button>
+      <button id="themeBtn" class="icon-btn" title="Switch theme (T)" aria-label="Switch theme">
+        <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
+      </button>
+    </header>
+
+    <div id="welcome" class="welcome" hidden>
+      <b>👋 Welcome to StudyPilot!</b>
+      <p>Two quick steps: <b>1)</b> paste your Claude API key below to turn on the AI study tools, and <b>2)</b> connect Google Classroom (or add tasks by hand). Then open any Google Doc and click the purple button.</p>
+    </div>
+
+    <main>
+      <!-- ───────────── Dashboard ───────────── -->
+      <section id="tab-dashboard" class="tab">
+        <div class="hero">
+          <svg class="ring" viewBox="0 0 80 80" aria-hidden="true">
+            <circle cx="40" cy="40" r="34" class="ring-bg"/>
+            <circle cx="40" cy="40" r="34" class="ring-fg" id="weekRing"/>
+          </svg>
+          <div class="ring-label"><b id="weekPct">0%</b><span>this week</span></div>
+          <div class="hero-text">
+            <b id="heroTitle">All caught up 🎉</b>
+            <span id="heroSub">Nothing due soon.</span>
+            <span class="streak" id="streak" hidden></span>
+          </div>
+        </div>
+
+        <div class="stats">
+          <button class="stat s-overdue" data-filter="overdue"><b id="cOverdue">0</b><span>Overdue</span></button>
+          <button class="stat s-today" data-filter="today"><b id="cToday">0</b><span>Due today</span></button>
+          <button class="stat s-week" data-filter="week"><b id="cWeek">0</b><span>This week</span></button>
+          <button class="stat s-done" data-filter="done"><b id="cDone">0</b><span>Done (7d)</span></button>
+        </div>
+
+        <div id="connectBanner" class="banner" hidden>
+          <div>
+            <b>Connect Google Classroom</b>
+            <span>Pull in your assignments and due dates automatically.</span>
+          </div>
+          <button id="connectBtn" class="btn primary sm">Connect</button>
+        </div>
+        <div id="syncError" class="banner error" hidden></div>
+
+        <div class="toolbar">
+          <div class="search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+            <input id="search" type="search" placeholder="Search  ( / )" aria-label="Search homework">
+          </div>
+          <select id="courseFilter" aria-label="Filter by class"><option value="">All classes</option></select>
+          <button id="addToggle" class="btn primary sq" title="Add a task (N)" aria-label="Add a task">+</button>
+        </div>
+
+        <div class="chips" id="filterChips">
+          <button class="chip active" data-filter="all">All open</button>
+          <button class="chip" data-filter="overdue">Overdue</button>
+          <button class="chip" data-filter="today">Today</button>
+          <button class="chip" data-filter="week">This week</button>
+          <button class="chip" data-filter="later">Later</button>
+          <button class="chip" data-filter="done">Done</button>
+        </div>
+
+        <form id="addForm" class="card form" hidden>
+          <input id="fTitle" required placeholder="What do you need to do?" maxlength="200">
+          <div class="grid2">
+            <input id="fCourse" placeholder="Class (optional)" list="courseList" maxlength="80">
+            <input id="fDue" type="datetime-local" aria-label="Due date">
+          </div>
+          <div class="grid2">
+            <select id="fEst" aria-label="Time estimate">
+              <option value="15">~15 min</option><option value="30" selected>~30 min</option><option value="45">~45 min</option>
+              <option value="60">~1 hour</option><option value="90">~1.5 hours</option><option value="120">~2 hours</option><option value="180">~3 hours</option>
+            </select>
+            <button class="btn primary" type="submit">Add task</button>
+          </div>
+          <datalist id="courseList"></datalist>
+        </form>
+
+        <ul id="taskList" class="tasks"></ul>
+        <div id="empty" class="empty" hidden></div>
+        <p class="sync-status" id="syncStatus"></p>
+      </section>
+
+      <!-- ───────────── Planner ───────────── -->
+      <section id="tab-plan" class="tab" hidden>
+        <div class="section-head">
+          <h2>Your next 7 days</h2>
+          <label class="inline">Daily time
+            <select id="capacity">
+              <option value="30">30m</option><option value="60">1h</option><option value="90">1.5h</option><option value="120">2h</option>
+              <option value="180">3h</option><option value="240">4h</option><option value="300">5h</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint">Homework is spread across days before each deadline, most urgent first. Click a task's time on the dashboard to change its estimate.</p>
+        <div id="planDays" class="plan"></div>
+        <button id="aiPlanBtn" class="btn gradient wide">✨ Make me an AI study plan</button>
+        <div id="aiPlan" class="card md" hidden></div>
+      </section>
+
+      <!-- ───────────── Focus ───────────── -->
+      <section id="tab-focus" class="tab" hidden>
+        <div class="seg" role="tablist">
+          <button class="seg-btn active" data-mode="focus">🎯 Focus</button>
+          <button class="seg-btn" data-mode="break">☕ Break</button>
+        </div>
+        <div class="timer">
+          <svg viewBox="0 0 200 200" aria-hidden="true">
+            <circle cx="100" cy="100" r="88" class="ring-bg"/>
+            <circle cx="100" cy="100" r="88" class="ring-fg" id="timerRing"/>
+          </svg>
+          <div class="timer-text"><b id="timerTime">25:00</b><span id="timerMode">Focus</span></div>
+        </div>
+        <div class="timer-actions">
+          <button id="timerReset" class="btn ghost">Reset</button>
+          <button id="timerStart" class="btn gradient big">Start</button>
+          <button id="timerSkip" class="btn ghost">Skip</button>
+        </div>
+        <div class="card">
+          <div class="row"><b>Today</b><span id="focusToday">0 / 60 min</span></div>
+          <div class="bar"><i id="focusBar"></i></div>
+          <div class="row muted small"><span id="focusSessions">0 sessions total</span><span id="focusStreak"></span></div>
+        </div>
+        <div class="card">
+          <b>This week</b>
+          <div id="weekChart" class="chart"></div>
+        </div>
+      </section>
+
+      <!-- ───────────── Flashcards ───────────── -->
+      <section id="tab-cards" class="tab" hidden>
+        <div class="section-head">
+          <h2>Flashcards</h2>
+          <select id="deckFilter" aria-label="Deck"><option value="">All decks</option></select>
+        </div>
+        <div class="card review" id="reviewBox">
+          <div id="reviewEmpty" class="empty-mini"></div>
+          <div id="reviewCard" hidden>
+            <div class="flashcard" id="flashcard" tabindex="0">
+              <span class="fc-deck" id="fcDeck"></span>
+              <div class="fc-front" id="fcFront"></div>
+              <div class="fc-back" id="fcBack" hidden></div>
+            </div>
+            <button id="showAnswer" class="btn gradient wide">Show answer (Space)</button>
+            <div id="gradeBtns" class="grade" hidden>
+              <button class="btn again" data-grade="again">Again <kbd>1</kbd></button>
+              <button class="btn good" data-grade="good">Good <kbd>2</kbd></button>
+              <button class="btn easy" data-grade="easy">Easy <kbd>3</kbd></button>
+            </div>
+            <p class="muted small center" id="reviewLeft"></p>
+          </div>
+        </div>
+        <details class="card">
+          <summary><b>＋ Add a card</b></summary>
+          <form id="cardForm" class="form">
+            <input id="cFront" required placeholder="Front: question or term" maxlength="500">
+            <textarea id="cBack" required placeholder="Back: answer or definition" maxlength="1000"></textarea>
+            <div class="grid2">
+              <input id="cDeck" placeholder="Deck (e.g. Biology)" list="deckList" maxlength="60">
+              <button class="btn primary" type="submit">Add card</button>
+            </div>
+            <datalist id="deckList"></datalist>
+          </form>
+        </details>
+        <div class="card">
+          <b>Decks</b>
+          <ul id="deckListView" class="decks"></ul>
+          <p class="hint">Tip: select text in a Google Doc, open the sidebar, and press 🃏 Flashcards to make a deck instantly.</p>
+        </div>
+      </section>
+
+      <!-- ───────────── Settings ───────────── -->
+      <section id="tab-settings" class="tab" hidden>
+        <div class="card">
+          <h3>🤖 Claude AI</h3>
+          <label>API key
+            <div class="key-row">
+              <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+              <button id="showKey" class="btn ghost sm" type="button">Show</button>
+              <button id="testKey" class="btn primary sm" type="button">Test</button>
+            </div>
+          </label>
+          <p class="hint" id="keyStatus">Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. It's stored only in this browser and sent only to Anthropic.</p>
+          <div class="grid2">
+            <label>Model<select id="model"></select></label>
+            <label>Thinking depth<select id="effort">
+              <option value="low">Fast</option><option value="medium">Balanced</option><option value="high">Thorough</option>
+            </select></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🏫 Google Classroom</h3>
+          <p id="gcStatus" class="hint">Not connected.</p>
+          <div class="row gap">
+            <button id="gcConnect" class="btn primary sm">Connect</button>
+            <button id="gcDisconnect" class="btn ghost sm" hidden>Disconnect</button>
+          </div>
+          <label class="switch"><input type="checkbox" id="autoSync"><span></span>Auto-sync every hour</label>
+        </div>
+
+        <div class="card">
+          <h3>⏰ Reminders & planning</h3>
+          <label class="switch"><input type="checkbox" id="remindersOn"><span></span>Notify me before homework is due</label>
+          <div class="grid2">
+            <label>Remind me<select id="reminderHours">
+              <option value="2">2h before</option><option value="6">6h before</option><option value="12">12h before</option>
+              <option value="24">1 day before</option><option value="48">2 days before</option>
+            </select></label>
+            <label>Daily focus goal<select id="dailyFocusGoalMin">
+              <option value="30">30 min</option><option value="60">1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option><option value="180">3 hours</option>
+            </select></label>
+          </div>
+          <div class="grid2">
+            <label>Focus length<select id="focusLen">
+              <option value="15">15 min</option><option value="25">25 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="50">50 min</option>
+            </select></label>
+            <label>Break length<select id="breakLen">
+              <option value="3">3 min</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option>
+            </select></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🎨 Look & feel</h3>
+          <div class="grid2">
+            <label>Theme<select id="theme"><option value="auto">Match system</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+            <label>Sidebar side<select id="sidebarSide"><option value="right">Right</option><option value="left">Left</option></select></label>
+          </div>
+          <div class="swatches" id="swatches" aria-label="Accent color"></div>
+          <label class="switch"><input type="checkbox" id="showLauncher"><span></span>Show the floating button in Docs & Classroom</label>
+        </div>
+
+        <div class="card">
+          <h3>⌨️ Shortcuts</h3>
+          <ul class="keys">
+            <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> open this dashboard</li>
+            <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> toggle the study sidebar</li>
+            <li><kbd>1</kbd>–<kbd>5</kbd> switch tabs · <kbd>/</kbd> search · <kbd>N</kbd> new task</li>
+            <li><kbd>R</kbd> sync · <kbd>T</kbd> theme · <kbd>Ctrl</kbd>+<kbd>↵</kbd> run a tool in the sidebar</li>
+            <li>Right-click selected text on any page → <b>StudyPilot</b></li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>💾 Your data</h3>
+          <div class="row gap">
+            <button id="exportBtn" class="btn ghost sm">Export backup</button>
+            <label class="btn ghost sm file">Import backup<input id="importFile" type="file" accept="application/json" hidden></label>
+            <button id="resetBtn" class="btn danger sm">Reset everything</button>
+          </div>
+        </div>
+
+        <div class="card about">
+          <img src="icons/logo.svg" alt="StudyPilot logo">
+          <div>
+            <b>StudyPilot</b> <span class="muted" id="version"></span>
+            <p>Created by <b class="gradient-text">Abdullah Masoud</b></p>
+            <p class="hint">AI by Claude (Anthropic) · Assignments via the Google Classroom API. StudyPilot helps you learn: it explains, hints and checks, and never hands in work for you.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom" aria-label="Sections">
+      <button class="nav active" data-tab="dashboard" title="Dashboard (1)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg><span>Home</span>
+      </button>
+      <button class="nav" data-tab="plan" title="Planner (2)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Plan</span>
+      </button>
+      <button class="nav" data-tab="focus" title="Focus timer (3)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg><span>Focus</span>
+      </button>
+      <button class="nav" data-tab="cards" title="Flashcards (4)">
+        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="15" height="13" rx="2"/><path d="M7 4h13a2 2 0 0 1 2 2v11"/></svg><span>Cards</span>
+      </button>
+      <button class="nav" data-tab="settings" title="Settings (5)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span>
+      </button>
+    </nav>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="lib/md.js"></script>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

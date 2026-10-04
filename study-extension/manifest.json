@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "StudyPilot: Classroom & Docs Study Assistant",
+  "short_name": "StudyPilot",
+  "version": "1.0.0",
+  "description": "Your homework dashboard for Google Classroom, plus an AI study sidebar in Google Docs. Created by Abdullah Masoud.",
+  "author": "Abdullah Masoud",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "StudyPilot",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "identity",
+    "scripting",
+    "activeTab",
+    "alarms",
+    "notifications",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "https://classroom.googleapis.com/*",
+    "https://oauth2.googleapis.com/*",
+    "https://api.anthropic.com/*",
+    "https://docs.google.com/*",
+    "https://classroom.google.com/*"
+  ],
+  "oauth2": {
+    "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/classroom.courses.readonly",
+      "https://www.googleapis.com/auth/classroom.coursework.me.readonly"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/*", "https://classroom.google.com/*"],
+      "js": ["lib/md.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/icon48.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+Shift+P" },
+      "description": "Open the StudyPilot dashboard"
+    },
+    "toggle-sidebar": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "Show or hide the Study Assistant sidebar"
+    }
+  }
+}

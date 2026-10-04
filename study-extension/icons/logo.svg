@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="0.55" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#C026D3"/>
+    </linearGradient>
+    <linearGradient id="plane" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A5F3FC"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.2" r="0.9">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.35"/>
+      <stop offset="0.6" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
+  <rect width="128" height="128" rx="30" fill="url(#glow)"/>
+  <!-- open book -->
+  <path d="M16 58c16-7 33-6 48 5 15-11 32-12 48-5v46c-16-6-33-5-48 6-15-11-32-12-48-6z" fill="#fff"/>
+  <path d="M64 63v47" stroke="#C4B5FD" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M26 72c9-3 19-3 28 1M26 83c9-3 19-3 28 1M74 73c9-4 19-4 28-1M74 84c9-4 19-4 28-1" stroke="#DDD6FE" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <!-- paper plane -->
+  <path d="M58 30l54-16-20 40-11-12z" fill="url(#plane)"/>
+  <path d="M81 42l31-28-26 33z" fill="#0891B2" opacity="0.55"/>
+  <!-- trail -->
+  <path d="M52 40c-6 4-10 8-12 13" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="1 7" fill="none" opacity="0.9"/>
+</svg>
