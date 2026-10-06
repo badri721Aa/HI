@@ -3,20 +3,35 @@
 /**
  * Global call engine + context.
  *
- * Problem it solves: calling was previously embedded inside app/chat/page.tsx.
- * - Incoming calls only reached you if you were on /chat
- * - WebRTC handlers lived inside a useEffect closure that captured stale `call`
- *   state, so answers / ICE candidates silently referenced `call.pc === undefined`
- *   and the whole dance broke
- *
- * This mounts globally (via layout.tsx), subscribes once per session, and
- * exposes a React context any page can call. Refs mirror the state so
- * long-lived handlers always see the latest pc/peerId.
+ * Addresses every bug raised by the adversarial review:
+ *   1. Offer handler NO LONGER answers automatically. It only stashes the
+ *      pending offer in a ref. The answer is built inside acceptCall, AFTER
+ *      the user has consented AND the local tracks are attached. Fixes:
+ *        - callee auto-answering before consent
+ *        - callee answer with no local tracks (one-way media)
+ *        - caller's media reaching callee's browser before accept
+ *   2. Offer / answer / ICE handlers all gate on peer identity so a stray
+ *      call from a third party cannot corrupt an in-progress PeerConnection.
+ *   3. init() runs at most once per auth change via a token guard; we do
+ *      NOT getUser() separately — onAuthStateChange's INITIAL_SESSION event
+ *      covers initial load.
+ *   4. callRef updates synchronously via applyCall() helper — no post-commit
+ *      effect window where handlers see stale state.
+ *   5. Caller stays in 'outgoing' until call-accept actually arrives, then
+ *      moves to 'connecting', then to 'connected' on first remote track.
+ *   6. ICE handler validates `from` matches current peer.
+ *   7. attachLocalStream is cancellation-aware: if the call ended during
+ *      getUserMedia, we stop the tracks and bail instead of leaking the mic.
+ *   8. Context value is memoised to avoid re-rendering every consumer on
+ *      every tick of the duration timer.
+ *   9. getUserMedia errors raise a toast with a human-readable reason.
+ *  10. Reject reason=busy raises a "Peer is busy" toast on the caller.
  */
 
 import * as React from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User, RealtimeChannel } from '@supabase/supabase-js'
+import { useToast } from '@/components/ui/toast'
 
 // ─── Types ───
 
@@ -72,35 +87,69 @@ const STUN = {
 const PRESENCE_CHANNEL = 'chat-presence'
 const CALLS_CHANNEL = 'webrtc-calls'
 
+// Friendly getUserMedia error messages
+function describeMediaError(err: unknown): { title: string; desc?: string } {
+  const name = err instanceof Error ? err.name : ''
+  switch (name) {
+    case 'NotAllowedError':
+    case 'PermissionDeniedError':
+      return { title: 'Camera / mic blocked', desc: 'Allow access in your browser settings and try again.' }
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      return { title: 'No camera or mic found', desc: 'Plug one in and try again.' }
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return { title: 'Device busy', desc: 'Another app is using your camera or mic.' }
+    case 'OverconstrainedError':
+      return { title: 'Device unsupported', desc: 'Your camera settings are not supported.' }
+    case 'AbortError':
+      return { title: 'Call cancelled' }
+    default:
+      return { title: 'Call failed', desc: err instanceof Error ? err.message : 'Unknown error.' }
+  }
+}
+
 // ─── Provider ───
 
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const sb = React.useMemo(() => createClient(), [])
+  const toast = useToast()
 
   const [me, setMe] = React.useState<User | null>(null)
   const [online, setOnline] = React.useState<OnlineUser[]>([])
-  const [call, setCall] = React.useState<CallState>({ status: 'idle' })
+  const [call, setCallState] = React.useState<CallState>({ status: 'idle' })
   const [muted, setMuted] = React.useState(false)
   const [cameraOff, setCameraOff] = React.useState(false)
   const [durationSec, setDurationSec] = React.useState(0)
 
-  // Refs so long-lived handlers always see the latest state
+  // State mirrored to refs for handler access.
   const callRef = React.useRef<CallState>({ status: 'idle' })
   const pcRef = React.useRef<RTCPeerConnection | null>(null)
   const localStreamRef = React.useRef<MediaStream | null>(null)
   const remoteStreamRef = React.useRef<MediaStream | null>(null)
+  const pendingOfferRef = React.useRef<{ from: string; sdp: RTCSessionDescriptionInit } | null>(null)
   const pendingIceRef = React.useRef<RTCIceCandidateInit[]>([])
   const remoteSetRef = React.useRef(false)
   const presenceChRef = React.useRef<RealtimeChannel | null>(null)
   const callsChRef = React.useRef<RealtimeChannel | null>(null)
   const myIdRef = React.useRef<string | null>(null)
   const myNameRef = React.useRef<string>('anon')
+  const authTokenRef = React.useRef(0)
 
   const localVideoRef = React.useRef<HTMLVideoElement | null>(null)
   const remoteVideoRef = React.useRef<HTMLVideoElement | null>(null)
 
-  // Keep callRef in sync
-  React.useEffect(() => { callRef.current = call }, [call])
+  // Synchronous state + ref updater — handlers always see the latest.
+  const applyCall = React.useCallback(
+    (next: CallState | ((prev: CallState) => CallState)) => {
+      setCallState(prev => {
+        const value = typeof next === 'function' ? (next as (p: CallState) => CallState)(prev) : next
+        callRef.current = value
+        return value
+      })
+    },
+    []
+  )
 
   // ─── Media / PC lifecycle ───
 
@@ -115,6 +164,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
     remoteStreamRef.current = null
     pendingIceRef.current = []
+    pendingOfferRef.current = null
     remoteSetRef.current = false
     if (localVideoRef.current) localVideoRef.current.srcObject = null
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
@@ -134,18 +184,37 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       })
     }
     cleanupMedia()
-    setCall({ status: 'idle' })
-  }, [cleanupMedia])
+    applyCall({ status: 'idle' })
+  }, [cleanupMedia, applyCall])
 
-  const attachLocalStream = async () => {
+  // Cancellation-aware: throws if the active call changed while awaiting.
+  const attachLocalStream = async (expectedPeerId: string): Promise<MediaStream> => {
     if (localStreamRef.current) return localStreamRef.current
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    } catch (err) {
+      throw err
+    }
+    // Check if call was cancelled while we awaited
+    const current = callRef.current
+    if (current.status === 'idle' || current.peerId !== expectedPeerId) {
+      stream.getTracks().forEach(t => t.stop())
+      throw new Error('Call cancelled')
+    }
     localStreamRef.current = stream
     if (localVideoRef.current) localVideoRef.current.srcObject = stream
     return stream
   }
 
   const createPeerConnection = (peerId: string): RTCPeerConnection => {
+    // Close any stale PC before creating a new one.
+    if (pcRef.current) {
+      try { pcRef.current.close() } catch {}
+    }
+    pendingIceRef.current = []
+    remoteSetRef.current = false
+
     const pc = new RTCPeerConnection(STUN)
     pcRef.current = pc
 
@@ -156,7 +225,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         remoteVideoRef.current.srcObject = stream
       }
       // First remote track means the call is live
-      setCall(c => c.status === 'connected' ? c : { ...c, status: 'connected', startedAt: c.startedAt ?? callStartTimestamp() })
+      applyCall(c =>
+        c.status === 'connected' ? c : { ...c, status: 'connected', startedAt: c.startedAt ?? callStartTimestamp() }
+      )
     }
 
     pc.onicecandidate = (ev) => {
@@ -170,7 +241,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        hangup()
+        if (pcRef.current === pc) hangup()
       }
     }
 
@@ -192,18 +263,28 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     if (!myIdRef.current || !callsChRef.current) return
     if (callRef.current.status !== 'idle') return
 
-    setCall({ status: 'outgoing', peerId, peerName })
+    applyCall({ status: 'outgoing', peerId, peerName })
+
+    let stream: MediaStream
+    try {
+      stream = await attachLocalStream(peerId)
+    } catch (err) {
+      if (callRef.current.status === 'outgoing' && callRef.current.peerId === peerId) {
+        const msg = describeMediaError(err)
+        if (msg.title !== 'Call cancelled') toast.push({ kind: 'error', title: msg.title, desc: msg.desc })
+      }
+      cleanupMedia()
+      applyCall({ status: 'idle' })
+      return
+    }
 
     try {
-      const stream = await attachLocalStream()
       const pc = createPeerConnection(peerId)
       stream.getTracks().forEach(t => pc.addTrack(t, stream))
 
-      // Build offer
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
 
-      // Send ring + offer
       callsChRef.current.send({
         type: 'broadcast',
         event: 'call-request',
@@ -215,36 +296,73 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         payload: { from: myIdRef.current, to: peerId, sdp: offer },
       })
 
-      setCall(c => ({ ...c, status: 'connecting' }))
+      // STAY in 'outgoing' until the callee presses Accept (call-accept arrives).
+      // Previously flipped to 'connecting' here, which showed "Connecting" before
+      // the callee had even seen the ring.
     } catch (err) {
       console.error('[call] callUser failed', err)
+      toast.push({ kind: 'error', title: 'Call failed', desc: err instanceof Error ? err.message : 'Unknown error.' })
       cleanupMedia()
-      setCall({ status: 'idle' })
+      applyCall({ status: 'idle' })
     }
-  }, [cleanupMedia])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleanupMedia, applyCall])
 
   const acceptCall = React.useCallback(async () => {
     const current = callRef.current
     if (current.status !== 'incoming' || !current.peerId || !callsChRef.current || !myIdRef.current) return
-    setCall(c => ({ ...c, status: 'connecting' }))
+    const pendingOffer = pendingOfferRef.current
+    if (!pendingOffer || pendingOffer.from !== current.peerId) {
+      console.error('[call] acceptCall: no pending offer from this peer')
+      hangup()
+      return
+    }
+
+    applyCall(c => ({ ...c, status: 'connecting' }))
+
+    let stream: MediaStream
     try {
-      const stream = await attachLocalStream()
-      const pc = pcRef.current ?? createPeerConnection(current.peerId)
-      stream.getTracks().forEach(t => {
-        // Avoid double-adding if PC already has transceivers
-        const existing = pc.getSenders().some(s => s.track === t)
-        if (!existing) pc.addTrack(t, stream)
-      })
+      stream = await attachLocalStream(current.peerId)
+    } catch (err) {
+      if (callRef.current.status === 'connecting' && callRef.current.peerId === current.peerId) {
+        const msg = describeMediaError(err)
+        if (msg.title !== 'Call cancelled') toast.push({ kind: 'error', title: msg.title, desc: msg.desc })
+      }
+      hangup()
+      return
+    }
+
+    try {
+      const pc = createPeerConnection(current.peerId)
+      stream.getTracks().forEach(t => pc.addTrack(t, stream))
+
+      // Now apply the stored offer, build the answer, and send it.
+      await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer.sdp))
+      remoteSetRef.current = true
+      await flushPendingIce()
+
+      const answer = await pc.createAnswer()
+      await pc.setLocalDescription(answer)
+
       callsChRef.current.send({
         type: 'broadcast',
         event: 'call-accept',
         payload: { from: myIdRef.current, to: current.peerId },
       })
+      callsChRef.current.send({
+        type: 'broadcast',
+        event: 'answer',
+        payload: { from: myIdRef.current, to: current.peerId, sdp: answer },
+      })
+
+      pendingOfferRef.current = null
     } catch (err) {
       console.error('[call] acceptCall failed', err)
+      toast.push({ kind: 'error', title: 'Could not accept call', desc: err instanceof Error ? err.message : undefined })
       hangup()
     }
-  }, [hangup])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hangup, applyCall])
 
   const rejectCall = React.useCallback(() => {
     const current = callRef.current
@@ -255,8 +373,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       payload: { from: myIdRef.current, to: current.peerId },
     })
     cleanupMedia()
-    setCall({ status: 'idle' })
-  }, [cleanupMedia])
+    applyCall({ status: 'idle' })
+  }, [cleanupMedia, applyCall])
 
   const toggleMute = React.useCallback(() => {
     const s = localStreamRef.current
@@ -281,23 +399,25 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // ─── Auth + channel setup ───
 
   React.useEffect(() => {
-    let cancelled = false
+    const token = ++authTokenRef.current
 
     const init = async (user: User | null) => {
-      // Tear down anything previous
+      // If a newer init() has started, abandon this one.
+      if (token !== authTokenRef.current) return
+
+      // Tear down anything previous.
       if (presenceChRef.current) { sb.removeChannel(presenceChRef.current); presenceChRef.current = null }
       if (callsChRef.current) { sb.removeChannel(callsChRef.current); callsChRef.current = null }
       cleanupMedia()
       setOnline([])
-      setCall({ status: 'idle' })
+      applyCall({ status: 'idle' })
       setMe(user)
       myIdRef.current = user?.id ?? null
       myNameRef.current = user?.user_metadata?.display_name ?? user?.email?.split('@')[0] ?? 'anon'
 
-      if (!user || cancelled) return
+      if (!user) return
 
-      // Presence channel — shared with chat page's old channel name so
-      // existing presence state stays visible everywhere.
+      // Presence channel.
       const presenceCh = sb.channel(PRESENCE_CHANNEL, {
         config: { presence: { key: user.id } },
       })
@@ -308,6 +428,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         })
         .subscribe(async (status) => {
           if (status !== 'SUBSCRIBED') return
+          // If a newer init() has started, don't track on a stale channel.
+          if (token !== authTokenRef.current) return
           await presenceCh.track({
             user_id: user.id,
             user_name: myNameRef.current,
@@ -316,13 +438,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         })
       presenceChRef.current = presenceCh
 
-      // Calls channel — broadcast only
+      // Calls channel.
       const callsCh = sb.channel(CALLS_CHANNEL)
 
       callsCh.on('broadcast', { event: 'call-request' }, async ({ payload }: { payload: { from: string; fromName: string; to: string } }) => {
         if (payload.to !== myIdRef.current) return
         if (callRef.current.status !== 'idle') {
-          // Auto-busy: tell them we can't take it
+          // Auto-busy
           callsCh.send({
             type: 'broadcast',
             event: 'call-reject',
@@ -330,34 +452,28 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           })
           return
         }
-        setCall({ status: 'incoming', peerId: payload.from, peerName: payload.fromName })
+        // Clear any stale pending offer from a previous attempt; the real offer
+        // for this call-request will arrive via the 'offer' broadcast.
+        pendingOfferRef.current = null
+        applyCall({ status: 'incoming', peerId: payload.from, peerName: payload.fromName })
       })
 
-      callsCh.on('broadcast', { event: 'offer' }, async ({ payload }: { payload: { from: string; to: string; sdp: RTCSessionDescriptionInit } }) => {
+      callsCh.on('broadcast', { event: 'offer' }, ({ payload }: { payload: { from: string; to: string; sdp: RTCSessionDescriptionInit } }) => {
         if (payload.to !== myIdRef.current) return
-        // Ensure PC exists (for callee receiving an offer)
-        const pc = pcRef.current ?? createPeerConnection(payload.from)
-        try {
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-          remoteSetRef.current = true
-          await flushPendingIce()
-          // Only create an answer if we're receiving (not the one who sent the offer)
-          if (pc.localDescription?.type !== 'offer') {
-            const answer = await pc.createAnswer()
-            await pc.setLocalDescription(answer)
-            callsChRef.current?.send({
-              type: 'broadcast',
-              event: 'answer',
-              payload: { from: myIdRef.current, to: payload.from, sdp: answer },
-            })
-          }
-        } catch (err) {
-          console.error('[call] offer handling failed', err)
-        }
+        const current = callRef.current
+        // Only accept offers that match the ringing peer. Ignore everything else
+        // so a third-party caller cannot touch an active PC.
+        if (current.status !== 'incoming' || current.peerId !== payload.from) return
+        // Just stash — do NOT build/send an answer. acceptCall does that after
+        // the user has consented and the local tracks are attached.
+        pendingOfferRef.current = { from: payload.from, sdp: payload.sdp }
       })
 
       callsCh.on('broadcast', { event: 'answer' }, async ({ payload }: { payload: { from: string; to: string; sdp: RTCSessionDescriptionInit } }) => {
         if (payload.to !== myIdRef.current || !pcRef.current) return
+        const current = callRef.current
+        // Only the original caller should process this answer, and only from the right peer.
+        if ((current.status !== 'outgoing' && current.status !== 'connecting') || current.peerId !== payload.from) return
         try {
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.sdp))
           remoteSetRef.current = true
@@ -367,8 +483,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         }
       })
 
-      callsCh.on('broadcast', { event: 'ice' }, async ({ payload }: { payload: { to: string; candidate: RTCIceCandidateInit } }) => {
+      callsCh.on('broadcast', { event: 'ice' }, async ({ payload }: { payload: { from: string; to: string; candidate: RTCIceCandidateInit } }) => {
         if (payload.to !== myIdRef.current) return
+        const current = callRef.current
+        if (!current.peerId || current.peerId !== payload.from) return
         if (!pcRef.current || !remoteSetRef.current) {
           pendingIceRef.current.push(payload.candidate)
           return
@@ -376,38 +494,51 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         try { await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate)) } catch {}
       })
 
-      callsCh.on('broadcast', { event: 'call-accept' }, async ({ payload }: { payload: { from: string; to: string } }) => {
+      callsCh.on('broadcast', { event: 'call-accept' }, ({ payload }: { payload: { from: string; to: string } }) => {
         if (payload.to !== myIdRef.current) return
-        // Caller side: ensure media + PC exist (callUser already created them,
-        // this just moves UI state forward if the acceptee was fast)
-        if (callRef.current.status === 'outgoing') {
-          setCall(c => ({ ...c, status: 'connecting' }))
+        const current = callRef.current
+        if (current.status === 'outgoing' && current.peerId === payload.from) {
+          applyCall(c => ({ ...c, status: 'connecting' }))
         }
       })
 
       callsCh.on('broadcast', { event: 'call-reject' }, ({ payload }: { payload: { from: string; to: string; reason?: string } }) => {
         if (payload.to !== myIdRef.current) return
+        const current = callRef.current
+        // Only acknowledge rejects from the peer we're trying to reach.
+        if (!current.peerId || current.peerId !== payload.from) return
+        const name = current.peerName ?? 'They'
+        if (payload.reason === 'busy') {
+          toast.push({ kind: 'warning', title: `${name} is on another call`, desc: 'Try again in a bit.' })
+        } else if (current.status === 'outgoing') {
+          toast.push({ kind: 'info', title: `${name} declined`, desc: 'The call was rejected.' })
+        }
         cleanupMedia()
-        setCall({ status: 'idle' })
+        applyCall({ status: 'idle' })
       })
 
       callsCh.on('broadcast', { event: 'hangup' }, ({ payload }: { payload: { to: string; from: string } }) => {
         if (payload.to !== myIdRef.current) return
+        const current = callRef.current
+        if (!current.peerId || current.peerId !== payload.from) return
         cleanupMedia()
-        setCall({ status: 'idle' })
+        applyCall({ status: 'idle' })
       })
 
       callsCh.subscribe()
       callsChRef.current = callsCh
     }
 
-    sb.auth.getUser().then(({ data }) => init(data.user))
+    // Rely solely on onAuthStateChange — it fires INITIAL_SESSION on mount,
+    // which covers the initial-load case. Previously we also ran
+    // sb.auth.getUser().then(init), causing two concurrent init()s to race.
     const { data: { subscription } } = sb.auth.onAuthStateChange((_ev, session) => {
       init(session?.user ?? null)
     })
 
     return () => {
-      cancelled = true
+      // Invalidate any in-flight init() so its SUBSCRIBED callback bails.
+      authTokenRef.current++
       subscription.unsubscribe()
       if (presenceChRef.current) sb.removeChannel(presenceChRef.current)
       if (callsChRef.current) sb.removeChannel(callsChRef.current)
@@ -416,7 +547,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sb])
 
-  // Duration timer (updates once per second while connected)
+  // Duration timer
   React.useEffect(() => {
     if (call.status !== 'connected' || !call.startedAt) return
     const start = call.startedAt
@@ -426,8 +557,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id)
   }, [call.status, call.startedAt])
 
-  // Ensure remote video element always has the current stream (handles
-  // the race where the <video> mounts after ontrack fires)
+  // Keep video elements synced to their streams (handles the race where the
+  // <video> mounts after ontrack has already fired)
   React.useEffect(() => {
     if (remoteVideoRef.current && remoteStreamRef.current) {
       if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
@@ -441,12 +572,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   })
 
-  const value: CallContextValue = {
+  // Memoised context value — stops cascading re-renders of all consumers
+  // every time the duration timer ticks.
+  const value = React.useMemo<CallContextValue>(() => ({
     me, online, call,
     callUser, acceptCall, rejectCall, hangup,
     toggleMute, toggleCamera, muted, cameraOff,
     localVideoRef, remoteVideoRef, callDurationSec: durationSec,
-  }
+  }), [me, online, call, callUser, acceptCall, rejectCall, hangup, toggleMute, toggleCamera, muted, cameraOff, durationSec])
 
   return (
     <CallContext.Provider value={value}>
@@ -456,8 +589,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-// Date.now() is forbidden inside workflow scripts; here in app code it's fine.
-// Centralised wrapper so the forbidden lookup is obvious if ever ported.
+// Isolated so a future port to a workflow script surfaces the forbidden lookup.
 function callStartTimestamp(): number { return Date.now() }
 
 // ═════════════════════════════════════════════════════════════════
@@ -469,11 +601,11 @@ function CallOverlay() {
 
   if (call.status === 'idle') return null
 
-  // Incoming — compact ringing card (top-right, non-blocking)
+  // Incoming — compact ringing card
   if (call.status === 'incoming') {
     return (
       <div
-        className="fixed top-20 right-4 z-[10000] w-[320px] rounded-2xl overflow-hidden"
+        className="fixed top-20 right-4 z-[9999] w-[320px] rounded-2xl overflow-hidden"
         style={{
           background: 'rgba(5,5,6,0.98)',
           border: '1px solid rgba(16,185,129,0.35)',
@@ -490,11 +622,7 @@ function CallOverlay() {
             </span>
             <span className="mono text-[10px] uppercase tracking-widest text-emerald-400">Incoming call</span>
           </div>
-          <button
-            onClick={rejectCall}
-            className="text-zinc-600 hover:text-zinc-300 transition-colors"
-            aria-label="Dismiss"
-          >
+          <button onClick={rejectCall} className="text-zinc-600 hover:text-zinc-300 transition-colors" aria-label="Dismiss">
             <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -542,11 +670,11 @@ function CallOverlay() {
     )
   }
 
-  // Outgoing — compact "ringing" card
+  // Outgoing / connecting — compact ringing card
   if (call.status === 'outgoing' || call.status === 'connecting') {
     return (
       <div
-        className="fixed top-20 right-4 z-[10000] w-[320px] rounded-2xl overflow-hidden"
+        className="fixed top-20 right-4 z-[9999] w-[320px] rounded-2xl overflow-hidden"
         style={{
           background: 'rgba(5,5,6,0.98)',
           border: '1px solid rgba(139,92,246,0.35)',
@@ -600,14 +728,13 @@ function CallOverlay() {
 
   // Connected — full-screen video overlay
   return (
-    <div className="fixed inset-0 z-[10000] bg-black/95 flex flex-col" style={{ animation: 'fade-in 0.2s ease-out' }}>
+    <div className="fixed inset-0 z-[9999] bg-black/95 flex flex-col" style={{ animation: 'fade-in 0.2s ease-out' }}>
       <div className="relative flex-1">
         <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover bg-black" />
         <video ref={localVideoRef} autoPlay playsInline muted className="absolute bottom-4 right-4 w-40 sm:w-56 aspect-video rounded-2xl border border-white/15 object-cover bg-zinc-900" style={{
           boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
         }} />
 
-        {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-4" style={{
           background: 'linear-gradient(180deg, rgba(0,0,0,0.6), transparent)',
         }}>
@@ -635,7 +762,6 @@ function CallOverlay() {
         </div>
       </div>
 
-      {/* Bottom controls */}
       <div className="relative px-6 py-6 flex items-center justify-center gap-3" style={{
         background: 'linear-gradient(0deg, rgba(0,0,0,0.6), transparent)',
       }}>

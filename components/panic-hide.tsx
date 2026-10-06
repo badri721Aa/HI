@@ -25,7 +25,7 @@ export function PanicHide() {
     <div
       id="panic-overlay"
       style={{ display: 'none' }}
-      className="fixed inset-0 z-[9999] bg-white overflow-auto"
+      className="fixed inset-0 z-[2147483646] bg-white overflow-auto"
     >
       {/* Fake Google Classroom */}
       <div style={{ fontFamily: 'Google Sans, Roboto, Arial, sans-serif', minHeight: '100vh', background: '#fff' }}>
