@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User, RealtimeChannel } from '@supabase/supabase-js'
 import { isOwner, canAdmin, formatTime } from '@/lib/utils'
+import { useCall } from '@/components/call-provider'
 
 interface Message {
   id: string
@@ -23,23 +24,7 @@ interface Reaction {
   emoji: string
 }
 
-interface PresenceState {
-  user_id: string
-  user_name: string
-  online_at: number
-}
-
-interface CallState {
-  type: 'incoming' | 'outgoing' | 'connected' | 'idle'
-  peerId?: string
-  peerName?: string
-  localStream?: MediaStream
-  remoteStream?: MediaStream
-  pc?: RTCPeerConnection
-}
-
 const EMOJIS = ['👍','❤️','😂','😮','😢','🔥']
-const STUN = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
 
 export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -50,22 +35,20 @@ export default function ChatPage() {
   const [authLoading, setAuthLoading] = useState(true)
   const [banned, setBanned] = useState(false)
   const [typing, setTyping] = useState<string[]>([])
-  const [online, setOnline] = useState<PresenceState[]>([])
   const [hover, setHover] = useState<string | null>(null)
-  const [call, setCall] = useState<CallState>({ type: 'idle' })
 
   const bottomRef = useRef<HTMLDivElement>(null)
-  const localVideoRef = useRef<HTMLVideoElement>(null)
-  const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const presenceCh = useRef<RealtimeChannel | null>(null)
-  const callCh = useRef<RealtimeChannel | null>(null)
+  const dataCh = useRef<RealtimeChannel | null>(null)
   const sb = createClient()
 
-  // ── Initialise ──────────────────────────────────────────────
+  // Calls now live in the global CallProvider — chat only consumes
+  // the online list and the `callUser` action.
+  const { online, callUser, call } = useCall()
+
+  // ─── Initialise ──────────────────────────────────────────────
   useEffect(() => {
     let uid = ''
-    let uname = ''
 
     sb.auth.getUser().then(async ({ data }) => {
       const u = data.user
@@ -73,9 +56,8 @@ export default function ChatPage() {
       setAuthLoading(false)
       if (!u) return
       uid = u.id
-      uname = u.user_metadata?.display_name ?? u.email?.split('@')[0] ?? 'anon'
 
-      // Fetch profile + messages + reactions in parallel
+      // Fetch profile + messages + reactions + ban in parallel
       const [{ data: p }] = await Promise.all([
         sb.from('profiles').select('role').eq('id', u.id).single(),
         fetchMessages(),
@@ -84,15 +66,12 @@ export default function ChatPage() {
       ])
       if (p) setUserRole(p.role)
 
-      // ── Presence ──────────────────────────────────────────
-      presenceCh.current = sb.channel('chat-presence', { config: { presence: { key: uid } } })
-        .on('presence', { event: 'sync' }, () => {
-          const state = presenceCh.current!.presenceState<PresenceState>()
-          setOnline(Object.values(state).flat())
-        })
+      // Data channel — messages + reactions + typing broadcast.
+      // Separate from the call channels so presence/calls aren't blocked
+      // behind message postgres_changes events.
+      dataCh.current = sb.channel('chat-data')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, ({ new: row }) => {
           const msg = row as Message
-          // Skip if already present (optimistic update replaced the temp entry)
           setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages' }, ({ new: row }) => {
@@ -115,66 +94,23 @@ export default function ChatPage() {
         })
         .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { name: string; uid: string } }) => {
           if (payload.uid === uid) return
-          setTyping(prev => {
-            if (!prev.includes(payload.name)) return [...prev, payload.name]
-            return prev
-          })
+          setTyping(prev => prev.includes(payload.name) ? prev : [...prev, payload.name])
           setTimeout(() => setTyping(prev => prev.filter(n => n !== payload.name)), 3000)
-        })
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            await presenceCh.current!.track({ user_id: uid, user_name: uname, online_at: Date.now() })
-          }
-        })
-
-      // ── WebRTC signaling channel ───────────────────────────
-      callCh.current = sb.channel('webrtc-calls')
-        .on('broadcast', { event: 'call-request' }, ({ payload }: { payload: { from: string; fromName: string; to: string } }) => {
-          if (payload.to !== uid) return
-          setCall({ type: 'incoming', peerId: payload.from, peerName: payload.fromName })
-        })
-        .on('broadcast', { event: 'call-accept' }, ({ payload }: { payload: { from: string; to: string } }) => {
-          if (payload.to !== uid) return
-          initiatePeerConnection(payload.from, true)
-        })
-        .on('broadcast', { event: 'call-reject' }, ({ payload }: { payload: { to: string } }) => {
-          if (payload.to !== uid) return
-          hangup()
-        })
-        .on('broadcast', { event: 'offer' }, async ({ payload }: { payload: { to: string; sdp: RTCSessionDescriptionInit } }) => {
-          if (payload.to !== uid || !call.pc) return
-          await call.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-          const answer = await call.pc.createAnswer()
-          await call.pc.setLocalDescription(answer)
-          callCh.current!.send({ type: 'broadcast', event: 'answer', payload: { to: call.peerId!, sdp: answer } })
-        })
-        .on('broadcast', { event: 'answer' }, async ({ payload }: { payload: { to: string; sdp: RTCSessionDescriptionInit } }) => {
-          if (payload.to !== uid || !call.pc) return
-          await call.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-        })
-        .on('broadcast', { event: 'ice' }, async ({ payload }: { payload: { to: string; candidate: RTCIceCandidateInit } }) => {
-          if (payload.to !== uid || !call.pc) return
-          try { await call.pc.addIceCandidate(new RTCIceCandidate(payload.candidate)) } catch {}
-        })
-        .on('broadcast', { event: 'hangup' }, ({ payload }: { payload: { to: string } }) => {
-          if (payload.to !== uid) return
-          hangup()
         })
         .subscribe()
     })
 
     return () => {
-      if (presenceCh.current) sb.removeChannel(presenceCh.current)
-      if (callCh.current) sb.removeChannel(callCh.current)
-      hangup()
+      if (dataCh.current) sb.removeChannel(dataCh.current)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // ── Data fetching ────────────────────────────────────────────
+  // ─── Data fetching ────────────────────────────────────────────
   async function checkBanned(email: string) {
     const { data } = await sb.from('banned_users').select('id').eq('name', email).single()
     if (data) setBanned(true)
@@ -199,13 +135,12 @@ export default function ChatPage() {
     }
   }
 
-  // ── Messaging ────────────────────────────────────────────────
+  // ─── Messaging ────────────────────────────────────────────────
   async function send() {
     if (!input.trim() || !user || banned) return
     const text = input.trim()
     const displayName = user.user_metadata?.display_name ?? user.email?.split('@')[0] ?? 'anon'
 
-    // Optimistic: clear input and show message immediately
     setInput('')
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
     const tempMsg: Message = {
@@ -219,8 +154,6 @@ export default function ChatPage() {
     }
     setMessages(prev => [...prev, tempMsg])
 
-    // Persist to DB; swap or drop the temp depending on whether the
-    // realtime echo already added the real row.
     const { data, error } = await sb.from('chat_messages').insert({
       user_id: user.id,
       user_name: displayName,
@@ -230,7 +163,6 @@ export default function ChatPage() {
     }).select().single()
 
     if (error) {
-      // Restore input + drop temp on failure so the user can retry
       console.error('[chat] send failed', error)
       setMessages(prev => prev.filter(m => m.id !== tempId))
       setInput(text)
@@ -248,20 +180,17 @@ export default function ChatPage() {
   }
 
   function broadcastTyping() {
-    if (!presenceCh.current || !user) return
+    if (!dataCh.current || !user) return
     const name = user.user_metadata?.display_name ?? 'anon'
-    presenceCh.current.send({ type: 'broadcast', event: 'typing', payload: { name, uid: user.id } })
+    dataCh.current.send({ type: 'broadcast', event: 'typing', payload: { name, uid: user.id } })
     if (typingTimer.current) clearTimeout(typingTimer.current)
     typingTimer.current = setTimeout(() => {}, 2500)
   }
 
   async function deleteMessage(msg: Message) {
-    // Optimistic: drop from UI immediately so the user gets feedback
     setMessages(prev => prev.filter(m => m.id !== msg.id))
     const { error } = await sb.from('chat_messages').update({ deleted: true }).eq('id', msg.id)
     if (error) {
-      // RLS refused — likely because admins lack UPDATE policy on others' rows.
-      // Restore the message so the UI matches DB state and log for the operator.
       console.error('[chat] delete refused', error)
       setMessages(prev => [...prev, msg].sort((a, b) => a.created_at.localeCompare(b.created_at)))
     }
@@ -278,61 +207,7 @@ export default function ChatPage() {
     }
   }
 
-  // ── WebRTC ───────────────────────────────────────────────────
-  async function initiatePeerConnection(peerId: string, isCallee: boolean) {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-    if (localVideoRef.current) localVideoRef.current.srcObject = stream
-
-    const pc = new RTCPeerConnection(STUN)
-    stream.getTracks().forEach(t => pc.addTrack(t, stream))
-
-    pc.ontrack = (e) => {
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0]
-    }
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate && callCh.current) {
-        callCh.current.send({ type: 'broadcast', event: 'ice', payload: { to: peerId, candidate: e.candidate.toJSON() } })
-      }
-    }
-
-    setCall(prev => ({ ...prev, type: 'connected', pc, localStream: stream }))
-
-    if (!isCallee) {
-      const offer = await pc.createOffer()
-      await pc.setLocalDescription(offer)
-      callCh.current!.send({ type: 'broadcast', event: 'offer', payload: { to: peerId, sdp: offer } })
-    }
-  }
-
-  function callUser(peerId: string, peerName: string) {
-    if (!user || !callCh.current) return
-    setCall({ type: 'outgoing', peerId, peerName })
-    callCh.current.send({
-      type: 'broadcast', event: 'call-request',
-      payload: { from: user.id, fromName: user.user_metadata?.display_name ?? 'anon', to: peerId },
-    })
-    initiatePeerConnection(peerId, false)
-  }
-
-  function acceptCall() {
-    if (!user || !call.peerId || !callCh.current) return
-    callCh.current.send({ type: 'broadcast', event: 'call-accept', payload: { from: user.id, to: call.peerId } })
-    initiatePeerConnection(call.peerId, true)
-  }
-
-  const hangup = useCallback(() => {
-    if (call.pc) { call.pc.close() }
-    if (call.localStream) call.localStream.getTracks().forEach(t => t.stop())
-    if (call.peerId && callCh.current && user) {
-      callCh.current.send({ type: 'broadcast', event: 'hangup', payload: { to: call.peerId } })
-    }
-    setCall({ type: 'idle' })
-    if (localVideoRef.current) localVideoRef.current.srcObject = null
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
-  }, [call, user])
-
-  // ── Gate ─────────────────────────────────────────────────────
+  // ─── Gate ─────────────────────────────────────────────────────
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center pt-14">
@@ -355,82 +230,10 @@ export default function ChatPage() {
   }
 
   const isAdminUser = canAdmin(userRole)
+  const callBusy = call.status !== 'idle'
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col px-6 pb-20 pt-28" style={{ minHeight: '100vh' }}>
-
-      {/* ── Video call overlay ───────────────────────────────── */}
-      {call.type !== 'idle' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/90 backdrop-blur-md">
-          <div className="glass-hi relative w-full max-w-xl rounded-3xl p-6 space-y-4">
-            {call.type === 'incoming' && (
-              <>
-                <div className="text-center space-y-2">
-                  <div className="mono text-[10px] tracking-widest text-zinc-500 uppercase">Incoming call</div>
-                  <p className="text-lg font-semibold text-zinc-100">{call.peerName}</p>
-                </div>
-                <div className="flex justify-center gap-4">
-                  <button onClick={acceptCall} className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-400 transition-all active:scale-95">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.68A2 2 0 012 1.07h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
-                    </svg>
-                  </button>
-                  <button onClick={hangup} className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-lg hover:bg-rose-400 transition-all active:scale-95">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <line x1="1" y1="1" x2="23" y2="23"/><path strokeLinecap="round" d="M16.72 11.06A10.94 10.94 0 0119 12.55M5 5a10.94 10.94 0 012.93 1.5m9.95 9.95a10.94 10.94 0 01-4.02 2.13M1.83 1.83l20.34 20.34"/>
-                    </svg>
-                  </button>
-                </div>
-              </>
-            )}
-            {call.type === 'outgoing' && (
-              <div className="text-center space-y-4">
-                <div className="mono text-[10px] tracking-widest text-zinc-500 uppercase animate-pulse">Calling...</div>
-                <p className="text-lg font-semibold text-zinc-100">{call.peerName}</p>
-                <button onClick={hangup} className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-500 text-white hover:bg-rose-400 transition-all">
-                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <line x1="1" y1="1" x2="23" y2="23"/><path strokeLinecap="round" d="M16.72 11.06A10.94 10.94 0 0119 12.55"/>
-                  </svg>
-                </button>
-              </div>
-            )}
-            {call.type === 'connected' && (
-              <>
-                <div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-900">
-                  <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                  <video ref={localVideoRef} autoPlay playsInline muted className="absolute bottom-3 right-3 w-28 rounded-xl border border-white/10 object-cover" />
-                </div>
-                <div className="flex justify-center gap-3">
-                  <button
-                    onClick={() => { if (call.localStream) call.localStream.getAudioTracks().forEach(t => { t.enabled = !t.enabled }) }}
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all"
-                    title="Toggle mute"
-                  >
-                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path strokeLinecap="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
-                    </svg>
-                  </button>
-                  <button onClick={hangup} className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 text-white hover:bg-rose-400 transition-all">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <line x1="1" y1="1" x2="23" y2="23"/>
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => { if (call.localStream) call.localStream.getVideoTracks().forEach(t => { t.enabled = !t.enabled }) }}
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all"
-                    title="Toggle camera"
-                  >
-                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                    </svg>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="mb-8">
         <div className="mb-3 flex items-center gap-2">
@@ -442,11 +245,19 @@ export default function ChatPage() {
             <h1 className="font-nacelle text-3xl font-semibold text-zinc-100 tracking-tight">Public Room</h1>
             <p className="mt-2 text-sm text-zinc-500">{messages.length} messages</p>
           </div>
-          {/* Online count */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.07] bg-zinc-900/40 px-3 py-1.5">
+          <a
+            href="/call"
+            className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-all hover:brightness-110 active:scale-[0.98]"
+            style={{
+              background: 'rgba(16,185,129,0.08)',
+              border: '1px solid rgba(16,185,129,0.3)',
+              boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
+            }}
+            title="Dedicated calls page"
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <span className="mono text-[10px] text-zinc-500">{online.length} online</span>
-          </div>
+            <span className="mono text-[10px] text-emerald-300 uppercase tracking-widest">{online.length} online · Call page</span>
+          </a>
         </div>
       </div>
 
@@ -475,6 +286,7 @@ export default function ChatPage() {
           }, {})
 
           const canDelete = m.user_id === user.id || isAdminUser
+          const canCall = !!m.user_id && m.user_id !== user.id && online.some(o => o.user_id === m.user_id) && !callBusy
 
           return (
             <div
@@ -505,7 +317,6 @@ export default function ChatPage() {
                 <p className={'text-sm leading-relaxed break-words ' + (m.is_owner ? 'text-amber-50/80' : 'text-zinc-300')}>
                   {m.message}
                 </p>
-                {/* Reactions row */}
                 {Object.keys(grouped).length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {Object.entries(grouped).map(([emoji, { count, mine }]) => (
@@ -525,7 +336,6 @@ export default function ChatPage() {
                   </div>
                 )}
               </div>
-              {/* Hover actions */}
               {hover === m.id && (
                 <div className="absolute -top-2 right-0 flex items-center gap-0.5 rounded-xl border border-white/[0.08] bg-zinc-900/90 backdrop-blur px-1.5 py-1 shadow-lg">
                   {EMOJIS.map(e => (
@@ -545,14 +355,13 @@ export default function ChatPage() {
                       del
                     </button>
                   )}
-                  {/* Call button — show if other user is online */}
-                  {m.user_id && m.user_id !== user.id && online.some(o => o.user_id === m.user_id) && call.type === 'idle' && (
+                  {canCall && (
                     <button
                       onClick={() => callUser(m.user_id!, m.user_name)}
                       className="ml-0.5 rounded-lg px-1.5 py-0.5 mono text-[9px] text-zinc-600 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all"
-                      title="Video call"
+                      title={`Video call ${m.user_name}`}
                     >
-                      📹
+                      📹 call
                     </button>
                   )}
                 </div>
@@ -560,7 +369,6 @@ export default function ChatPage() {
             </div>
           )
         })}
-        {/* Typing indicator */}
         {typing.length > 0 && (
           <div className="mono text-[10px] text-zinc-700">
             {typing.join(', ')} {typing.length === 1 ? 'is' : 'are'} typing...

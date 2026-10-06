@@ -72,6 +72,7 @@ function buildItems(): Item[] {
   const nav: Item[] = [
     { label: 'Home', desc: 'Platform dashboard and module overview', href: '/', tag: 'Page', kind: 'nav', icon: '⌂' },
     { label: 'Live Chat', desc: 'Real-time messaging, reactions, P2P video', href: '/chat', tag: 'Chat', kind: 'nav', icon: '💬', shortcut: 'G C' },
+    { label: 'Calls', desc: 'Dial any online user — WebRTC peer-to-peer video', href: '/call', tag: 'Chat', kind: 'nav', icon: '📞', shortcut: 'G V' },
     { label: 'News Feed', desc: 'Pinned announcements and admin broadcasts', href: '/news', tag: 'Feed', kind: 'nav', icon: '📡' },
     { label: 'Proxy Browser', desc: 'Bypass content filters, browse freely', href: '/proxy', tag: 'Proxy', kind: 'nav', icon: '🌐' },
     { label: 'AI Assistant', desc: 'In-browser AI, no API keys required', href: '/ai', tag: 'AI', kind: 'nav', icon: '🤖' },

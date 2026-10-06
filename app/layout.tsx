@@ -10,6 +10,7 @@ import { AIWidget } from '@/components/ai-widget'
 import { CommandPalette } from '@/components/command-palette'
 import { TelemetryBar } from '@/components/telemetry-bar'
 import { ToastProvider } from '@/components/ui/toast'
+import { CallProvider } from '@/components/call-provider'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -40,19 +41,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark">
       <body className={`${inter.variable} ${nacelle.variable} bg-black text-zinc-300 antialiased font-inter`}>
         <ToastProvider>
-          <div className="relative min-h-screen">
-            <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-50" />
-            <PanicHide />
-            <PanicHandler />
-            <TrollReceiver />
-            <AIWidget />
-            <CommandPalette />
-            <Nav />
-            <main className="min-h-screen pb-8">
-              {children}
-            </main>
-            <TelemetryBar />
-          </div>
+          <CallProvider>
+            <div className="relative min-h-screen">
+              <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-50" />
+              <PanicHide />
+              <PanicHandler />
+              <TrollReceiver />
+              <AIWidget />
+              <CommandPalette />
+              <Nav />
+              <main className="min-h-screen pb-8">
+                {children}
+              </main>
+              <TelemetryBar />
+            </div>
+          </CallProvider>
         </ToastProvider>
       </body>
     </html>
