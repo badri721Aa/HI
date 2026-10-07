@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { PRODUCTS, getProduct } from "@/content/catalog";
@@ -22,6 +22,20 @@ const [sansSemibold, sansRegular, mono, arabicBold, arabicMedium] = await Promis
 ]);
 const fonts = ogFonts({ sansSemibold, sansRegular, mono, arabicBold, arabicMedium });
 
+/**
+ * Product photos for the cards: assets/og-photos/<slug>.jpg (4:5 JPEG; Satori
+ * cannot decode WebP). Products without one get the silhouette art.
+ */
+const photoDir = join(process.cwd(), "assets/og-photos");
+const photoFiles = (await readdir(photoDir).catch(() => [] as string[])).filter((f) => f.endsWith(".jpg"));
+const photos = new Map(
+  await Promise.all(
+    photoFiles.map(
+      async (f) => [f.slice(0, -4), `data:image/jpeg;base64,${(await readFile(join(photoDir, f))).toString("base64")}`] as const,
+    ),
+  ),
+);
+
 /** Image routes only see their own params, so this lists every locale × product. */
 export function generateStaticParams() {
   return LOCALES.flatMap((lang) => PRODUCTS.map((p) => ({ lang, slug: p.slug })));
@@ -31,5 +45,5 @@ export default async function Image({ params }: { params: Promise<{ lang: string
   const { lang, slug } = await params;
   const product = getProduct(slug);
   if (!isLocale(lang) || !product) return new Response("Not found", { status: 404 });
-  return new ImageResponse(<OgCard {...productCard(product, lang)} />, { ...size, fonts });
+  return new ImageResponse(<OgCard {...productCard(product, lang, photos.get(slug))} />, { ...size, fonts });
 }

@@ -37,7 +37,7 @@ const SWATCHES = MATERIALS.reduce(
  * lg: the lead card takes the first half over two rows, Silk and PETG stack
  * beside it, and Resin, TPU and the heat note share the last row.
  */
-const PLACEMENT: Record<MaterialId, string> = {
+const PLACEMENT: Partial<Record<MaterialId, string>> = {
   "pla-matte": "md:col-span-6 lg:col-span-3 lg:row-span-2",
   "pla-silk": "md:col-span-3",
   petg: "md:col-span-3",
@@ -45,6 +45,8 @@ const PLACEMENT: Record<MaterialId, string> = {
   tpu: "md:col-span-3 lg:col-span-2",
 };
 const LEAD: MaterialId = "pla-matte";
+/** Lead card first, whatever the catalog order, so the bento never leaves holes. */
+const ORDERED = [...MATERIALS].sort((a, b) => Number(b.id === LEAD) - Number(a.id === LEAD));
 
 /** Card surface: hairline ring with a lit top edge; the ring strengthens on hover and the spotlight follows the cursor. */
 const CARD =
@@ -63,7 +65,7 @@ export function Materials() {
         </Reveal>
 
         <div className="mt-14 grid grid-cols-1 gap-3 md:mt-20 md:grid-cols-6 md:gap-4">
-          {MATERIALS.map((material, i) => (
+          {ORDERED.map((material, i) => (
             <Reveal key={material.id} delay={i * 0.06} className={cn("h-full", PLACEMENT[material.id])}>
               {material.id === LEAD ? (
                 <Tilt max={4} className="h-full">
@@ -75,7 +77,7 @@ export function Materials() {
             </Reveal>
           ))}
 
-          <Reveal delay={MATERIALS.length * 0.06} className="h-full md:col-span-6 lg:col-span-2">
+          <Reveal delay={ORDERED.length * 0.06} className="h-full md:col-span-6 lg:col-span-2">
             <div
               className="relative flex h-full flex-col gap-5 overflow-hidden rounded-2xl p-6 edge-light md:flex-row md:items-center md:p-7 lg:flex-col lg:items-start lg:justify-between lg:gap-10"
               style={{

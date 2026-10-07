@@ -40,7 +40,8 @@ export function homeCard(locale: Locale): OgCardProps {
   };
 }
 
-export function productCard(product: Product, locale: Locale): OgCardProps {
+/** `photo`: optional PNG/JPEG data URI of the product (see assets/og-photos). */
+export function productCard(product: Product, locale: Locale, photo?: string): OgCardProps {
   const t = getDictionary(locale);
   const progress = 0.7;
   const index = PRODUCTS.findIndex((p) => p.slug === product.slug);
@@ -71,6 +72,7 @@ export function productCard(product: Product, locale: Locale): OgCardProps {
     body: product.tagline[locale],
     details: [price, getMaterial(product.material).name[locale], size],
     swatches: product.colors.map((c) => c.hex),
+    photo,
     ...printReadout(product, progress, locale),
   };
 }

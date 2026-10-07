@@ -150,8 +150,8 @@ function PrintPanel({ p, rtl, label }: { p: OgCardProps; rtl: boolean; label: CS
   );
 }
 
-const PHOTO = { width: 352, height: 440 } as const;
-const PHOTO_TOP = 104;
+const PHOTO = { width: 312, height: 390 } as const;
+const PHOTO_TOP = 112;
 const PHOTO_LEFT = (ART_W - PHOTO.width) / 2;
 
 /** Panel with the product photo framed like a print bed, one hot layer across it. */

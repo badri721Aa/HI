@@ -151,13 +151,6 @@ export function ProductMesh({
     },
     [lines],
   );
-  useLayoutEffect(() => {
-    const o = Math.min(Math.max(wireOpacity, 0), 1);
-    lines.major.opacity = 0.9 * o;
-    lines.minor.opacity = 0.42 * o;
-    lines.accent.opacity = 0.8 * o;
-  }, [lines, wireOpacity]);
-
   const bulb = useMemo(
     () =>
       lamp
@@ -181,29 +174,55 @@ export function ProductMesh({
     [bulb],
   );
 
+  // Imperative handles. three.js objects are mutated only through refs (in
+  // effects and frame callbacks), never during render.
+  const live = useRef<{ material: PrintMaterial; bulb: typeof bulb } | null>(null);
+  useLayoutEffect(() => {
+    live.current = { material, bulb };
+  }, [material, bulb]);
+
+  const majorRef = useRef<THREE.LineSegments>(null);
+  const minorRef = useRef<THREE.LineSegments>(null);
+  const accentRef = useRef<THREE.LineSegments>(null);
+  useLayoutEffect(() => {
+    const o = Math.min(Math.max(wireOpacity, 0), 1);
+    const set = (obj: THREE.LineSegments | null, a: number) => {
+      if (obj) (obj.material as THREE.LineBasicMaterial).opacity = a * o;
+    };
+    set(majorRef.current, 0.9);
+    set(minorRef.current, 0.42);
+    set(accentRef.current, 0.8);
+  }, [wire, wireOpacity]);
+
   // Colour: the material starts at whatever is on screen and eases to the target.
   const shown = useRef<THREE.Color | null>(null);
   const target = useRef<THREE.Color | null>(null);
   useLayoutEffect(() => {
+    const m = live.current?.material;
+    if (!m) return;
     target.current ??= new THREE.Color();
     target.current.set(color.hex);
     shown.current ??= target.current.clone();
-    material.color.copy(shown.current);
-    syncPrintColors(material);
+    m.color.copy(shown.current);
+    syncPrintColors(m);
   }, [material, color.hex]);
 
   useLayoutEffect(() => {
-    if (lamp) setPrintPattern(material, lamp.pattern.repeat, lamp.pattern.range);
+    const m = live.current?.material;
+    if (m && lamp) setPrintPattern(m, lamp.pattern.repeat, lamp.pattern.range);
   }, [material, lamp]);
 
   const light = useRef<THREE.PointLight>(null);
   const bulbMesh = useRef<THREE.Mesh>(null);
   const glowNow = useRef(0);
-  const warm = useMemo(() => new THREE.Color(BULB), []);
+  const warm = useRef<THREE.Color | null>(null);
 
   useFrame((state, delta) => {
+    const r = live.current;
+    if (!r) return;
+    const m = r.material;
     const dt = Math.min(delta, 0.1);
-    const u = material.userData.uniforms;
+    const u = m.userData.uniforms;
     u.uTime.value = state.clock.elapsedTime;
 
     // Colour ease.
@@ -212,17 +231,17 @@ export function ProductMesh({
     if (s && t && !s.equals(t)) {
       s.lerp(t, 1 - Math.exp(-dt / COLOR_TAU));
       if (Math.abs(s.r - t.r) + Math.abs(s.g - t.g) + Math.abs(s.b - t.b) < 1e-3) s.copy(t);
-      material.color.copy(s);
-      syncPrintColors(material);
+      m.color.copy(s);
+      syncPrintColors(m);
     }
 
     // Print progress (object space; the hot band rides just under it).
     const frac = clip ? clip.get() : clipHeight;
     const clipping = frac !== null && frac !== undefined && Number.isFinite(frac) && frac < 1;
-    setPrintClip(material, frac, info.height);
+    setPrintClip(m, frac, info.height);
 
     // Lamp bulb: hidden until the print has passed it, eased on and off.
-    if (lamp && bulb) {
+    if (lamp && r.bulb) {
       const passed = !clipping || (frac as number) * info.height >= lamp.bulbY + lamp.bulbRadius * 0.5;
       const want = wireframe || !passed ? 0 : Math.min(Math.max(glow, 0), 1);
       glowNow.current += (want - glowNow.current) * (1 - Math.exp(-dt / GLOW_TAU));
@@ -230,9 +249,10 @@ export function ProductMesh({
       const g = glowNow.current;
       const scale = (info.size.w / 1.4) ** 2;
       if (light.current) light.current.intensity = 1.6 * scale * g;
-      bulb.material.emissiveIntensity = 3.2 * g;
+      r.bulb.material.emissiveIntensity = 3.2 * g;
       if (bulbMesh.current) bulbMesh.current.visible = passed && !wireframe;
-      u.uInnerGlow.value.copy(warm).multiplyScalar(0.035 * g);
+      warm.current ??= new THREE.Color(BULB);
+      u.uInnerGlow.value.copy(warm.current).multiplyScalar(0.035 * g);
     }
   });
 
@@ -241,9 +261,9 @@ export function ProductMesh({
       {wire ? (
         <>
           <mesh geometry={geometry} material={lines.occluder} />
-          <lineSegments geometry={wire.minor} material={lines.minor} renderOrder={1} />
-          <lineSegments geometry={wire.major} material={lines.major} renderOrder={2} />
-          <lineSegments geometry={wire.accent} material={lines.accent} renderOrder={2} />
+          <lineSegments ref={minorRef} geometry={wire.minor} material={lines.minor} renderOrder={1} />
+          <lineSegments ref={majorRef} geometry={wire.major} material={lines.major} renderOrder={2} />
+          <lineSegments ref={accentRef} geometry={wire.accent} material={lines.accent} renderOrder={2} />
         </>
       ) : (
         <mesh
