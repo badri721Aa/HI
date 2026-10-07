@@ -23,16 +23,20 @@ const [sansSemibold, sansRegular, mono, arabicBold, arabicMedium] = await Promis
 const fonts = ogFonts({ sansSemibold, sansRegular, mono, arabicBold, arabicMedium });
 
 /**
- * Product photos for the cards: assets/og-photos/<slug>.jpg (4:5 JPEG; Satori
- * cannot decode WebP). Products without one get the silhouette art.
+ * Product photos for the cards: assets/og-photos/<slug>.png, 312×390 (the
+ * photo well) and at most 256 colours, which keeps each card well under the
+ * ~300 KB that WhatsApp link previews tolerate. Satori cannot decode WebP.
+ * Products without a photo get the silhouette art.
  */
 const photoDir = join(process.cwd(), "assets/og-photos");
-const photoFiles = (await readdir(photoDir).catch(() => [] as string[])).filter((f) => f.endsWith(".jpg"));
+const photoFiles = (await readdir(photoDir).catch(() => [] as string[])).filter((f) => /\.(png|jpe?g)$/.test(f));
 const photos = new Map(
   await Promise.all(
-    photoFiles.map(
-      async (f) => [f.slice(0, -4), `data:image/jpeg;base64,${(await readFile(join(photoDir, f))).toString("base64")}`] as const,
-    ),
+    photoFiles.map(async (f) => {
+      const type = f.endsWith(".png") ? "png" : "jpeg";
+      const data = await readFile(join(photoDir, f));
+      return [f.replace(/\.[^.]+$/, ""), `data:image/${type};base64,${data.toString("base64")}`] as const;
+    }),
   ),
 );
 

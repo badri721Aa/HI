@@ -268,7 +268,7 @@ export function ProductMesh({
       ) : (
         <mesh
           geometry={geometry}
-          material={material as PrintMaterial}
+          material={material}
           customDepthMaterial={shadows ? depthMaterial : undefined}
           castShadow={shadows}
           receiveShadow={quality === "high"}
