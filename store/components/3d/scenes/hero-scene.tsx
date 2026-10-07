@@ -62,6 +62,7 @@ const TARGET = new THREE.Vector3(0, H * 0.45, 0);
 const plateCorner = (x: number, z: number, y: number) => new THREE.Vector3((x * PLATE) / 2, y, (z * PLATE) / 2);
 /** The piece and the head's highest reach (end of the print). */
 const FIT_PIECE: THREE.Vector3[] = [
+  ...ring(R * rippleBase(0) * (1 + RIPPLE.amp), 0),
   ...ring(R * rippleBase(0.35) * (1 + RIPPLE.amp), 0.35 * H),
   ...ring(R * rippleBase(1) + PRINT_HEAD_REACH * HEAD_SCALE, H + PRINT_HEAD_HEIGHT * HEAD_SCALE),
   plateCorner(-1, -1, 0),
@@ -81,7 +82,7 @@ const FIT_ALL: THREE.Vector3[] = [
  * - narrow (phone) boxes: the piece and the back of the plate sit above the
  *   HUD; the plate's front edge runs on beneath it.
  */
-const WIDE = { rect: { l: 0.27, r: 0.97, t: 0.03, b: 0.93 } satisfies FrameRect, fit: FIT_ALL };
+const WIDE = { rect: { l: 0.34, r: 0.98, t: 0.03, b: 0.93 } satisfies FrameRect, fit: FIT_ALL };
 const NARROW = { rect: { l: 0.2, r: 0.98, t: 0.03, b: 0.665 } satisfies FrameRect, fit: FIT_PIECE };
 const NARROW_PX = 560;
 
@@ -208,9 +209,8 @@ function HeroContent({
     const t = s.t;
     let turn = s.turn;
     let lift = 0;
-    let print = 1;
     if (t < T1) {
-      print = easeInOutSine(t / T_PRINT);
+      const print = easeInOutSine(t / T_PRINT);
       s.clip = Math.max(print, 0.0004);
       s.hot = range(t, 0, 0.35);
       s.head = range(t, 0, 0.45);

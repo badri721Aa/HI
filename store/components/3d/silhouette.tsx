@@ -47,15 +47,15 @@ export function ProductSilhouette({
           <stop offset="0" stopColor="black" stopOpacity="0.55" />
           <stop offset="0.3" stopColor="white" stopOpacity="0.14" />
           <stop offset="0.46" stopColor="white" stopOpacity="0" />
-          <stop offset="0.8" stopColor="black" stopOpacity="0.3" />
-          <stop offset="1" stopColor="black" stopOpacity="0.62" />
+          <stop offset="0.78" stopColor="black" stopOpacity="0.36" />
+          <stop offset="1" stopColor="black" stopOpacity="0.66" />
         </linearGradient>
         {/* Ambient occlusion towards the plate. */}
         <linearGradient id={`${id}-ao`} x1="0" x2="0" y1={b.y0} y2={b.y1} gradientUnits="userSpaceOnUse">
           <stop offset="0.7" stopColor="black" stopOpacity="0" />
           <stop offset="1" stopColor="black" stopOpacity="0.35" />
         </linearGradient>
-        <linearGradient id={`${id}-plate`} x1="-30" x2="130" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+        <linearGradient id={`${id}-plate`} x1="0" x2="100" y1="0" y2="0" gradientUnits="userSpaceOnUse">
           <stop offset="0" stopColor="white" stopOpacity="0" />
           <stop offset="0.5" stopColor="white" stopOpacity="0.22" />
           <stop offset="1" stopColor="white" stopOpacity="0" />
@@ -65,8 +65,8 @@ export function ProductSilhouette({
           <stop offset="1" stopColor="black" stopOpacity="0" />
         </radialGradient>
         {/* Layer lines, exaggerated so they read at this size. */}
-        <pattern id={`${id}-layers`} width="4" height="1.1" patternUnits="userSpaceOnUse">
-          <rect width="4" height="0.32" fill="black" fillOpacity="0.16" />
+        <pattern id={`${id}-layers`} width="4" height="0.9" patternUnits="userSpaceOnUse">
+          <rect width="4" height="0.22" fill="black" fillOpacity="0.09" />
         </pattern>
         <clipPath id={`${id}-shape`}>
           <path d={d} />
@@ -79,7 +79,7 @@ export function ProductSilhouette({
         </clipPath>
       </defs>
 
-      {plate ? <rect x="-30" y={b.y1} width="160" height="0.35" fill={url("plate")} /> : null}
+      {plate ? <rect x="0" y={b.y1} width="100" height="0.3" fill={url("plate")} /> : null}
       <ellipse cx={(b.x0 + b.x1) / 2} cy={b.y1} rx={w * 0.66} ry={2.4} fill={url("shadow")} />
 
       <g clipPath={printing ? url("printed") : undefined}>

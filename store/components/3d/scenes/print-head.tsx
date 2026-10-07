@@ -58,7 +58,7 @@ export interface PrintHeadProps {
 export function PrintHead({ ref, position, scale = 1, opacity = 1, light = 1 }: PrintHeadProps) {
   const parts = useMemo(() => {
     const brass = new THREE.MeshStandardMaterial({ color: "#c49a58", metalness: 1, roughness: 0.3 });
-    const sock = new THREE.MeshStandardMaterial({ color: "#26262c", metalness: 0, roughness: 0.82 });
+    const sock = new THREE.MeshStandardMaterial({ color: "#2f3037", metalness: 0, roughness: 0.74 });
     const steel = new THREE.MeshStandardMaterial({ color: "#b7bcc4", metalness: 1, roughness: 0.28 });
     const alu = new THREE.MeshStandardMaterial({ color: "#a9aeb6", metalness: 0.85, roughness: 0.36 });
     const fan = new THREE.MeshStandardMaterial({ color: "#121216", metalness: 0.2, roughness: 0.55 });

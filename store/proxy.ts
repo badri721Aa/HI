@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/config";
+import { PRODUCTS } from "@/content/catalog";
 import type { Locale } from "@/types";
 
 const GEO_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -36,8 +37,38 @@ export function pickLocale(cookie: string | undefined, acceptLanguage: string | 
   return ar > 0 && ar >= en ? "ar" : DEFAULT_LOCALE;
 }
 
+const PRODUCT_PATH = /^\/(?:en|ar)\/products\/([^/]+)\/?$/;
+const PRODUCT_SLUGS = new Set(PRODUCTS.map((p) => p.slug));
+
+/**
+ * With cache components, an unknown product slug streams the prerendered page
+ * shell before notFound() runs, so the 404 page would arrive with status 200
+ * (a "soft 404"). Answering here keeps the localized 404 page but with a real
+ * 404 status for browsers and crawlers.
+ */
+function unknownProduct(pathname: string): boolean {
+  const match = PRODUCT_PATH.exec(pathname);
+  if (!match) return false;
+  let slug: string;
+  try {
+    slug = decodeURIComponent(match[1]);
+  } catch {
+    return true;
+  }
+  return !PRODUCT_SLUGS.has(slug);
+}
+
 /** Sends "/" to "/en" or "/ar", keeping the query string, and remembers the visitor's country. */
 export function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname !== "/") {
+    if (!unknownProduct(request.nextUrl.pathname)) return NextResponse.next();
+    // Rewrite to a slug that never exists (also covers malformed escapes, which
+    // would otherwise fail to decode further down) and keep the 404 status.
+    const url = request.nextUrl.clone();
+    url.pathname = url.pathname.replace(/\/products\/[^/]+\/?$/, "/products/not-found");
+    return NextResponse.rewrite(url, { status: 404 });
+  }
+
   const locale = pickLocale(request.cookies.get("lang")?.value, request.headers.get("accept-language"));
 
   const url = request.nextUrl.clone();
@@ -62,4 +93,4 @@ export function proxy(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/"] };
+export const config = { matcher: ["/", "/:lang/products/:slug"] };

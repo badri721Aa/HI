@@ -91,15 +91,17 @@ function rippleVase(): Silhouette {
   const R = dims.w / 200;
   const to = frame(dims.w / 100, H);
   const rows = 120;
-  const steps = 720;
+  const steps = 120;
 
-  // Envelope of the projected wall: the widest x over all angles at each height.
+  // Envelope of the projected wall: the widest x over all angles at each
+  // height. It always lies within ±30° of the view's side (beyond that cos θ
+  // loses more than the ±4.5 % ridges can add), so only that arc is sampled.
   const right: Pt[] = [];
   for (let j = 0; j <= rows; j++) {
     const t = j / rows;
     let best = 0;
-    for (let k = 0; k < steps; k++) {
-      const th = (k / steps) * TAU;
+    for (let k = 0; k <= steps; k++) {
+      const th = (k / steps - 0.5) * (Math.PI / 3);
       best = Math.max(best, ripplePerimeterRadius(t, th, dims) * Math.cos(th));
     }
     right.push(to(best, t * H));

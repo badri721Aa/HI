@@ -35,8 +35,13 @@ export function FailedPrint({ className }: { className?: string }) {
   );
 }
 
-/* The strand, projected onto the silhouette's 0 0 100 100 box (front view, 40 units per model unit). */
+/*
+ * The nest, projected onto the silhouette's 0 0 100 100 box (front view, 40
+ * units per model unit). The drawing has no hotend, so the strand starts
+ * where it reaches the nest.
+ */
 const STRAND = FAILED_TANGLE.points
+  .slice(7)
   .map(([x, y], i) => `${i ? "L" : "M"}${(50 + x * 40).toFixed(2)} ${(94 - y * 40).toFixed(2)}`)
   .join("");
 
@@ -47,7 +52,7 @@ function FailedFallback({ className }: { className?: string }) {
         <ProductSilhouette kind={PIECE.model} color={PIECE.colors[0].hex} progress={FAILED_CLIP} hot={false} plate className="absolute inset-0 size-full" />
         <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false" className="absolute inset-0 size-full" overflow="visible">
           <path d={STRAND} fill="none" stroke="black" strokeOpacity="0.5" strokeWidth="0.9" strokeLinejoin="round" transform="translate(0.3 0.4)" />
-          <path d={STRAND} fill="none" stroke={PIECE.colors[0].hex} strokeWidth="0.45" strokeLinejoin="round" strokeLinecap="round" />
+          <path d={STRAND} fill="none" stroke={PIECE.colors[0].hex} strokeWidth="0.4" strokeLinejoin="round" strokeLinecap="round" />
         </svg>
       </div>
     </div>

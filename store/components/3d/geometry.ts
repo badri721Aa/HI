@@ -289,18 +289,30 @@ function addGrid(b: MeshBuilder, P: Vec3[][], opts: GridOptions) {
     }
     N.push(row);
   }
-  // Poles: average the neighbouring row.
+  // Poles and collapsed corners: average the nearest row that has a usable
+  // normal (next row first; a row can itself be a pole, e.g. a disc's centre).
+  const rowSum = (r: number): Vec3 => {
+    const acc: Vec3 = [0, 0, 0];
+    for (const n of N[r]) {
+      acc[0] += n[0];
+      acc[1] += n[1];
+      acc[2] += n[2];
+    }
+    return acc;
+  };
   for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
       if (N[j][i][0] !== 0 || N[j][i][1] !== 0 || N[j][i][2] !== 0) continue;
-      const nb = N[j + 1 < rows ? j + 1 : j - 1];
-      const acc: Vec3 = [0, 0, 0];
-      for (const n of nb) {
-        acc[0] += n[0];
-        acc[1] += n[1];
-        acc[2] += n[2];
+      for (let k = 1; k < rows; k++) {
+        const r = j + k < rows ? j + k : j - k >= 0 ? j - k : -1;
+        const acc = r >= 0 ? rowSum(r) : null;
+        const alt = j - k >= 0 && j + k < rows ? rowSum(j - k) : null;
+        const pick = acc && len(acc) > 1e-9 ? acc : alt && len(alt) > 1e-9 ? alt : null;
+        if (pick) {
+          N[j][i] = normalize(pick);
+          break;
+        }
       }
-      N[j][i] = normalize(acc);
     }
   }
 
