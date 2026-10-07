@@ -1,6 +1,6 @@
-# Layer Up — 3D-printing storefront
+# 3D BH — 3D-printing storefront
 
-A bilingual (English / Arabic) storefront for Layer Up, a 3D-printing shop in Bahrain and the UAE.
+A bilingual (English / Arabic) storefront for 3D BH, a 3D-printing shop in Bahrain and the UAE.
 
 - Products are shown with real photos. The brand moments are live 3D, rendered from code with no model files to upload: a vase printing in the hero, the "How it's made" scroll story, and the 404 page.
 - Orders are sent as a pre-filled WhatsApp message to the right line:

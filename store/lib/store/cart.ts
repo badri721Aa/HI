@@ -50,7 +50,7 @@ export const useCart = create<CartState>()(
       clear: () => set({ lines: [] }),
     }),
     {
-      name: "layerup-cart",
+      name: "3dbh-cart",
       version: 1,
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,

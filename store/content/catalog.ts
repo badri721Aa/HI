@@ -35,7 +35,7 @@ export const CATEGORIES: { id: CategoryId; name: L10n }[] = [
 export const PRODUCTS: Product[] = [
   {
     slug: "hex-phone-case",
-    sku: "LU-CASE-01",
+    sku: "3DBH-CASE-01",
     name: { en: "Hex Phone Case", ar: "كفر الخلايا السداسية" },
     tagline: {
       en: "A honeycomb back in two shades of blue, with a grippy textured finish.",
@@ -64,7 +64,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     slug: "keycap-clicker",
-    sku: "LU-FDG-01",
+    sku: "3DBH-FDG-01",
     name: { en: "Keycap Clicker", ar: "ميدالية الكيكاب" },
     tagline: {
       en: "A keyboard key on your keyring. Press it as often as you like.",
@@ -87,7 +87,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     slug: "gear-shifter",
-    sku: "LU-FDG-02",
+    sku: "3DBH-FDG-02",
     name: { en: "Gear Shifter", ar: "القير المصغّر" },
     tagline: {
       en: "A palm-sized H-pattern shifter: five gears and reverse on a diamond-knurled base.",
@@ -114,7 +114,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     slug: "dumpling-steamer",
-    sku: "LU-GFT-01",
+    sku: "3DBH-GFT-01",
     name: { en: "Dumpling in a Steamer", ar: "دمبلنغ في سلة البخار" },
     tagline: {
       en: "A smiling dumpling that hides under the lid of its own little steamer basket.",
@@ -137,7 +137,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     slug: "plant-cell-model",
-    sku: "LU-EDU-01",
+    sku: "3DBH-EDU-01",
     name: { en: "Plant Cell Model", ar: "مجسم الخلية النباتية" },
     tagline: {
       en: "A four-colour plant cell with the nucleus, chloroplasts and vacuole in relief.",

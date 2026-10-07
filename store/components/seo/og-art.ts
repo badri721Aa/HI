@@ -280,7 +280,7 @@ export interface MarkOptions {
 }
 
 /**
- * The Layer Up mark (components/ui/logo-geometry.ts): three stacked layers and
+ * The 3D BH mark (components/ui/logo-geometry.ts): three stacked layers and
  * a fourth arriving in the accent colour. `scale` is the side of the mark's
  * 24-unit box as a fraction of the canvas.
  */

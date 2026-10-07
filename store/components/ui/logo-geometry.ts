@@ -1,5 +1,5 @@
 /**
- * The Layer Up mark, in a 24-unit box: printed layers stacked into a stepped
+ * The 3D BH mark, in a 24-unit box: printed layers stacked into a stepped
  * point (each narrower than the one below, so the stack reads as "up"), the
  * newest one on top in the accent colour, like the hot layer the nozzle just
  * laid down. Plain data so the React logo, the favicon and the Open Graph

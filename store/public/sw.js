@@ -1,5 +1,5 @@
 /*
- * Layer Up service worker.
+ * 3D BH service worker.
  *
  * - Page navigations go to the network; if that fails (offline), the cached
  *   /offline.html is shown instead of the browser's error page.
@@ -11,7 +11,7 @@
  * Bump VERSION to drop old caches on the next visit.
  */
 const VERSION = "v1";
-const PREFIX = "layerup-";
+const PREFIX = "3dbh-";
 const SHELL_CACHE = `${PREFIX}shell-${VERSION}`;
 const STATIC_CACHE = `${PREFIX}static-${VERSION}`;
 const OFFLINE_URL = "/offline.html";

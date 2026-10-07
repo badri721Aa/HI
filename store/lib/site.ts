@@ -7,9 +7,9 @@ import type { Currency, L10n, Region, WhatsAppLine, WhatsAppLineId } from "@/typ
  */
 export const site = {
   /** Brand name. Shown in the header, metadata and WhatsApp messages. */
-  name: "Layer Up",
-  /** Short code used in order references, e.g. LU-7K3Q2 */
-  orderPrefix: "LU",
+  name: "3D BH",
+  /** Short code used in order references, e.g. 3DBH-7K3Q2 */
+  orderPrefix: "3DBH",
   url: resolveSiteUrl(),
   instagram: null as string | null,
   email: null as string | null,
