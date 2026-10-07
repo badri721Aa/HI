@@ -28,7 +28,7 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
         <main className="relative isolate flex min-h-[100svh] items-center overflow-hidden">
           <GridBackdrop />
           <div className="shell py-24">
-            <p aria-hidden="true" className="text-[clamp(5rem,16vw,9rem)]">
+            <p aria-hidden="true" className="text-[clamp(5rem,16vw,9rem)] leading-none">
               <PrintedCode code="500" progress={0.34} />
             </p>
 

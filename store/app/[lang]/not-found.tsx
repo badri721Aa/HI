@@ -17,7 +17,7 @@ export default async function NotFound() {
       <GridBackdrop />
       <div className="shell grid min-h-[100svh] items-center gap-y-6 pt-28 pb-20 md:grid-cols-12 md:gap-x-8 md:pt-36 md:pb-28">
         <div className="md:col-span-6 lg:col-span-5">
-          <p className="text-[clamp(6.5rem,24vw,12.5rem)] text-fg">
+          <p className="text-[clamp(6.5rem,24vw,12.5rem)] leading-none text-fg">
             <span className="sr-only">{copy.code}</span>
             <PrintedCode code={copy.code} progress={0.52} />
           </p>

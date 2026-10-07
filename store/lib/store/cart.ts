@@ -47,7 +47,7 @@ export const useCart = create<CartState>()(
       clear: () => set({ lines: [] }),
     }),
     {
-      name: "infill-cart",
+      name: "layerup-cart",
       version: 1,
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,

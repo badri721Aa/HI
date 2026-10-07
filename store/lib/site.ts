@@ -6,10 +6,10 @@ import type { Currency, L10n, Region, WhatsAppLine, WhatsAppLineId } from "@/typ
  * should be checked against how the business actually operates.
  */
 export const site = {
-  /** CONFIRM: brand name. Shown in the header, metadata and WhatsApp messages. */
-  name: "Infill",
-  /** Short code used in order references, e.g. INF-7K3Q2 */
-  orderPrefix: "INF",
+  /** Brand name. Shown in the header, metadata and WhatsApp messages. */
+  name: "Layer Up",
+  /** Short code used in order references, e.g. LU-7K3Q2 */
+  orderPrefix: "LU",
   url: resolveSiteUrl(),
   instagram: null as string | null,
   email: null as string | null,

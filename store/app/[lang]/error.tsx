@@ -25,7 +25,7 @@ export default function ErrorPage({ error, retry }: { error: Error & { digest?: 
       <GridBackdrop />
       <div className="shell flex min-h-[100svh] flex-col justify-center pt-28 pb-20 md:pt-36 md:pb-28">
         <div className="max-w-xl">
-          <p aria-hidden="true" className="text-[clamp(5rem,16vw,9rem)] text-fg">
+          <p aria-hidden="true" className="text-[clamp(5rem,16vw,9rem)] leading-none text-fg">
             <PrintedCode code="500" progress={0.34} />
           </p>
 

@@ -30,7 +30,7 @@ export const usePrefs = create<PrefsState>()(
       setSound: (sound) => set({ sound }),
     }),
     {
-      name: "infill-prefs",
+      name: "layerup-prefs",
       version: 1,
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,

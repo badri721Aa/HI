@@ -7,7 +7,7 @@ import { LIMITS, cityName, priceOrder, sanitizeText } from "./order";
 /* Crockford base32 without I, L, O, U: easy to read out over the phone. */
 const REF_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
-/** Short human-friendly order reference, e.g. INF-7K3Q2. */
+/** Short human-friendly order reference, e.g. LU-7K3Q2. */
 export function createOrderRef(random: () => number = Math.random): string {
   let id = "";
   for (let i = 0; i < 5; i++) id += REF_ALPHABET[Math.floor(random() * REF_ALPHABET.length)];

@@ -34,7 +34,7 @@ export default function GlobalNotFound() {
               <Logo />
             </Link>
 
-            <p className="mt-14 text-[clamp(6rem,22vw,11rem)]">
+            <p className="mt-14 text-[clamp(6rem,22vw,11rem)] leading-none">
               <span className="sr-only">{en.site.notFound.code}</span>
               <PrintedCode code={en.site.notFound.code} progress={0.52} />
             </p>
