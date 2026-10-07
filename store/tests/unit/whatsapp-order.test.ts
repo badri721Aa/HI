@@ -319,8 +319,8 @@ describe("sanitizeText", () => {
   });
 
   it("strips bidi marks and overrides that could reorder the message", () => {
-    expect(sanitizeText("‎abc‏", 50)).toBe("abc");
-    expect(sanitizeText("x‪y‫z‬‭‮", 50)).toBe("xyz");
+    expect(sanitizeText("\u200Eabc\u200F", 50)).toBe("abc");
+    expect(sanitizeText("x\u202Ay\u202Bz\u202C\u202D\u202E", 50)).toBe("xyz");
   });
 
   it("keeps Arabic, Latin and punctuation intact", () => {

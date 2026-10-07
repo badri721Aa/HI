@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type Ref } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { ColorOption, MaterialId, ShowcaseProduct } from "@/types";
+import { readLive as read, type Live } from "./core/live";
 import { getGeometry, getModelInfo, getWireframeGeometry } from "./geometry";
 import {
   createPrintDepthMaterial,
@@ -37,6 +38,10 @@ const FALLBACK_COLOR: ColorOption = { id: "silver", name: { en: "Silver", ar: "�
 const COLOR_TAU = 0.066;
 /** Bulb switch-on / off time constant. */
 const GLOW_TAU = 0.14;
+/** Hot-band emissive intensity at hot = 1. */
+const HOT_INTENSITY = 2.4;
+
+export type { Live };
 
 function pickSize(product: ShowcaseProduct, sizeId?: string): ShowcaseProduct["sizes"][number] {
   return product.sizes.find((s) => s.id === sizeId) ?? product.sizes[0];
@@ -64,16 +69,25 @@ export interface ProductMeshProps {
    * Takes precedence over clipHeight when given.
    */
   clip?: { get(): number | null | undefined };
+  /** 0–1+ multiplier of the glowing hot band at the cut. Default 1; 0 turns it off. */
+  hot?: Live<number>;
+  /**
+   * Angle θ (object space, atan2(z, x)) of the nozzle laying the current
+   * layer: the hot band then burns brightest just behind it. null = even glow.
+   */
+  hotTrail?: { get(): number | null };
   /** CAD-style hidden-line wireframe instead of the printed material. */
   wireframe?: boolean;
   /** Opacity multiplier for the wireframe lines (for cross-fades). Default 1. */
-  wireOpacity?: number;
+  wireOpacity?: Live<number>;
+  /** Wireframe only: hide lines behind the solid (hidden-line). Default true. */
+  occlude?: Live<boolean>;
   /** Default: true for quality "high", false for "low". */
   castShadow?: boolean;
-  /** "low" for thumbnails (cheap materials), "high" for the standalone viewer. Default "low". */
+  /** "low" for thumbnails (cheap materials), "high" for a close-up viewer. Default "low". */
   quality?: "low" | "high";
   /** 0–1 brightness of a lamp's bulb (lattice-lamp only). Default 1. Changes ease in ~0.4 s. */
-  glow?: number;
+  glow?: Live<number>;
   /** The root group (object space of the model: base on y = 0). */
   ref?: Ref<THREE.Group>;
 }
@@ -84,8 +98,11 @@ export function ProductMesh({
   sizeId,
   clipHeight,
   clip,
+  hot = 1,
+  hotTrail,
   wireframe = false,
   wireOpacity = 1,
+  occlude = true,
   castShadow,
   quality = "low",
   glow = 1,
@@ -176,23 +193,10 @@ export function ProductMesh({
 
   // Imperative handles. three.js objects are mutated only through refs (in
   // effects and frame callbacks), never during render.
-  const live = useRef<{ material: PrintMaterial; bulb: typeof bulb } | null>(null);
+  const live = useRef<{ material: PrintMaterial; bulb: typeof bulb; lines: typeof lines } | null>(null);
   useLayoutEffect(() => {
-    live.current = { material, bulb };
-  }, [material, bulb]);
-
-  const majorRef = useRef<THREE.LineSegments>(null);
-  const minorRef = useRef<THREE.LineSegments>(null);
-  const accentRef = useRef<THREE.LineSegments>(null);
-  useLayoutEffect(() => {
-    const o = Math.min(Math.max(wireOpacity, 0), 1);
-    const set = (obj: THREE.LineSegments | null, a: number) => {
-      if (obj) (obj.material as THREE.LineBasicMaterial).opacity = a * o;
-    };
-    set(majorRef.current, 0.9);
-    set(minorRef.current, 0.42);
-    set(accentRef.current, 0.8);
-  }, [wire, wireOpacity]);
+    live.current = { material, bulb, lines };
+  }, [material, bulb, lines]);
 
   // Colour: the material starts at whatever is on screen and eases to the target.
   const shown = useRef<THREE.Color | null>(null);
@@ -212,6 +216,8 @@ export function ProductMesh({
     if (m && lamp) setPrintPattern(m, lamp.pattern.repeat, lamp.pattern.range);
   }, [material, lamp]);
 
+  const occluderRef = useRef<THREE.Mesh>(null);
+  const linesRef = useRef<THREE.Group>(null);
   const light = useRef<THREE.PointLight>(null);
   const bulbMesh = useRef<THREE.Mesh>(null);
   const glowNow = useRef(0);
@@ -239,11 +245,25 @@ export function ProductMesh({
     const frac = clip ? clip.get() : clipHeight;
     const clipping = frac !== null && frac !== undefined && Number.isFinite(frac) && frac < 1;
     setPrintClip(m, frac, info.height);
+    u.uHotIntensity.value = HOT_INTENSITY * Math.max(read(hot), 0);
+    const trail = hotTrail ? hotTrail.get() : null;
+    if (trail === null) u.uHotTrail.value.y = 0;
+    else u.uHotTrail.value.set(trail, 1);
+
+    // Wireframe opacity and hidden-line occluder.
+    if (wire) {
+      const o = Math.min(Math.max(read(wireOpacity), 0), 1);
+      r.lines.major.opacity = 0.9 * o;
+      r.lines.minor.opacity = 0.42 * o;
+      r.lines.accent.opacity = 0.8 * o;
+      if (linesRef.current) linesRef.current.visible = o > 0.002;
+      if (occluderRef.current) occluderRef.current.visible = o > 0.002 && read(occlude);
+    }
 
     // Lamp bulb: hidden until the print has passed it, eased on and off.
     if (lamp && r.bulb) {
       const passed = !clipping || (frac as number) * info.height >= lamp.bulbY + lamp.bulbRadius * 0.5;
-      const want = wireframe || !passed ? 0 : Math.min(Math.max(glow, 0), 1);
+      const want = wireframe || !passed ? 0 : Math.min(Math.max(read(glow), 0), 1);
       glowNow.current += (want - glowNow.current) * (1 - Math.exp(-dt / GLOW_TAU));
       if (Math.abs(want - glowNow.current) < 1e-3) glowNow.current = want;
       const g = glowNow.current;
@@ -260,10 +280,12 @@ export function ProductMesh({
     <group ref={ref}>
       {wire ? (
         <>
-          <mesh geometry={geometry} material={lines.occluder} />
-          <lineSegments ref={minorRef} geometry={wire.minor} material={lines.minor} renderOrder={1} />
-          <lineSegments ref={majorRef} geometry={wire.major} material={lines.major} renderOrder={2} />
-          <lineSegments ref={accentRef} geometry={wire.accent} material={lines.accent} renderOrder={2} />
+          <mesh ref={occluderRef} geometry={geometry} material={lines.occluder} />
+          <group ref={linesRef}>
+            <lineSegments geometry={wire.minor} material={lines.minor} renderOrder={1} />
+            <lineSegments geometry={wire.major} material={lines.major} renderOrder={2} />
+            <lineSegments geometry={wire.accent} material={lines.accent} renderOrder={2} />
+          </group>
         </>
       ) : (
         <mesh
@@ -274,7 +296,7 @@ export function ProductMesh({
           receiveShadow={quality === "high"}
         />
       )}
-      {lamp && bulb ? (
+      {lamp && bulb && !wireframe ? (
         <>
           <mesh ref={bulbMesh} geometry={bulb.geometry} material={bulb.material} position={[0, lamp.bulbY, 0]} />
           {/* Always mounted (intensity 0 when off) so switching never changes the light count and recompiles shaders. */}

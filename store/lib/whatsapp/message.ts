@@ -70,7 +70,8 @@ const T = {
 } as const;
 
 function addressLine(region: Region, customer: Pick<Customer, "city" | "area">, locale: Locale): string {
-  const parts = [cityName(region, customer.city, locale), REGION_CONFIG[region].name[locale]];
+  // No city yet (live preview before one is picked): print just the region, not ", Bahrain".
+  const parts = [cityName(region, customer.city, locale), REGION_CONFIG[region].name[locale]].filter(Boolean);
   const area = sanitizeText(customer.area, LIMITS.area);
   return area ? `${parts.join(locale === "ar" ? "، " : ", ")} — ${area}` : parts.join(locale === "ar" ? "، " : ", ");
 }

@@ -55,6 +55,12 @@ export interface PrintUniforms {
   uHotIntensity: { value: number };
   /** Thickness of the hot band in model units (default 1.5 mm). */
   uHotBand: { value: number };
+  /**
+   * Hot trail behind a moving nozzle: x = nozzle angle θ in object space
+   * (atan2(z, x)), y = 0–1 amount. At 1 the band burns brightest just behind
+   * the nozzle and cools around the perimeter; at 0 it glows evenly.
+   */
+  uHotTrail: { value: THREE.Vector2 };
   /** Extra emissive light (linear RGB) added everywhere, e.g. a lamp shade lit from inside. */
   uInnerGlow: { value: THREE.Color };
   /** Lattice tiles: x = around (integer), y = rows. */
@@ -142,6 +148,7 @@ uniform float uClipY;
 uniform vec3 uHotColor;
 uniform float uHotIntensity;
 uniform float uHotBand;
+uniform vec2 uHotTrail;
 uniform float uLayer;
 uniform float uLayerStrength;
 uniform float uTime;
@@ -218,7 +225,9 @@ const FRAG_NORMAL = /* glsl */ `
 const FRAG_EMISSIVE = /* glsl */ `
   totalEmissiveRadiance += uInnerGlow;
   float printFlicker = 0.94 + 0.06 * sin( uTime * 9.0 + ( vPrintPos.x + vPrintPos.z ) * 60.0 );
-  totalEmissiveRadiance += uHotColor * ( printHot * uHotIntensity * printFlicker );
+  float printBehind = mod( uHotTrail.x - atan( vPrintPos.z, vPrintPos.x ), 6.28318530718 );
+  float printTrail = mix( 1.0, 0.22 + 1.5 * exp( -printBehind * 1.6 ), uHotTrail.y );
+  totalEmissiveRadiance += uHotColor * ( printHot * uHotIntensity * printFlicker * printTrail );
 `;
 
 function patch(src: string, anchor: string, add: string, after = true): string {
@@ -318,6 +327,7 @@ function makeUniforms(layerHeight: number, strength: number): PrintUniforms {
     uTime: { value: 0 },
     uHotIntensity: { value: 2.4 },
     uHotBand: { value: 1.5 * MM },
+    uHotTrail: { value: new THREE.Vector2(0, 0) },
     uInnerGlow: { value: new THREE.Color(0, 0, 0) },
     uPatternRepeat: { value: new THREE.Vector2(14, 6) },
     uPatternRange: { value: new THREE.Vector2(0.15, 0.95) },

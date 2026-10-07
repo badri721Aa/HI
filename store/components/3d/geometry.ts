@@ -4,7 +4,6 @@ import {
   TAU,
   clamp,
   lerp,
-  monotoneSpline,
   roundedPolygonPoint,
   seeded,
   smoothstep,
@@ -12,6 +11,7 @@ import {
   type Vec3,
 } from "./core/math";
 import { CORNER_HALF, LAMP_TILES_AROUND, STAR_HALF } from "./core/pattern";
+import { RIPPLE, lampLayout, rippleBase, ripplePerimeterRadius } from "./core/profiles";
 
 /*
  * Procedural geometry for every ModelKind. No downloaded meshes: each piece is
@@ -119,44 +119,10 @@ export function disposeGeometryCache(): void {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Ripple vase profile (shared with the hero nozzle)                          */
+/* Ripple vase profile (shared with the hero nozzle): see core/profiles.ts     */
 /* -------------------------------------------------------------------------- */
 
-const RIPPLE = {
-  ridges: 12,
-  /** Ridge amplitude as a fraction of the local radius. */
-  amp: 0.045,
-  /** A quarter turn from base to lip. */
-  twist: Math.PI / 2,
-  wall: 1.6 * MM,
-  floor: 2 * MM,
-};
-
-// Foot → belly → waist → lip flare, as fractions of the outer radius.
-const rippleProfile = monotoneSpline(
-  [0, 0.1, 0.22, 0.35, 0.5, 0.66, 0.82, 0.92, 1],
-  [0.7, 0.84, 0.93, 0.955, 0.9, 0.77, 0.66, 0.675, 0.735],
-);
-// The belly knot is the profile maximum (monotone spline: no overshoot), so
-// with ridges on top the outer radius peaks at exactly w/2.
-const RIPPLE_NORM = 1 / (0.955 * (1 + RIPPLE.amp));
-
-function rippleBase(t: number) {
-  return rippleProfile(clamp(t, 0, 1)) * RIPPLE_NORM;
-}
-
-/**
- * Outer radius (model units) of the ripple vase at height fraction t (0–1)
- * and angle theta. The hero scene uses it to drive the nozzle around the wall.
- * θ follows the module convention (x = r·cos θ, z = r·sin θ); the ridges
- * rotate by a quarter turn (−π/2 in θ) from base to lip. Exact: this is the
- * same function the mesh is built from.
- */
-export function ripplePerimeterRadius(t: number, theta: number, dims: Dims): number {
-  const tt = clamp(t, 0, 1);
-  const R = Math.min(dims.w, dims.d) / 200;
-  return R * rippleBase(tt) * (1 + RIPPLE.amp * Math.cos(RIPPLE.ridges * (theta + RIPPLE.twist * tt)));
-}
+export { ripplePerimeterRadius };
 
 /* -------------------------------------------------------------------------- */
 /* Mesh builder                                                               */
@@ -501,35 +467,6 @@ function buildRippleVase(dims: Dims): CacheEntry {
 }
 
 /* ---------------------------------- Lamp ---------------------------------- */
-
-/**
- * Lamp layout. UVs are cylindrical everywhere on the lamp:
- *   u = θ / 2π (0 → 1 around, seam duplicated so u reaches exactly 1),
- *   v = y / H  (object-space height fraction of the whole lamp).
- * The lattice is cut by the material only for v inside `pattern.range`, which
- * starts above the base ring and stops below the top rim, so rims, the base
- * ring and the socket (whose UVs are pinned to v = 0) stay solid. Outer and
- * inner shade surfaces share (u, v) at the same θ and y, so every hole goes
- * cleanly through the 2 mm wall.
- */
-function lampLayout(dims: Dims) {
-  const H = dims.h * MM;
-  const R = Math.min(dims.w, dims.d) / 200;
-  const baseH = 0.1 * H;
-  const shadeR = (y: number) => {
-    const s = clamp((y - baseH) / (H - baseH), 0, 1);
-    return R * (0.88 + 0.12 * Math.sin(Math.PI * s));
-  };
-  const tile = (TAU * R) / LAMP_TILES_AROUND;
-  const shadeH = H - baseH;
-  const rows = Math.max(1, Math.floor((shadeH - 2 * 8 * MM) / tile));
-  const margin = (shadeH - rows * tile) / 2;
-  const range: [number, number] = [(baseH + margin) / H, (H - margin) / H];
-  const socketTop = 0.3 * H;
-  const bulbRadius = 0.24 * R;
-  const bulbY = socketTop + bulbRadius * 0.82;
-  return { H, R, baseH, shadeR, tile, rows, range, socketTop, bulbRadius, bulbY };
-}
 
 function buildLatticeLamp(dims: Dims): CacheEntry {
   const b = new MeshBuilder();

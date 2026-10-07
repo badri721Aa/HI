@@ -94,7 +94,7 @@ describe("buildWhatsAppMessagePayload (English)", () => {
   });
 
   it("prints the iPhone model under the phone case, cleaned", () => {
-    const msg = message([{ ...phoneCase, note: "  iPhone\u0000 15 Pro‮ " }]);
+    const msg = message([{ ...phoneCase, note: "  iPhone\u0000 15 Pro\u202E " }]);
     expect(msg).toContain("\n   iPhone model: iPhone 15 Pro\n");
   });
 
@@ -130,7 +130,7 @@ describe("buildWhatsAppMessagePayload (English)", () => {
 
   it("sanitizes customer free text", () => {
     const msg = message([clicker], {
-      customer: { name: "  Fatima\u0007 ", city: "manama", area: "‮Block 1", notes: "a\n\n\n\nb\t" },
+      customer: { name: "  Fatima\u0007 ", city: "manama", area: "\u202EBlock 1", notes: "a\n\n\n\nb\t" },
     });
     expect(msg).toContain("\nName: Fatima\n");
     expect(msg).toContain("\nDeliver to: Manama, Bahrain — Block 1\n");
@@ -356,7 +356,7 @@ describe("buildCustomRequestMessage", () => {
   });
 
   it("caps and cleans the description", () => {
-    const msg = buildCustomRequestMessage({ ...base, description: `‮${"d".repeat(900)}` });
+    const msg = buildCustomRequestMessage({ ...base, description: `\u202E${"d".repeat(900)}` });
     expect(msg).toContain(`\nWhat: ${"d".repeat(500)}\n`);
     expect(msg).not.toContain("d".repeat(501));
   });

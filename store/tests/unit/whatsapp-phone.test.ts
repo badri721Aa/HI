@@ -36,9 +36,9 @@ describe("toWaDigits", () => {
   });
 
   it("ignores non-breaking, thin and zero-width spaces and bidi marks", () => {
-    expect(toWaDigits("+973 3985 8885")).toBe("97339858885");
-    expect(toWaDigits("+973 3985 8885")).toBe("97339858885");
-    expect(toWaDigits("‎+971​50 464 4502‏")).toBe("971504644502");
+    expect(toWaDigits("+973\u00A03985\u00A08885")).toBe("97339858885");
+    expect(toWaDigits("+973\u20093985\u202F8885")).toBe("97339858885");
+    expect(toWaDigits("\u200E+971\u200B50 464 4502\u200F")).toBe("971504644502");
   });
 
   it("returns an empty string when there are no digits", () => {

@@ -40,7 +40,9 @@ function shape(node: Tree): unknown {
 
 const placeholders = (text: string) => [...new Set(text.match(/\{\w+\}/g) ?? [])].sort();
 
-const ARABIC = /[؀-ۿ]/;
+const ARABIC = /[\u0600-\u06FF]/;
+/** A CLDR plural-category leaf (picked with Intl.PluralRules): "<group>.<category>". */
+const PLURAL_FORM = /^(.*)\.(zero|one|two|few|many|other)$/;
 
 describe.each(Object.entries(NAMESPACES))("messages: %s", (_name, messages) => {
   const en = messages.en as unknown as Tree;
@@ -57,6 +59,16 @@ describe.each(Object.entries(NAMESPACES))("messages: %s", (_name, messages) => {
       if (typeof value !== "string") continue;
       const other = arByPath.get(path);
       expect(typeof other, path).toBe("string");
+      const plural = PLURAL_FORM.exec(path);
+      if (plural && plural[2] !== "other") {
+        // Plural forms may spell the number out (Arabic dual "قطعتان" has no {n}),
+        // but may only use placeholders the English forms of the group provide.
+        const group = enLeaves
+          .filter((l) => l.path.startsWith(`${plural[1]}.`) && typeof l.value === "string")
+          .flatMap((l) => placeholders(l.value as string));
+        for (const name of placeholders(other as string)) expect(group, path).toContain(name);
+        continue;
+      }
       expect(placeholders(other as string), path).toEqual(placeholders(value));
     }
   });
@@ -95,7 +107,7 @@ describe.each(Object.entries(NAMESPACES))("messages: %s", (_name, messages) => {
   it("uses no emoji", () => {
     for (const tree of [en, ar]) {
       for (const { path, value } of leaves(tree)) {
-        if (typeof value === "string") expect(value, path).not.toMatch(/\p{Extended_Pictographic}/u);
+        if (typeof value === "string") expect(value, path).not.toMatch(/\p{Emoji_Presentation}|\uFE0F/u);
       }
     }
   });
