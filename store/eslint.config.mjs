@@ -12,8 +12,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Standalone 3D storefront with its own config.
-    "store/**",
   ]),
 ]);
 
