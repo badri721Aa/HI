@@ -1,0 +1,36 @@
+# Synthetic check of the live storefront. GitHub's shortest schedule is every
+# 5 minutes; every 15 is plenty for a small shop and keeps Actions usage low.
+# A failed run emails the repository owner. Scheduled workflows run from the
+# default branch.
+name: store uptime
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SITE: https://3dbh.vercel.app
+    steps:
+      - name: Pages answer 200
+        run: |
+          set -euo pipefail
+          for path in /en /ar /en/products/hex-phone-case /sitemap.xml /robots.txt; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$SITE$path")
+            echo "$path -> $code"
+            test "$code" = "200"
+          done
+      - name: Root redirects to a locale
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$SITE/")
+          echo "/ -> $code"
+          test "$code" = "307"
+      - name: Unknown products are real 404s
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$SITE/en/products/uptime-probe")
+          echo "/en/products/uptime-probe -> $code"
+          test "$code" = "404"

@@ -37,6 +37,10 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  images: {
+    // AVIF first (smallest), WebP for browsers without AVIF.
+    formats: ["image/avif", "image/webp"],
+  },
   experimental: {
     globalNotFound: true,
   },
@@ -53,6 +57,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/(.*)", headers: securityHeaders },
+      {
+        // Product photos keep their file names when replaced, so cache for a
+        // week (not forever) and revalidate in the background.
+        source: "/products/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
+      },
       {
         source: "/sw.js",
         headers: [

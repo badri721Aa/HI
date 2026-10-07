@@ -1,0 +1,18 @@
+# Weekly dependency and security updates for the 3D BH storefront (store/).
+# Dependabot reads this file from the repository's default branch.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /store
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      three:
+        patterns: ["three", "@types/three", "@react-three/*"]
+      next:
+        patterns: ["next", "eslint-config-next", "react", "react-dom", "@types/react*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
