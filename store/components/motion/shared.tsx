@@ -20,25 +20,25 @@ export const WAIT_ATTR = "data-motion-wait";
  * containing block for fixed descendants.
  */
 const CSS = `
-@keyframes infill-reveal {
+@keyframes lu-reveal {
   from { opacity: 0; transform: translate3d(0, var(--reveal-y, 16px), 0); filter: blur(6px); }
 }
-@keyframes infill-word {
+@keyframes lu-word {
   from { opacity: 0; transform: translate3d(0, 0.38em, 0); filter: blur(8px); }
 }
-.infill-reveal { animation: infill-reveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
-.infill-word { display: inline-block; animation: infill-word 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
-[${WAIT_ATTR}].infill-reveal, [${WAIT_ATTR}] .infill-word { animation: none; opacity: 0; }
+.lu-reveal { animation: lu-reveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.lu-word { display: inline-block; animation: lu-word 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+[${WAIT_ATTR}].lu-reveal, [${WAIT_ATTR}] .lu-word { animation: none; opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .infill-reveal, .infill-word { animation: none !important; }
-  [${WAIT_ATTR}].infill-reveal, [${WAIT_ATTR}] .infill-word { opacity: 1; }
+  .lu-reveal, .lu-word { animation: none !important; }
+  [${WAIT_ATTR}].lu-reveal, [${WAIT_ATTR}] .lu-word { opacity: 1; }
 }
 `;
 
 /** Keyframes for Reveal and SplitText. React hoists it into <head> once (deduped by href). */
 export function MotionStyles() {
   return (
-    <style href="infill-motion" precedence="infill-motion">
+    <style href="lu-motion" precedence="lu-motion">
       {CSS}
     </style>
   );

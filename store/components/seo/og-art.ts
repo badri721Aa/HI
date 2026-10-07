@@ -6,6 +6,8 @@
  * Colours mirror the tokens in app/globals.css. Generated images can't read
  * CSS variables, so they are repeated here once.
  */
+import { MARK_BOX, MARK_RADIUS, MARK_STACK, MARK_TOP, type MarkBar } from "@/components/ui/logo-geometry";
+
 
 export const OG_COLORS = {
   ink950: "#020203",
@@ -278,25 +280,19 @@ export interface MarkOptions {
 }
 
 /**
- * The Logo mark (components/ui/logo.tsx): a rounded square with diagonal
- * hatching, the way a slicer fills the inside of a part. Proportions follow
- * the 24-unit original, where the square is 17 units wide.
+ * The Layer Up mark (components/ui/logo-geometry.ts): three stacked layers and
+ * a fourth arriving in the accent colour. `scale` is the side of the mark's
+ * 24-unit box as a fraction of the canvas.
  */
 export function markSvg({ size: S, background, scale, weight = 1 }: MarkOptions): string {
   const C = OG_COLORS;
   const m = S * scale;
-  const u = m / 17;
+  const u = m / MARK_BOX;
   const x0 = (S - m) / 2;
-  const rx = 4.5 * u;
-  const stroke = Math.max(1.5 * u * weight, 1);
-  const hatchW = Math.max(1.25 * u * weight, 0.9);
-  const step = 6 * u;
-
-  const hatch: string[] = [];
-  for (let o = -3; o <= 3; o++) {
-    const x = x0 + m / 2 + o * step - m;
-    hatch.push(`<line x1="${r(x)}" y1="${r(x0 + m * 1.5)}" x2="${r(x + m * 2)}" y2="${r(x0 - m / 2)}"/>`);
-  }
+  // Heavier icons read better with slightly thinner bars.
+  const shrink = (1 - weight) * 0.6;
+  const bar = (b: MarkBar, fill: string, opacity = 1) =>
+    `<rect x="${r(x0 + b.x * u)}" y="${r(x0 + (b.y + shrink / 2) * u)}" width="${r(b.w * u)}" height="${r((b.h - shrink) * u)}" rx="${r(MARK_RADIUS * u)}" fill="${fill}" fill-opacity="${opacity}"/>`;
 
   const bg =
     background === "rounded"
@@ -307,15 +303,8 @@ export function markSvg({ size: S, background, scale, weight = 1 }: MarkOptions)
         : "";
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">
-<defs>
-  <clipPath id="c"><rect x="${r(x0)}" y="${r(x0)}" width="${r(m)}" height="${r(m)}" rx="${r(rx)}"/></clipPath>
-  <linearGradient id="h" x1="${r(x0)}" y1="${r(x0)}" x2="${r(x0 + m)}" y2="${r(x0 + m)}" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="${C.silver}"/>
-    <stop offset="1" stop-color="${C.platinum}"/>
-  </linearGradient>
-</defs>
 ${bg}
-<g clip-path="url(#c)" stroke="url(#h)" stroke-width="${r(hatchW)}" stroke-linecap="square">${hatch.join("")}</g>
-<rect x="${r(x0)}" y="${r(x0)}" width="${r(m)}" height="${r(m)}" rx="${r(rx)}" fill="none" stroke="${C.fg}" stroke-width="${r(stroke)}"/>
+${MARK_STACK.map((b, i) => bar(b, C.fg, 0.62 + i * 0.19)).join("\n")}
+${bar(MARK_TOP, C.glow)}
 </svg>`;
 }

@@ -81,7 +81,7 @@ export function Materials() {
             <div
               className="relative flex h-full flex-col gap-5 overflow-hidden rounded-2xl p-6 edge-light md:flex-row md:items-center md:p-7 lg:flex-col lg:items-start lg:justify-between lg:gap-10"
               style={{
-                // Diagonal infill hatching, the same motif as the logo mark.
+                // Diagonal infill hatching, the way a slicer fills the inside of a part.
                 backgroundImage:
                   "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.028) 0 1px, transparent 1px 11px)",
               }}

@@ -117,7 +117,7 @@ export function SplitText({
   const word = (w: Word, i: number) => (
     <Fragment key={`${i}-${w.text}`}>
       {i > 0 ? " " : null}
-      <span className="infill-word" style={{ animationDelay: `${(delay + w.index * stagger).toFixed(3)}s` }}>
+      <span className="lu-word" style={{ animationDelay: `${(delay + w.index * stagger).toFixed(3)}s` }}>
         {w.text}
       </span>
     </Fragment>

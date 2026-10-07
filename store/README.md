@@ -1,8 +1,8 @@
-# Infill — 3D-printed objects storefront
+# Layer Up — 3D-printing storefront
 
-A bilingual (English / Arabic) storefront for a 3D-printing shop in Bahrain and the UAE.
+A bilingual (English / Arabic) storefront for Layer Up, a 3D-printing shop in Bahrain and the UAE.
 
-- Every product is rendered live in 3D from code, so there are no model files to upload.
+- Products are shown with real photos. The brand moments are live 3D, rendered from code with no model files to upload: a vase printing in the hero, the "How it's made" scroll story, and the 404 page.
 - Orders are sent as a pre-filled WhatsApp message to the right line:
 
 | Region | Line | Number |
@@ -45,16 +45,17 @@ npm run dev          # http://localhost:3000  → redirects to /en or /ar
 | All site text (English and Arabic) | `lib/i18n/messages/*.ts` |
 | Colours, fonts, spacing | `app/globals.css` (`@theme`) and `app/fonts.ts` |
 
-Values marked `CONFIRM` in `lib/site.ts` are sensible defaults (hours, delivery days). Check them against how the shop really works. The catalog is sample data: replace it with real products, prices and stock before launch.
+Values marked `CONFIRM` in `lib/site.ts` and `content/catalog.ts` are defaults to check against how the shop really works (hours, delivery days, AED prices, materials).
 
 ### Adding a product
 
-Add an entry to `PRODUCTS` in `content/catalog.ts`.
+1. Put the photo in `public/products/` as a 4:5 portrait WebP (about 1000×1250), cropped close around the piece.
+2. Add an entry to `PRODUCTS` in `content/catalog.ts` with the photo, colours (hex; `hex2` for two-tone), sizes and a price per currency. BHD uses 3 decimals (`1.5` → `1.500 BHD`); AED uses 2.
+3. Optional fields appear on the product page only when you fill them: dimensions per size, material, layer height, print time, lead time, stock.
+4. If customers must tell you something per item (like their iPhone model), add a `variantNote`. It becomes a required field and is printed in the WhatsApp order.
+5. For the social-media preview card, also add a small PNG copy of the photo to `assets/og-photos/<slug>.png` (social cards can't read WebP).
 
-- Each product picks a `model` (one of the procedural 3D shapes in `components/3d/geometry.ts`), a material, colours (hex) and sizes.
-- Each size has outer dimensions in mm and a price per currency.
-- BHD uses 3 decimals (`9.5` → `9.500 BHD`); AED uses 2.
-- The product page, sitemap, Open Graph image and structured data are generated automatically.
+The product page, sitemap, social card and structured data are generated automatically.
 
 ## How ordering works
 

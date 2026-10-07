@@ -355,7 +355,7 @@ export function createPrintMaterial(opts: PrintMaterialOptions): PrintMaterial {
   };
   // One program per variant of the injected code (the pattern adds a define;
   // finish and quality change which physical features are compiled in).
-  m.customProgramCacheKey = () => `infill-print-v1:${pattern}:${m.userData.finish}:${m.userData.quality}`;
+  m.customProgramCacheKey = () => `lu-print-v1:${pattern}:${m.userData.finish}:${m.userData.quality}`;
   return m;
 }
 
@@ -385,7 +385,7 @@ export function createPrintDepthMaterial(source: PrintMaterial): THREE.MeshDepth
       `if ( vPrintPos.y > uClipY ) discard;\n#ifdef PRINT_PATTERN\nif ( printLattice( vPrintUv ) < 0.0 ) discard;\n#endif`,
     );
   };
-  m.customProgramCacheKey = () => `infill-print-depth-v1:${pattern}`;
+  m.customProgramCacheKey = () => `lu-print-depth-v1:${pattern}`;
   return m;
 }
 

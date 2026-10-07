@@ -56,7 +56,7 @@ export function Reveal({
         // The union of intrinsic tags makes the ref type awkward; every option is an HTMLElement.
         ref={ref as Ref<never>}
         id={id}
-        className={cn("infill-reveal", className)}
+        className={cn("lu-reveal", className)}
         style={vars}
         {...aria}
       >

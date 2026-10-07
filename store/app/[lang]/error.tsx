@@ -17,7 +17,7 @@ export default function ErrorPage({ error, retry }: { error: Error & { digest?: 
 
   useEffect(() => {
     // The digest matches the server log entry for errors thrown on the server.
-    console.error("[infill] page error", error.digest ?? "", error);
+    console.error("[layer-up] page error", error.digest ?? "", error);
   }, [error]);
 
   return (

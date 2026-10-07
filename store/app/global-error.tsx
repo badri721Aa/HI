@@ -18,7 +18,7 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
   const ar = siteCopy.ar.error;
 
   useEffect(() => {
-    console.error("[infill] root error", error.digest ?? "", error);
+    console.error("[layer-up] root error", error.digest ?? "", error);
   }, [error]);
 
   return (
