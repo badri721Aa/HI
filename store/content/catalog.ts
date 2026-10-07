@@ -1,249 +1,173 @@
 import type { CategoryId, ColorOption, L10n, MaterialInfo, Product } from "@/types";
 
 /*
- * SAMPLE CATALOG — replace with the real products, prices and stock.
- * Prices are per unit. BHD uses 3 decimals (e.g. 9.5 → 9.500 BHD).
- * Every product renders in 3D from its `model` kind; no image files needed.
+ * THE CATALOG. Real products, photographed by the shop.
+ * - Prices are per piece. BHD uses 3 decimals (2 → 2.000 BHD).
+ * - CONFIRM: AED prices are converted from BHD at the fixed peg and rounded.
+ *   Set them to whatever the UAE line actually charges.
+ * - Photos live in /public/products (cropped 4:5; the first image is the cover).
+ * - `stock: null` = made to order. Set a number to show "N ready to ship".
  */
 
-const c = (id: string, en: string, ar: string, hex: string, finish: ColorOption["finish"] = "matte"): ColorOption => ({
+const c = (id: string, en: string, ar: string, hex: string, hex2?: string): ColorOption => ({
   id,
   name: { en, ar },
   hex,
-  finish,
+  hex2,
+  finish: "matte",
 });
 
-const BONE = c("bone", "Bone", "عظمي", "#E6E0D4");
-const GRAPHITE = c("graphite", "Graphite", "جرافيت", "#3A3A41");
-const SAND = c("sand", "Sand", "رملي", "#CDB89B");
-const SAGE = c("sage", "Sage", "مريمية", "#9DAA95");
-const CLAY = c("clay", "Clay", "طيني", "#B4664B");
+const img = (
+  src: string,
+  width: number,
+  height: number,
+  blurDataURL: string,
+  alt: L10n,
+): Product["images"][number] => ({ src, width, height, blurDataURL, alt });
 
 export const CATEGORIES: { id: CategoryId; name: L10n }[] = [
-  { id: "lighting", name: { en: "Lighting", ar: "إضاءة" } },
-  { id: "vessels", name: { en: "Vessels", ar: "أوانٍ" } },
-  { id: "desk", name: { en: "Desk", ar: "مكتب" } },
-  { id: "objects", name: { en: "Objects", ar: "قطع فنية" } },
+  { id: "cases", name: { en: "Phone cases", ar: "كفرات الجوال" } },
+  { id: "fidgets", name: { en: "Fidgets", ar: "ألعاب الفدجت" } },
+  { id: "gifts", name: { en: "Gifts", ar: "هدايا" } },
+  { id: "education", name: { en: "School models", ar: "مجسمات مدرسية" } },
 ];
 
 export const PRODUCTS: Product[] = [
   {
-    slug: "mashrabiya-lamp",
-    sku: "INF-LMP-01",
-    name: { en: "Mashrabiya Lamp", ar: "مصباح المشربية" },
+    slug: "hex-phone-case",
+    sku: "LU-CASE-01",
+    name: { en: "Hex Phone Case", ar: "كفر الخلايا السداسية" },
     tagline: {
-      en: "An eight-point star lattice that throws its pattern across the room.",
-      ar: "شبكة نجمة ثمانية ترسم ظلالها على جدران الغرفة.",
+      en: "A honeycomb back in two shades of blue, with a grippy textured finish.",
+      ar: "ظهر بنقشة خلايا النحل بدرجتين من الأزرق، بملمس خشن يمنع الانزلاق.",
     },
     description: {
-      en: "The lattice is printed as one piece, with no glue and no joins. Ships wired with a warm 2700K LED bulb and a 2 m fabric cable with an inline switch.",
-      ar: "تُطبع الشبكة قطعة واحدة بلا لصق ولا وصلات. يصلك المصباح موصولاً بلمبة LED دافئة 2700K وسلك قماشي بطول مترين مع مفتاح.",
+      en: "Printed to fit your iPhone, with cut-outs for the buttons and the camera. Tell us your model when you add it to your order. Other colours on request.",
+      ar: "يُطبع ليناسب جهاز الآيفون الخاص بك، مع فتحات للأزرار والكاميرا. اكتب موديل جهازك عند إضافته إلى الطلب. ألوان أخرى متوفرة عند الطلب.",
     },
-    category: "lighting",
-    model: "lattice-lamp",
-    material: "pla-matte",
-    colors: [BONE, GRAPHITE, CLAY],
-    sizes: [
-      { id: "table", name: { en: "Table", ar: "طاولة" }, dims: { w: 140, d: 140, h: 240 }, price: { BHD: 18, AED: 180 } },
-      { id: "large", name: { en: "Large", ar: "كبير" }, dims: { w: 180, d: 180, h: 320 }, price: { BHD: 26, AED: 255 } },
+    category: "cases",
+    colors: [c("sky-blue", "Sky blue", "أزرق سماوي", "#4fa3db", "#a9d3f0")],
+    sizes: [{ id: "fitted", name: { en: "Fitted to your iPhone", ar: "حسب موديل الآيفون" }, price: { BHD: 2, AED: 20 } }],
+    variantNote: {
+      label: { en: "iPhone model", ar: "موديل الآيفون" },
+      placeholder: { en: "e.g. iPhone 15", ar: "مثال: iPhone 15" },
+      required: true,
+    },
+    images: [
+      img("/products/hex-phone-case.webp", 920, 1150, "data:image/webp;base64,UklGRmwAAABXRUJQVlA4IGAAAACQAgCdASoKAAwAAoBCJbACdEcAfoACEyG9Roa7AAD+lyni1+6aridi3vkuV+D7CUs2TwVa2itC/CUzRXc5uuqnx1fIAQlMwdRjKY0uAJmE3zgYZLukwT/mfy8av5kAAAA=", {
+        en: "Blue 3D-printed iPhone case with a raised hexagon pattern, held in a hand",
+        ar: "كفر آيفون أزرق مطبوع ثلاثي الأبعاد بنقشة سداسية بارزة في يد",
+      }),
     ],
     stock: null,
-    leadTimeDays: [3, 5],
-    printHours: 19,
-    layerHeight: 0.16,
-    badge: "new",
     featured: true,
   },
   {
-    slug: "ripple-vase",
-    sku: "INF-VAS-01",
-    name: { en: "Ripple Vase", ar: "مزهرية التموّج" },
+    slug: "keycap-clicker",
+    sku: "LU-FDG-01",
+    name: { en: "Keycap Clicker", ar: "ميدالية الكيكاب" },
     tagline: {
-      en: "Twelve soft ridges, twisted a quarter turn from base to lip.",
-      ar: "اثنا عشر تموّجاً ناعماً تلتف ربع دورة من القاعدة إلى الحافة.",
+      en: "A keyboard key on your keyring. Press it as often as you like.",
+      ar: "زر كيبورد في ميداليتك. اضغطه كلما أردت.",
     },
     description: {
-      en: "Printed as one continuous spiral wall, so the outside has no seam. Made for dried stems; add a glass liner if you want fresh flowers.",
-      ar: "يُطبع جداراً حلزونياً متصلاً فلا يظهر أي خط وصل من الخارج. مناسب للزهور المجففة، وأضف إناءً زجاجياً داخلياً للزهور الطبيعية.",
+      en: "A fidget clicker the size of a single key, on a metal chain and split ring. Small enough for a school bag or a set of car keys.",
+      ar: "كليكر بحجم زر واحد، مع سلسلة وحلقة معدنية. صغير بما يكفي لحقيبة المدرسة أو مفاتيح السيارة.",
     },
-    category: "vessels",
-    model: "ripple-vase",
-    material: "pla-matte",
-    colors: [BONE, GRAPHITE, SAND, SAGE],
-    sizes: [
-      { id: "s", name: { en: "Small", ar: "صغير" }, dims: { w: 120, d: 120, h: 160 }, price: { BHD: 6.5, AED: 65 } },
-      { id: "m", name: { en: "Medium", ar: "وسط" }, dims: { w: 150, d: 150, h: 220 }, price: { BHD: 9.5, AED: 95 } },
-      { id: "l", name: { en: "Large", ar: "كبير" }, dims: { w: 180, d: 180, h: 300 }, price: { BHD: 13.5, AED: 135 } },
-    ],
-    stock: 6,
-    leadTimeDays: [2, 3],
-    printHours: 7,
-    layerHeight: 0.2,
-    featured: true,
-  },
-  {
-    slug: "dune-bowl",
-    sku: "INF-BWL-01",
-    name: { en: "Dune Bowl", ar: "وعاء الكثبان" },
-    tagline: {
-      en: "Rippled like wind over sand. For keys, fruit, or nothing at all.",
-      ar: "متموّج كأثر الريح على الرمل. للمفاتيح أو الفاكهة أو للزينة فقط.",
-    },
-    description: {
-      en: "Silk PLA gives each ridge a metallic edge that shifts as you walk past. Wipe clean with a damp cloth.",
-      ar: "يمنح الـPLA الحريري كل تموّج لمعة معدنية تتغير مع زاوية النظر. يُنظف بقطعة قماش رطبة.",
-    },
-    category: "vessels",
-    model: "wave-bowl",
-    material: "pla-silk",
-    colors: [
-      c("silk-sand", "Silk Sand", "رملي حريري", "#D6C09F", "silk"),
-      c("silk-silver", "Silk Silver", "فضي حريري", "#C9CDD3", "silk"),
-      c("silk-copper", "Silk Copper", "نحاسي حريري", "#B8794A", "silk"),
-    ],
-    sizes: [
-      { id: "m", name: { en: "Medium", ar: "وسط" }, dims: { w: 200, d: 200, h: 70 }, price: { BHD: 9, AED: 90 } },
-      { id: "l", name: { en: "Large", ar: "كبير" }, dims: { w: 260, d: 260, h: 90 }, price: { BHD: 14, AED: 140 } },
-    ],
-    stock: 4,
-    leadTimeDays: [2, 3],
-    printHours: 8,
-    layerHeight: 0.2,
-  },
-  {
-    slug: "facet-planter",
-    sku: "INF-PLT-01",
-    name: { en: "Facet Planter", ar: "أصيص الأوجه" },
-    tagline: {
-      en: "Low-poly planter with a drainage hole and a matching saucer.",
-      ar: "أصيص بأوجه هندسية مع فتحة تصريف وصحن مطابق.",
-    },
-    description: {
-      en: "Sized for succulents and small indoor plants. The saucer is printed separately so water never sits against the pot.",
-      ar: "مناسب للصباريات والنباتات الداخلية الصغيرة. يُطبع الصحن منفصلاً حتى لا تتجمع المياه حول الأصيص.",
-    },
-    category: "vessels",
-    model: "facet-planter",
-    material: "pla-matte",
-    colors: [BONE, GRAPHITE, CLAY],
-    sizes: [
-      { id: "s", name: { en: "Small", ar: "صغير" }, dims: { w: 100, d: 100, h: 90 }, price: { BHD: 4.5, AED: 45 } },
-      { id: "m", name: { en: "Medium", ar: "وسط" }, dims: { w: 140, d: 140, h: 125 }, price: { BHD: 6, AED: 60 } },
-      { id: "l", name: { en: "Large", ar: "كبير" }, dims: { w: 180, d: 180, h: 160 }, price: { BHD: 8.5, AED: 85 } },
-    ],
-    stock: 12,
-    leadTimeDays: [1, 2],
-    printHours: 5,
-    layerHeight: 0.24,
-  },
-  {
-    slug: "trefoil-knot",
-    sku: "INF-OBJ-01",
-    name: { en: "Trefoil Knot", ar: "العقدة الثلاثية" },
-    tagline: {
-      en: "The simplest knot in mathematics, cast in resin at 0.05 mm.",
-      ar: "أبسط عقدة في الرياضيات، مطبوعة بالريزن بدقة 0.05 مم.",
-    },
-    description: {
-      en: "Printed in resin, washed, UV-cured and hand-sanded, so layer lines all but disappear. Each run is limited to twenty pieces.",
-      ar: "تُطبع بالريزن ثم تُغسل وتُعالج بالأشعة فوق البنفسجية وتُصقل يدوياً حتى تختفي خطوط الطبقات تقريباً. كل دفعة محدودة بعشرين قطعة.",
-    },
-    category: "objects",
-    model: "knot-sculpture",
-    material: "resin",
-    colors: [c("pearl", "Pearl", "لؤلؤي", "#ECE7DF", "silk"), c("obsidian", "Obsidian", "أوبسيديان", "#18181C", "silk")],
-    sizes: [
-      { id: "s", name: { en: "Small", ar: "صغير" }, dims: { w: 90, d: 90, h: 60 }, price: { BHD: 7.5, AED: 75 } },
-      { id: "m", name: { en: "Medium", ar: "وسط" }, dims: { w: 140, d: 140, h: 90 }, price: { BHD: 12, AED: 120 } },
+    category: "fidgets",
+    colors: [c("yellow", "Yellow", "أصفر", "#f2b300")],
+    sizes: [{ id: "one", name: { en: "One size", ar: "مقاس واحد" }, price: { BHD: 1, AED: 10 } }],
+    images: [
+      img("/products/keycap-clicker.webp", 800, 1000, "data:image/webp;base64,UklGRlQAAABXRUJQVlA4IEgAAADQAQCdASoKAAwAAoBCJQBOgB5PG8rQAAD+eMDs/rlqTJhielKq0caJ0vdm32DMqXe0mujEPB1URKYBV5CPTz+xgvHXx8MAAAA=", {
+        en: "Yellow 3D-printed keycap clicker on a metal keyring",
+        ar: "ميدالية كيكاب صفراء مطبوعة ثلاثية الأبعاد مع حلقة معدنية",
+      }),
     ],
     stock: null,
-    leadTimeDays: [2, 4],
-    printHours: 9,
-    layerHeight: 0.05,
-    badge: "limited",
   },
   {
-    slug: "twist-pen-cup",
-    sku: "INF-DSK-01",
-    name: { en: "Twist Pen Cup", ar: "حامل الأقلام الملتوي" },
+    slug: "gear-shifter",
+    sku: "LU-FDG-02",
+    name: { en: "Gear Shifter", ar: "القير المصغّر" },
     tagline: {
-      en: "A hexagon rotated sixty degrees on its way up.",
-      ar: "سداسي يدور ستين درجة وهو يرتفع.",
+      en: "A palm-sized H-pattern shifter: five gears and reverse on a diamond-knurled base.",
+      ar: "قير بنمط H بحجم الكف: خمس سرعات والرجوع (R)، على قاعدة بنقشة الألماس.",
     },
     description: {
-      en: "Weighted base so it doesn't tip when you grab a pen. Fits standard pens, scissors and a 30 cm ruler.",
-      ar: "قاعدة ثقيلة فلا ينقلب عند سحب القلم. يتسع للأقلام والمقص ومسطرة 30 سم.",
+      en: "A desk fidget for car people. The red knob moves through the gate just like the real thing.",
+      ar: "لعبة مكتبية لعشاق السيارات. المقبض الأحمر يتنقل بين السرعات كأنه قير حقيقي.",
     },
-    category: "desk",
-    model: "spiral-cup",
-    material: "pla-silk",
-    colors: [
-      c("silk-silver", "Silk Silver", "فضي حريري", "#C9CDD3", "silk"),
-      c("silk-copper", "Silk Copper", "نحاسي حريري", "#B8794A", "silk"),
-      c("silk-pearl", "Silk Pearl", "لؤلؤي حريري", "#ECE7DF", "silk"),
+    category: "fidgets",
+    colors: [c("black-red", "Black & red", "أسود وأحمر", "#1c1c20", "#e0322b")],
+    sizes: [{ id: "one", name: { en: "One size", ar: "مقاس واحد" }, price: { BHD: 1, AED: 10 } }],
+    images: [
+      img("/products/gear-shifter.webp", 440, 550, "data:image/webp;base64,UklGRmIAAABXRUJQVlA4IFYAAADwAQCdASoKAAwAAoBCJQBWABuyFXK6xAAA/hj6WByq2+5yYOHDkZtz0jiDLkn4W657J7lI0/tfizDgR22uCgbPJYPz4CEQ9ERRNCNZZhSfsR70K3PgAA==", {
+        en: "Black 3D-printed gear shifter with a red knob and a diamond-pattern base",
+        ar: "قير مصغّر أسود مطبوع ثلاثي الأبعاد بمقبض أحمر وقاعدة بنقشة الألماس",
+      }),
+      img("/products/gear-shifter-set.webp", 674, 450, "data:image/webp;base64,UklGRkoAAABXRUJQVlA4ID4AAACQAQCdASoKAAcAAoBCJZwAAlbbcTgA/sBRsY7tdHLzIKdQVxHjyTGj2q/GrLcP1AguUdXkZpfi2AJvs8agAA==", {
+        en: "Three gear shifters side by side on the printer bed",
+        ar: "ثلاثة قيرات مصغّرة جنباً إلى جنب على سطح الطابعة",
+      }),
     ],
-    sizes: [{ id: "one", name: { en: "One size", ar: "مقاس واحد" }, dims: { w: 85, d: 85, h: 110 }, price: { BHD: 3.5, AED: 35 } }],
-    stock: 20,
-    leadTimeDays: [1, 2],
-    printHours: 3,
-    layerHeight: 0.2,
+    stock: null,
   },
   {
-    slug: "arc-phone-stand",
-    sku: "INF-DSK-02",
-    name: { en: "Arc Phone Stand", ar: "حامل الهاتف القوسي" },
+    slug: "dumpling-steamer",
+    sku: "LU-GFT-01",
+    name: { en: "Dumpling in a Steamer", ar: "دمبلنغ في سلة البخار" },
     tagline: {
-      en: "Holds a phone at 65°, with a channel for the charging cable.",
-      ar: "يحمل الهاتف بزاوية 65° مع مجرى لسلك الشحن.",
+      en: "A smiling dumpling that hides under the lid of its own little steamer basket.",
+      ar: "دمبلنغ مبتسم يختبئ تحت غطاء سلة البخار الصغيرة.",
     },
     description: {
-      en: "Printed in PETG, which handles heat better than PLA, so it is fine on a sunny desk. Fits phones up to 85 mm wide, with or without a case.",
-      ar: "مطبوع من PETG الذي يتحمل الحرارة أكثر من PLA، فلا مشكلة على مكتب مشمس. يناسب الهواتف حتى عرض 85 مم مع الغطاء أو بدونه.",
+      en: "Printed in three colours: a pink dumpling with a printed face, inside a bamboo-coloured steamer with a lift-off lid. Small enough to sit in your palm.",
+      ar: "مطبوع بثلاثة ألوان: دمبلنغ وردي بوجه مطبوع داخل سلة بلون الخيزران بغطاء يُرفع. صغير بحجم راحة اليد.",
     },
-    category: "desk",
-    model: "arc-stand",
-    material: "petg",
-    colors: [GRAPHITE, BONE, c("ice", "Ice", "ثلجي", "#CFE6EA", "translucent")],
-    sizes: [{ id: "one", name: { en: "One size", ar: "مقاس واحد" }, dims: { w: 80, d: 90, h: 120 }, price: { BHD: 4, AED: 40 } }],
-    stock: 15,
-    leadTimeDays: [1, 2],
-    printHours: 2.5,
-    layerHeight: 0.2,
-  },
-  {
-    slug: "hex-coasters",
-    sku: "INF-OBJ-02",
-    name: { en: "Hex Coasters", ar: "قواعد أكواب سداسية" },
-    tagline: {
-      en: "Flexible TPU coasters that grip the table and the glass.",
-      ar: "قواعد مرنة من TPU تثبت على الطاولة وتمسك الكوب.",
-    },
-    description: {
-      en: "Concentric ridges keep condensation off the table. Dishwasher-safe on the top rack.",
-      ar: "التموجات الدائرية تمنع وصول قطرات التكثف إلى الطاولة. آمنة في الرف العلوي لغسالة الصحون.",
-    },
-    category: "objects",
-    model: "hex-coaster",
-    material: "tpu",
-    colors: [GRAPHITE, SAND, SAGE],
-    sizes: [
-      { id: "set-4", name: { en: "Set of 4", ar: "طقم ٤ قطع" }, dims: { w: 100, d: 87, h: 6 }, price: { BHD: 5, AED: 50 } },
-      { id: "set-6", name: { en: "Set of 6", ar: "طقم ٦ قطع" }, dims: { w: 100, d: 87, h: 6 }, price: { BHD: 7, AED: 70 } },
+    category: "gifts",
+    colors: [c("pink-bamboo", "Pink & bamboo", "وردي وخيزراني", "#e8506a", "#e3cc98")],
+    sizes: [{ id: "small", name: { en: "Small", ar: "صغير" }, price: { BHD: 1.5, AED: 15 } }],
+    images: [
+      img("/products/dumpling-steamer.webp", 640, 800, "data:image/webp;base64,UklGRmYAAABXRUJQVlA4IFoAAAAQAgCdASoKAAwAAoBCJQBOgCKKiSZltaAAAP7tLt+lA1VKWaAbSAN6wbSRDYKHX7D9e6J1jJm2zVPQ4RRIDSmf5V+O/0x2ABrO0ccPGH0tiBW9xdGrRFM4AAA=", {
+        en: "Pink 3D-printed dumpling with a smiling face peeking out of a bamboo-coloured steamer",
+        ar: "دمبلنغ وردي مبتسم مطبوع ثلاثي الأبعاد يطل من سلة بخار بلون الخيزران",
+      }),
     ],
-    stock: 10,
-    leadTimeDays: [1, 2],
-    printHours: 4,
-    layerHeight: 0.2,
+    stock: null,
+  },
+  {
+    slug: "plant-cell-model",
+    sku: "LU-EDU-01",
+    name: { en: "Plant Cell Model", ar: "مجسم الخلية النباتية" },
+    tagline: {
+      en: "A four-colour plant cell with the nucleus, chloroplasts and vacuole in relief.",
+      ar: "خلية نباتية بأربعة ألوان، تبرز فيها النواة والبلاستيدات الخضراء والفجوة العصارية.",
+    },
+    description: {
+      en: "Made for science class and school projects. The cell wall, membrane, cytoplasm and organelles are raised, colour-coded parts you can point to.",
+      ar: "مصمم لحصص العلوم والمشاريع المدرسية. جدار الخلية والغشاء والسيتوبلازم والعضيات أجزاء بارزة وملونة يسهل الإشارة إليها وشرحها.",
+    },
+    category: "education",
+    colors: [c("multicolour", "Multicolour", "متعدد الألوان", "#2fae68", "#f2c230")],
+    sizes: [{ id: "one", name: { en: "One size", ar: "مقاس واحد" }, price: { BHD: 3, AED: 30 } }],
+    images: [
+      img("/products/plant-cell-model.webp", 1000, 1250, "data:image/webp;base64,UklGRnQAAABXRUJQVlA4IGgAAAAQAgCdASoKAAwAAoBCJbACdAERH2jvxWHgAP7vkRy16+lT40XYZx8YvKsyt8M8zihU7F9e/5k7DUbipUqvvVUsIoWT6+1xb9MYnnln6+nZ7aS9/KxwjTtUuL+5DniBuvZAI88GhcqQAA==", {
+        en: "Multicolour 3D-printed plant cell model with raised organelles",
+        ar: "مجسم خلية نباتية متعدد الألوان مطبوع ثلاثي الأبعاد بعضيات بارزة",
+      }),
+    ],
+    stock: null,
   },
 ];
 
+/** CONFIRM: remove any material the shop doesn't print with. */
 export const MATERIALS: MaterialInfo[] = [
   {
     id: "pla-matte",
-    name: { en: "PLA Matte", ar: "PLA مطفي" },
+    name: { en: "PLA", ar: "PLA" },
     summary: {
-      en: "Plant-based, crisp detail, a soft stone-like surface. Keep it out of parked cars in summer.",
-      ar: "مصنوع من مصادر نباتية، تفاصيل حادة وسطح ناعم يشبه الحجر. أبعده عن السيارة المتوقفة في الصيف.",
+      en: "Plant-based, crisp detail, a soft matte surface. The default for most pieces. Keep it out of parked cars in summer.",
+      ar: "مصنوع من مصادر نباتية، تفاصيل حادة وسطح مطفي ناعم. الخيار الأساسي لمعظم القطع. أبعده عن السيارة المتوقفة في الصيف.",
     },
     scores: { strength: 3, detail: 4, heat: 2, flex: 1 },
     heatC: 55,
@@ -267,16 +191,6 @@ export const MATERIALS: MaterialInfo[] = [
     },
     scores: { strength: 4, detail: 3, heat: 3, flex: 2 },
     heatC: 75,
-  },
-  {
-    id: "resin",
-    name: { en: "Resin", ar: "ريزن" },
-    summary: {
-      en: "UV-cured at 0.05 mm layers. Lines you can barely see, edges you can feel.",
-      ar: "يُعالج بالأشعة فوق البنفسجية بطبقات 0.05 مم. خطوط بالكاد تُرى وحواف دقيقة.",
-    },
-    scores: { strength: 3, detail: 5, heat: 2, flex: 1 },
-    heatC: 60,
   },
   {
     id: "tpu",

@@ -6,7 +6,7 @@ export const home = defineMessages({
     hero: {
       eyebrow: "3D-printed objects · Bahrain & UAE",
       titleLines: ["Objects,", "printed layer", "by layer."],
-      body: "Lamps, vessels and desk pieces, printed to order in matte, silk and resin. Pick a piece, send the order on WhatsApp, and we deliver across Bahrain and the UAE.",
+      body: "Phone cases, fidget toys, gifts and school models, printed to order. Pick a piece, send the order on WhatsApp, and we deliver across Bahrain and the UAE.",
       hud: {
         printing: "Printing",
         complete: "Complete",
@@ -22,8 +22,8 @@ export const home = defineMessages({
     },
     collection: {
       eyebrow: "Collection",
-      title: "Printed to order, finished by hand.",
-      body: "Every piece below is a live 3D model. Turn it, pick a colour, and the price follows your region.",
+      title: "Printed to order, in small batches.",
+      body: "Real photos of real prints. Pick a piece and the price follows your region.",
       all: "All",
       count: "{n} pieces",
       from: "From",
@@ -47,7 +47,7 @@ export const home = defineMessages({
         },
         {
           title: "Print",
-          body: "A nozzle at 210°C lays each layer down. A lamp takes about nineteen hours; a pen cup, about three.",
+          body: "A nozzle at 210°C lays each layer down, switching colours mid-print when a piece needs more than one. Small pieces take under an hour; bigger ones run through the night.",
           meta: "0.4 mm nozzle · 210°C",
         },
         {
@@ -59,8 +59,8 @@ export const home = defineMessages({
     },
     materials: {
       eyebrow: "Materials",
-      title: "Five materials, each for a reason.",
-      body: "PLA for detail, PETG for heat, resin for precision, TPU for grip.",
+      title: "Four materials, each for a reason.",
+      body: "PLA for detail, silk PLA for shine, PETG for heat, TPU for grip.",
       scores: { strength: "Strength", detail: "Detail", heat: "Heat", flex: "Flex" },
       softens: "Softens around {n}°C",
       heatNote: "Bahrain and UAE summers are hard on plastics. Anything meant for a car or a sunny window, we print in PETG.",
@@ -101,6 +101,10 @@ export const home = defineMessages({
           a: "Pieces marked as ready ship within a day or two. Made-to-order pieces show their production time on the product, plus delivery.",
         },
         {
+          q: "Which iPhone models do the cases fit?",
+          a: "Each case is printed for one model. Type yours when you add the case to your order and we'll confirm it in the chat before printing.",
+        },
+        {
           q: "Can I get a different colour or size?",
           a: "Usually, yes. Most pieces can be printed in any colour we stock and scaled up or down. Ask in the chat.",
         },
@@ -123,7 +127,7 @@ export const home = defineMessages({
     hero: {
       eyebrow: "قطع مطبوعة ثلاثية الأبعاد · البحرين والإمارات",
       titleLines: ["قطعٌ تُطبع", "طبقةً", "فوق طبقة."],
-      body: "مصابيح وأوانٍ وقطع مكتبية تُطبع عند الطلب بخامات مطفية وحريرية وريزن. اختر قطعتك وأرسل طلبك عبر واتساب، ونوصله إليك في البحرين والإمارات.",
+      body: "كفرات جوال وألعاب فدجت وهدايا ومجسمات مدرسية تُطبع عند الطلب. اختر قطعتك وأرسل طلبك عبر واتساب، ونوصله إليك في البحرين والإمارات.",
       hud: {
         printing: "جارٍ الطباعة",
         complete: "اكتملت",
@@ -138,8 +142,8 @@ export const home = defineMessages({
     },
     collection: {
       eyebrow: "المجموعة",
-      title: "تُطبع عند الطلب، وتُشطّب يدوياً.",
-      body: "كل قطعة هنا نموذج ثلاثي الأبعاد حي. أدِرها واختر لونها، والسعر يتبع منطقتك.",
+      title: "تُطبع عند الطلب، بكميات صغيرة.",
+      body: "صور حقيقية لقطع مطبوعة فعلاً. اختر قطعتك والسعر يتبع منطقتك.",
       all: "الكل",
       count: "{n} قطع",
       from: "من",
@@ -163,7 +167,7 @@ export const home = defineMessages({
         },
         {
           title: "الطباعة",
-          body: "تضع فوهة بحرارة 210°م كل طبقة فوق الأخرى. يستغرق المصباح نحو تسع عشرة ساعة، وحامل الأقلام نحو ثلاث.",
+          body: "تضع فوهة بحرارة 210°م كل طبقة فوق الأخرى، وتبدّل اللون أثناء الطباعة حين تحتاج القطعة أكثر من لون. القطع الصغيرة تُطبع في أقل من ساعة، والكبيرة تستمر طوال الليل.",
           meta: "فوهة 0.4 مم · 210°م",
         },
         {
@@ -175,8 +179,8 @@ export const home = defineMessages({
     },
     materials: {
       eyebrow: "الخامات",
-      title: "خمس خامات، لكلٍ منها سبب.",
-      body: "PLA للتفاصيل، وPETG للحرارة، والريزن للدقة، وTPU للمرونة.",
+      title: "أربع خامات، لكلٍ منها سبب.",
+      body: "PLA للتفاصيل، وPLA الحريري للمعان، وPETG للحرارة، وTPU للمرونة.",
       scores: { strength: "المتانة", detail: "التفاصيل", heat: "الحرارة", flex: "المرونة" },
       softens: "يلين عند نحو {n}°م",
       heatNote: "صيف البحرين والإمارات قاسٍ على البلاستيك. أي قطعة للسيارة أو لنافذة مشمسة نطبعها من PETG.",
@@ -214,6 +218,10 @@ export const home = defineMessages({
         {
           q: "كم يستغرق الطلب؟",
           a: "القطع الجاهزة تُشحن خلال يوم أو يومين. أما القطع التي تُصنع عند الطلب فمدة تجهيزها مذكورة في صفحة المنتج، يضاف إليها وقت التوصيل.",
+        },
+        {
+          q: "ما موديلات الآيفون التي تناسبها الكفرات؟",
+          a: "يُطبع كل كفر لموديل واحد. اكتب موديل جهازك عند إضافة الكفر إلى طلبك، وسنؤكده معك في المحادثة قبل الطباعة.",
         },
         {
           q: "هل يمكن تغيير اللون أو المقاس؟",

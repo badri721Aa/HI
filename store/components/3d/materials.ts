@@ -154,17 +154,23 @@ ${PATTERN_FN}
 `;
 
 const FRAG_MAIN = /* glsl */ `
+  // Screen-space derivatives first: they must be taken in uniform control flow.
+  float printDy = fwidth( vPrintPos.y );
+  vec2 printInfillQ = vec2( vPrintPos.x + vPrintPos.z, vPrintPos.x - vPrintPos.z ) * ( 0.70710678 / ${f(4 * MM)} );
+  float printInfillAa = max( fwidth( printInfillQ.x ), 1.0e-5 );
+  #ifdef PRINT_PATTERN
+    float printSd = printLattice( vPrintUv );
+    float printAa = max( fwidth( printSd ), 1.0e-5 ) * 0.75;
+  #endif
+
   // Print progress: nothing above the clip plane exists yet.
   if ( vPrintPos.y > uClipY ) discard;
-  float printDy = fwidth( vPrintPos.y );
   float printClipOn = 1.0 - step( 1.0e5, uClipY );
   float printBelow = uClipY - vPrintPos.y;
   float printBand = max( uHotBand, printDy * 1.5 );
   float printHot = printClipOn * ( 1.0 - smoothstep( 0.0, printBand, printBelow ) );
 
   #ifdef PRINT_PATTERN
-    float printSd = printLattice( vPrintUv );
-    float printAa = max( fwidth( printSd ), 1.0e-5 ) * 0.75;
     float printCov = smoothstep( -printAa, printAa, printSd );
     if ( printCov < 0.004 ) discard;
     diffuseColor.a *= printCov;
@@ -180,10 +186,15 @@ const FRAG_MAIN = /* glsl */ `
   diffuseColor.rgb *= 1.0 - 0.1 * printLayerAmt * printGroove;
 
   #ifdef DOUBLE_SIDED
-    // Back faces are only visible through the cut or a lattice hole: shade them as the wall's section.
+    // Back faces are only visible through the cut or a lattice hole: shade
+    // them as the part's cross-section. While printing, a 45° infill grid
+    // shows inside solid parts and the freshest ~2 mm of wall glows.
     if ( ! gl_FrontFacing ) {
-      diffuseColor.rgb *= 0.62;
-      printHot = max( printHot, printClipOn * ( 1.0 - smoothstep( 0.0, printBand * 4.0, printBelow ) ) );
+      vec2 printCell = abs( fract( printInfillQ ) - 0.5 );
+      float printLine = 1.0 - smoothstep( 0.07 - printInfillAa, 0.07 + printInfillAa, 0.5 - max( printCell.x, printCell.y ) );
+      printLine *= 1.0 - smoothstep( 0.15, 0.6, printInfillAa );
+      diffuseColor.rgb *= mix( 0.55, 0.9, printLine * printClipOn );
+      printHot = max( printHot, printClipOn * ( 1.0 - smoothstep( 0.0, printBand * 1.4, printBelow ) ) );
     }
   #endif
 `;

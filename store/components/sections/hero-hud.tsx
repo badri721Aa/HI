@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react";
 import { useI18n } from "@/components/providers/i18n-provider";
-import { MATERIALS, getProduct } from "@/content/catalog";
+import { MATERIALS } from "@/content/catalog";
+import { SHOWCASE } from "@/content/showcase";
 import { fmt } from "@/lib/i18n";
 import { usePrintState } from "@/lib/store/print";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils";
  * when that product exists, and falls back to PLA Matte at 0.20 mm otherwise,
  * so editing the catalog can never break the hero.
  */
-const PIECE = getProduct("ripple-vase");
+const PIECE = SHOWCASE.vase;
 const MATERIAL =
   MATERIALS.find((m) => m.id === PIECE?.material) ?? MATERIALS.find((m) => m.id === "pla-matte") ?? MATERIALS[0] ?? null;
 const LAYER_HEIGHT_MM = PIECE?.layerHeight ?? 0.2;

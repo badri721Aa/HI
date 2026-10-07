@@ -4,12 +4,12 @@ import { priceFor } from "@/lib/currency";
 export type StockState =
   | { kind: "ready"; n: number }
   | { kind: "low"; n: number }
-  | { kind: "made"; min: number; max: number };
+  | { kind: "made"; min?: number; max?: number };
 
-/** In stock (≥4), low (1–3), or made to order (null / 0 stock). */
+/** In stock (≥4), low (1–3), or made to order (null / 0 stock; days only when known). */
 export function stockState(product: Product): StockState {
   const { stock, leadTimeDays } = product;
-  if (stock === null || stock <= 0) return { kind: "made", min: leadTimeDays[0], max: leadTimeDays[1] };
+  if (stock === null || stock <= 0) return { kind: "made", min: leadTimeDays?.[0], max: leadTimeDays?.[1] };
   if (stock <= 3) return { kind: "low", n: stock };
   return { kind: "ready", n: stock };
 }

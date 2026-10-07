@@ -4,7 +4,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type Ref } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { ColorOption, MaterialId, Product, SizeOption } from "@/types";
+import type { ColorOption, MaterialId, ShowcaseProduct } from "@/types";
 import { getGeometry, getModelInfo, getWireframeGeometry } from "./geometry";
 import {
   createPrintDepthMaterial,
@@ -38,22 +38,22 @@ const COLOR_TAU = 0.066;
 /** Bulb switch-on / off time constant. */
 const GLOW_TAU = 0.14;
 
-function pickSize(product: Product, sizeId?: string): SizeOption {
+function pickSize(product: ShowcaseProduct, sizeId?: string): ShowcaseProduct["sizes"][number] {
   return product.sizes.find((s) => s.id === sizeId) ?? product.sizes[0];
 }
 
 /** Height of the rendered model in model units (1 = 100 mm), for camera framing. */
-export function getModelHeight(product: Product, sizeId?: string): number {
+export function getModelHeight(product: ShowcaseProduct, sizeId?: string): number {
   return getModelInfo(product.model, pickSize(product, sizeId).dims).height;
 }
 
 /** Bounding size of the rendered model in model units (coasters: the stack of three). */
-export function getModelSize(product: Product, sizeId?: string): { w: number; h: number; d: number } {
+export function getModelSize(product: ShowcaseProduct, sizeId?: string): { w: number; h: number; d: number } {
   return getModelInfo(product.model, pickSize(product, sizeId).dims).size;
 }
 
 export interface ProductMeshProps {
-  product: Product;
+  product: ShowcaseProduct;
   colorId: string;
   sizeId?: string;
   /** 0–1 fraction of the model height that is "printed". Omit for a finished piece. */

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { ModelKind, SizeOption } from "@/types";
+import type { Dims, ModelKind } from "@/types";
 import {
   TAU,
   clamp,
@@ -26,7 +26,6 @@ import { CORNER_HALF, LAMP_TILES_AROUND, STAR_HALF } from "./core/pattern";
  *   from here; call disposeGeometryCache() if the whole 3D layer goes away.
  */
 
-type Dims = SizeOption["dims"];
 
 const MM = 0.01;
 
@@ -95,17 +94,17 @@ function entry(kind: ModelKind, dims: Dims): CacheEntry {
  * - facet-planter includes the saucer; lattice-lamp includes base ring and
  *   socket (the glowing bulb itself is added by ProductMesh).
  */
-export function getGeometry(kind: ModelKind, dims: SizeOption["dims"]): THREE.BufferGeometry {
+export function getGeometry(kind: ModelKind, dims: Dims): THREE.BufferGeometry {
   return entry(kind, dims).mesh;
 }
 
 /** CAD-style line geometry for the "model" stage (LineSegments). Cached; do not dispose. */
-export function getWireframeGeometry(kind: ModelKind, dims: SizeOption["dims"]): WireframeGeometry {
+export function getWireframeGeometry(kind: ModelKind, dims: Dims): WireframeGeometry {
   return entry(kind, dims).wire;
 }
 
 /** Bounding size, sweep height and kind-specific extras (lamp bulb + lattice). */
-export function getModelInfo(kind: ModelKind, dims: SizeOption["dims"]): ModelInfo {
+export function getModelInfo(kind: ModelKind, dims: Dims): ModelInfo {
   return entry(kind, dims).info;
 }
 
@@ -153,7 +152,7 @@ function rippleBase(t: number) {
  * rotate by a quarter turn (−π/2 in θ) from base to lip. Exact: this is the
  * same function the mesh is built from.
  */
-export function ripplePerimeterRadius(t: number, theta: number, dims: SizeOption["dims"]): number {
+export function ripplePerimeterRadius(t: number, theta: number, dims: Dims): number {
   const tt = clamp(t, 0, 1);
   const R = Math.min(dims.w, dims.d) / 200;
   return R * rippleBase(tt) * (1 + RIPPLE.amp * Math.cos(RIPPLE.ridges * (theta + RIPPLE.twist * tt)));

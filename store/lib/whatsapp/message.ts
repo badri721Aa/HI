@@ -93,8 +93,9 @@ export function buildWhatsAppMessagePayload({ ref, region, locale, lines, custom
   const out: string[] = [t.greeting(site.name), "", `*${t.order} ${ref}*`, ""];
 
   priced.lines.forEach((p, i) => {
-    const dims = `${p.dims.w}×${p.dims.d}×${p.dims.h} ${t.mm}`;
-    out.push(`${i + 1}. ${p.product.name[locale]} — ${p.sizeName} (${dims})${sep}${p.colorName}`);
+    const dims = p.dims ? ` (${p.dims.w}×${p.dims.d}×${p.dims.h} ${t.mm})` : "";
+    out.push(`${i + 1}. ${p.product.name[locale]} — ${p.sizeName}${dims}${sep}${p.colorName}`);
+    if (p.note) out.push(`   ${p.note.label}: ${p.note.value}`);
     out.push(
       p.line.qty > 1
         ? `   ${p.line.qty} × ${fmt(p.unitPrice)} = ${fmt(p.lineTotal)}`

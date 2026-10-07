@@ -15,7 +15,10 @@ interface CartState {
 }
 
 const sameVariant = (a: OrderLine, b: OrderLine) =>
-  a.slug === b.slug && a.colorId === b.colorId && a.sizeId === b.sizeId;
+  a.slug === b.slug &&
+  a.colorId === b.colorId &&
+  a.sizeId === b.sizeId &&
+  (a.note ?? "").trim().toLowerCase() === (b.note ?? "").trim().toLowerCase();
 
 /**
  * Order basket, persisted to localStorage. `skipHydration` keeps the first

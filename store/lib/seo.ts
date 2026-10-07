@@ -158,7 +158,7 @@ export function organizationJsonLd(locale: Locale): Record<string, unknown> {
 export function productJsonLd(product: Product, locale: Locale): Record<string, unknown> {
   const url = absoluteUrl(`/${locale}/products/${product.slug}`);
   const inStock = (product.stock ?? 0) > 0;
-  const [minDays, maxDays] = product.leadTimeDays;
+  const leadTime = product.leadTimeDays;
   const regions = Object.values(REGION_CONFIG);
 
   const offers = product.sizes.flatMap((size) =>
@@ -173,9 +173,16 @@ export function productJsonLd(product: Product, locale: Locale): Record<string, 
       eligibleRegion: { "@type": "Country", name: COUNTRY_NAME[region.id], identifier: region.id },
       url,
       seller: { "@type": "OnlineStore", "@id": STORE_ID, name: site.name },
-      ...(inStock
+      ...(inStock || !leadTime
         ? {}
-        : { deliveryLeadTime: { "@type": "QuantitativeValue", minValue: minDays, maxValue: maxDays, unitCode: "DAY" } }),
+        : {
+            deliveryLeadTime: {
+              "@type": "QuantitativeValue",
+              minValue: leadTime[0],
+              maxValue: leadTime[1],
+              unitCode: "DAY",
+            },
+          }),
     })),
   );
 
@@ -187,9 +194,12 @@ export function productJsonLd(product: Product, locale: Locale): Record<string, 
     description: `${product.tagline[locale]} ${product.description[locale]}`,
     sku: product.sku,
     brand: { "@type": "Brand", name: site.name },
-    material: getMaterial(product.material).name[locale],
+    ...(product.material ? { material: getMaterial(product.material).name[locale] } : {}),
     category: CATEGORIES.find((c) => c.id === product.category)?.name[locale],
-    image: [absoluteUrl(`/${locale}/products/${product.slug}/opengraph-image`)],
+    image: [
+      ...product.images.map((i) => absoluteUrl(i.src)),
+      absoluteUrl(`/${locale}/products/${product.slug}/opengraph-image`),
+    ],
     url,
     offers,
   };

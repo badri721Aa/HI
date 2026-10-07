@@ -6,7 +6,7 @@ export const siteCopy = defineMessages({
     meta: {
       title: "3D-printed objects, made to order",
       description:
-        "Lamps, vases, planters and desk pieces, 3D-printed to order. Order on WhatsApp with delivery across Bahrain and the UAE.",
+        "Phone cases, fidget toys, gifts and school models, 3D-printed to order. Order on WhatsApp with delivery across Bahrain and the UAE.",
       ogAlt: "A 3D-printed vase mid-print, layer lines glowing",
       productOgAlt: "A 3D-printed piece caught mid-print, with its price, material and size",
     },
@@ -44,7 +44,7 @@ export const siteCopy = defineMessages({
     meta: {
       title: "قطع مطبوعة ثلاثية الأبعاد، تُصنع عند الطلب",
       description:
-        "مصابيح ومزهريات وأصص وقطع مكتبية مطبوعة ثلاثية الأبعاد عند الطلب. اطلب عبر واتساب مع التوصيل في البحرين والإمارات.",
+        "كفرات جوال وألعاب فدجت وهدايا ومجسمات مدرسية مطبوعة ثلاثية الأبعاد عند الطلب. اطلب عبر واتساب مع التوصيل في البحرين والإمارات.",
       ogAlt: "مزهرية أثناء الطباعة ثلاثية الأبعاد وخطوط طبقاتها مضيئة",
       productOgAlt: "قطعة مطبوعة ثلاثية الأبعاد أثناء طباعتها، مع سعرها وخامتها ومقاسها",
     },

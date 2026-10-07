@@ -8,7 +8,7 @@ import { isPlausiblePhone } from "./phone";
 
 export const MAX_QTY = 20;
 export const MAX_LINES = 20;
-export const LIMITS = { name: 60, phone: 24, area: 80, notes: 400 } as const;
+export const LIMITS = { name: 60, phone: 24, area: 80, notes: 400, note: 40 } as const;
 
 /**
  * Validation error keys. The UI maps each to a translated message via the
@@ -20,6 +20,8 @@ export type OrderErrorKey =
   | "qty_invalid"
   | "unknown_product"
   | "unknown_variant"
+  | "note_required"
+  | "note_too_long"
   | "name_required"
   | "name_too_long"
   | "phone_invalid"
@@ -47,6 +49,7 @@ export const orderLineSchema = z
     colorId: z.string().min(1),
     sizeId: z.string().min(1),
     qty: z.number().int(err("qty_invalid")).min(1, err("qty_invalid")).max(MAX_QTY, err("qty_invalid")),
+    note: z.string().trim().max(LIMITS.note, err("note_too_long")).optional(),
   })
   .superRefine((line, ctx) => {
     const product = getProduct(line.slug);
@@ -59,6 +62,9 @@ export const orderLineSchema = z
     }
     if (!product.sizes.some((s) => s.id === line.sizeId)) {
       ctx.addIssue({ code: "custom", message: "unknown_variant", path: ["sizeId"] });
+    }
+    if (product.variantNote?.required && !line.note?.trim()) {
+      ctx.addIssue({ code: "custom", message: "note_required", path: ["note"] });
     }
   });
 
@@ -114,7 +120,9 @@ export interface PricedLine {
   product: Product;
   colorName: string;
   sizeName: string;
-  dims: Product["sizes"][number]["dims"];
+  dims?: Product["sizes"][number]["dims"];
+  /** Cleaned answer to the product's variantNote, with its label. */
+  note?: { label: string; value: string };
   unitPrice: number;
   lineTotal: number;
 }
@@ -147,6 +155,10 @@ export function priceOrder(lines: OrderLine[], region: Region, locale: Locale): 
       colorName: color.name[locale],
       sizeName: size.name[locale],
       dims: size.dims,
+      note:
+        product.variantNote && line.note?.trim()
+          ? { label: product.variantNote.label[locale], value: sanitizeText(line.note, LIMITS.note) }
+          : undefined,
       unitPrice: fromMinor(unitMinor, currency),
       lineTotal: fromMinor(totalMinor, currency),
     });
