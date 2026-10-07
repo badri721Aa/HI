@@ -8,6 +8,7 @@ export const siteCopy = defineMessages({
       description:
         "Lamps, vases, planters and desk pieces, 3D-printed to order. Order on WhatsApp with delivery across Bahrain and the UAE.",
       ogAlt: "A 3D-printed vase mid-print, layer lines glowing",
+      productOgAlt: "A 3D-printed piece caught mid-print, with its price, material and size",
     },
     footer: {
       tagline: "3D-printed objects, made to order in small batches.",
@@ -45,6 +46,7 @@ export const siteCopy = defineMessages({
       description:
         "مصابيح ومزهريات وأصص وقطع مكتبية مطبوعة ثلاثية الأبعاد عند الطلب. اطلب عبر واتساب مع التوصيل في البحرين والإمارات.",
       ogAlt: "مزهرية أثناء الطباعة ثلاثية الأبعاد وخطوط طبقاتها مضيئة",
+      productOgAlt: "قطعة مطبوعة ثلاثية الأبعاد أثناء طباعتها، مع سعرها وخامتها ومقاسها",
     },
     footer: {
       tagline: "قطع مطبوعة ثلاثية الأبعاد، تُصنع عند الطلب بكميات صغيرة.",

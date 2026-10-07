@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#020203">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex">
+<title>Offline · Infill</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<!--
+  Served by public/sw.js when a page can't load without a connection.
+  Static on purpose: no scripts or styles from the app bundle. Keep the copy
+  in sync with lib/i18n/messages/site.ts (offline, error.retry) and the
+  numbers with WHATSAPP_LINES in lib/site.ts.
+-->
+<style>
+  :root {
+    --ink: #020203;
+    --card: #09090c;
+    --fg: #ededf0;
+    --muted: #a1a1ac;
+    --subtle: #7a7a86;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --silver: #c8ccd2;
+    --glow: #7de3ee;
+    --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --arabic: "Tajawal", "Geeza Pro", "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--ink); -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 35%, transparent 0, var(--ink) 75%),
+      linear-gradient(to right, var(--line) 1px, transparent 1px) 0 0 / 56px 56px,
+      linear-gradient(to bottom, var(--line) 1px, transparent 1px) 0 0 / 56px 56px,
+      var(--ink);
+    color: var(--fg);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    align-items: center;
+  }
+  main {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: max(48px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(48px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+  @media (min-width: 768px) { main { padding-inline: 32px; } }
+  .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 17px; letter-spacing: -0.03em; text-transform: lowercase; }
+  .brand svg { width: 24px; height: 24px; }
+  .eyebrow { margin: 56px 0 0; display: flex; align-items: center; gap: 12px; font: 12px/16px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); }
+  .ar { font-family: var(--arabic); }
+  .ar, .ar * { letter-spacing: normal !important; }
+  .pair { margin-top: 20px; display: grid; gap: 28px; }
+  @media (min-width: 640px) { .pair { grid-template-columns: 1fr 1fr; gap: 40px; } }
+  .title { margin: 0; font-weight: 600; font-size: clamp(34px, 6vw, 48px); line-height: 1.04; letter-spacing: -0.035em; text-wrap: balance; }
+  .ar .title { font-weight: 700; line-height: 1.2; }
+  .body { margin: 16px 0 0; font-size: 16px; line-height: 1.65; color: var(--muted); text-wrap: pretty; }
+  ul { list-style: none; margin: 32px 0 0; padding: 0; border-top: 1px solid var(--line); }
+  li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .label { flex: 1 1 12rem; min-width: 0; font-size: 15px; }
+  .label .ar { display: block; margin-top: 2px; font-size: 14px; color: var(--subtle); text-align: left; }
+  .actions { display: flex; align-items: center; gap: 8px; }
+  a { color: inherit; text-decoration: none; }
+  .tel {
+    display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px;
+    border: 1px solid var(--line-strong); font: 14px var(--mono); letter-spacing: 0.02em; direction: ltr; unicode-bidi: isolate;
+  }
+  .wa {
+    display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 999px;
+    border: 1px solid var(--line-strong); color: var(--fg);
+  }
+  .wa svg { width: 18px; height: 18px; }
+  .tel:hover, .wa:hover { border-color: rgba(255, 255, 255, 0.32); background: rgba(255, 255, 255, 0.04); }
+  .retry {
+    margin-top: 32px; display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 28px;
+    border: 0; border-radius: 999px; background: var(--fg); color: var(--ink); font: 500 16px var(--sans); cursor: pointer;
+    transition: background-color 200ms ease;
+  }
+  .retry:hover { background: #fff; }
+  .retry .ar { color: #24242e; }
+  :focus-visible { outline: 2px solid var(--glow); outline-offset: 3px; border-radius: 4px; }
+  .retry:focus-visible, .tel:focus-visible, .wa:focus-visible { border-radius: 999px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <a class="brand" href="/">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <defs>
+        <clipPath id="c"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/></clipPath>
+        <linearGradient id="h" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#c8ccd2"/><stop offset="1" stop-color="#8f939c"/>
+        </linearGradient>
+      </defs>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" stroke="currentColor" stroke-width="1.5"/>
+      <g clip-path="url(#c)" stroke="url(#h)" stroke-width="1.25">
+        <path d="M-12 24 12 0M-6 24 18 0M0 24 24 0M6 24 30 0M12 24 36 0"/>
+      </g>
+    </svg>
+    <span>Infill</span>
+  </a>
+
+  <p class="eyebrow"><span class="dot" aria-hidden="true"></span><span>Offline</span><span aria-hidden="true">·</span><span class="ar" lang="ar">غير متصل</span></p>
+
+  <div class="pair">
+    <div>
+      <h1 class="title">You're offline.</h1>
+      <p class="body">Reconnect to browse the collection. You can still reach us on:</p>
+    </div>
+    <div class="ar" lang="ar" dir="rtl">
+      <p class="title">أنت غير متصل.</p>
+      <p class="body">أعد الاتصال لتصفح المجموعة. ويمكنك التواصل معنا على:</p>
+    </div>
+  </div>
+
+  <ul>
+    <li>
+      <span class="label">Bahrain · Line 1<span class="ar" lang="ar" dir="rtl">البحرين · الخط ١</span></span>
+      <span class="actions">
+        <a class="tel" href="tel:+97339858885">+973 3985 8885</a>
+        <a class="wa" href="https://wa.me/97339858885" aria-label="WhatsApp +973 3985 8885"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><use href="#wa"/></svg></a>
+      </span>
+    </li>
+    <li>
+      <span class="label">Bahrain · Line 2<span class="ar" lang="ar" dir="rtl">البحرين · الخط ٢</span></span>
+      <span class="actions">
+        <a class="tel" href="tel:+97363669666">+973 6366 9666</a>
+        <a class="wa" href="https://wa.me/97363669666" aria-label="WhatsApp +973 6366 9666"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><use href="#wa"/></svg></a>
+      </span>
+    </li>
+    <li>
+      <span class="label">UAE<span class="ar" lang="ar" dir="rtl">الإمارات</span></span>
+      <span class="actions">
+        <a class="tel" href="tel:+971504644502">+971 50 464 4502</a>
+        <a class="wa" href="https://wa.me/971504644502" aria-label="WhatsApp +971 50 464 4502"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><use href="#wa"/></svg></a>
+      </span>
+    </li>
+  </ul>
+
+  <button class="retry" id="retry" type="button">
+    <span>Try again</span><span aria-hidden="true">·</span><span class="ar" lang="ar">حاول مرة أخرى</span>
+  </button>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="wa" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></symbol>
+  </svg>
+</main>
+<script>
+  (function () {
+    var retry = document.getElementById("retry");
+    if (retry) retry.addEventListener("click", function () { location.reload(); });
+    // Pick up where the visitor left off as soon as the connection is back.
+    window.addEventListener("online", function () { location.reload(); });
+  })();
+</script>
+</body>
+</html>

@@ -15,6 +15,8 @@ export const home = defineMessages({
         nozzle: "Nozzle",
         material: "Material",
         timeLeft: "Time left",
+        /** Remaining print time, e.g. "6h 05m". */
+        time: "{h}h {m}m",
       },
       scroll: "Scroll",
     },
@@ -74,6 +76,8 @@ export const home = defineMessages({
       lines: "WhatsApp",
       days: "Delivered {min}–{max} days after your piece is ready",
       fee: "Delivery fee confirmed in the chat",
+      /** Used only when REGION_CONFIG sets a flat deliveryFee. */
+      feeFlat: "Delivery fee: {amount}",
       coverage: {
         BH: "Manama, Muharraq, Riffa and every other area.",
         AE: "Dubai, Abu Dhabi, Sharjah and all seven emirates.",
@@ -128,6 +132,7 @@ export const home = defineMessages({
         nozzle: "الفوهة",
         material: "الخامة",
         timeLeft: "الوقت المتبقي",
+        time: "{h} س {m} د",
       },
       scroll: "مرّر",
     },
@@ -187,6 +192,7 @@ export const home = defineMessages({
       lines: "واتساب",
       days: "التوصيل خلال {min}–{max} أيام بعد تجهيز القطعة",
       fee: "رسوم التوصيل تُؤكد في المحادثة",
+      feeFlat: "رسوم التوصيل: {amount}",
       coverage: {
         BH: "المنامة والمحرق والرفاع وجميع المناطق.",
         AE: "دبي وأبوظبي والشارقة وجميع الإمارات السبع.",

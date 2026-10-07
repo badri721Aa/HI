@@ -35,6 +35,12 @@ export const common = defineMessages({
       startCustom: "Start a custom print",
       backToTop: "Back to top",
     },
+    menu: {
+      title: "Menu",
+      sections: "Site sections",
+      language: "Language",
+      opensWhatsApp: "opens WhatsApp",
+    },
     region: {
       label: "Delivering to",
       choose: "Choose your region",
@@ -110,6 +116,12 @@ export const common = defineMessages({
       browse: "تصفح المجموعة",
       startCustom: "ابدأ طباعة مخصصة",
       backToTop: "العودة للأعلى",
+    },
+    menu: {
+      title: "القائمة",
+      sections: "أقسام الموقع",
+      language: "اللغة",
+      opensWhatsApp: "يفتح واتساب",
     },
     region: {
       label: "التوصيل إلى",
