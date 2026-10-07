@@ -14,7 +14,7 @@ function textOf(link: string): string | null {
 
 describe("generateWhatsAppLink", () => {
   it("builds https://wa.me/<digits>?text=<encodeURIComponent(message)>", () => {
-    const msg = "Hi Layer Up, I'd like to place an order.";
+    const msg = "Hi, I'd like to place an order.";
     expect(generateWhatsAppLink("+973 3985 8885", msg)).toBe(
       `https://wa.me/97339858885?text=${encodeURIComponent(msg)}`,
     );
@@ -52,7 +52,7 @@ describe("generateWhatsAppLink", () => {
   });
 
   it("round-trips Arabic, emoji-free punctuation and mixed scripts", () => {
-    const msg = "مرحباً Layer Up، أرغب في تقديم طلب.\n*طلب رقم LU-7K3Q2*\n1.500 د.ب — iPhone 15 Pro";
+    const msg = "مرحباً، أرغب في تقديم طلب.\n*طلب رقم 3DBH-7K3Q2*\n1.500 د.ب — iPhone 15 Pro";
     const link = generateWhatsAppLink("+971504644502", msg);
     expect(link.startsWith("https://wa.me/971504644502?text=")).toBe(true);
     // Only URL-safe ASCII in the link itself.
