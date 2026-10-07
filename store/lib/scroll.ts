@@ -27,5 +27,9 @@ export function scrollToId(id: string) {
   const offset = -72;
   const lenis = scrollDriver.lenis;
   if (lenis) lenis.scrollTo(target, { offset, duration: 1.2 });
-  else window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY + offset, behavior: "smooth" });
+  else {
+    // No Lenis means reduced motion (or not mounted yet): honour it, JS "smooth" ignores the CSS override.
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY + offset, behavior: reduced ? "instant" : "smooth" });
+  }
 }
