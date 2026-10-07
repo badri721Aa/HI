@@ -45,13 +45,13 @@ const PLATE_FRAG = /* glsl */ `
   float fade = ( 1.0 - smoothstep( 0.25, 0.95, r ) ) * ( 1.0 - smoothstep( 0.86, 0.97, max( q.x, q.y ) ) );
   float minor = plateGrid( vPlatePos.xz, uPlateCell, 1.0 );
   float major = plateGrid( vPlatePos.xz, uPlateCell * 5.0, 1.2 );
-  totalEmissiveRadiance += uPlateLine * ( 0.018 * minor + 0.05 * major ) * fade * top;
+  totalEmissiveRadiance += uPlateLine * ( 0.03 * minor + 0.085 * major ) * fade * top;
 }
 `;
 
 function plateMaterial(half: number) {
   const m = new THREE.MeshPhysicalMaterial({
-    color: "#0b0b0e",
+    color: "#16161b",
     roughness: 0.42,
     metalness: 0.15,
     clearcoat: 0.35,

@@ -1,5 +1,24 @@
 "use client";
-// STUB — owned by the 3D scenes builder. Lazily mounts the single shared fixed <Canvas> with <View.Port />.
+
+import dynamic from "next/dynamic";
+import { ThreeBoundary } from "./scenes/three-boundary";
+import { markWebGLUnsupported, useWebGLSupport } from "./webgl-support";
+
+/* three.js loads only on capable clients, after hydration. */
+const SceneCanvas = dynamic(() => import("./scene-root"), { ssr: false });
+
+/**
+ * Mounts the single shared, fixed WebGL canvas that every 3D view on the
+ * page draws into. Renders nothing on the server, on devices without a
+ * capable WebGL2, and after the scene has failed (the views then show
+ * their SVG silhouettes instead).
+ */
 export function SceneRoot() {
-  return null;
+  const supported = useWebGLSupport();
+  if (!supported) return null;
+  return (
+    <ThreeBoundary onError={markWebGLUnsupported}>
+      <SceneCanvas />
+    </ThreeBoundary>
+  );
 }

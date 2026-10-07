@@ -142,7 +142,7 @@ const ART_LINES = Array.from({ length: ART_LAYERS }, (_, i) => {
 
 function PrintArt({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden className={className}>
+    <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet" aria-hidden className={className}>
       {/* Build plate */}
       <line x1="2" x2="98" y1="98" y2="98" stroke="currentColor" strokeOpacity={0.25} strokeWidth={1} vectorEffect="non-scaling-stroke" />
       {ART_LINES.map((l, i) => (
@@ -200,7 +200,7 @@ function CustomTile() {
         />
       </svg>
 
-      <div className="relative grid h-full grid-rows-[auto_minmax(0,1fr)_auto] p-5 @xs/tile:p-7 @lg/tile:grid-cols-[minmax(0,1fr)_11rem] @lg/tile:grid-rows-[auto_minmax(0,1fr)] @lg/tile:gap-x-8">
+      <div className="relative grid h-full grid-rows-[auto_minmax(0,1fr)_auto] p-4 @3xs/tile:p-5 @xs/tile:p-7 @lg/tile:grid-cols-[minmax(0,1fr)_minmax(11rem,38%)] @lg/tile:grid-rows-[auto_minmax(0,1fr)] @lg/tile:gap-x-8">
         <p className="eyebrow">{t.commerce.custom.eyebrow}</p>
 
         <div className="relative my-6 hidden min-h-28 text-silver @3xs/tile:block @lg/tile:col-start-2 @lg/tile:row-span-2 @lg/tile:row-start-1 @lg/tile:my-0">

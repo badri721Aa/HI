@@ -148,11 +148,20 @@ export function ProductGallery({
   }
 
   return (
-    <div className={className}>
+    <div
+      className={cn(
+        // Page, large screens: fill the column, but keep the photo (and thumbnails) within the viewport under
+        // the header; when height is short the well may crop up to ~10% rather than shrink to a sliver.
+        variant === "page" &&
+          (multiple ? "lg:max-w-[min(100%,calc((100svh-13rem)*0.9))]" : "lg:max-w-[min(100%,calc((100svh-8rem)*0.9))]"),
+        className,
+      )}
+    >
       <div
         className={cn(
           "relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-line bg-ink-900",
           variant === "drawer" && "max-h-[min(56svh,34rem)]",
+          variant === "page" && (multiple ? "lg:max-h-[calc(100svh-13rem)]" : "lg:max-h-[calc(100svh-8rem)]"),
           fine && "cursor-zoom-in",
         )}
         onPointerEnter={(e) => zoomTo(e, 1.6)}
@@ -187,7 +196,7 @@ export function ProductGallery({
         {multiple ? (
           <span
             aria-hidden
-            className="pointer-events-none absolute bottom-3 start-3 rounded-full bg-ink-950/60 px-2.5 py-1 font-mono text-[11px] text-fg tabular backdrop-blur-md"
+            className="pointer-events-none absolute bottom-3 start-3 rounded-full bg-ink-950/60 px-2.5 py-1 font-mono text-[0.6875rem] text-fg tabular backdrop-blur-md"
           >
             <span dir="ltr">
               {String(active + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}

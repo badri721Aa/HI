@@ -20,7 +20,6 @@ import {
   validateOrder,
   type OrderErrorKey,
 } from "@/lib/whatsapp";
-import { fmt } from "@/lib/i18n";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { LinePicker, radioKeyNav, useWhatsAppLine } from "./line-picker";
@@ -45,12 +44,26 @@ export function describedBy(...ids: (string | false | null | undefined)[]): stri
 }
 
 /** Inline validation message: danger colour plus an icon, so colour is never the only signal. */
-export function FieldError({ id, testId, children, className }: { id?: string; testId?: string; children: ReactNode; className?: string }) {
+export function FieldError({
+  id,
+  testId,
+  alert = false,
+  children,
+  className,
+}: {
+  id?: string;
+  testId?: string;
+  /** Announce immediately: for errors no focused field points to (aria-describedby covers the rest). */
+  alert?: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
   const reduced = useReducedMotion();
   return (
     <motion.p
       id={id}
       data-testid={testId}
+      role={alert ? "alert" : undefined}
       initial={reduced ? false : { opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: EASE }}
@@ -227,8 +240,16 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
   const href = generateWhatsAppLink(line.e164, message);
 
   const errors: Record<string, OrderErrorKey> = { ...validateOrder({ region, lines, customer, website }).errors };
-  // Some in-app browsers truncate very long links; notes are the only thing long enough to cause it.
-  if (!isWithinUrlLimit(href) && !errors["customer.notes"]) errors["customer.notes"] = "notes_too_long";
+  // Some in-app browsers truncate very long links. If shorter notes would fix it, flag the notes;
+  // if the order itself is too long (many pieces, especially in Arabic), ask to split it.
+  if (!isWithinUrlLimit(href)) {
+    const withoutNotes = generateWhatsAppLink(
+      line.e164,
+      buildWhatsAppMessagePayload({ ref: orderRef ?? "", region, locale, lines, customer: { ...customer, notes: "" } }),
+    );
+    if (customer.notes?.trim() && isWithinUrlLimit(withoutNotes)) errors["customer.notes"] ??= "notes_too_long";
+    else errors.link = "too_many_lines";
+  }
 
   const lineErrors: Record<number, OrderErrorKey> = {};
   for (const [path, key] of Object.entries(errors)) {
@@ -264,8 +285,8 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
     lineErrors,
     /** Order-level error (empty cart, too many lines). */
     orderError: errors.lines as OrderErrorKey | undefined,
-    /** The honeypot was filled: shown only after a send attempt. */
-    spam: attempted ? errors.website : undefined,
+    /** Problems no field owns (link too long, honeypot filled): shown only after a send attempt. */
+    formError: attempted ? (errors.link ?? errors.website) : undefined,
     fieldError: (field: CheckoutField): OrderErrorKey | undefined =>
       touched.has(field) ? errors[`customer.${field}`] : undefined,
     firstInvalidField: (): CheckoutField | undefined => CHECKOUT_FIELDS.find((f) => errors[`customer.${f}`]),
@@ -542,6 +563,20 @@ export function CheckoutForm({ checkout, region, onBack }: { checkout: Checkout;
   );
 }
 
+/** "Order 3DBH-7K3Q2" with only the reference in mono (mono spacing would stretch the Arabic words). */
+function OrderRefLabel({ template, value }: { template: string; value: string }) {
+  const [before, after = ""] = template.split("{ref}");
+  return (
+    <>
+      {before}
+      <span dir="ltr" className="font-mono tabular text-fg">
+        {value}
+      </span>
+      {after}
+    </>
+  );
+}
+
 /**
  * Step 2 footer: order reference and total, the send link (a real wa.me
  * anchor, so it works with middle-click and without our JS), and the
@@ -570,13 +605,13 @@ export function CheckoutSend({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-4">
-        <p className="font-mono text-xs tabular text-fg-muted">{orderRef ? fmt(copy.orderRef, { ref: orderRef }) : null}</p>
+        <p className="text-xs text-fg-muted">{orderRef ? <OrderRefLabel template={copy.orderRef} value={orderRef} /> : null}</p>
         <Amount value={total} className="text-[0.9375rem] font-medium text-fg" />
       </div>
 
-      {checkout.spam ? (
-        <FieldError testId="error-form" className="mt-3">
-          {t.common.errors[checkout.spam]}
+      {checkout.formError ? (
+        <FieldError testId="error-form" alert className="mt-3">
+          {t.common.errors[checkout.formError]}
         </FieldError>
       ) : null}
 

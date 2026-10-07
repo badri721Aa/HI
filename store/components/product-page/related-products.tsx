@@ -26,7 +26,7 @@ export function RelatedProducts({ product, locale }: { product: Product; locale:
   if (related.length === 0) return null;
 
   return (
-    <section aria-labelledby="related-title" className="mt-28 border-t border-line pt-14 md:mt-40 md:pt-20">
+    <section aria-labelledby="related-title" className="mt-24 border-t border-line pt-14 md:mt-32 md:pt-20">
       <Reveal className="flex items-end justify-between gap-6">
         <h2
           id="related-title"

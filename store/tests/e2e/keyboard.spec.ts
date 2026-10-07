@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
-import { cartDrawer, expect, gotoHome, productCard, quickView, test } from "./fixtures";
+import { getDictionary } from "@/lib/i18n";
+import { cartDrawer, expect, gotoHome, header, productCard, quickView, test } from "./fixtures";
 
 const focusIsInside = (dialog: Locator) => dialog.evaluate((el) => el.contains(document.activeElement));
 
@@ -37,7 +38,7 @@ test.describe("keyboard", () => {
   });
 
   test("the cart opens from the keyboard and Escape returns focus to the cart button", async ({ page }) => {
-    const trigger = page.getByTestId("cart-button");
+    const trigger = header(page).getByTestId("cart-button");
     await trigger.focus();
     await page.keyboard.press("Enter");
 
@@ -53,8 +54,9 @@ test.describe("keyboard", () => {
 
   test("the skip link is the first stop and moves focus to the main content", async ({ page }) => {
     await page.keyboard.press("Tab");
-    const skip = page.locator(":focus");
-    await expect(skip).toHaveAttribute("href", /#/);
+    const skip = page.getByRole("link", { name: getDictionary("en").common.skipToContent });
+    await expect(skip).toBeFocused();
+    await expect(skip).toBeInViewport();
     await page.keyboard.press("Enter");
     await expect
       .poll(() => page.evaluate(() => !!document.activeElement?.closest("main") || document.activeElement?.tagName === "MAIN"))

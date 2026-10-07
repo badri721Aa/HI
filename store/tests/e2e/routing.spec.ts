@@ -1,10 +1,11 @@
 import { PRODUCTS } from "@/content/catalog";
 import { getDictionary } from "@/lib/i18n";
 import { site } from "@/lib/site";
-import { expect, test, waitForHydration } from "./fixtures";
+import { expect, header, test, waitForHydration } from "./fixtures";
 
 test.describe("locale redirect from /", () => {
-  test("redirects with a 307 by Accept-Language, keeping the query", async ({ request }) => {
+  test("redirects with a 307 by Accept-Language, keeping the query", async ({ request, isMobile }) => {
+    test.skip(isMobile, "Plain HTTP check; covered on desktop.");
     const ar = await request.get("/?utm_source=ig", { headers: { "accept-language": "ar-BH,ar;q=0.9" }, maxRedirects: 0 });
     expect(ar.status()).toBe(307);
     const location = new URL(ar.headers()["location"], "http://localhost");
@@ -56,7 +57,7 @@ test.describe("locale redirect from /", () => {
       test.skip(isMobile, "The language switch is in the mobile menu; covered on desktop.");
       await page.goto("/en");
       await waitForHydration(page);
-      await page.getByTestId("lang-switch").click();
+      await header(page).getByTestId("lang-switch").click();
       await expect(page).toHaveURL(/\/ar(\/|#|$)/);
       await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
       await page.goto("/");

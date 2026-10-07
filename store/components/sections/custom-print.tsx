@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type MouseEvent } from "react";
+import { Fragment, useId, useState, type MouseEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Paperclip } from "lucide-react";
 import type { MaterialId } from "@/types";
@@ -377,10 +377,24 @@ function CustomForm() {
       <div className="mt-9 border-t border-line pt-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
           <p className="text-sm text-fg-muted">
-            {copy.sendingTo} <span className="text-fg">{line.label[locale]}</span> <span aria-hidden>·</span>{" "}
-            <span dir="ltr" className="font-mono tabular text-fg">
-              {line.display}
-            </span>
+            {copy.sendingTo}{" "}
+            {/* "Bahrain · Line 1 · +973 3985 8885", with room around each separator. */}
+            {[...line.label[locale].split(" · "), line.display].map((part, i, parts) => (
+              <Fragment key={i}>
+                {i === parts.length - 1 ? (
+                  <span dir="ltr" className="font-mono tabular text-fg">
+                    {part}
+                  </span>
+                ) : (
+                  <span className="text-fg">{part}</span>
+                )}
+                {i < parts.length - 1 ? (
+                  <span aria-hidden className="mx-1.5 text-fg-muted">
+                    ·
+                  </span>
+                ) : null}
+              </Fragment>
+            ))}
           </p>
           <LinePicker region={region} variant="compact" testIdPrefix="custom-" label={copy.sendingTo} />
         </div>

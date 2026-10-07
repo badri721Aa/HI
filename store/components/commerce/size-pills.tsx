@@ -57,7 +57,7 @@ export function SizePills({
           >
             <span className="text-sm font-medium leading-5">{size.name[locale]}</span>
             {size.dims ? (
-              <span className="font-mono text-[11px] leading-4 text-fg-muted tabular">
+              <span className="font-mono text-[0.6875rem] leading-4 text-fg-muted tabular">
                 {fmt(t.commerce.product.dims, { w: size.dims.w, d: size.dims.d, h: size.dims.h })}
               </span>
             ) : null}

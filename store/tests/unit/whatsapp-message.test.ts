@@ -12,6 +12,7 @@ import {
   buildWhatsAppMessagePayload,
   createOrderRef,
   generateWhatsAppLink,
+  isWithinUrlLimit,
   resolveLine,
   type CustomRequestInput,
 } from "@/lib/whatsapp";
@@ -265,9 +266,31 @@ describe("maximal order", () => {
     );
   });
 
-  it("stays under MAX_WHATSAPP_URL_LENGTH in Arabic", () => {
+  it("is detected as too long in Arabic, so checkout can block it with a clear error", () => {
+    // 20 lines × 40 Arabic note characters plus 400 Arabic notes is far past any real order.
     const link = maximalLink("ar", "ب");
-    expect(link.length, `maximal Arabic order link is ${link.length} characters`).toBeLessThanOrEqual(
+    expect(isWithinUrlLimit(link)).toBe(false);
+  });
+
+  it("fits a large but realistic Arabic order", () => {
+    // Every product, two of each, Arabic name/area and 200 characters of Arabic notes.
+    const lines: OrderLine[] = PRODUCTS.map((p) => ({
+      slug: p.slug,
+      colorId: p.colors[0].id,
+      sizeId: p.sizes[0].id,
+      qty: 2,
+      note: p.variantNote ? "iPhone 15 Pro Max" : undefined,
+    }));
+    const customer: Customer = {
+      name: "عبدالله محمد الهاشمي",
+      phone: "+973 3985 8885",
+      city: "riffa",
+      area: "مجمع 939، طريق 3905، مبنى 12",
+      notes: "ب".repeat(200),
+    };
+    const msg = buildWhatsAppMessagePayload({ ref: REF, region: "BH", locale: "ar", lines, customer });
+    const link = generateWhatsAppLink(resolveLine("BH").e164, msg);
+    expect(link.length, `realistic Arabic order link is ${link.length} characters`).toBeLessThanOrEqual(
       MAX_WHATSAPP_URL_LENGTH,
     );
   });

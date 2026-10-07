@@ -193,10 +193,13 @@ describe("SILHOUETTES", () => {
     expect(d).toMatch(/^[MmLlHhVvCcSsQqTtAaZz0-9.,\s+-]+$/);
     const numbers = (d.match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi) ?? []).map(Number);
     expect(numbers.length).toBeGreaterThan(2);
-    for (const n of numbers) {
-      expect(Number.isFinite(n)).toBe(true);
-      expect(n).toBeGreaterThanOrEqual(-0.5);
-      expect(n).toBeLessThanOrEqual(100.5);
+    for (const n of numbers) expect(Number.isFinite(n)).toBe(true);
+    // With absolute commands only, every coordinate must sit inside the box.
+    if (!/[a-y]/.test(d)) {
+      for (const n of numbers) {
+        expect(n).toBeGreaterThanOrEqual(-0.5);
+        expect(n).toBeLessThanOrEqual(100.5);
+      }
     }
   });
 });

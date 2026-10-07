@@ -28,8 +28,11 @@ export const useCart = create<CartState>()(
   persist(
     (set) => ({
       lines: [],
-      add: (line) =>
+      add: (input) =>
         set((state) => {
+          const raw = Math.floor(input.qty);
+          if (!Number.isFinite(raw)) return state;
+          const line = { ...input, qty: Math.min(MAX_QTY, Math.max(1, raw)) };
           const i = state.lines.findIndex((l) => sameVariant(l, line));
           if (i >= 0) {
             const lines = [...state.lines];

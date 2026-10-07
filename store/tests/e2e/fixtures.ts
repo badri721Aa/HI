@@ -62,6 +62,8 @@ export async function closeDialogs(page: Page) {
   }).toPass({ timeout: 10_000 });
 }
 
+/** The site header (banner landmark): scopes controls that other parts of the page may repeat. */
+export const header = (page: Page) => page.getByRole("banner");
 export const productCard = (page: Page, slug: string) => page.locator(`[data-testid="product-card"][data-slug="${slug}"]`);
 export const quickView = (page: Page) => page.getByTestId("quick-view");
 export const cartDrawer = (page: Page) => page.getByTestId("cart-drawer");
@@ -92,7 +94,7 @@ export async function addToOrder(page: Page, slug: string, opts: { note?: string
 export async function openCart(page: Page) {
   if (!(await cartDrawer(page).isVisible())) {
     await closeDialogs(page);
-    await page.getByTestId("cart-button").click();
+    await header(page).getByTestId("cart-button").click();
   }
   await expect(cartDrawer(page)).toBeVisible();
   return cartDrawer(page);
@@ -136,7 +138,7 @@ export async function chooseRegion(page: Page, region: Region, mobile: boolean) 
     await expect(option).toHaveAttribute("aria-pressed", "true");
     await closeDialogs(page);
   } else {
-    const option = page.getByTestId("region-switch").getByTestId(`region-${region}`);
+    const option = header(page).getByTestId("region-switch").getByTestId(`region-${region}`);
     await option.click();
     await expect(option).toHaveAttribute("aria-pressed", "true");
   }

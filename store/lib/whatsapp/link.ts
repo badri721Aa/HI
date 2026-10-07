@@ -5,10 +5,13 @@ import { toWaDigits } from "./phone";
 export const DEFAULT_REGION: Region = "BH";
 
 /**
- * wa.me handles long links, but some in-app browsers truncate URLs past
- * ~4k characters. Order forms cap free text so links stay under this.
+ * Upper bound for a wa.me link. Arabic text grows ~6× when percent-encoded,
+ * so a normal Arabic order easily passes 4k characters. WhatsApp, mobile
+ * Safari and Android WebViews all accept far longer URLs; 12k keeps a safe
+ * margin while letting realistic orders (up to ~20 lines in English, ~15 in
+ * Arabic) through. Checkout shows a clear error past this.
  */
-export const MAX_WHATSAPP_URL_LENGTH = 4000;
+export const MAX_WHATSAPP_URL_LENGTH = 12000;
 
 /**
  * Picks the WhatsApp line to send to. Falls back to the region's default

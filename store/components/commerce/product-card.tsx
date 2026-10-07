@@ -106,16 +106,20 @@ export function ProductCard({
       data-slug={product.slug}
       onPointerMove={onPointerMove}
       className={cn(
-        "group/card @container/card relative flex flex-col",
-        feature && "sm:grid sm:grid-cols-2 sm:gap-x-6 md:gap-x-8 lg:flex lg:h-full",
+        "group/card @container/card relative flex h-full flex-col",
+        feature && "sm:grid sm:grid-cols-2 sm:gap-x-5 lg:flex",
         className,
       )}
     >
-      {/* Photo well */}
+      {/*
+        Photo well. It sits above the stretched link (z-[2] vs z-[1]) so it can be its own stacking context
+        (isolate: reliable rounded clipping of the scaling photo, incl. Safari), but lets clicks fall through
+        to the link (pointer-events-none); only the quick-view button takes pointer events back.
+      */}
       <div
         ref={wellRef}
         className={cn(
-          "relative aspect-[4/5] overflow-hidden rounded-2xl border border-line bg-ink-900 transition-colors duration-500 ease-out-expo group-hover/card:border-line-strong",
+          "pointer-events-none relative isolate z-[2] aspect-[4/5] overflow-hidden rounded-2xl border border-line bg-ink-900 transition-colors duration-500 ease-out-expo group-hover/card:border-line-strong",
           feature && "lg:aspect-auto lg:min-h-0 lg:flex-1",
         )}
       >
@@ -138,12 +142,11 @@ export function ProductCard({
         />
 
         {product.badge ? (
-          <span className="absolute start-3 top-3 rounded-full bg-ink-950/65 px-2.5 py-1 font-mono text-[10px] uppercase leading-4 tracking-[0.14em] text-fg backdrop-blur-md">
+          <span className="absolute start-3 top-3 rounded-full bg-ink-950/65 px-2.5 py-1 font-mono text-[0.625rem] uppercase leading-4 tracking-[0.14em] text-fg backdrop-blur-md">
             {t.common.badges[product.badge]}
           </span>
         ) : null}
 
-        {/* Above the stretched link (z-10 vs z-[1]); the well itself must not create a stacking context. */}
         <button
           type="button"
           data-testid="quick-view-open"
@@ -151,7 +154,7 @@ export function ProductCard({
           aria-haspopup="dialog"
           onClick={openPreview}
           className={cn(
-            "glass absolute bottom-3 end-3 z-10 grid size-11 place-items-center rounded-full text-fg",
+            "glass pointer-events-auto absolute bottom-3 end-3 z-10 grid size-11 place-items-center rounded-full text-fg",
             "transition-[opacity,translate,background-color,border-color] duration-300 ease-out-expo hover:border-line-strong hover:bg-ink-700/80",
             "pointer-fine:translate-y-1 pointer-fine:opacity-0",
             "pointer-fine:group-hover/card:translate-y-0 pointer-fine:group-hover/card:opacity-100",
@@ -163,7 +166,8 @@ export function ProductCard({
       </div>
 
       {/* Text */}
-      <div className={cn("mt-4 min-w-0", feature && "sm:mt-0 sm:flex sm:flex-col sm:justify-end sm:pb-1 lg:mt-5 lg:pb-0")}>
+      {/* flex-1 + mt-auto on the meta row: colour dots and availability line up across a grid row. */}
+      <div className={cn("mt-4 flex min-w-0 flex-1 flex-col", feature && "sm:mt-0 sm:justify-end sm:pb-1 lg:mt-5 lg:flex-none lg:pb-0")}>
         {feature && category ? <p className="eyebrow mb-3 hidden sm:block">{category}</p> : null}
 
         <div
@@ -214,7 +218,7 @@ export function ProductCard({
           {product.tagline[locale]}
         </p>
 
-        <div className={cn("mt-3 flex items-center justify-between gap-3", feature && "sm:mt-5")}>
+        <div className={cn("mt-auto flex items-center justify-between gap-3 pt-3", feature && "sm:mt-0 sm:pt-5")}>
           <ul aria-label={t.commerce.product.colour} className="flex shrink-0 items-center gap-1">
             {product.colors.map((c) => (
               <li key={c.id} title={c.name[locale]} className="flex">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState, type FocusEvent, type Ref } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type FocusEvent, type Ref } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { useI18n } from "@/components/providers/i18n-provider";
@@ -11,14 +11,53 @@ import { cn } from "@/lib/utils";
 const DURATION = 5000;
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+const WIDE_QUERY = "(min-width: 64rem)";
+
+function subscribeWide(cb: () => void) {
+  const mq = window.matchMedia(WIDE_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+
+/** True from the lg breakpoint up, where a drawer leaves room beside it. */
+function useWide(): boolean {
+  return useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE_QUERY).matches, () => false);
+}
+
+type Placement = "bottom" | "beside" | "top";
+
+const PLACEMENT: Record<Placement, { outer: string; inner: string }> = {
+  // Bottom-centre on phones, bottom inline-end from sm up.
+  bottom: {
+    outer: "bottom-0 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]",
+    inner: "flex-col",
+  },
+  // A drawer is open on a wide screen: bottom inline-end of the page area, just beside the drawer.
+  beside: {
+    outer: "bottom-0 pb-[max(1.5rem,env(safe-area-inset-bottom))]",
+    inner: "flex-col me-[30rem]",
+  },
+  // A drawer fills the screen: drop in below its header, clear of the footer actions.
+  top: {
+    outer: "top-0 pt-[calc(env(safe-area-inset-top)+5.75rem)]",
+    inner: "flex-col-reverse",
+  },
+};
+
 /**
  * Confirmations ("Added to your order", "WhatsApp is open"). Bottom-centre
- * on phones, bottom inline-end on larger screens, above drawers. The live
- * region is always mounted so screen readers announce each new toast.
+ * on phones, bottom inline-end on larger screens, above drawers. While a
+ * drawer is open its footer holds the next action (send, clear, add), so
+ * toasts move beside the drawer on wide screens and below its header on
+ * narrow ones. The live region is always mounted so screen readers announce
+ * each new toast.
  */
 export function Toaster() {
   const toasts = useUI((s) => s.toasts);
   const dismiss = useUI((s) => s.dismissToast);
+  const drawerOpen = useUI((s) => s.cartOpen || s.navOpen || s.quickView !== null);
+  const wide = useWide();
+  const placement: Placement = !drawerOpen ? "bottom" : wide ? "beside" : "top";
 
   return (
     <div
@@ -26,17 +65,20 @@ export function Toaster() {
       aria-live="polite"
       aria-atomic="false"
       className={cn(
-        "pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center gap-2",
+        "pointer-events-none fixed inset-x-0 z-[60] flex justify-center sm:justify-end",
         // Physical padding on purpose: safe-area insets are physical too.
-        "pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]",
-        "sm:items-end sm:pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))]",
+        "pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]",
+        "sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))]",
+        PLACEMENT[placement].outer,
       )}
     >
-      <AnimatePresence initial={false} mode="popLayout">
-        {toasts.map((toast) => (
-          <ToastCard key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
-        ))}
-      </AnimatePresence>
+      <div className={cn("flex w-full max-w-sm gap-2", PLACEMENT[placement].inner)}>
+        <AnimatePresence initial={false} mode="popLayout">
+          {toasts.map((toast) => (
+            <ToastCard key={toast.id} toast={toast} fromTop={placement === "top"} onDismiss={() => dismiss(toast.id)} />
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
@@ -47,7 +89,17 @@ export function Toaster() {
  * pauses exactly when the toast does: on hover, on focus, and while the tab
  * is hidden (e.g. the visitor is over in WhatsApp).
  */
-function ToastCard({ toast, onDismiss, ref }: { toast: Toast; onDismiss: () => void; ref?: Ref<HTMLDivElement> }) {
+function ToastCard({
+  toast,
+  fromTop,
+  onDismiss,
+  ref,
+}: {
+  toast: Toast;
+  fromTop: boolean;
+  onDismiss: () => void;
+  ref?: Ref<HTMLDivElement>;
+}) {
   const { t } = useI18n();
   const reduced = useReducedMotion();
   const [hovered, setHovered] = useState(false);
@@ -99,7 +151,7 @@ function ToastCard({ toast, onDismiss, ref }: { toast: Toast; onDismiss: () => v
     <motion.div
       ref={ref}
       layout={reduced ? false : "position"}
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.98 }}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, y: fromTop ? -18 : 18, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, transition: { duration: reduced ? 0.12 : 0.2, ease: [0.4, 0, 1, 1] } }}
       transition={{ duration: reduced ? 0.2 : 0.5, ease: EASE }}
@@ -107,7 +159,8 @@ function ToastCard({ toast, onDismiss, ref }: { toast: Toast; onDismiss: () => v
       onPointerLeave={() => setHovered(false)}
       onFocus={() => setFocused(true)}
       onBlur={onBlur}
-      className="glass pointer-events-auto relative w-full max-w-sm overflow-hidden rounded-2xl shadow-[0_24px_60px_-24px_rgb(0_0_0/0.9)]"
+      // Frosted, but dense enough to stay legible over a bright button underneath.
+      className="pointer-events-auto relative w-full overflow-hidden rounded-2xl border border-line bg-ink-800/90 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.9)] backdrop-blur-xl backdrop-saturate-150"
     >
       <div className="flex items-start gap-3 py-3.5 pe-1.5 ps-4">
         <span aria-hidden className="mt-[0.4375rem] size-1.5 shrink-0 rounded-full bg-ok" />

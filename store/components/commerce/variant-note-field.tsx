@@ -46,7 +46,7 @@ export function VariantNoteField({
         <span
           aria-hidden
           className={cn(
-            "font-mono text-[11px] text-fg-muted tabular transition-opacity duration-300",
+            "font-mono text-[0.6875rem] text-fg-muted tabular transition-opacity duration-300",
             remaining <= 10 ? "opacity-100" : "opacity-0",
           )}
         >

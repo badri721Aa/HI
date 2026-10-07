@@ -132,7 +132,7 @@ export function lampOuterRadius(L: LampLayout, y: number): number {
   return L.shadeR(y);
 }
 
-/** Converts a height y (model units) on the shade to lattice tile rows (cy), or null outside the band. */
+/** Converts a height y (model units) on the shade to lattice tile rows (cy); outside 0…rows off the band. */
 export function lampTileRow(L: LampLayout, y: number): number {
   const v = y / L.H;
   return ((v - L.range[0]) / (L.range[1] - L.range[0])) * L.rows;

@@ -29,6 +29,9 @@ const CARDS = (
   </>
 );
 
+/** Key light position for a camera on +Z (rotate it with an orbiting camera). */
+export const KEY_POSITION = [-2.6, 4.2, 3.2] as const;
+
 export function Studio({
   environment = 1,
   keyIntensity = 1.5,
@@ -44,7 +47,7 @@ export function Studio({
       <Environment resolution={64} frames={1} environmentIntensity={environment}>
         {CARDS}
       </Environment>
-      <directionalLight ref={keyRef} position={[-2.6, 4.2, 3.2]} intensity={keyIntensity} color="#fff6ea" />
+      <directionalLight ref={keyRef} position={KEY_POSITION} intensity={keyIntensity} color="#fff6ea" />
     </>
   );
 }

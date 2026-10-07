@@ -36,8 +36,7 @@ const err = (key: OrderErrorKey) => ({ message: key });
 export function sanitizeText(input: string | undefined | null, max: number): string {
   if (!input) return "";
   return input
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0009\u000B-\u001F\u007F‎‏‪-‮]/g, "")
+    .replace(/[\u0000-\u0009\u000B-\u001F\u007F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
     .slice(0, max);

@@ -399,7 +399,11 @@ export function CartSummary({
         ) : null}
       </dl>
 
-      {error ? <FieldError className="mt-3">{error}</FieldError> : null}
+      {error ? (
+        <FieldError alert className="mt-3">
+          {error}
+        </FieldError>
+      ) : null}
 
       <button
         type="button"

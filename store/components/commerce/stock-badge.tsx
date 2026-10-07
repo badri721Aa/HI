@@ -28,7 +28,7 @@ export function StockBadge({ product, className }: { product: Product; className
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 items-center gap-1.5 font-mono text-[11px] leading-4 text-fg-muted tabular",
+        "inline-flex min-w-0 items-center gap-1.5 font-mono text-[0.6875rem] leading-4 text-fg-muted tabular rtl:text-xs",
         className,
       )}
     >

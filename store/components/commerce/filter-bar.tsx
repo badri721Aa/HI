@@ -98,7 +98,7 @@ export function FilterBar({
               <span
                 aria-hidden
                 className={cn(
-                  "font-mono text-[10px] tabular transition-colors duration-300",
+                  "font-mono text-[0.625rem] tabular transition-colors duration-300",
                   selected ? "text-fg-muted" : "text-fg-muted/70",
                 )}
               >

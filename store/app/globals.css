@@ -65,6 +65,10 @@ html[lang="ar"] {
   --font-mono: var(--font-jetbrains), var(--font-tajawal), ui-monospace, monospace;
   font-size: 106.25%;
 }
+/* The mono face's wide space glyph spreads Arabic words apart; Arabic labels use the sans stack. */
+html[lang="ar"] .eyebrow {
+  font-family: var(--font-sans);
+}
 /* Letter-spacing breaks Arabic letter joining. */
 html[lang="ar"] * {
   letter-spacing: normal !important;

@@ -111,17 +111,19 @@ describe("resolveLine", () => {
 
 describe("isWithinUrlLimit", () => {
   it("accepts URLs up to MAX_WHATSAPP_URL_LENGTH characters", () => {
-    expect(MAX_WHATSAPP_URL_LENGTH).toBe(4000);
+    // Must leave room for realistic Arabic orders (each Arabic letter is 6 encoded characters).
+    expect(MAX_WHATSAPP_URL_LENGTH).toBeGreaterThanOrEqual(8000);
     expect(isWithinUrlLimit("x".repeat(MAX_WHATSAPP_URL_LENGTH))).toBe(true);
     expect(isWithinUrlLimit("x".repeat(MAX_WHATSAPP_URL_LENGTH + 1))).toBe(false);
     expect(isWithinUrlLimit(generateWhatsAppLink("+97339858885", "hi"))).toBe(true);
   });
 
   it("measures the encoded length, which is what grows with Arabic text", () => {
-    const arabic = "ب".repeat(700);
+    const letters = Math.ceil(MAX_WHATSAPP_URL_LENGTH / 6);
+    const arabic = "ب".repeat(letters);
     const link = generateWhatsAppLink("+97339858885", arabic);
     // Each Arabic letter is two UTF-8 bytes → six characters once percent-encoded.
-    expect(link.length).toBe("https://wa.me/97339858885?text=".length + 700 * 6);
+    expect(link.length).toBe("https://wa.me/97339858885?text=".length + letters * 6);
     expect(isWithinUrlLimit(link)).toBe(false);
   });
 });

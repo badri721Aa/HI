@@ -184,7 +184,7 @@ export function CartDrawer() {
       return;
     }
     const field = checkout.firstInvalidField();
-    if (field || checkout.errors.website) {
+    if (field || checkout.errors.link || checkout.errors.website) {
       e.preventDefault();
       playSound("tap");
       if (field) document.getElementById(checkout.ids[field])?.focus();

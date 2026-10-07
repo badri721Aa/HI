@@ -154,23 +154,25 @@ export function LinePicker({
             key={id}
             {...common}
             className={cn(
-              "group/line flex min-h-[4.25rem] flex-col items-start justify-center gap-1.5 rounded-xl border px-3.5 py-3 text-start transition-[border-color,background-color] duration-200",
+              "group/line flex min-h-[4.25rem] flex-col justify-center gap-1.5 rounded-xl border px-3 py-3 text-start transition-[border-color,background-color] duration-200",
               selected
                 ? "border-line-strong bg-white/[0.04]"
                 : "border-line hover:border-line-strong hover:bg-white/[0.02]",
             )}
           >
-            <span className="flex items-center gap-2.5">
-              <RadioDot selected={selected} />
-              <span className={cn("text-sm font-medium transition-colors", selected ? "text-fg" : "text-fg-muted group-hover/line:text-fg")}>
+            <span className="flex w-full items-center justify-between gap-2">
+              <span
+                className={cn(
+                  "text-sm font-medium transition-colors",
+                  selected ? "text-fg" : "text-fg-muted group-hover/line:text-fg",
+                )}
+              >
                 {shortLineLabel(line, locale)}
               </span>
+              <RadioDot selected={selected} />
             </span>
-            {/* Indent past the dot; the outer span follows the page direction, the number stays LTR. */}
-            <span className="ps-[1.625rem]">
-              <span dir="ltr" className="font-mono text-[0.8125rem] tabular text-fg-muted">
-                {line.display}
-              </span>
+            <span dir="ltr" className="self-start whitespace-nowrap font-mono text-xs tabular text-fg-muted">
+              {line.display}
             </span>
           </button>
         );

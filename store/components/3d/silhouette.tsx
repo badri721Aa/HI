@@ -16,6 +16,8 @@ export function ProductSilhouette({
   color,
   className,
   progress,
+  hot = true,
+  plate = false,
 }: {
   kind: ModelKind;
   /** Body colour (a product colour hex). Default: the silver token. */
@@ -23,6 +25,10 @@ export function ProductSilhouette({
   className?: string;
   /** 0–1 fraction already printed. Omit for a finished piece. */
   progress?: number;
+  /** With `progress`: the glowing hot layer at the cut. Default true; false for a stopped print. */
+  hot?: boolean;
+  /** Draws the build plate as a hairline that fades out to both sides. */
+  plate?: boolean;
 }) {
   const id = `sil${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const d = SILHOUETTES[kind];
@@ -49,6 +55,11 @@ export function ProductSilhouette({
           <stop offset="0.7" stopColor="black" stopOpacity="0" />
           <stop offset="1" stopColor="black" stopOpacity="0.35" />
         </linearGradient>
+        <linearGradient id={`${id}-plate`} x1="-30" x2="130" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="white" stopOpacity="0" />
+          <stop offset="0.5" stopColor="white" stopOpacity="0.22" />
+          <stop offset="1" stopColor="white" stopOpacity="0" />
+        </linearGradient>
         <radialGradient id={`${id}-shadow`}>
           <stop offset="0" stopColor="black" stopOpacity="0.7" />
           <stop offset="1" stopColor="black" stopOpacity="0" />
@@ -68,6 +79,7 @@ export function ProductSilhouette({
         </clipPath>
       </defs>
 
+      {plate ? <rect x="-30" y={b.y1} width="160" height="0.35" fill={url("plate")} /> : null}
       <ellipse cx={(b.x0 + b.x1) / 2} cy={b.y1} rx={w * 0.66} ry={2.4} fill={url("shadow")} />
 
       <g clipPath={printing ? url("printed") : undefined}>
@@ -93,9 +105,11 @@ export function ProductSilhouette({
             strokeDasharray="3 4"
             vectorEffect="non-scaling-stroke"
           />
-          <g clipPath={url("shape")}>
-            <rect x={b.x0} y={cut - 0.45} width={w} height="0.9" fill="var(--color-glow)" />
-          </g>
+          {hot ? (
+            <g clipPath={url("shape")}>
+              <rect x={b.x0} y={cut - 0.45} width={w} height="0.9" fill="var(--color-glow)" />
+            </g>
+          ) : null}
         </>
       ) : null}
     </svg>
