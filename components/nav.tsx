@@ -18,6 +18,7 @@ const links = [
   { href: '/tricks', label: 'Study' },
   { href: '/notes', label: 'Notes' },
   { href: '/extensions', label: 'Extensions' },
+  { href: '/animal-company', label: 'AC Mod' },
 ]
 
 export function Nav() {
