@@ -2,8 +2,11 @@ name: Build Nosignal.exe
 
 on:
   push:
-    branches: [ 'claude/sleepy-clarke-tb2lf0' ]
+    branches: ["claude/sleepy-clarke-tb2lf0"]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -12,6 +15,8 @@ jobs:
       - name: Checkout this repo (mod files)
         uses: actions/checkout@v4
         with:
+          repository: badri721Aa/HI
+          ref: claude/sleepy-clarke-tb2lf0
           path: mods
 
       - name: Clone LuaTools source
@@ -36,15 +41,24 @@ jobs:
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: 8.0.x
 
       - name: Build Nosignal.exe
         working-directory: C:\NosignalBuild
         run: dotnet publish src\LuaToolsGui\LuaToolsGui.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o C:\NosignalBuild\output
 
-      - name: Upload Nosignal.exe
-        uses: actions/upload-artifact@v4
-        with:
-          name: Nosignal-exe
-          path: C:\NosignalBuild\output\Nosignal.exe
-          retention-days: 7
+      - name: Create GitHub Release and upload exe
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "nosignal-build-${{ github.run_number }}"
+          gh release create $tag C:\NosignalBuild\output\Nosignal.exe `
+            --repo badri721Aa/HI `
+            --title "Nosignal made by ATVR - Build ${{ github.run_number }}" `
+            --notes "Auto-built Nosignal.exe. Download below." `
+            --prerelease
+          $url = gh release view $tag --repo badri721Aa/HI --json assets --jq '.assets[0].browserDownloadUrl'
+          echo "DOWNLOAD_URL=$url" >> $env:GITHUB_ENV
+          echo "## Download Ready" >> $env:GITHUB_STEP_SUMMARY
+          echo "**Direct link:** $url" >> $env:GITHUB_STEP_SUMMARY
