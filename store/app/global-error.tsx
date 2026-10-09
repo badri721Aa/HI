@@ -2,6 +2,7 @@
 
 import "./globals.css";
 import { useEffect } from "react";
+import { trackEvent } from "@/lib/telemetry";
 import { fontVariables } from "./fonts";
 import { siteCopy } from "@/lib/i18n/messages/site";
 import { site } from "@/lib/site";
@@ -18,7 +19,8 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
   const ar = siteCopy.ar.error;
 
   useEffect(() => {
-    console.error("[layer-up] root error", error.digest ?? "", error);
+    console.error("[3dbh] root error", error.digest ?? "", error);
+    trackEvent("client_error", { where: "root", name: error.name, digest: error.digest ?? "", path: window.location.pathname });
   }, [error]);
 
   return (

@@ -1,4 +1,4 @@
-import { track } from "@vercel/analytics";
+import { trackEvent } from "@/lib/telemetry";
 import type { Currency, Locale, Region, WhatsAppLineId } from "@/types";
 
 /*
@@ -27,13 +27,7 @@ export interface CustomSentEvent {
   lang: Locale;
 }
 
-function send(name: string, data: Record<string, string | number | boolean>) {
-  try {
-    track(name, data);
-  } catch {
-    // Analytics blocked or not loaded: nothing to do.
-  }
-}
+const send = trackEvent;
 
 export function trackOrderSent(e: OrderSentEvent) {
   send("order_whatsapp", {

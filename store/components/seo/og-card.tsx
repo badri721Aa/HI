@@ -313,7 +313,6 @@ export function OgCard(p: OgCardProps) {
               fontWeight: 600,
               fontSize: 30,
               letterSpacing: -0.9,
-              textTransform: "lowercase",
             }}
           >
             {p.brand}

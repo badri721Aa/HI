@@ -8,7 +8,8 @@ export const siteCopy = defineMessages({
       description:
         "Phone cases, fidget toys, gifts and school models, 3D-printed to order. Order on WhatsApp with delivery across Bahrain and the UAE.",
       ogAlt: "A 3D-printed vase mid-print, layer lines glowing",
-      productOgAlt: "A 3D-printed piece caught mid-print, with its price, material and size",
+      /** Product share card: its photo, price and size. */
+      productOgAlt: "{name}: photo, price and size",
     },
     footer: {
       tagline: "3D-printed objects, made to order in small batches.",
@@ -25,6 +26,8 @@ export const siteCopy = defineMessages({
       rights: "© {year} {brand}. All rights reserved.",
     },
     notFound: {
+      /** Document title (the site name is appended). */
+      metaTitle: "Page not found",
       code: "404",
       title: "This page failed mid-print.",
       body: "The link may be old, or the page has moved. The collection is still here.",
@@ -52,7 +55,7 @@ export const siteCopy = defineMessages({
       description:
         "كفرات جوال وألعاب فدجت وهدايا ومجسمات مدرسية مطبوعة ثلاثية الأبعاد عند الطلب. اطلب عبر واتساب مع التوصيل في البحرين والإمارات.",
       ogAlt: "مزهرية أثناء الطباعة ثلاثية الأبعاد وخطوط طبقاتها مضيئة",
-      productOgAlt: "قطعة مطبوعة ثلاثية الأبعاد أثناء طباعتها، مع سعرها وخامتها ومقاسها",
+      productOgAlt: "{name}: صورة القطعة مع سعرها ومقاسها",
     },
     footer: {
       tagline: "قطع مطبوعة ثلاثية الأبعاد، تُصنع عند الطلب بكميات صغيرة.",
@@ -69,6 +72,7 @@ export const siteCopy = defineMessages({
       rights: "© {year} {brand}. جميع الحقوق محفوظة.",
     },
     notFound: {
+      metaTitle: "الصفحة غير موجودة",
       code: "404",
       title: "توقفت طباعة هذه الصفحة في منتصفها.",
       body: "قد يكون الرابط قديماً أو نُقلت الصفحة. المجموعة ما زالت هنا.",

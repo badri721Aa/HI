@@ -3,8 +3,8 @@ import type { Locale, Product } from "@/types";
 import { LOCALES } from "@/types";
 import { CATEGORIES, getMaterial } from "@/content/catalog";
 import { CURRENCY_DECIMALS, priceFor } from "@/lib/currency";
-import { getDictionary } from "@/lib/i18n";
-import { HOURS, REGION_CONFIG, WHATSAPP_LINES, site } from "@/lib/site";
+import { fmt, getDictionary } from "@/lib/i18n";
+import { HOURS, HOURS_CONFIRMED, REGION_CONFIG, WHATSAPP_LINES, site, type RegionConfig } from "@/lib/site";
 
 /**
  * Date the catalogue or copy last changed, used as the sitemap's lastModified.
@@ -30,6 +30,18 @@ export function languageAlternates(path = "") {
     ar: `/ar${path}`,
     "x-default": `/en${path}`,
   };
+}
+
+/** Size of the generated share cards (the opengraph-image routes). */
+const OG_SIZE = { width: 1200, height: 630 } as const;
+
+/**
+ * The share card of a page, with alt text in the page's language. Setting it
+ * here (rather than through the image file's static `alt` export, which has
+ * one language) wins over the file convention; twitter:image inherits it.
+ */
+function ogImages(path: string, alt: string) {
+  return [{ url: path, ...OG_SIZE, alt, type: "image/png" }];
 }
 
 function openGraphBase(locale: Locale) {
@@ -59,7 +71,13 @@ export function layoutMetadata(locale: Locale): Metadata {
     description: meta.description,
     applicationName: site.name,
     alternates: { canonical: `/${locale}`, languages: languageAlternates() },
-    openGraph: { ...openGraphBase(locale), url: `/${locale}`, title, description: meta.description },
+    openGraph: {
+      ...openGraphBase(locale),
+      url: `/${locale}`,
+      title,
+      description: meta.description,
+      images: ogImages(`/${locale}/opengraph-image`, meta.ogAlt),
+    },
     twitter: { card: "summary_large_image" },
     appleWebApp: { capable: true, title: site.name, statusBarStyle: "black-translucent" },
     formatDetection: { telephone: false },
@@ -72,28 +90,51 @@ export function layoutMetadata(locale: Locale): Metadata {
   };
 }
 
-/** Product page metadata. The product's opengraph-image supplies the images. */
+/**
+ * Product page metadata. The description is the short tagline (the full copy
+ * runs past what results show); the image is the product's share card.
+ */
 export function productMetadata(product: Product, locale: Locale): Metadata {
   const name = product.name[locale];
   const path = `/products/${product.slug}`;
+  const meta = getDictionary(locale).site.meta;
   return {
     title: name,
-    description: `${product.tagline[locale]} ${product.description[locale]}`,
+    description: product.tagline[locale],
     alternates: { canonical: `/${locale}${path}`, languages: languageAlternates(path) },
     openGraph: {
       ...openGraphBase(locale),
       url: `/${locale}${path}`,
       title: `${name} · ${site.name}`,
       description: product.tagline[locale],
+      images: ogImages(`/${locale}${path}/opengraph-image`, fmt(meta.productOgAlt, { name })),
+    },
+  };
+}
+
+/**
+ * 404 metadata: its own title, no canonical or hreflang (the layout's point
+ * at the home page), and noindex (Next adds one for the 404 status as well).
+ */
+export function notFoundMetadata(locale: Locale): Metadata {
+  const copy = getDictionary(locale).site;
+  return {
+    title: copy.notFound.metaTitle,
+    robots: { index: false, follow: true },
+    alternates: { canonical: null },
+    openGraph: {
+      ...openGraphBase(locale),
+      title: `${copy.notFound.metaTitle} · ${site.name}`,
+      images: ogImages(`/${locale}/opengraph-image`, copy.meta.ogAlt),
     },
   };
 }
 
 /** Hours the WhatsApp lines are answered, grouped into schema.org specs. */
-function openingHours() {
+export function openingHours(hoursByDay: typeof HOURS = HOURS) {
   const groups = new Map<string, string[]>();
   for (let day = 0; day < 7; day++) {
-    const hours = HOURS[day];
+    const hours = hoursByDay[day];
     if (!hours) continue;
     const key = hours.join("|");
     groups.set(key, [...(groups.get(key) ?? []), DAYS[day]]);
@@ -112,7 +153,8 @@ function openingHours() {
  */
 export function organizationJsonLd(locale: Locale): Record<string, unknown> {
   const t = getDictionary(locale);
-  const hours = openingHours();
+  // Unconfirmed hours are never published (see HOURS_CONFIRMED).
+  const hours = HOURS_CONFIRMED ? openingHours() : undefined;
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -154,6 +196,39 @@ export function organizationJsonLd(locale: Locale): Record<string, unknown> {
   };
 }
 
+const days = (range: readonly [number, number]) => ({
+  "@type": "QuantitativeValue",
+  minValue: range[0],
+  maxValue: range[1],
+  unitCode: "DAY",
+});
+
+/**
+ * Delivery inside one country: how long making takes (when the catalog says)
+ * and the courier's transit time. The fee is quoted in the WhatsApp chat
+ * unless the region sets a flat one, so the rate is left out otherwise.
+ */
+function shippingDetails(region: RegionConfig, leadTime: readonly [number, number] | undefined) {
+  return {
+    "@type": "OfferShippingDetails",
+    shippingDestination: { "@type": "DefinedRegion", addressCountry: region.id },
+    deliveryTime: {
+      "@type": "ShippingDeliveryTime",
+      ...(leadTime ? { handlingTime: days(leadTime) } : {}),
+      transitTime: days(region.deliveryDays),
+    },
+    ...(region.deliveryFee !== null
+      ? {
+          shippingRate: {
+            "@type": "MonetaryAmount",
+            value: region.deliveryFee.toFixed(CURRENCY_DECIMALS[region.currency]),
+            currency: region.currency,
+          },
+        }
+      : {}),
+  };
+}
+
 /** Product with one Offer per size and currency (BHD for Bahrain, AED for the UAE). */
 export function productJsonLd(product: Product, locale: Locale): Record<string, unknown> {
   const url = absoluteUrl(`/${locale}/products/${product.slug}`);
@@ -173,6 +248,7 @@ export function productJsonLd(product: Product, locale: Locale): Record<string, 
       eligibleRegion: { "@type": "Country", name: COUNTRY_NAME[region.id], identifier: region.id },
       url,
       seller: { "@type": "OnlineStore", "@id": STORE_ID, name: site.name },
+      shippingDetails: shippingDetails(region, inStock ? undefined : leadTime),
       ...(inStock || !leadTime
         ? {}
         : {
@@ -202,5 +278,22 @@ export function productJsonLd(product: Product, locale: Locale): Record<string, 
     ],
     url,
     offers,
+  };
+}
+
+/** Mirrors the visible breadcrumb on product pages: Collection › category › product. */
+export function breadcrumbJsonLd(product: Product, locale: Locale): Record<string, unknown> {
+  const t = getDictionary(locale);
+  const collection = absoluteUrl(`/${locale}#collection`);
+  const category = CATEGORIES.find((c) => c.id === product.category);
+  const trail = [
+    { name: t.common.nav.collection, item: collection },
+    ...(category ? [{ name: category.name[locale], item: collection }] : []),
+    { name: product.name[locale], item: absoluteUrl(`/${locale}/products/${product.slug}`) },
+  ];
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: trail.map((step, i) => ({ "@type": "ListItem", position: i + 1, ...step })),
   };
 }

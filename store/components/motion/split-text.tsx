@@ -71,10 +71,10 @@ function segmentLine(line: string): Segment[] {
 /**
  * Word-by-word entrance (opacity, rise, blur), staggered.
  *
- * Accessible: the full text sits in a visually hidden span for screen
- * readers and the animated words are aria-hidden. Splits on whitespace only,
- * so it is safe for Arabic, and keeps mixed Arabic/Latin lines in the right
- * order. A "\n" in `text` forces a line break.
+ * Accessible: the tag's aria-label carries the full text for screen readers
+ * and the animated words are aria-hidden, so crawlers see the text once.
+ * Splits on whitespace only, so it is safe for Arabic, and keeps mixed
+ * Arabic/Latin lines in the right order. A "\n" in `text` forces a line break.
  *
  * `trigger="auto"` (default) plays from the first paint when the text is on
  * screen at load (the hero) and otherwise waits until it scrolls into view;
@@ -126,8 +126,8 @@ export function SplitText({
   return (
     <>
       <MotionStyles />
-      <Tag ref={ref as Ref<never>} id={id} className={className}>
-        <span className="sr-only">{text.replace(/\s*\n\s*/g, " ")}</span>
+      {/* The label names it for screen readers; crawlers read the words once, from the animated copy. */}
+      <Tag ref={ref as Ref<never>} id={id} className={className} aria-label={text.replace(/\s*\n\s*/g, " ")}>
         <span aria-hidden="true">
           {lines.map((segments, li) => (
             <Fragment key={li}>

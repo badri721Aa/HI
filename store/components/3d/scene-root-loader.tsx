@@ -24,7 +24,7 @@ function SharedCanvas() {
   const supported = useWebGLSupport();
   if (!supported) return null;
   return (
-    <ThreeBoundary onError={markWebGLUnsupported}>
+    <ThreeBoundary onError={() => markWebGLUnsupported("render-error")}>
       <SceneCanvas />
     </ThreeBoundary>
   );

@@ -2,11 +2,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { LOCALES, isLocale } from "@/lib/i18n";
-import { siteCopy } from "@/lib/i18n/messages/site";
 import { OgCard, ogFonts } from "@/components/seo/og-card";
 import { homeCard } from "@/components/seo/og-content";
 
-export const alt = siteCopy.en.meta.ogAlt;
+// Alt text is set per language with the page metadata (ogImages in lib/seo.ts).
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

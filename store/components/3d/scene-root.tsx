@@ -165,7 +165,7 @@ export function SceneCanvas() {
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const onLost = () => markWebGLUnsupported();
+    const onLost = () => markWebGLUnsupported("context-lost");
     canvas.addEventListener("webglcontextlost", onLost);
     return () => canvas.removeEventListener("webglcontextlost", onLost);
   }, []);

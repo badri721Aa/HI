@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { Product } from "@/types";
 import { PRODUCTS, getProduct } from "@/content/catalog";
-import { WHATSAPP_LINES, site } from "@/lib/site";
+import { HOURS_CONFIRMED, WHATSAPP_LINES, site } from "@/lib/site";
+import { REGION_CONFIG } from "@/lib/site";
 import {
   absoluteUrl,
+  breadcrumbJsonLd,
   languageAlternates,
   layoutMetadata,
+  notFoundMetadata,
+  openingHours,
   organizationJsonLd,
   productJsonLd,
   productMetadata,
 } from "@/lib/seo";
+import sitemap from "@/app/sitemap";
 
 type Json = Record<string, unknown>;
 
@@ -87,12 +92,33 @@ describe("productJsonLd", () => {
   it("lists absolute URLs for every photo, then the OG card", () => {
     const p = product("gear-shifter");
     const images = productJsonLd(p, "en").image as string[];
+    expect(p.images.length).toBeGreaterThan(0);
     expect(images).toEqual([
-      `${site.url}/products/gear-shifter.webp`,
-      `${site.url}/products/gear-shifter-set.webp`,
+      ...p.images.map((i) => `${site.url}${i.src}`),
       `${site.url}/en/products/gear-shifter/opengraph-image`,
     ]);
     for (const url of images) expect(() => new URL(url)).not.toThrow();
+  });
+
+  it("gives every offer shipping details for its own country", () => {
+    for (const o of offersOf(productJsonLd(product("keycap-clicker"), "en"))) {
+      const region = (o.eligibleRegion as Json).identifier as "BH" | "AE";
+      const details = o.shippingDetails as Json;
+      expect(details["@type"]).toBe("OfferShippingDetails");
+      expect(details.shippingDestination).toEqual({ "@type": "DefinedRegion", addressCountry: region });
+      const transit = (details.deliveryTime as Json).transitTime as Json;
+      expect(transit).toMatchObject({
+        minValue: REGION_CONFIG[region].deliveryDays[0],
+        maxValue: REGION_CONFIG[region].deliveryDays[1],
+        unitCode: "DAY",
+      });
+      // The fee is quoted in the chat, so no rate is claimed.
+      if (REGION_CONFIG[region].deliveryFee === null) expect(details).not.toHaveProperty("shippingRate");
+    }
+    const timed: Product = { ...product("keycap-clicker"), leadTimeDays: [2, 4] };
+    for (const o of offersOf(productJsonLd(timed, "en"))) {
+      expect(((o.shippingDetails as Json).deliveryTime as Json).handlingTime).toMatchObject({ minValue: 2, maxValue: 4 });
+    }
   });
 
   it("is localized for Arabic", () => {
@@ -110,6 +136,19 @@ describe("productJsonLd", () => {
         expect(json).not.toMatch(/undefined|NaN|null/);
       }
     }
+  });
+});
+
+describe("breadcrumbJsonLd", () => {
+  it("mirrors the visible breadcrumb, ending on the product URL", () => {
+    const p = product("gear-shifter");
+    const ld = breadcrumbJsonLd(p, "ar");
+    expect(ld["@type"]).toBe("BreadcrumbList");
+    const items = ld.itemListElement as Json[];
+    expect(items.map((i) => i.position)).toEqual(items.map((_, k) => k + 1));
+    expect(items[0]).toMatchObject({ "@type": "ListItem", item: `${site.url}/ar#collection` });
+    expect(items.at(-1)).toMatchObject({ name: p.name.ar, item: `${site.url}/ar/products/gear-shifter` });
+    expect(JSON.stringify(ld)).not.toMatch(/undefined|NaN|null/);
   });
 });
 
@@ -134,7 +173,8 @@ describe("organizationJsonLd", () => {
     for (const point of points) {
       expect(point["@type"]).toBe("ContactPoint");
       expect(["BH", "AE"]).toContain(point.areaServed);
-      expect((point.hoursAvailable as Json[]).length).toBeGreaterThan(0);
+      if (HOURS_CONFIRMED) expect((point.hoursAvailable as Json[]).length).toBeGreaterThan(0);
+      else expect(point.hoursAvailable).toBeUndefined();
     }
     expect(Object.keys(WHATSAPP_LINES)).toHaveLength(3);
   });
@@ -145,7 +185,7 @@ describe("organizationJsonLd", () => {
   });
 
   it("groups opening hours with Friday afternoon on its own", () => {
-    const hours = (store("en").contactPoint as Json[])[0].hoursAvailable as Json[];
+    const hours = openingHours() as Json[];
     const friday = hours.find((h) => (h.dayOfWeek as string[]).includes("Friday"));
     expect(friday).toMatchObject({ opens: "14:00", closes: "22:00", dayOfWeek: ["Friday"] });
     const days = hours.flatMap((h) => h.dayOfWeek as string[]);
@@ -168,10 +208,43 @@ describe("URLs and metadata", () => {
     });
   });
 
+  it("labels the share cards in the page's language", () => {
+    const image = (meta: ReturnType<typeof layoutMetadata>) => (meta.openGraph?.images as Json[])[0];
+    expect(image(layoutMetadata("ar"))).toMatchObject({ url: "/ar/opengraph-image", width: 1200, height: 630 });
+    expect(image(layoutMetadata("ar")).alt).toMatch(/[\u0600-\u06FF]/);
+    const p = product("keycap-clicker");
+    const card = image(productMetadata(p, "ar"));
+    expect(card.url).toBe("/ar/products/keycap-clicker/opengraph-image");
+    expect(card.alt).toContain(p.name.ar);
+    expect(image(productMetadata(p, "en")).alt).toContain(p.name.en);
+  });
+
+  it("keeps product descriptions to the short tagline", () => {
+    for (const p of PRODUCTS) expect(productMetadata(p, "en").description, p.slug).toBe(p.tagline.en);
+  });
+
+  it("gives the 404 its own title, no canonical and noindex", () => {
+    const meta = notFoundMetadata("ar");
+    expect(meta.title).toBe("الصفحة غير موجودة");
+    expect(meta.alternates).toEqual({ canonical: null });
+    expect(meta.robots).toMatchObject({ index: false });
+  });
+
   it("gives each locale its own canonical", () => {
     expect(layoutMetadata("ar").alternates?.canonical).toBe("/ar");
     const meta = productMetadata(product("keycap-clicker"), "en");
     expect(meta.alternates?.canonical).toBe("/en/products/keycap-clicker");
     expect(meta.title).toBe("Keycap Clicker");
+  });
+});
+
+describe("sitemap", () => {
+  it("lists each product's real photos, and the share card for the home page", () => {
+    const entries = sitemap();
+    for (const p of PRODUCTS) {
+      const entry = entries.find((e) => e.url === `${site.url}/ar/products/${p.slug}`);
+      expect(entry?.images, p.slug).toEqual(p.images.map((i) => `${site.url}${i.src}`));
+    }
+    expect(entries.find((e) => e.url === `${site.url}/en`)?.images).toEqual([`${site.url}/en/opengraph-image`]);
   });
 });

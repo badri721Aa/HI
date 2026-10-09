@@ -162,8 +162,8 @@ interface Sim {
   hudClock: number;
   px: number;
   py: number;
-  /** Layout the framing was solved for (box size, direction, HUD zone). */
-  layout: string;
+  /** Layout the framing was solved for: box size, direction, HUD zone. */
+  layout: [width: number, height: number, rtl: boolean, zoneWidth: number, zoneHeight: number];
   rect: FrameRect;
   fullDistance: number;
   /** Print fraction the current framing was solved for. */
@@ -203,7 +203,7 @@ function HeroContent({
     hudClock: 1,
     px: 0,
     py: 0,
-    layout: "",
+    layout: [0, 0, false, -1, -1],
     rect: { l: SIDE, r: 1 - SIDE, t: TOP, b: BOTTOM },
     fullDistance: 10,
     framed: -1,
@@ -291,10 +291,10 @@ function HeroContent({
     const { width, height } = api.size.current;
     const aspect = width / height;
     const z = zone.current;
-    const layout = `${width}x${height}:${rtl ? "rtl" : "ltr"}:${z.width}x${z.height}`;
+    const l = s.layout;
     const fit = reduced ? 1 : Math.max(s.clip ?? 1, EARLY);
-    if (layout !== s.layout) {
-      s.layout = layout;
+    if (l[0] !== width || l[1] !== height || l[2] !== rtl || l[3] !== z.width || l[4] !== z.height) {
+      s.layout = [width, height, rtl, z.width, z.height];
       _target.set(0, targetY(1), 0);
       s.rect = mirrorRect(chooseRect(width, height, z, aspect), rtl);
       solveFraming(fitPoints(1), _target, AZIMUTH, ELEVATION, FOV, aspect, s.rect, s.framing);

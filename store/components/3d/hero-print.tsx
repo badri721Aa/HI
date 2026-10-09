@@ -12,7 +12,10 @@ import { ThreeBoundary } from "./scenes/three-boundary";
 import { useWebGLSupport } from "./webgl-support";
 
 /* The scene (three.js) loads only when WebGL is available. */
-const HeroScene = dynamic(() => import("./scenes/hero-scene").then((m) => m.HeroScene), { ssr: false });
+const HeroScene = dynamic(() => import("./scenes/hero-scene").then((m) => m.HeroScene), {
+  ssr: false,
+  loading: () => <HeroGhost className="absolute inset-0" />,
+});
 
 const PIECE = SHOWCASE.vase;
 const DIMS = PIECE.sizes[0].dims;
@@ -33,7 +36,7 @@ export function HeroPrint({ className, avoid }: { className?: string; avoid?: Re
   const reduced = useReducedMotion();
   useSceneDemand(supported === true);
 
-  if (supported === null) return <div className={className} />;
+  if (supported === null) return <HeroGhost className={className} />;
   if (!supported) return <HeroFallback className={className} />;
   return (
     <ThreeBoundary fallback={<HeroFallback className={className} />}>
@@ -46,6 +49,15 @@ function HeroFallback({ className }: { className?: string }) {
   useEffect(() => {
     usePrintState.getState().set({ progress: 1, layer: TOTAL_LAYERS, totalLayers: TOTAL_LAYERS, minutesLeft: 0 });
   }, []);
+  return <HeroSilhouette className={className} />;
+}
+
+/** A faint outline of the piece while the scene's code loads, so the box is never blank. */
+function HeroGhost({ className }: { className?: string }) {
+  return <HeroSilhouette className={cn("opacity-[0.12]", className)} />;
+}
+
+function HeroSilhouette({ className }: { className?: string }) {
   return (
     <div className={cn("relative", className)}>
       {/* Roughly the 3D composition, clear of the HUD: above its strip on phones, beside its card on tablets, above it on large screens. */}

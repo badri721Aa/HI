@@ -8,13 +8,22 @@ interface Page {
   path: string;
   priority: number;
   changeFrequency: "weekly" | "monthly";
+  /** Image paths on the site; products list their real photos. */
+  images?: string[];
 }
 
-/** Home and every product, in English and Arabic, each listing its translations. */
+/** Home and every product, in English and Arabic, each listing its translations and images. */
 export default function sitemap(): MetadataRoute.Sitemap {
   const pages: Page[] = [
     { path: "", priority: 1, changeFrequency: "weekly" },
-    ...PRODUCTS.map((p): Page => ({ path: `/products/${p.slug}`, priority: 0.8, changeFrequency: "monthly" })),
+    ...PRODUCTS.map(
+      (p): Page => ({
+        path: `/products/${p.slug}`,
+        priority: 0.8,
+        changeFrequency: "monthly",
+        images: p.images.map((i) => i.src),
+      }),
+    ),
   ];
 
   return pages.flatMap((page) => {
@@ -27,7 +36,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: page.changeFrequency,
       priority: page.priority,
       alternates: { languages },
-      images: [absoluteUrl(`/${locale}${page.path}/opengraph-image`)],
+      images: (page.images ?? [`/${locale}${page.path}/opengraph-image`]).map((src) => absoluteUrl(src)),
     }));
   });
 }

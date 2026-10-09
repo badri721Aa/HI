@@ -18,8 +18,9 @@ const HeroPrint = dynamic(() => import("@/components/3d/hero-print").then((m) =>
 
 /*
  * The only gradient text on the site: a vertical fg → silver sheen on the
- * last title line (bright at the top, so it reads as metal, not as dimmed). It is applied to the line and to every span inside it,
- * so it still paints when SplitText animates words as separate layers. The
+ * last title line (bright at the top, so it reads as metal rather than
+ * dimmed). It is applied to the line and to every span inside it, so it
+ * still paints when SplitText animates words as separate layers. The
  * padding/negative-margin pair grows the paint box so descenders and Arabic
  * marks are not clipped by background-clip at this tight leading.
  */
@@ -110,7 +111,7 @@ export function Hero() {
             itself clear of the readout.
           */}
           <div className="relative order-first lg:order-none lg:col-span-6 lg:col-start-7 lg:row-start-1">
-            <div aria-hidden className="relative h-[34svh] min-h-60 md:h-[40svh] lg:h-[min(78vh,760px)]">
+            <div aria-hidden data-scene="" className="relative h-[34svh] min-h-60 md:h-[40svh] lg:h-[min(78vh,760px)]">
               <HeroPrint className="size-full" avoid={hud} />
             </div>
             {/* z-10 keeps the readout above the shared 3D canvas (z-[5]); no ancestor creates a stacking context. */}

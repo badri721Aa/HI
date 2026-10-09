@@ -17,6 +17,14 @@ test.describe("home page", () => {
     for (const id of SECTIONS) await expect(page.locator(`#${id}`), `#${id}`).toBeAttached();
   });
 
+  test("keeps the hero's call to action on the first screen", async ({ page }) => {
+    const cta = page.locator("#top").getByRole("link", { name: getDictionary("en").common.actions.browse });
+    await expect(cta).toBeVisible();
+    const box = await cta.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  });
+
   test("shows one card per product", async ({ page }) => {
     const cards = page.getByTestId("product-card");
     await expect(cards).toHaveCount(PRODUCTS.length);

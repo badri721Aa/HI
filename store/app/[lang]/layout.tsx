@@ -13,6 +13,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { CartDrawer } from "@/components/commerce/cart-drawer";
 import { QuickView } from "@/components/commerce/quick-view";
 import { Toaster } from "@/components/commerce/toaster";
+import { Cursor } from "@/components/motion/cursor";
 import { SceneRoot } from "@/components/3d/scene-root-loader";
 
 export function generateStaticParams() {
@@ -50,6 +51,8 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
           <CartDrawer />
           <QuickView />
           <Toaster />
+          <Cursor />
+          {/* Mounts the shared WebGL canvas only once a 3D scene on the page asks for it. */}
           <SceneRoot />
         </AppProviders>
         <ServiceWorkerRegister />

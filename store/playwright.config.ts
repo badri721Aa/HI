@@ -14,6 +14,8 @@ const webglArgs = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe
  */
 export default defineConfig({
   testDir: "tests/e2e",
+  // Visual baselines (tests/e2e/visual.spec.ts, opt-in with VISUAL=1): one folder per project, no OS suffix.
+  snapshotPathTemplate: "{testDir}/__screenshots__/{testFilePath}/{projectName}/{arg}{ext}",
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,

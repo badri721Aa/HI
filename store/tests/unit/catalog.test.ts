@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CURRENCIES, LOCALES, type L10n, type MaterialId } from "@/types";
-import { CATEGORIES, MATERIALS, PRODUCTS, getMaterial, getProduct } from "@/content/catalog";
+import { CATEGORIES, MATERIALS, NOT_FOUND_SLUG, PRODUCTS, getMaterial, getProduct } from "@/content/catalog";
 import { CURRENCY_DECIMALS } from "@/lib/currency";
 import { site } from "@/lib/site";
 import { LIMITS } from "@/lib/whatsapp";
@@ -139,6 +139,12 @@ describe("catalog: colours and sizes", () => {
         }
       }
     }
+  });
+});
+
+describe("catalog: reserved slugs", () => {
+  it("never uses the 404 slug the proxy rewrites to", () => {
+    expect(PRODUCTS.map((p) => p.slug)).not.toContain(NOT_FOUND_SLUG);
   });
 });
 

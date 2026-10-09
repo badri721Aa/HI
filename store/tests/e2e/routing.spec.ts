@@ -1,6 +1,7 @@
 import { PRODUCTS } from "@/content/catalog";
 import { getDictionary } from "@/lib/i18n";
 import { site } from "@/lib/site";
+import { GLOBAL_NOT_FOUND_PATH } from "@/proxy";
 import { expect, header, test, waitForHydration } from "./fixtures";
 
 test.describe("locale redirect from /", () => {
@@ -82,6 +83,66 @@ test.describe("not found", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: getDictionary("ar").site.notFound.title }),
     ).toBeVisible();
+  });
+});
+
+test.describe("unknown paths", () => {
+  test("an unknown path under /ar gets the Arabic 404, right to left, with a 404 status", async ({ page }) => {
+    const response = await page.goto("/ar/products-typo/deeper");
+    expect(response?.status()).toBe(404);
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    await expect(
+      page.getByRole("heading", { level: 1, name: getDictionary("ar").site.notFound.title }),
+    ).toBeVisible();
+    await expect(page).toHaveTitle(new RegExp(getDictionary("ar").site.notFound.metaTitle));
+  });
+
+  test("a path outside both languages gets the branded bilingual 404 with a 404 status", async ({ page }) => {
+    for (const path of ["/shop", "/fr", `/products/${PRODUCTS[0].slug}`]) {
+      const response = await page.goto(path);
+      expect(response?.status(), path).toBe(404);
+      await expect(page.getByRole("heading", { level: 1, name: getDictionary("en").site.notFound.title }), path).toBeVisible();
+      await expect(page.getByText(getDictionary("ar").site.notFound.title), path).toBeVisible();
+    }
+  });
+
+  test.describe("plain HTTP", () => {
+    test.skip(({ isMobile }) => isMobile, "Plain HTTP checks; the desktop project covers them.");
+
+    test("malformed percent-escapes are a 404, not a server error", async ({ request }) => {
+      for (const path of ["/en/products/%ZZ", "/en/products/%E0%A4%A", "/%E0%A4%A", "/en/%E0%A4%A"]) {
+        const response = await request.get(path, { maxRedirects: 0 });
+        expect(response.status(), path).toBe(404);
+      }
+    });
+
+    test("an upper-case locale redirects to the lowercase one", async ({ request }) => {
+      const response = await request.get("/EN?utm_source=ig", { maxRedirects: 0 });
+      expect(response.status()).toBe(308);
+      const location = new URL(response.headers()["location"], "http://localhost");
+      expect(location.pathname).toBe("/en");
+      expect(location.searchParams.get("utm_source")).toBe("ig");
+    });
+
+    test("the 404 page is server-rendered with its title and noindex", async ({ request }) => {
+      const html = await (await request.get(GLOBAL_NOT_FOUND_PATH)).text();
+      expect(html).toMatch(/<title>[^<]*3D BH<\/title>/);
+      expect(html).toMatch(/<meta name="robots" content="[^"]*noindex/);
+    });
+  });
+});
+
+test.describe("product pages without 3D", () => {
+  test("never download three.js or create a canvas", async ({ page }) => {
+    const scripts: Promise<string>[] = [];
+    page.on("response", (response) => {
+      if (response.request().resourceType() === "script") scripts.push(response.text().catch(() => ""));
+    });
+    await page.goto(`/en/products/${PRODUCTS[0].slug}`);
+    await waitForHydration(page);
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator("canvas")).toHaveCount(0);
+    for (const body of await Promise.all(scripts)) expect(body).not.toContain("THREE.WebGLRenderer");
   });
 });
 

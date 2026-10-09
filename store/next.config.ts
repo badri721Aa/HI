@@ -2,6 +2,21 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
 
+// lib/site.ts falls back to http://localhost:3000 for canonical, hreflang, OG,
+// JSON-LD, sitemap and robots URLs when neither variable is set (Vercel sets
+// the second). Make that loud on any production build or start.
+if (
+  process.env.NODE_ENV === "production" &&
+  !process.env.NEXT_PUBLIC_SITE_URL &&
+  !process.env.VERCEL_PROJECT_PRODUCTION_URL
+) {
+  console.warn(
+    "\n[3D BH] Warning: NEXT_PUBLIC_SITE_URL is not set, so canonical URLs, the sitemap, robots.txt, " +
+      "Open Graph tags and JSON-LD will point at http://localhost:3000. Set it to the public origin, " +
+      "e.g. NEXT_PUBLIC_SITE_URL=https://3dbh.vercel.app\n",
+  );
+}
+
 /**
  * Static-friendly CSP (no nonces, which would force dynamic rendering).
  * Inline scripts are needed for Next's bootstrap and JSON-LD.

@@ -237,3 +237,6 @@ export function getMaterial(id: MaterialInfo["id"]): MaterialInfo {
   if (!m) throw new Error(`Unknown material: ${id}`);
   return m;
 }
+
+/** A slug no product may use: the proxy rewrites unknown paths to /<lang>/products/<this> for the localized 404. */
+export const NOT_FOUND_SLUG = "not-found";

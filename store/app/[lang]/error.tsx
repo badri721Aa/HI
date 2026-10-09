@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackEvent } from "@/lib/telemetry";
 import { RotateCcw } from "lucide-react";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -17,7 +18,8 @@ export default function ErrorPage({ error, retry }: { error: Error & { digest?: 
 
   useEffect(() => {
     // The digest matches the server log entry for errors thrown on the server.
-    console.error("[layer-up] page error", error.digest ?? "", error);
+    console.error("[3dbh] page error", error.digest ?? "", error);
+    trackEvent("client_error", { where: "page", name: error.name, digest: error.digest ?? "", path: window.location.pathname });
   }, [error]);
 
   return (
