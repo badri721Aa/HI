@@ -71,8 +71,10 @@ function segmentLine(line: string): Segment[] {
 /**
  * Word-by-word entrance (opacity, rise, blur), staggered.
  *
- * Accessible: the tag's aria-label carries the full text for screen readers
- * and the animated words are aria-hidden, so crawlers see the text once.
+ * Accessible: the animated words are the only copy of the text, read as
+ * is (no aria-label, which ARIA forbids on a generic span, and no hidden
+ * duplicate for crawlers to see twice). A plain space between words and
+ * before each line break keeps them apart in the accessible name.
  * Splits on whitespace only, so it is safe for Arabic, and keeps mixed
  * Arabic/Latin lines in the right order. A "\n" in `text` forces a line break.
  *
@@ -126,21 +128,24 @@ export function SplitText({
   return (
     <>
       <MotionStyles />
-      {/* The label names it for screen readers; crawlers read the words once, from the animated copy. */}
-      <Tag ref={ref as Ref<never>} id={id} className={className} aria-label={text.replace(/\s*\n\s*/g, " ")}>
-        <span aria-hidden="true">
-          {lines.map((segments, li) => (
-            <Fragment key={li}>
-              {li > 0 ? <br /> : null}
-              {segments.map((segment, si) => (
-                <Fragment key={`${si}-${segment.key}`}>
-                  {si > 0 ? " " : null}
-                  {segment.dir ? <span dir={segment.dir}>{segment.words.map(word)}</span> : segment.words.map(word)}
-                </Fragment>
-              ))}
-            </Fragment>
-          ))}
-        </span>
+      <Tag ref={ref as Ref<never>} id={id} className={className}>
+        {lines.map((segments, li) => (
+          <Fragment key={li}>
+            {/* Invisible before the break, but keeps the words either side of it apart when read. */}
+            {li > 0 ? (
+              <>
+                {" "}
+                <br />
+              </>
+            ) : null}
+            {segments.map((segment, si) => (
+              <Fragment key={`${si}-${segment.key}`}>
+                {si > 0 ? " " : null}
+                {segment.dir ? <span dir={segment.dir}>{segment.words.map(word)}</span> : segment.words.map(word)}
+              </Fragment>
+            ))}
+          </Fragment>
+        ))}
       </Tag>
     </>
   );

@@ -3,9 +3,12 @@ import type { Product } from "@/types";
 import { PRODUCTS, getProduct } from "@/content/catalog";
 import { HOURS_CONFIRMED, WHATSAPP_LINES, site } from "@/lib/site";
 import { REGION_CONFIG } from "@/lib/site";
+import { getDictionary } from "@/lib/i18n";
+import { bidiRuns } from "@/components/seo/og-text";
 import {
   absoluteUrl,
   breadcrumbJsonLd,
+  homeMetadata,
   languageAlternates,
   layoutMetadata,
   notFoundMetadata,
@@ -219,6 +222,19 @@ describe("URLs and metadata", () => {
     expect(image(productMetadata(p, "en")).alt).toContain(p.name.en);
   });
 
+  it("gives the home page its share card with alt text, so the image file beside it cannot drop the alt", () => {
+    for (const locale of ["en", "ar"] as const) {
+      const og = homeMetadata(locale).openGraph;
+      // The page's Open Graph replaces the layout's wholesale, so it must match it.
+      expect(og, locale).toEqual(layoutMetadata(locale).openGraph);
+      expect((og?.images as Json[])[0]).toMatchObject({
+        url: `/${locale}/opengraph-image`,
+        alt: getDictionary(locale).site.meta.ogAlt,
+      });
+    }
+    expect((homeMetadata("ar").openGraph?.images as Json[])[0].alt).toMatch(/[\u0600-\u06FF]/);
+  });
+
   it("keeps product descriptions to the short tagline", () => {
     for (const p of PRODUCTS) expect(productMetadata(p, "en").description, p.slug).toBe(p.tagline.en);
   });
@@ -246,5 +262,60 @@ describe("sitemap", () => {
       expect(entry?.images, p.slug).toEqual(p.images.map((i) => `${site.url}${i.src}`));
     }
     expect(entries.find((e) => e.url === `${site.url}/en`)?.images).toEqual([`${site.url}/en/opengraph-image`]);
+  });
+});
+
+describe("bidiRuns (Arabic share card text)", () => {
+  const EDGE = /^[.,:;!?\u2026\u060C\u061B\u061F]|[.,:;!?\u2026\u060C\u061B\u061F]$/;
+
+  it("splits a final full stop off the last word, to be drawn on its left", () => {
+    expect(bidiRuns("فوق طبقة.")).toEqual([
+      { text: "فوق", rtl: true },
+      { text: "طبقة", rtl: true, after: "." },
+    ]);
+  });
+
+  it("splits mid-sentence marks off their word too", () => {
+    const runs = bidiRuns("زر كيبورد في ميداليتك. اضغطه كلما أردت.");
+    expect(runs.find((r) => r.text === "ميداليتك")).toEqual({ text: "ميداليتك", rtl: true, after: "." });
+    expect(bidiRuns("بحجم الكف: خمس")[1]).toEqual({ text: "الكف", rtl: true, after: ":" });
+    expect(bidiRuns("بأربعة ألوان، تبرز")[1]).toEqual({ text: "ألوان", rtl: true, after: "،" });
+  });
+
+  it("leaves no edge punctuation inside any Arabic line the cards draw", () => {
+    const t = getDictionary("ar");
+    const lines = [...t.home.hero.titleLines, t.common.brandLine, ...PRODUCTS.flatMap((p) => [p.name.ar, p.tagline.ar])];
+    for (const line of lines) {
+      const runs = bidiRuns(line);
+      for (const run of runs) expect(run.text, line).not.toMatch(EDGE);
+      if (line.endsWith(".")) expect(runs.at(-1)?.after, line).toBe(".");
+    }
+  });
+
+  it("judges a word's direction without its punctuation, and mirrors brackets and quotes", () => {
+    // "(R)،" is Latin despite the Arabic comma; on a right-to-left line ")" is drawn on its right, "،(" on its left.
+    expect(bidiRuns("والرجوع (R)، على")[1]).toEqual({ text: "R", rtl: false, before: ")", after: "،(" });
+    expect(bidiRuns("«كلمة»")).toEqual([{ text: "كلمة", rtl: true, before: "»", after: "«" }]);
+    // Punctuation-only words read entirely right to left.
+    expect(bidiRuns("كلمة (")[1]).toEqual({ text: ")", rtl: false });
+  });
+
+  it("splits only the outer edges of a left-to-right run", () => {
+    expect(bidiRuns("من PLA، PETG.")).toEqual([
+      { text: "من", rtl: true },
+      { text: "PLA، PETG", rtl: false, after: "." },
+    ]);
+  });
+
+  it("keeps signs and inner punctuation with their word", () => {
+    expect(bidiRuns("اطلب +973 3985 8885")).toEqual([
+      { text: "اطلب", rtl: true },
+      { text: "+973 3985 8885", rtl: false },
+    ]);
+    expect(bidiRuns("من 3.000 د.ب · 30.00 د.إ").map((r) => r.text)).toEqual(["من", "3.000", "د.ب", "·", "30.00", "د.إ"]);
+    expect(bidiRuns("الطبقة 638 / 1100")).toEqual([
+      { text: "الطبقة", rtl: true },
+      { text: "638 / 1100", rtl: false },
+    ]);
   });
 });

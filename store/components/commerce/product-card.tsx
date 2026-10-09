@@ -43,7 +43,8 @@ export type ProductCardAction = "quick-view" | "page";
  * photo fills whatever height its grid area gives it (the parent must give
  * it a height, e.g. a 2-row span). `wellClassName` lets a grid reshape the
  * default 4:5 well (e.g. `lg:aspect-square`); the studio shots are centred,
- * so a centred crop keeps the whole piece.
+ * so a centred crop keeps the whole piece (the wide feature well crops a
+ * little higher, see `focal`).
  */
 export function ProductCard({
   product,
@@ -77,6 +78,11 @@ export function ProductCard({
     (feature
       ? "(min-width: 1360px) 632px, (min-width: 1024px) 47vw, (min-width: 640px) 46vw, 92vw"
       : "(min-width: 1360px) 300px, (min-width: 1024px) 23vw, (min-width: 640px) 45vw, 46vw");
+  /*
+   * The large feature well is wider than 4:5, so a centred crop takes ~17% off a tall piece's height and the
+   * phone case's top edge met the frame. The studio pieces sit a touch above centre: crop there instead.
+   */
+  const focal = feature ? "lg:object-[50%_38%]" : undefined;
 
   /* Cursor highlight over the photo (fine pointers): --mx/--my on the well, once per frame. */
   const wellRef = useRef<HTMLDivElement>(null);
@@ -132,14 +138,14 @@ export function ProductCard({
         )}
       >
         <div className="absolute inset-0 transition-[scale] duration-[600ms] ease-out-expo group-hover/card:scale-[1.03]">
-          {cover ? <ProductPhoto image={cover} sizes={photoSizes} /> : null}
+          {cover ? <ProductPhoto image={cover} sizes={photoSizes} className={focal} /> : null}
           {/* Second photo cross-fades in on hover; never loaded on touch screens, which can't hover. */}
           {second && fine ? (
             <ProductPhoto
               image={second}
               sizes={photoSizes}
               alt=""
-              className="opacity-0 transition-opacity duration-500 ease-out-expo group-hover/card:opacity-100"
+              className={cn("opacity-0 transition-opacity duration-500 ease-out-expo group-hover/card:opacity-100", focal)}
             />
           ) : null}
         </div>

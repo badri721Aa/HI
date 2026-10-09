@@ -104,13 +104,17 @@ export function Collection() {
             value={filter}
             onChange={setFilter}
             className={cn(
-              // Phones: bleed to the screen edge and fade out before the count.
-              "-ms-4 min-w-0 flex-1 ps-4 pe-8 md:-ms-1.5 md:ps-1.5 md:pe-1.5",
+              // Phones: bleed to both screen edges and fade out at the end one.
+              "-mx-4 min-w-0 flex-1 ps-4 pe-8 md:-ms-1.5 md:me-0 md:ps-1.5 md:pe-1.5",
               "max-md:[mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]",
               "max-md:rtl:[mask-image:linear-gradient(to_left,black_calc(100%-2.5rem),transparent)]",
             )}
           />
-          <p aria-live="polite" className="shrink-0 font-mono text-xs text-fg-muted tabular">
+          {/*
+            Phones: announced only. Beside the scrolling chips the faded last chip read as part of it ("Fidget… 5
+            pieces"), and the selected chip already shows the same count.
+          */}
+          <p aria-live="polite" className="shrink-0 font-mono text-xs text-fg-muted tabular max-md:sr-only">
             {piecesLabel(n, copy)}
           </p>
         </Reveal>

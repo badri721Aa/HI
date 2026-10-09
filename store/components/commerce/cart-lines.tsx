@@ -11,13 +11,14 @@ import { Amount } from "@/components/commerce/price";
 import { QtyStepper } from "@/components/commerce/qty-stepper";
 import { ProductSilhouette } from "@/components/3d/silhouette";
 import { ButtonLink, buttonStyles } from "@/components/ui/button";
+import { LogoMark } from "@/components/ui/logo";
 import { REGION_CONFIG, vat } from "@/lib/site";
 import { fromMinor, toMinor } from "@/lib/currency";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
-import { LIMITS, variantLabel, type OrderErrorKey, type PricedLine, type PricedOrder } from "@/lib/whatsapp";
+import { LIMITS, variantParts, type OrderErrorKey, type PricedLine, type PricedOrder } from "@/lib/whatsapp";
 import { fmt } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { FieldError, describedBy, inputStyles } from "./checkout-form";
+import { DotList, FieldError, describedBy, inputStyles } from "./checkout-form";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -133,7 +134,7 @@ function CartLineItem({
   const errorId = useId();
   const { product, line } = priced;
   const name = product.name[locale];
-  const variant = variantLabel(product, line, locale);
+  const variant = variantParts(product, line, locale);
   const image = product.images[0];
   const needsNote = Boolean(product.variantNote?.required) && !line.note?.trim();
   // An iPhone model typed wrong can be fixed here instead of removing and re-adding the piece.
@@ -180,15 +181,20 @@ function CartLineItem({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h3 className="text-[0.9375rem] font-medium leading-snug text-fg">
+                {/* The hit area grows to 44px tall around the one-line title. */}
                 <Link
                   href={`/${locale}/products/${product.slug}`}
                   onClick={onNavigate}
-                  className="rounded-sm transition-colors hover:text-silver"
+                  className="relative inline-block rounded-sm transition-colors before:absolute before:inset-x-0 before:top-1/2 before:h-full before:min-h-11 before:-translate-y-1/2 before:content-[''] hover:text-silver"
                 >
                   {name}
                 </Link>
               </h3>
-              {variant ? <p className="mt-1 text-sm leading-snug text-fg-muted">{variant}</p> : null}
+              {variant.length ? (
+                <p className="mt-1 text-sm leading-snug text-fg-muted">
+                  <DotList parts={variant} />
+                </p>
+              ) : null}
               {priced.note && !editingNote ? (
                 <p className="mt-0.5 text-sm leading-snug text-fg-muted">
                   {priced.note.label}: <span className="text-fg">{priced.note.value}</span>{" "}
@@ -196,7 +202,8 @@ function CartLineItem({
                     type="button"
                     onClick={() => setEditingNote(true)}
                     aria-label={`${t.common.actions.edit}: ${priced.note.label}`}
-                    className="relative ms-1 text-[0.8125rem] underline decoration-line-strong underline-offset-4 transition-colors before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] hover:text-fg hover:decoration-fg-muted"
+                    // A 44px square hit area centred on the short word, whatever its width.
+                    className="relative ms-1 text-[0.8125rem] underline decoration-line-strong underline-offset-4 transition-colors before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] hover:text-fg hover:decoration-fg-muted"
                   >
                     {t.common.actions.edit}
                   </button>
@@ -328,7 +335,7 @@ function LineNote({
 /** Diagonal infill hatching: the same motif as the logo mark and the materials card. */
 const HATCH = "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.028) 0 1px, transparent 1px 11px)";
 
-/** Nothing in the order yet: an empty build plate, and the two ways forward. */
+/** Nothing in the order yet: a clear build plate, and the two ways forward. */
 export function CartEmpty({ onNavigate }: { onNavigate: () => void }) {
   const { t, locale } = useI18n();
   const copy = t.commerce.cart;
@@ -345,8 +352,8 @@ export function CartEmpty({ onNavigate }: { onNavigate: () => void }) {
         <span className="absolute end-3 top-3 size-3 border-e border-t border-line-strong" />
         <span className="absolute bottom-3 start-3 size-3 border-b border-s border-line-strong" />
         <span className="absolute bottom-3 end-3 size-3 border-b border-e border-line-strong" />
-        {/* The footprint of a piece that isn't there. */}
-        <span className="absolute inset-0 m-auto size-16 rounded-xl border border-dashed border-line-strong bg-ink-900/60" />
+        {/* The studio's mark, faint, with only its newest layer lit: the bed is ready for the first piece. */}
+        <LogoMark className="absolute inset-0 m-auto size-12 text-fg/20" />
         <span dir="ltr" className="absolute inset-x-0 bottom-3.5 text-center font-mono text-[0.6875rem] tracking-[0.14em] text-fg-muted">
           Z 0.00
         </span>

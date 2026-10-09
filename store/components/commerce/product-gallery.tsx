@@ -9,15 +9,21 @@ import { useFinePointer } from "@/components/motion/shared";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
-/** Cover photos are cropped 4:5; anything noticeably wider or taller is letterboxed instead of cropped. */
+/** Cover photos are cropped 4:5; anything noticeably wider or taller is shown whole instead of cropped. */
 const WELL_RATIO = 4 / 5;
 const isWellShaped = (image: ProductImage) => Math.abs(image.width / image.height - WELL_RATIO) < 0.08;
 
 /**
- * A product photo that fills a positioned 4:5 well. 4:5 photos are cropped
- * to fill (object-cover); other shapes (e.g. a landscape shot of a set) sit
- * whole on a blurred wash of their own colours, so nothing important is cut.
- * Uses the catalog's tiny blurDataURL as the loading placeholder.
+ * A product photo in a positioned well (4:5 in the gallery; grids may reshape
+ * it). 4:5 photos fill the well (object-cover, centred unless `className`
+ * moves the focal point). Other shapes, e.g. a landscape shot of a set, sit
+ * whole and inset on the plain dark well with their own rounded corners, so
+ * nothing is cut and no colour wash muddies the surface.
+ *
+ * Either way a photo is never drawn larger than its file: in a well bigger
+ * than that (a small original on a large screen) it sits centred at its own
+ * size, corners rounded, instead of being blown up soft. Uses the catalog's
+ * tiny blurDataURL as the loading placeholder.
  */
 export function ProductPhoto({
   image,
@@ -34,31 +40,51 @@ export function ProductPhoto({
   className?: string;
 }) {
   const { locale } = useI18n();
-  const fit = isWellShaped(image) ? "cover" : "contain";
-  const img = (
-    <Image
-      src={image.src}
-      width={image.width}
-      height={image.height}
-      alt={alt ?? image.alt[locale]}
-      sizes={sizes}
-      placeholder="blur"
-      blurDataURL={image.blurDataURL}
-      preload={preload}
-      draggable={false}
-      style={{ objectFit: fit }}
-      className={cn("absolute inset-0 size-full select-none", fit === "cover" ? "object-cover" : "object-contain", fit === "cover" && className)}
-    />
-  );
-  if (fit === "cover") return img;
-  return (
-    <div className={cn("absolute inset-0", className)}>
-      <div
-        aria-hidden
-        className="absolute inset-0 scale-125 bg-cover bg-center opacity-60 blur-2xl"
-        style={{ backgroundImage: `url("${image.blurDataURL}")` }}
+  const label = alt ?? image.alt[locale];
+  const props = {
+    src: image.src,
+    width: image.width,
+    height: image.height,
+    sizes,
+    placeholder: "blur",
+    blurDataURL: image.blurDataURL,
+    preload,
+    draggable: false,
+  } as const;
+
+  if (isWellShaped(image)) {
+    return (
+      <Image
+        {...props}
+        alt={label}
+        // The box is the well, capped at the file's size. Its rounded corners and hairline only show when the
+        // cap leaves it smaller than the well; otherwise the well's own (larger) rounding clips them away.
+        style={{ objectFit: "cover", maxWidth: image.width, maxHeight: image.height }}
+        className={cn("absolute inset-0 m-auto size-full select-none rounded-xl object-cover ring-1 ring-line", className)}
       />
-      {img}
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "absolute inset-0 grid place-items-center p-[6%] [container-type:size]",
+        "bg-[radial-gradient(closest-side,rgb(255_255_255/0.035),transparent)]",
+        className,
+      )}
+    >
+      <Image
+        {...props}
+        alt={label}
+        // Sized to its own shape inside the well (container units), so the rounded corners are the photo's.
+        style={{
+          objectFit: "cover",
+          width: `min(100cqw, ${image.width}px, 100cqh * ${image.width / image.height})`,
+          height: "auto",
+          aspectRatio: `${image.width} / ${image.height}`,
+        }}
+        className="select-none rounded-[min(0.75rem,3cqw)] object-cover ring-1 ring-line"
+      />
     </div>
   );
 }
@@ -73,15 +99,17 @@ const MIN_ZOOM = 1.15;
  * How far a photo can be magnified before it runs out of pixels: the loaded
  * file's width over the width it is drawn at, in device pixels. naturalWidth
  * is the file the browser actually fetched (next/image never upscales), so
- * a small original or a retina screen leaves little or no headroom.
+ * a small original or a retina screen leaves little or no headroom. The photo
+ * covers its own box (the well, or a smaller box for a capped or contained
+ * photo); offset sizes ignore the zoom's own scale.
  */
-function zoomHeadroom(well: HTMLElement, img: HTMLImageElement | null | undefined) {
-  if (!img?.naturalWidth || !img.naturalHeight) return 1;
-  const { width, height } = well.getBoundingClientRect();
-  const ratio = img.naturalWidth / img.naturalHeight;
-  const contain = img.style.objectFit === "contain";
-  const drawn = contain ? Math.min(width, height * ratio) : Math.max(width, height * ratio);
-  return img.naturalWidth / (drawn * (window.devicePixelRatio || 1));
+export function zoomHeadroom(
+  img: Pick<HTMLImageElement, "naturalWidth" | "naturalHeight" | "offsetWidth" | "offsetHeight"> | null | undefined,
+  dpr: number,
+) {
+  if (!img?.naturalWidth || !img.naturalHeight || !img.offsetWidth) return 1;
+  const drawn = Math.max(img.offsetWidth, img.offsetHeight * (img.naturalWidth / img.naturalHeight));
+  return img.naturalWidth / (drawn * (dpr || 1));
 }
 
 /**
@@ -157,7 +185,7 @@ export function ProductGallery({
   const zoomIn = (e: PointerEvent<HTMLDivElement>) => {
     if (!fine || e.pointerType !== "mouse") return;
     const img = zoomRef.current?.querySelector<HTMLImageElement>(`[data-photo="${active}"] img`);
-    const scale = Math.min(MAX_ZOOM, zoomHeadroom(e.currentTarget, img));
+    const scale = Math.min(MAX_ZOOM, zoomHeadroom(img, window.devicePixelRatio));
     zoomScale.current = scale >= MIN_ZOOM ? scale : 1;
     e.currentTarget.style.cursor = zoomScale.current > 1 ? "zoom-in" : "";
     zoomFollow(e);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useId, useState, type MouseEvent } from "react";
+import { useId, useState, type MouseEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Paperclip } from "lucide-react";
 import type { MaterialId, Region } from "@/types";
@@ -13,6 +13,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { QtyStepper } from "@/components/commerce/qty-stepper";
 import {
   CharCount,
+  DotList,
   Field,
   RegionChoice,
   Select,
@@ -343,14 +344,15 @@ function CustomForm() {
             onChange={changeRegion}
             labelledBy={id("region")}
             testIdPrefix="custom-"
-            className="mt-2 sm:max-w-sm"
+            className="mt-2"
           />
         </div>
 
         {REGION_CONFIG[region].lines.length > 1 ? (
           <div className="mt-6">
             <p className="text-sm font-medium text-fg">{cartCopy.sendTo}</p>
-            <LinePicker region={region} testIdPrefix="custom-" label={cartCopy.sendTo} className="mt-2 sm:max-w-md" />
+            {/* Full width, its two cards on the same columns as name and city below. */}
+            <LinePicker region={region} testIdPrefix="custom-" label={cartCopy.sendTo} className="mt-2 sm:gap-x-4" />
           </div>
         ) : null}
 
@@ -417,25 +419,26 @@ function CustomForm() {
       </div>
 
       <div className="mt-9 border-t border-line pt-6">
+        {/* "Sending to Bahrain · Line 1 · +973 3985 8885": on a narrow phone the number moves down whole, with no dot left behind. */}
         <p id={id("dest")} className="text-sm text-fg-muted">
-          {copy.sendingTo}{" "}
-          {/* "Bahrain · Line 1 · +973 3985 8885", with room around each separator. */}
-          {[...line.label[locale].split(" · "), line.display].map((part, i, parts) => (
-            <Fragment key={i}>
-              {i === parts.length - 1 ? (
-                <span dir="ltr" className="font-mono tabular text-fg">
-                  {part}
-                </span>
-              ) : (
-                <span className="text-fg">{part}</span>
-              )}
-              {i < parts.length - 1 ? (
-                <span aria-hidden className="mx-1.5 text-fg-muted">
-                  ·
-                </span>
-              ) : null}
-            </Fragment>
-          ))}
+          <DotList
+            parts={[
+              ...line.label[locale].split(" · ").map((part, i) =>
+                i === 0 ? (
+                  <span key={i}>
+                    {copy.sendingTo} <span className="text-fg">{part}</span>
+                  </span>
+                ) : (
+                  <span key={i} className="text-fg">
+                    {part}
+                  </span>
+                ),
+              ),
+              <span key="number" dir="ltr" className="whitespace-nowrap font-mono tabular text-fg">
+                {line.display}
+              </span>,
+            ]}
+          />
         </p>
 
         <a
@@ -451,8 +454,9 @@ function CustomForm() {
           className={buttonStyles({
             variant: "primary",
             size: "lg",
-            // On a narrow phone the label wraps instead of widening the form.
-            className: "mt-6 w-full max-sm:h-auto max-sm:min-h-13 max-sm:whitespace-normal max-sm:px-5 max-sm:py-3 max-sm:text-center sm:w-auto",
+            // A touch smaller on phones so the label stays on one line at 360px; narrower still, it wraps rather than widen the form.
+            className:
+              "mt-6 w-full max-sm:h-auto max-sm:min-h-13 max-sm:whitespace-normal max-sm:px-4 max-sm:py-3 max-sm:text-center max-sm:text-[0.9375rem] sm:w-auto",
           })}
         >
           <WhatsAppIcon className="size-5" />

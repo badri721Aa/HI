@@ -13,6 +13,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { useI18n } from "@/components/providers/i18n-provider";
+import { useSheetFooterHeight, useSheetLayout } from "@/components/ui/drawer";
 import { useUI, type Toast } from "@/lib/store/ui";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,7 @@ function useWide(): boolean {
   return useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE_QUERY).matches, () => false);
 }
 
-type Placement = "bottom" | "beside" | "top";
+type Placement = "bottom" | "beside" | "top" | "sheet";
 
 const PLACEMENT: Record<Placement, { outer: string; inner: string }> = {
   // Bottom-centre on phones, bottom inline-end from sm up.
@@ -46,27 +47,39 @@ const PLACEMENT: Record<Placement, { outer: string; inner: string }> = {
     outer: "bottom-0 pb-[max(1.5rem,env(safe-area-inset-bottom))]",
     inner: "flex-col me-[30rem]",
   },
-  // A drawer fills the screen: drop in below its header, clear of the footer actions.
+  // A side drawer fills the screen (sm to lg): drop in below its header, clear of the footer actions.
   top: {
     outer: "top-0 pt-[calc(env(safe-area-inset-top)+5.75rem)]",
     inner: "flex-col-reverse",
   },
+  // A bottom sheet on a phone: its header (title, close) sits wherever its height puts it, but its
+  // footer is always at the bottom, so stand just above that (the measured height, set inline).
+  sheet: {
+    outer: "bottom-0 pb-[max(1rem,env(safe-area-inset-bottom))]",
+    inner: "flex-col",
+  },
 };
+
+/** Gap between a toast and the bottom sheet's footer. */
+const SHEET_GAP = 12;
 
 /**
  * Confirmations ("Added to your order", "WhatsApp is open"). Bottom-centre
  * on phones, bottom inline-end on larger screens, above drawers. While a
- * drawer is open its footer holds the next action (send, clear, add), so
- * toasts move beside the drawer on wide screens and below its header on
- * narrow ones. The live region is always mounted so screen readers announce
- * each new toast.
+ * drawer is open its footer holds the next action (send, clear, add) and its
+ * header the close button, so toasts move beside the drawer on wide screens,
+ * below its header on tablets, and just above a bottom sheet's footer on
+ * phones. The live region is always mounted so screen readers announce each
+ * new toast.
  */
 export function Toaster() {
   const toasts = useUI((s) => s.toasts);
   const dismiss = useUI((s) => s.dismissToast);
   const drawerOpen = useUI((s) => s.cartOpen || s.navOpen || s.quickView !== null);
   const wide = useWide();
-  const placement: Placement = !drawerOpen ? "bottom" : wide ? "beside" : "top";
+  const sheet = useSheetLayout();
+  const sheetFooter = useSheetFooterHeight();
+  const placement: Placement = !drawerOpen ? "bottom" : wide ? "beside" : sheet ? "sheet" : "top";
 
   return (
     <div
@@ -80,6 +93,8 @@ export function Toaster() {
         "sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))]",
         PLACEMENT[placement].outer,
       )}
+      // The footer's own padding already clears the home indicator.
+      style={placement === "sheet" && sheetFooter > 0 ? { paddingBottom: sheetFooter + SHEET_GAP } : undefined}
     >
       <div className={cn("flex w-full max-w-sm gap-2", PLACEMENT[placement].inner)}>
         <AnimatePresence initial={false} mode="popLayout">
@@ -175,6 +190,7 @@ function ToastCard({
   return (
     <motion.div
       ref={ref}
+      data-testid="toast"
       layout={reduced ? false : "position"}
       initial={reduced ? { opacity: 0 } : { opacity: 0, y: fromTop ? -18 : 18, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}

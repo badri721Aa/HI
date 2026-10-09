@@ -16,17 +16,59 @@ const FADE = { stiffness: 400, damping: 40 };
 const TEXT_ENTRY = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
 const INTERACTIVE = 'a[href], button, [role="button"], label[for], summary';
 
-type Mode = "hidden" | "rest" | "link" | "label";
+export type CursorMode = "hidden" | "rest" | "link" | "label";
+
+/** Whether a link's ::after is laid over a larger area (a card's stretched title link), per element. */
+const stretchedCache = new WeakMap<Element, boolean>();
+
+function isStretched(el: Element): boolean {
+  let stretched = stretchedCache.get(el);
+  if (stretched === undefined) {
+    stretched = getComputedStyle(el, "::after").position === "absolute";
+    stretchedCache.set(el, stretched);
+  }
+  return stretched;
+}
+
+/** The point is on the element's own boxes (a link's text), not on an overlay it stretches beyond them. */
+function onOwnBox(el: Element, x: number, y: number): boolean {
+  for (const r of el.getClientRects()) {
+    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true;
+  }
+  return false;
+}
+
+/**
+ * What the ring shows with the pointer over `target` at (x, y): `key` is the
+ * `data-cursor` label key in "label" mode. `byPoint` means the answer depends
+ * on where in the target the pointer is (a stretched link: label over the
+ * area it covers, link over its own text), so moves within it re-ask.
+ */
+export function cursorModeAt(target: Element, x: number, y: number): { mode: CursorMode; key?: string; byPoint: boolean } {
+  if (target.closest(TEXT_ENTRY)) return { mode: "hidden", byPoint: false };
+  const interactive = target.closest(INTERACTIVE);
+  const tagged = target.closest<HTMLElement>("[data-cursor]");
+  let byPoint = false;
+  if (tagged) {
+    // A link or button nested in the labelled area (the eye button on a photo) is a target of its own.
+    const nested = !!interactive && interactive !== tagged && tagged.contains(interactive);
+    byPoint = !nested && interactive === tagged && isStretched(tagged);
+    if (!nested && !(byPoint && onOwnBox(tagged, x, y))) return { mode: "label", key: tagged.dataset.cursor ?? "", byPoint };
+  }
+  return { mode: interactive ? "link" : "rest", byPoint };
+}
 
 /**
  * Desktop cursor ring: a thin circle that trails the pointer on a light
  * spring, next to the native cursor (which stays). Over `data-cursor="<key>"`
  * elements it grows and shows that key's label from `t.site.cursor` (view,
- * drag, open); over plain links and buttons it shrinks; it hides over text
- * fields and when the pointer leaves the window. Fine hovering pointers only,
- * and never under reduced motion. Driven by motion values: no React renders
- * while the pointer moves. Portals to <body>, so it can be mounted anywhere
- * inside the providers.
+ * drag, open); over plain links and buttons it shrinks, including a button
+ * inside a labelled area (a photo's quick-view button) and a stretched link's
+ * own text (a card's title), so the label never prints across them; it hides
+ * over text fields and when the pointer leaves the window. Fine hovering
+ * pointers only, and never under reduced motion. Driven by motion values: no
+ * React renders while the pointer moves. Portals to <body>, so it can be
+ * mounted anywhere inside the providers.
  */
 export function Cursor() {
   const fine = useFinePointer();
@@ -49,11 +91,13 @@ function CursorRing() {
   const labelOpacity = useSpring(0, FADE);
 
   useEffect(() => {
-    let mode: Mode = "hidden";
+    let mode: CursorMode = "hidden";
     let label = "";
     let lastTarget: EventTarget | null = null;
+    /** The mode depends on where in the target the pointer is, so moving within it re-checks. */
+    let byPoint = false;
 
-    const apply = (next: Mode, nextLabel = "") => {
+    const apply = (next: CursorMode, nextLabel = "") => {
       if (next === mode && nextLabel === label) return;
       mode = next;
       label = nextLabel;
@@ -63,18 +107,14 @@ function CursorRing() {
       labelOpacity.set(nextLabel ? 1 : 0);
     };
 
-    const modeFor = (target: Element): [Mode, string?] => {
-      if (target.closest(TEXT_ENTRY)) return ["hidden"];
-      const tagged = target.closest<HTMLElement>("[data-cursor]");
-      if (tagged) return ["label", labels[tagged.dataset.cursor ?? ""] ?? ""];
-      if (target.closest(INTERACTIVE)) return ["link"];
-      return ["rest"];
-    };
-
-    const retarget = (target: EventTarget | null) => {
-      if (target === lastTarget) return;
+    const retarget = (target: EventTarget | null, px: number, py: number) => {
+      if (target === lastTarget && !byPoint) return;
       lastTarget = target;
-      if (target instanceof Element) apply(...modeFor(target));
+      byPoint = false;
+      if (!(target instanceof Element)) return;
+      const next = cursorModeAt(target, px, py);
+      byPoint = next.byPoint;
+      apply(next.mode, next.mode === "label" ? (labels[next.key ?? ""] ?? "") : "");
     };
 
     const onMove = (e: PointerEvent) => {
@@ -86,7 +126,7 @@ function CursorRing() {
       }
       x.set(e.clientX);
       y.set(e.clientY);
-      retarget(e.target);
+      retarget(e.target, e.clientX, e.clientY);
     };
 
     // Scrolling moves the page under a still pointer: re-read what it is over, once per frame.
@@ -95,12 +135,13 @@ function CursorRing() {
       if (frame || lastTarget === null) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
-        if (lastTarget !== null) retarget(document.elementFromPoint(x.get(), y.get()));
+        if (lastTarget !== null) retarget(document.elementFromPoint(x.get(), y.get()), x.get(), y.get());
       });
     };
 
     const onLeave = () => {
       lastTarget = null;
+      byPoint = false;
       apply("hidden");
     };
 

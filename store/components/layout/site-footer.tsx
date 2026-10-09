@@ -179,7 +179,7 @@ export function SiteFooter() {
           <p className="text-sm text-fg-subtle">
             <Rights template={f.rights} year={year} brand={site.name} />
           </p>
-          <Button variant="ghost" size="sm" onClick={backToTop} className="-ms-4 h-11 sm:ms-0 sm:-me-4 sm:h-9">
+          <Button variant="ghost" size="sm" onClick={backToTop} className="-ms-4 h-11 sm:ms-0 sm:-me-4">
             {t.common.actions.backToTop}
             <ArrowUp aria-hidden strokeWidth={1.5} className="size-4" />
           </Button>

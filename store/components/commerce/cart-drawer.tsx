@@ -205,7 +205,8 @@ export function CartDrawer() {
       void loadOrderValidator();
       return;
     }
-    // If the validator could not load at all, let the order through rather than block it.
+    // The validator's chunk failed to load: the essentials were checked without it (useCheckout); try it again for next time.
+    if (checkout.validation === "failed") void loadOrderValidator();
     if (firstLineError !== undefined || checkout.orderError) {
       e.preventDefault();
       playSound("tap");
@@ -272,7 +273,12 @@ export function CartDrawer() {
               <CartSummary
                 totals={totals}
                 disabled={empty}
-                error={showLineErrors && checkout.orderError ? t.common.errors[checkout.orderError] : undefined}
+                // Too long to send is known from the pieces alone: say so before any details are typed.
+                error={
+                  (showLineErrors || checkout.orderTooLong) && checkout.orderError
+                    ? t.common.errors[checkout.orderError]
+                    : undefined
+                }
                 onContinue={onContinue}
               />
             ) : (

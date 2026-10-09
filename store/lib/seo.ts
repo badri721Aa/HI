@@ -36,9 +36,10 @@ export function languageAlternates(path = "") {
 const OG_SIZE = { width: 1200, height: 630 } as const;
 
 /**
- * The share card of a page, with alt text in the page's language. Setting it
- * here (rather than through the image file's static `alt` export, which has
- * one language) wins over the file convention; twitter:image inherits it.
+ * The share card of a page, with alt text in the page's language (the image
+ * file's static `alt` export has one language); twitter:image inherits it.
+ * Next lets an opengraph-image file override inherited images on its own
+ * segment's page, so a page beside one must set its images itself.
  */
 function ogImages(path: string, alt: string) {
   return [{ url: path, ...OG_SIZE, alt, type: "image/png" }];
@@ -61,23 +62,31 @@ export const siteViewport: Viewport = {
   viewportFit: "cover",
 };
 
-/** Root-layout metadata. OG/Twitter images come from the opengraph-image files. */
+const homeTitle = (locale: Locale) => `${site.name} — ${getDictionary(locale).site.meta.title}`;
+
+/** Open Graph for the home page, which is also the default for pages that set none. */
+function homeOpenGraph(locale: Locale): NonNullable<Metadata["openGraph"]> {
+  const meta = getDictionary(locale).site.meta;
+  return {
+    ...openGraphBase(locale),
+    url: `/${locale}`,
+    title: homeTitle(locale),
+    description: meta.description,
+    images: ogImages(`/${locale}/opengraph-image`, meta.ogAlt),
+  };
+}
+
+/** Root-layout metadata. Pages with their own share card replace its Open Graph. */
 export function layoutMetadata(locale: Locale): Metadata {
   const meta = getDictionary(locale).site.meta;
-  const title = `${site.name} — ${meta.title}`;
+  const title = homeTitle(locale);
   return {
     metadataBase: new URL(site.url),
     title: { default: title, template: `%s · ${site.name}` },
     description: meta.description,
     applicationName: site.name,
     alternates: { canonical: `/${locale}`, languages: languageAlternates() },
-    openGraph: {
-      ...openGraphBase(locale),
-      url: `/${locale}`,
-      title,
-      description: meta.description,
-      images: ogImages(`/${locale}/opengraph-image`, meta.ogAlt),
-    },
+    openGraph: homeOpenGraph(locale),
     twitter: { card: "summary_large_image" },
     appleWebApp: { capable: true, title: site.name, statusBarStyle: "black-translucent" },
     formatDetection: { telephone: false },
@@ -88,6 +97,14 @@ export function layoutMetadata(locale: Locale): Metadata {
     },
     category: "shopping",
   };
+}
+
+/**
+ * Home page metadata. app/[lang]/opengraph-image.tsx sits beside the page, so
+ * without this the file's card (no alt) replaces the layout's localized one.
+ */
+export function homeMetadata(locale: Locale): Metadata {
+  return { openGraph: homeOpenGraph(locale) };
 }
 
 /**

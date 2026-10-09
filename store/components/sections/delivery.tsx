@@ -172,8 +172,9 @@ function RegionCard({ region }: { region: Region }) {
                   <span className="truncate text-sm text-fg-muted transition-colors group-hover/line:text-fg">
                     {line.label[locale]}
                   </span>
-                  <span className="tabular ms-auto shrink-0 font-mono text-sm text-fg" dir="ltr">
-                    {line.display}
+                  {/* ms-auto resolves against the element's own direction, so the number's LTR isolation lives inside it. */}
+                  <span className="ms-auto shrink-0 font-mono text-sm tabular text-fg">
+                    <bdi dir="ltr">{line.display}</bdi>
                   </span>
                   <ArrowUpRight
                     aria-hidden

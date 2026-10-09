@@ -1,6 +1,7 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
-import { organizationJsonLd } from "@/lib/seo";
+import { homeMetadata, organizationJsonLd } from "@/lib/seo";
 import { JsonLd } from "@/components/seo/json-ld";
 import { Hero } from "@/components/sections/hero";
 import { Collection } from "@/components/sections/collection";
@@ -10,6 +11,12 @@ import { CustomPrint } from "@/components/sections/custom-print";
 import { Delivery } from "@/components/sections/delivery";
 import { Reviews } from "@/components/sections/reviews";
 import { Faq } from "@/components/sections/faq";
+
+// Sets the share card with its localized alt; the opengraph-image file beside this page would otherwise replace it.
+export async function generateMetadata({ params }: PageProps<"/[lang]">): Promise<Metadata> {
+  const { lang } = await params;
+  return isLocale(lang) ? homeMetadata(lang) : {};
+}
 
 export default async function HomePage({ params }: PageProps<"/[lang]">) {
   const { lang } = await params;

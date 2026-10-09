@@ -11,6 +11,7 @@ import {
   createHotHaloMaterial,
   createPrintDepthMaterial,
   createPrintMaterial,
+  hotRamp,
   setPrintClip,
   setPrintPattern,
   syncPrintColors,
@@ -247,11 +248,11 @@ export function ProductMesh({
       syncPrintColors(m);
     }
 
-    // Print progress (object space; the hot band rides just under it).
+    // Print progress (object space; the hot band rides just under it, and comes up over the first millimetres).
     const frac = clip ? clip.get() : clipHeight;
     const clipping = frac !== null && frac !== undefined && Number.isFinite(frac) && frac < 1;
     setPrintClip(m, frac, info.height);
-    const heat = Math.max(read(hot), 0);
+    const heat = Math.max(read(hot), 0) * (clipping ? hotRamp((frac as number) * info.height) : 1);
     u.uHotIntensity.value = HOT_INTENSITY * heat;
     const haloOn = clipping ? Math.min(heat, 1) : 0;
     r.halo.uniforms.uHaloStrength.value = HALO_STRENGTH * haloOn;

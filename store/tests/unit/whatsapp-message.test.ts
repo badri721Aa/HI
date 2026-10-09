@@ -14,6 +14,7 @@ import {
   createOrderRef,
   generateWhatsAppLink,
   isWithinUrlLimit,
+  orderLinkOverflow,
   resolveLine,
   type CustomRequestInput,
 } from "@/lib/whatsapp";
@@ -428,6 +429,47 @@ describe("buildOrderLink (compact receipt)", () => {
     const link = buildOrderLink(phone, input(lines, customer, "ar"));
     expect(link).toMatchObject({ compact: true, fits: false });
     expect(textOf(link.href)).toBe(link.message);
+  });
+
+  describe("orderLinkOverflow", () => {
+    /** n phone cases with 40-character Arabic models, quantity 20: the longest lines the cart allows. */
+    const longLines = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ ...phoneCase, qty: MAX_QTY, note: `${i} ${"ب".repeat(LIMITS.note)}`.slice(0, LIMITS.note) }));
+    const shortDetails: Customer = { name: "فاطمة علي", city: "riffa" };
+
+    /** The most lines that still fit with these details. */
+    function mostThatFit(customer: Customer) {
+      let n = 1;
+      while (n < MAX_LINES && buildOrderLink(phone, input(longLines(n + 1), customer, "ar")).fits) n++;
+      return n;
+    }
+
+    it("is null when the link fits", () => {
+      expect(orderLinkOverflow(phone, input([clicker, phoneCase], fatima))).toBeNull();
+      expect(orderLinkOverflow(phone, input(longLines(MAX_LINES), fatima, "en"))).toBeNull();
+    });
+
+    it("blames the notes only when shorter notes would make it fit", () => {
+      const n = mostThatFit(shortDetails);
+      const customer = { ...shortDetails, notes: "ب".repeat(LIMITS.notes) };
+      expect(buildOrderLink(phone, input(longLines(n), customer, "ar")).fits).toBe(false);
+      expect(orderLinkOverflow(phone, input(longLines(n), customer, "ar"))).toBe("notes");
+    });
+
+    it("says 'pieces' when no details could make it fit, as with a full Arabic cart of long models", () => {
+      const lines = longLines(MAX_LINES);
+      expect(buildOrderLink(phone, input(lines, { name: "", city: "" }, "ar")).fits).toBe(false);
+      expect(orderLinkOverflow(phone, input(lines, shortDetails, "ar"))).toBe("pieces");
+      expect(orderLinkOverflow(phone, input(lines, { ...shortDetails, notes: "ب" }, "ar"))).toBe("pieces");
+    });
+
+    it("says 'details' when the pieces fit on their own but not with what was typed", () => {
+      const n = mostThatFit({ name: "", city: "" });
+      const long: Customer = { name: "ب".repeat(LIMITS.name), city: "other-bh", area: "ب".repeat(LIMITS.area) };
+      const lines = longLines(n);
+      expect(buildOrderLink(phone, input(lines, long, "ar")).fits).toBe(false);
+      expect(orderLinkOverflow(phone, input(lines, long, "ar"))).toBe("details");
+    });
   });
 });
 

@@ -40,16 +40,45 @@ export function getLenis(): Lenis | null {
   return scrollDriver.lenis;
 }
 
+const prefersReduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Room the fixed header takes at the top of the viewport: the html's
+ * scroll-padding-top (globals.css), which native focus and fragment
+ * scrolling already honour, so anchors land where Tab would put them.
+ */
+export function headerOffset(): number {
+  const padding = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop);
+  return Number.isFinite(padding) ? padding : 72;
+}
+
+/** Page offset that puts `el` just below the fixed header. A number, so Lenis doesn't add the scroll padding again. */
+export function anchorTop(el: Element): number {
+  return el.getBoundingClientRect().top + window.scrollY - headerOffset();
+}
+
+/** Instantly puts the page at `y`, keeping Lenis in step. */
+export function jumpToY(y: number) {
+  scrollDriver.lenis?.scrollTo(y, { immediate: true, force: true });
+  // Lenis skips a target it already holds, even when the page has moved under it; its native scroll handler then catches up.
+  if (Math.abs(window.scrollY - y) >= 1) window.scrollTo({ top: y, behavior: "instant" });
+}
+
 /** Smooth-scrolls to a section id (without "#"), accounting for the fixed header. */
 export function scrollToId(id: string) {
   const target = document.getElementById(id);
   if (!target) return;
-  const offset = -72;
+  const top = anchorTop(target);
   const lenis = scrollDriver.lenis;
-  if (lenis) lenis.scrollTo(target, { offset, duration: 1.2 });
-  else {
-    // No Lenis means reduced motion (or not mounted yet): honour it, JS "smooth" ignores the CSS override.
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY + offset, behavior: reduced ? "instant" : "smooth" });
-  }
+  if (lenis) lenis.scrollTo(top, { duration: 1.2 });
+  // No Lenis means reduced motion (or not mounted yet): honour it, JS "smooth" ignores the CSS override.
+  else window.scrollTo({ top, behavior: prefersReduced() ? "instant" : "smooth" });
+}
+
+/** Scrolls to the top of the page: smooth by default, instant with reduced motion or `immediate`. */
+export function scrollToTop({ immediate = false }: { immediate?: boolean } = {}) {
+  const instant = immediate || prefersReduced();
+  const lenis = scrollDriver.lenis;
+  if (lenis) lenis.scrollTo(0, { immediate: instant, force: true, duration: 1.2 });
+  else window.scrollTo({ top: 0, behavior: instant ? "instant" : "smooth" });
 }

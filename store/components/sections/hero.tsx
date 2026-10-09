@@ -1,9 +1,9 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { Fragment, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowDown } from "lucide-react";
+import { HeroPrint } from "@/components/3d/hero-print";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { ButtonLink } from "@/components/ui/button";
 import { Magnetic } from "@/components/motion/magnetic";
@@ -12,9 +12,6 @@ import { SplitText } from "@/components/motion/split-text";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { HeroHud } from "./hero-hud";
-
-/* three.js only loads on the client, after the page is interactive. */
-const HeroPrint = dynamic(() => import("@/components/3d/hero-print").then((m) => m.HeroPrint), { ssr: false });
 
 /*
  * The only gradient text on the site: a vertical fg → silver sheen on the
@@ -36,7 +33,11 @@ export function Hero() {
   const hud = useRef<HTMLDivElement>(null);
 
   return (
-    <section id="top" aria-labelledby="hero-title" className="relative flex min-h-[100svh] flex-col pt-[72px]">
+    <section
+      id="top"
+      aria-labelledby="hero-title"
+      className="relative flex min-h-[100svh] flex-col pt-[calc(72px+env(safe-area-inset-top))]"
+    >
       <Backdrop />
 
       <div className="shell relative flex flex-1 flex-col justify-center pb-14 pt-4 md:pt-8 lg:pb-24 lg:pt-6">
@@ -111,6 +112,7 @@ export function Hero() {
             itself clear of the readout.
           */}
           <div className="relative order-first lg:order-none lg:col-span-6 lg:col-start-7 lg:row-start-1">
+            {/* HeroPrint is three.js-free (its scene loads on demand), so its faint placeholder is in the server HTML. */}
             <div aria-hidden data-scene="" className="relative h-[34svh] min-h-60 md:h-[40svh] lg:h-[min(78vh,760px)]">
               <HeroPrint className="size-full" avoid={hud} />
             </div>

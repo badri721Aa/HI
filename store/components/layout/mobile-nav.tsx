@@ -18,17 +18,25 @@ import { LangSwitch } from "./lang-switch";
 
 export const MOBILE_NAV_ID = "mobile-nav";
 
+/**
+ * Widths at which the header's inline section links replace this menu (lg; xl on /ar, whose Tajawal
+ * labels at the larger root size need about 60px more than a 1024px row has). Mirrors the `lg:` and
+ * `rtl:xl:` classes on the nav and the menu button in site-header.tsx.
+ */
+export const INLINE_NAV_QUERY = { ltr: "(min-width: 64rem)", rtl: "(min-width: 80rem)" } as const;
+
 const EASE = [0.16, 1, 0.3, 1] as const;
 const LINES = Object.values(WHATSAPP_LINES);
 
 /**
- * Menu for small screens, built on the shared Drawer (a bottom sheet on
- * phones): large section links, region and language, and the three WhatsApp
- * lines. Back closes it. Section links close the menu; SmoothScroll then
- * scrolls once the drawer has released the page.
+ * Menu for screens too narrow for the header's section links, built on the
+ * shared Drawer (a bottom sheet on phones): large section links, region and
+ * language, and the three WhatsApp lines. Back closes it. Section links
+ * close the menu; SmoothScroll then scrolls once the drawer has released
+ * the page.
  */
 export function MobileNav({ activeId, langHash }: { activeId?: string | null; langHash?: string }) {
-  const { locale, t } = useI18n();
+  const { locale, dir, t } = useI18n();
   const open = useUI((s) => s.navOpen);
   const setNavOpen = useUI((s) => s.setNavOpen);
   const reduced = useReducedMotion();
@@ -38,16 +46,16 @@ export function MobileNav({ activeId, langHash }: { activeId?: string | null; la
     playSound("close");
   };
 
-  // The menu only exists below lg; close it if the window grows past that.
+  // The menu only exists while the header has no inline links; close it if the window grows past that.
   useEffect(() => {
     if (!open) return;
-    const mq = window.matchMedia("(min-width: 64rem)");
+    const mq = window.matchMedia(INLINE_NAV_QUERY[dir]);
     const onChange = () => {
       if (mq.matches) setNavOpen(false);
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [open, setNavOpen]);
+  }, [open, setNavOpen, dir]);
 
   const enter = (i: number) =>
     reduced

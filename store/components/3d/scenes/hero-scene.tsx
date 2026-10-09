@@ -180,14 +180,17 @@ function HeroContent({
   rtl,
   pointer,
   zone,
+  onDrawn,
 }: {
   api: SceneViewApi;
   reduced: boolean;
   rtl: boolean;
   pointer: Pointer;
   zone: RefObject<HudZone>;
+  onDrawn?: () => void;
 }) {
   const camera = useRef<THREE.PerspectiveCamera>(null);
+  const frames = useRef(0);
   const vase = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
   const sim = useRef<Sim>({
@@ -229,6 +232,8 @@ function HeroContent({
     const cam = camera.current;
     if (!api.active.current || !cam) return;
     const dt = Math.min(delta, 1 / 20);
+    // Reported on the second frame: the first one compiles the shaders and may take a while to show.
+    if (frames.current < 2 && ++frames.current === 2) onDrawn?.();
 
     // Timeline.
     let turn = s.turn;
@@ -370,16 +375,19 @@ function HeroContent({
  * DOM side: the tracked box, pointer input and the HUD's footprint.
  * `avoid` is an element overlaid on the box's bottom-start corner (the HUD,
  * absolutely positioned in the same container as the box) that the
- * composition must keep clear of.
+ * composition must keep clear of. `onDrawn` fires once, when the scene has
+ * a frame on screen.
  */
 export function HeroScene({
   className,
   reduced,
   avoid,
+  onDrawn,
 }: {
   className?: string;
   reduced: boolean;
   avoid?: RefObject<HTMLElement | null>;
+  onDrawn?: () => void;
 }) {
   const { dir } = useI18n();
   const rtl = dir === "rtl";
@@ -416,7 +424,7 @@ export function HeroScene({
 
   return (
     <SceneView className={className}>
-      {(api) => <HeroContent api={api} reduced={reduced} rtl={rtl} pointer={pointer} zone={zone} />}
+      {(api) => <HeroContent api={api} reduced={reduced} rtl={rtl} pointer={pointer} zone={zone} onDrawn={onDrawn} />}
     </SceneView>
   );
 }

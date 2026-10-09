@@ -17,14 +17,15 @@ const INDEX = hasReviews ? "07" : "06";
 /*
  * Native <details>/<summary>: works without JavaScript and with every assistive
  * technology. Where the browser supports ::details-content and
- * interpolate-size, the answer also eases open; elsewhere it simply appears.
+ * interpolate-size, the answer also eases open; elsewhere, and under reduced
+ * motion, it simply appears.
  */
 const DETAILS =
   "group border-b border-line [interpolate-size:allow-keywords] " +
   "[&::details-content]:h-0 [&::details-content]:overflow-clip " +
   "[&::details-content]:transition-[height,content-visibility] [&::details-content]:duration-500 " +
   "[&::details-content]:ease-out-expo [&::details-content]:[transition-behavior:allow-discrete] " +
-  "open:[&::details-content]:h-auto";
+  "motion-reduce:[&::details-content]:transition-none open:[&::details-content]:h-auto";
 
 export function Faq() {
   const { t, locale } = useI18n();

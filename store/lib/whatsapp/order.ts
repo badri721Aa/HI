@@ -27,6 +27,7 @@ export type OrderErrorKey =
   | "area_required"
   | "area_too_long"
   | "notes_too_long"
+  | "notes_too_long_for_link"
   | "spam";
 
 /** Strips control characters, trims, and collapses runs of blank lines. */
@@ -76,6 +77,27 @@ export interface PricedOrder {
   lines: PricedLine[];
   subtotal: number;
   itemCount: number;
+}
+
+/**
+ * The checks no order may skip, without zod: used only when the full
+ * validator (./schema, loaded on demand) could not be loaded, so a failed
+ * chunk never lets a blank order through. Keys and paths match validateOrder.
+ */
+export function checkOrderEssentials({ region, lines, customer }: OrderInput): ValidationResult {
+  const errors: Record<string, OrderErrorKey> = {};
+  if (lines.length === 0) errors.lines = "cart_empty";
+  lines.forEach((line, i) => {
+    if (getProduct(line.slug)?.variantNote?.required && !line.note?.trim()) errors[`lines.${i}.note`] = "note_required";
+  });
+  // Measured as the message prints it, so a name of only control characters counts as empty.
+  const name = sanitizeText(customer.name, LIMITS.name).length;
+  if (name === 0) errors["customer.name"] = "name_required";
+  else if (name < 2) errors["customer.name"] = "name_too_short";
+  const city = customer.city?.trim() ?? "";
+  if (!REGION_CONFIG[region]?.cities.some((c) => c.id === city)) errors["customer.city"] = "city_required";
+  else if (isOtherCity(city) && !sanitizeText(customer.area, LIMITS.area)) errors["customer.area"] = "area_required";
+  return { ok: Object.keys(errors).length === 0, errors };
 }
 
 /** Prices order lines in the region's currency, skipping lines that no longer exist in the catalog. */

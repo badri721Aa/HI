@@ -5,7 +5,7 @@ import { LOCALES, isLocale } from "@/lib/i18n";
 import { OgCard, ogFonts } from "@/components/seo/og-card";
 import { homeCard } from "@/components/seo/og-content";
 
-// Alt text is set per language with the page metadata (ogImages in lib/seo.ts).
+// Alt text is set per language by the home page metadata (homeMetadata in lib/seo.ts).
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

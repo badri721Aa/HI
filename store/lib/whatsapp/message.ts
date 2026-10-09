@@ -181,6 +181,23 @@ export function buildOrderLink(phone: string, input: Omit<OrderMessageInput, "co
   return { message, href, compact: true, fits: isWithinUrlLimit(href) };
 }
 
+/**
+ * Why an order's link is past the URL limit, or null when it fits:
+ * - "notes": the same order with shorter notes would fit;
+ * - "details": it would fit without the customer's details, so shorter ones (or fewer pieces) may do;
+ * - "pieces": the pieces alone are too long, whatever is typed: only splitting the order helps.
+ */
+export type OrderLinkOverflow = "notes" | "details" | "pieces";
+
+const NO_DETAILS: Customer = { name: "", phone: "", city: "", area: "", notes: "" };
+
+export function orderLinkOverflow(phone: string, input: Omit<OrderMessageInput, "compact">): OrderLinkOverflow | null {
+  const fits = (customer: Customer) => buildOrderLink(phone, { ...input, customer }).fits;
+  if (fits(input.customer)) return null;
+  if (input.customer.notes?.trim() && fits({ ...input.customer, notes: "" })) return "notes";
+  return fits(NO_DETAILS) ? "details" : "pieces";
+}
+
 export interface CustomRequestInput {
   ref: string;
   region: Region;

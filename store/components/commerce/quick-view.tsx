@@ -16,8 +16,8 @@ import { ProductGallery } from "./product-gallery";
  * The quick-view drawer (a bottom sheet on phones), driven by
  * useUI().quickView (a product slug). Photos, then the full ProductDetails
  * (the drawer title is the product name, so details start with the tagline)
- * with its quantity and "Add to order" pinned in the drawer's sticky footer,
- * then a link to the product page. Back closes it. Remounts its content per
+ * with its price, quantity and "Add to order" pinned in the drawer's sticky
+ * footer, then a link to the product page. Back closes it. Remounts its content per
  * product so picks and quantities never leak from one piece to the next, and
  * keeps showing the last product while the drawer slides out.
  */

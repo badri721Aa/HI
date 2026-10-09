@@ -47,7 +47,7 @@ export const commerce = defineMessages({
       emptyBody: "Add a piece from the collection, or send us an idea for a custom print.",
       subtotal: "Subtotal",
       delivery: "Delivery fee",
-      deliveryChat: "Confirmed in chat",
+      deliveryChat: "To be confirmed in the chat",
       vat: "VAT {n}%",
       total: "Total",
       continue: "Continue to delivery details",

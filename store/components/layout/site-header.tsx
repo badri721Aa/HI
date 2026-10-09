@@ -59,6 +59,10 @@ function MenuIcon({ className }: { className?: string }) {
  * on large screens with an underline that follows the section in view; region,
  * language, sound and the order button at the end. Small screens get the
  * logo, the order button and a menu.
+ *
+ * Arabic keeps the menu up to xl: its labels (Tajawal at the 106.25% root
+ * size) and controls need about 1000px beside the logo, more than a 1024px
+ * row has once the gutters are taken (see INLINE_NAV_QUERY).
  */
 export function SiteHeader() {
   const { locale, t } = useI18n();
@@ -121,12 +125,12 @@ export function SiteHeader() {
         <Link
           href={`/${locale}`}
           onClick={onLogoClick}
-          className="-ms-2 inline-flex h-11 items-center rounded-full px-2 lg:justify-self-start"
+          className="-ms-2 inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-full px-2 lg:justify-self-start"
         >
           <Logo />
         </Link>
 
-        <nav aria-label={t.common.menu.sections} className="hidden lg:block">
+        <nav aria-label={t.common.menu.sections} className="hidden lg:block rtl:lg:hidden rtl:xl:block">
           <LayoutGroup id="site-header-nav">
             <ul className="flex items-center">
               {NAV_ITEMS.map((item) => {
@@ -137,7 +141,7 @@ export function SiteHeader() {
                       href={sectionHref(locale, item.id)}
                       aria-current={current ? "true" : undefined}
                       className={cn(
-                        "relative inline-flex h-10 items-center whitespace-nowrap px-3 text-[0.8125rem] font-medium tracking-[-0.005em] transition-colors duration-300 xl:px-3.5",
+                        "relative inline-flex h-10 items-center whitespace-nowrap px-2.5 text-[0.8125rem] font-medium tracking-[-0.005em] transition-colors duration-300 xl:px-3.5",
                         current ? "text-fg" : "text-fg-muted hover:text-fg",
                       )}
                     >
@@ -153,7 +157,7 @@ export function SiteHeader() {
                               ? { duration: 0 }
                               : { layout: { type: "spring", stiffness: 380, damping: 34 }, opacity: { duration: 0.3 } }
                           }
-                          className="absolute inset-x-3 bottom-1 h-px bg-glow xl:inset-x-3.5"
+                          className="absolute inset-x-2.5 bottom-1 h-px bg-glow xl:inset-x-3.5"
                         />
                       ) : null}
                     </Link>
@@ -164,7 +168,8 @@ export function SiteHeader() {
           </LayoutGroup>
         </nav>
 
-        <div className="flex items-center justify-end gap-1 lg:justify-self-end">
+        {/* Column 3 even when the nav is hidden (Arabic below xl), so the cluster never lands in the middle. */}
+        <div className="flex items-center justify-end gap-1 lg:col-start-3 lg:justify-self-end">
           {/* Unmounted while the menu is open so its own copies are the only ones in the DOM. */}
           {navOpen ? null : (
             <>
@@ -174,7 +179,7 @@ export function SiteHeader() {
           )}
           <SoundToggle className="hidden lg:inline-flex" />
           <span aria-hidden className="mx-1.5 hidden h-4 w-px bg-line-strong lg:block" />
-          <CartButton className="lg:-me-2" />
+          <CartButton className="lg:-me-2 rtl:lg:me-0 rtl:xl:-me-2" />
           <button
             type="button"
             data-testid="menu-button"
@@ -186,7 +191,7 @@ export function SiteHeader() {
               setNavOpen(true);
               playSound("open");
             }}
-            className="-me-2 inline-flex size-11 items-center justify-center rounded-full text-fg transition-colors duration-300 hover:bg-white/[0.05] lg:hidden"
+            className="-me-2 inline-flex size-11 items-center justify-center rounded-full text-fg transition-colors duration-300 hover:bg-white/[0.05] lg:hidden rtl:lg:inline-flex rtl:xl:hidden"
           >
             <MenuIcon className="size-5 rtl:-scale-x-100" />
           </button>

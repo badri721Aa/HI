@@ -82,6 +82,9 @@ html[lang="ar"] * {
     background: var(--color-ink-950);
     /* Opening a drawer hides the scrollbar; keep its gutter so the page and header don't shift. */
     scrollbar-gutter: stable;
+    /* Keeps focused controls, anchors and scrollIntoView clear of the fixed header (h-18 at rest, h-15
+       scrolled, below the status bar), with room for the focus ring. lib/scroll reads it for its anchors. */
+    scroll-padding-top: calc(4.5rem + env(safe-area-inset-top));
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
   }
@@ -234,5 +237,9 @@ html[lang="ar"] * {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* Its own rule: a browser without ::details-content would drop the whole list above. (FAQ answers.) */
+  ::details-content {
+    transition-duration: 0.01ms !important;
   }
 }

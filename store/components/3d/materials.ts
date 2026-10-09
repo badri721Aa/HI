@@ -105,6 +105,21 @@ const POINTER_TILT = 0.176;
 const DRIFT_BAND = 2.4 * MM;
 const GRAIN_CELL = 1.2 * MM;
 
+/** Printed height over which the hot band and its halo come up to full strength (model units). */
+export const HOT_RAMP = 8 * MM;
+
+/**
+ * 0–1 strength of the hot band once `printed` model units have been laid
+ * (smoothstep over HOT_RAMP). The first millimetres of a piece are its
+ * solid floor, all of it inside the band, so at full strength the whole
+ * disc would burn white on every loop restart; ramping in leaves the glow
+ * to the rising wall.
+ */
+export function hotRamp(printed: number): number {
+  const x = Math.min(Math.max(printed / HOT_RAMP, 0), 1);
+  return x * x * (3 - 2 * x);
+}
+
 /** Visual layer spacing in model units: clamp(layerHeight × 3, 0.45 mm, 1.2 mm). */
 export function layerSpacing(layerHeight: number): number {
   return Math.min(Math.max(layerHeight * 3, 0.45), 1.2) * MM;
@@ -497,10 +512,13 @@ export function createPrintDepthMaterial(source: PrintMaterial): THREE.MeshDepth
 const HALO_VERT = /* glsl */ `
 uniform float uHaloGrow;
 varying float vHaloY;
+varying float vHaloWall;
 varying vec3 vHaloNormal;
 varying vec3 vHaloView;
 void main() {
   vHaloY = position.y;
+  // Walls only: a floor or ledge seen from above would otherwise wash over with cyan.
+  vHaloWall = 1.0 - smoothstep( 0.72, 0.96, abs( normal.y ) );
   vec4 mv = modelViewMatrix * vec4( position + normal * uHaloGrow, 1.0 );
   vHaloNormal = normalize( normalMatrix * normal );
   vHaloView = - mv.xyz;
@@ -514,6 +532,7 @@ uniform vec3 uHotColor;
 uniform float uHaloWidth;
 uniform float uHaloStrength;
 varying float vHaloY;
+varying float vHaloWall;
 varying vec3 vHaloNormal;
 varying vec3 vHaloView;
 void main() {
@@ -521,7 +540,7 @@ void main() {
   float d = ( vHaloY - uClipY ) / uHaloWidth;
   float band = exp( - d * d );
   float rim = 1.0 - abs( dot( normalize( vHaloNormal ), normalize( vHaloView ) ) );
-  float a = band * ( 0.3 + 0.7 * rim * rim ) * uHaloStrength;
+  float a = band * ( 0.3 + 0.7 * rim * rim ) * vHaloWall * uHaloStrength;
   if ( a < 0.002 ) discard;
   gl_FragColor = vec4( uHotColor, a );
   #include <colorspace_fragment>
@@ -534,7 +553,7 @@ export type HaloMaterial = THREE.ShaderMaterial & { uniforms: { uHaloStrength: {
  * A cheap bloom stand-in for the hot band: the piece's own geometry, pushed
  * out a little along its normals and drawn additively in the hot colour,
  * fading away above and below the cut and brightest towards the silhouette
- * (a fresnel shell). Shares uClipY and uHotColor with `source`; drive
+ * (a fresnel shell), on walls only. Shares uClipY and uHotColor with `source`; drive
  * uHaloStrength (0 = off) per frame and hide the mesh when it is 0.
  */
 export function createHotHaloMaterial(source: PrintMaterial): HaloMaterial {

@@ -19,8 +19,8 @@ import { AnimatePresence, animate, motion, useDragControls, useMotionValue, type
 import { X } from "lucide-react";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
-import { releaseBackEntry, useCloseOnBack } from "@/lib/hooks/use-close-on-back";
-import { lockScroll, unlockScroll } from "@/lib/scroll";
+import { afterClose, releaseBackEntry, useCloseOnBack } from "@/lib/hooks/use-close-on-back";
+import { lockScroll, scrollToTop, unlockScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 
 const FOCUSABLE =
@@ -44,12 +44,35 @@ function subscribeSheet(cb: () => void) {
   return () => mq.removeEventListener("change", cb);
 }
 
-function useSheetLayout() {
+/** True below `sm`, where drawers open as bottom sheets. */
+export function useSheetLayout() {
   return useSyncExternalStore(
     subscribeSheet,
     () => window.matchMedia(SHEET_QUERY).matches,
     () => false,
   );
+}
+
+/** Height of the open bottom sheet's pinned footer (0 when there is none or no sheet is open). */
+let sheetFooter = 0;
+const sheetFooterListeners = new Set<() => void>();
+
+function setSheetFooter(height: number) {
+  if (height === sheetFooter) return;
+  sheetFooter = height;
+  sheetFooterListeners.forEach((cb) => cb());
+}
+
+function subscribeSheetFooter(cb: () => void) {
+  sheetFooterListeners.add(cb);
+  return () => {
+    sheetFooterListeners.delete(cb);
+  };
+}
+
+/** The open bottom sheet's footer height, so toasts can sit just above it, clear of the sheet's header. */
+export function useSheetFooterHeight() {
+  return useSyncExternalStore(subscribeSheetFooter, () => sheetFooter, () => 0);
 }
 
 /** The open drawer's footer slot for <DrawerFooter>; `undefined` outside a drawer. */
@@ -105,6 +128,7 @@ export function Drawer({
   const sheet = useSheetLayout();
   const reduced = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const titleId = useId();
   const descId = useId();
@@ -155,6 +179,19 @@ export function Drawer({
     };
   }, [open]);
 
+  useEffect(() => {
+    const area = footerRef.current;
+    if (!open || !sheet || !area) return;
+    const measure = () => setSheetFooter(area.offsetHeight);
+    const observer = new ResizeObserver(measure);
+    observer.observe(area);
+    measure();
+    return () => {
+      observer.disconnect();
+      setSheetFooter(0);
+    };
+  }, [open, sheet, mounted]);
+
   if (!mounted) return null;
 
   const fromRight = (side === "end") === (dir === "ltr");
@@ -195,11 +232,13 @@ export function Drawer({
   };
 
   /*
-   * With a history entry of our own, following a link must not step back over
-   * it. A link to another page replaces the entry rather than stacking on top
-   * of it, so Back returns to the page the drawer was opened on. In-page
-   * anchors (SmoothScroll) and links to the other language (a new document)
-   * keep their own handling.
+   * With a history entry of our own, a link must not leave that entry behind
+   * as a dead Back step. A link to another page replaces it, so Back returns
+   * to the page the drawer was opened on; so does the other language, a new
+   * document. A link to this very page just closes (stepping back over the
+   * entry) and goes to the top. In-page anchors, which SmoothScroll has taken
+   * by now, keep the entry as their own step, like a native anchor jump.
+   * The link's own click handler still runs (closing the drawer, sounds).
    */
   const onLinkCapture = (e: ReactMouseEvent) => {
     if (!closeOnBack || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -209,10 +248,21 @@ export function Drawer({
     }
     const url = new URL(anchor.href);
     if (url.origin !== window.location.origin) return;
-    releaseBackEntry();
-    const samePage = url.pathname === window.location.pathname && url.search === window.location.search;
-    if (e.defaultPrevented || samePage || anchor.hreflang) return;
+    if (e.defaultPrevented) return releaseBackEntry();
     e.preventDefault();
+    if (anchor.hreflang) {
+      releaseBackEntry();
+      const href = anchor.href;
+      // A task later, after the link's own handler (it closes the menu and stores the language).
+      window.setTimeout(() => window.location.replace(href));
+      return;
+    }
+    if (url.pathname === window.location.pathname && url.search === window.location.search && !url.hash) {
+      afterClose(() => scrollToTop());
+      onClose();
+      return;
+    }
+    releaseBackEntry();
     router.replace(url.pathname + url.search + url.hash);
   };
 
@@ -305,8 +355,11 @@ export function Drawer({
             >
               <FooterSlot.Provider value={slot}>{children}</FooterSlot.Provider>
             </div>
-            {footer ? <div className={FOOTER}>{footer}</div> : null}
-            <div ref={setSlot} className={cn(FOOTER, "empty:hidden")} />
+            {/* Measured on phones: toasts sit just above it. */}
+            <div ref={footerRef} className="shrink-0">
+              {footer ? <div className={FOOTER}>{footer}</div> : null}
+              <div ref={setSlot} className={cn(FOOTER, "empty:hidden")} />
+            </div>
           </motion.div>
         </div>
       ) : null}

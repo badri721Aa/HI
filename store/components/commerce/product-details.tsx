@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Check } from "lucide-react";
-import type { Product } from "@/types";
+import type { Locale, OrderLine, Product } from "@/types";
 import { MATERIALS } from "@/content/catalog";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { defaultVariant } from "@/lib/product";
 import { generateWhatsAppLink, resolveLine } from "@/lib/whatsapp/link";
 import { LIMITS, MAX_LINES, MAX_QTY, sanitizeText } from "@/lib/whatsapp/order";
+import { variantLabel } from "@/lib/whatsapp/variant";
 import { site } from "@/lib/site";
 import { fmt } from "@/lib/i18n";
 import { playSound } from "@/lib/sound";
@@ -40,6 +41,15 @@ function Row({ label, children, className }: { label: string; children: ReactNod
       <span className="min-w-0 text-end text-sm text-fg">{children}</span>
     </div>
   );
+}
+
+/**
+ * "Hex Phone Case — Fitted to your iPhone · Sky blue · iPhone 15 Pro": a line
+ * named the way the cart lists it (variantLabel leaves out a lone "One size").
+ */
+export function lineSummary(product: Product, line: OrderLine, locale: Locale): string {
+  const variant = variantLabel(product, line, locale);
+  return [`${product.name[locale]}${variant ? ` — ${variant}` : ""}`, line.note].filter(Boolean).join(" · ");
 }
 
 /**
@@ -89,7 +99,8 @@ export function useAddToOrder(product: Product, controlled: { colorId?: string; 
       return null;
     }
     const cleanNote = noteSpec ? sanitizeText(note, LIMITS.note) : "";
-    const result = addLine({ slug: product.slug, colorId: color.id, sizeId: size.id, qty, ...(cleanNote ? { note: cleanNote } : {}) });
+    const line: OrderLine = { slug: product.slug, colorId: color.id, sizeId: size.id, qty, ...(cleanNote ? { note: cleanNote } : {}) };
+    const result = addLine(line);
     if (result === "full") {
       toast({ title: copy.fullTitle, body: fmt(copy.fullBody, { max: MAX_LINES }) });
       return result;
@@ -100,11 +111,7 @@ export function useAddToOrder(product: Product, controlled: { colorId?: string; 
       return result;
     }
     playSound("add");
-    const comma = locale === "ar" ? "، " : ", ";
-    toast({
-      title: copy.addedTitle,
-      body: `${product.name[locale]} — ${size.name[locale]}${comma}${color.name[locale]}${cleanNote ? ` · ${cleanNote}` : ""}`,
-    });
+    toast({ title: copy.addedTitle, body: lineSummary(product, line, locale) });
     setAdded(true);
     window.clearTimeout(addedTimer.current);
     addedTimer.current = window.setTimeout(() => setAdded(false), ADDED_MS);
@@ -185,10 +192,11 @@ export function AddToOrderBar({ order, className }: { order: AddToOrder; classNa
  * `order` from useAddToOrder() (then control colour and size through it),
  * and `orderBar={false}` when an <AddToOrderBar> is rendered elsewhere.
  *
- * `orderBar="footer"` pins the quantity and "Add to order" in the enclosing
- * Drawer's sticky footer (via <DrawerFooter>), so the quick view's main
- * action is always on screen; the note field stays in the body and an
- * empty required note is focused (scrolled to) on add.
+ * `orderBar="footer"` pins the price, quantity and "Add to order" in the
+ * enclosing Drawer's sticky footer (via <DrawerFooter>), so the quick view's
+ * main action and what it costs are on screen however tall the photo is;
+ * availability, the note field and the rest stay in the body, and an empty
+ * required note is focused (scrolled to) on add.
  */
 export function ProductDetails({
   product,
@@ -264,6 +272,19 @@ export function ProductDetails({
   if (specTable) specs.push({ key: "sku", label: copy.sku, value: product.sku, ltr: true });
 
   const SpecsHeading = page ? "h2" : "h3";
+  const inFooter = orderBar === "footer";
+
+  const price = (textClass: string) => (
+    <p data-testid="product-price" className={cn("font-mono tabular text-fg", textClass)}>
+      <Price size={size} />
+      {qty > 1 ? (
+        <span className="text-[0.8125rem] text-fg-muted">
+          {" "}
+          × {qty} = <Price size={size} qty={qty} className="text-fg" />
+        </span>
+      ) : null}
+    </p>
+  );
 
   return (
     <div className={className}>
@@ -278,18 +299,16 @@ export function ProductDetails({
         <p className="text-[0.9375rem] leading-relaxed text-fg-muted">{product.tagline[locale]}</p>
       )}
 
-      <div className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-2", page ? "mt-7" : "mt-5")}>
-        <p data-testid="product-price" className={cn("font-mono tabular text-fg", page ? "text-2xl" : "text-xl")}>
-          <Price size={size} />
-          {qty > 1 ? (
-            <span className="text-[0.8125rem] text-fg-muted">
-              {" "}
-              × {qty} = <Price size={size} qty={qty} className="text-fg" />
-            </span>
-          ) : null}
-        </p>
-        <StockBadge product={product} />
-      </div>
+      {inFooter ? (
+        <div className="mt-4">
+          <StockBadge product={product} />
+        </div>
+      ) : (
+        <div className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-2", page ? "mt-7" : "mt-5")}>
+          {price(page ? "text-2xl" : "text-xl")}
+          <StockBadge product={product} />
+        </div>
+      )}
 
       {/* Options */}
       <div className={cn("border-t border-line", page ? "mt-8" : "mt-6")}>
@@ -336,9 +355,10 @@ export function ProductDetails({
         />
       ) : null}
 
-      {orderBar === "footer" ? (
+      {inFooter ? (
         <DrawerFooter>
-          <AddToOrderBar order={order} />
+          {price("text-lg leading-6")}
+          <AddToOrderBar order={order} className="mt-3" />
         </DrawerFooter>
       ) : orderBar ? (
         <AddToOrderBar order={order} className="mt-6" />

@@ -114,24 +114,76 @@ export function presentationForms(text: string): string {
 }
 
 /**
+ * Punctuation that belongs to the line rather than to the word it touches
+ * (Unicode bidi neutrals): sentence marks, quotes and brackets. Satori lays
+ * out each text node left to right, so a full stop kept inside "طبقة." lands
+ * on the word's right, between it and the next word. Signs such as "+", "-"
+ * and "/" stay with their word, so "+973" keeps its plus where it is.
+ */
+const EDGE = String.raw`[.,:;!?\u2026\u060C\u061B\u061F\u06D4"'\u2018\u2019\u201C\u201D\u00AB\u00BB()[\]{}]`;
+const SPLIT_EDGES = new RegExp(`^(${EDGE}*)(.*?)(${EDGE}*)$`, "su");
+const MIRROR: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[", "{": "}", "}": "{", "«": "»", "»": "«" };
+
+/** Neutral characters as they read on a right-to-left line: reversed, with brackets mirrored. */
+function rtlNeutral(text: string): string {
+  return Array.from(text)
+    .reverse()
+    .map((c) => MIRROR[c] ?? c)
+    .join("");
+}
+
+export type BidiRun = {
+  /** One Arabic word, or left-to-right words drawn together. */
+  text: string;
+  /** Arabic: drawn on its presentation-form copy (see ArabicWord). */
+  rtl: boolean;
+  /** Punctuation from the logical start of the run, ready to draw on its right. */
+  before?: string;
+  /** Punctuation from the logical end of the run, ready to draw on its left. */
+  after?: string;
+};
+
+/** A word as [leading punctuation, the word itself, trailing punctuation]. */
+function splitEdges(word: string): [string, string, string] {
+  const [, lead = "", core = "", trail = ""] = SPLIT_EDGES.exec(word) ?? [];
+  return core ? [lead, core, trail] : ["", word, ""];
+}
+
+/**
  * Visual runs for a right-to-left line, in logical order. Each Arabic word is
  * its own run; consecutive Latin/number words (and neutral words between
  * them, per the Unicode bidi rules) stay together as one left-to-right run.
+ * Punctuation at a run's edges takes the line's direction, so it is split off
+ * to be drawn beside the run: a final full stop ends up on the far left.
  */
-export function bidiRuns(text: string): string[] {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  const dirs = words.map((w) => (RTL_CHAR.test(w) ? "R" : LTR_CHAR.test(w) ? "L" : "N"));
-  const runs: string[] = [];
+export function bidiRuns(text: string): BidiRun[] {
+  const words = text.trim().split(/\s+/).filter(Boolean).map(splitEdges);
+  // Judged without the edges: "(R)،" is a Latin word, despite the Arabic comma.
+  const dirs = words.map(([, w]) => (RTL_CHAR.test(w) ? "R" : LTR_CHAR.test(w) ? "L" : "N"));
+  const runs: BidiRun[] = [];
+  const run = (lead: string, text: string, trail: string, rtl: boolean): BidiRun => ({
+    text,
+    rtl,
+    ...(lead ? { before: rtlNeutral(lead) } : {}),
+    ...(trail ? { after: rtlNeutral(trail) } : {}),
+  });
   let i = 0;
   while (i < words.length) {
     if (dirs[i] !== "L") {
-      runs.push(words[i]);
+      const [lead, core, trail] = words[i];
+      // A word with no letters or digits reads entirely in the line's direction.
+      runs.push(dirs[i] === "R" ? run(lead, core, trail, true) : { text: rtlNeutral(lead + core + trail), rtl: false });
       i++;
       continue;
     }
     let end = i;
     for (let j = i + 1; j < words.length && dirs[j] !== "R"; j++) if (dirs[j] === "L") end = j;
-    runs.push(words.slice(i, end + 1).join(" "));
+    // Punctuation between the words stays inside the run; only its outer edges are split off.
+    const inner = words
+      .slice(i, end + 1)
+      .map(([lead, core, trail], k, all) => `${k > 0 ? lead : ""}${core}${k < all.length - 1 ? trail : ""}`)
+      .join(" ");
+    runs.push(run(words[i][0], inner, words[end][2], false));
     i = end + 1;
   }
   return runs;
@@ -146,11 +198,19 @@ function ArabicWord({ word }: { word: string }) {
   );
 }
 
-/**
- * A line or paragraph of text. Left-to-right text renders as-is; right-to-left
- * text is laid out run by run, starting from the right edge, wrapping as
- * needed.
- */
+/** One run as a box. Split-off punctuation hugs it (no word gap) and never wraps away from it. */
+function Run({ run }: { run: BidiRun }) {
+  const body = run.rtl ? <ArabicWord word={run.text} /> : <span>{run.text}</span>;
+  if (!run.before && !run.after) return body;
+  return (
+    <div style={{ display: "flex", flexDirection: "row-reverse", flexShrink: 0 }}>
+      {run.before ? <span>{run.before}</span> : null}
+      {body}
+      {run.after ? <span>{run.after}</span> : null}
+    </div>
+  );
+}
+
 /**
  * Vowel marks (harakat, tanween, shadda, sukun). Without mark positioning they
  * can land on the wrong side of a letter, and everyday Arabic is written
@@ -158,6 +218,11 @@ function ArabicWord({ word }: { word: string }) {
  */
 const HARAKAT = /[\u064B-\u0652\u0670]/g;
 
+/**
+ * A line or paragraph of text. Left-to-right text renders as-is; right-to-left
+ * text is laid out run by run, starting from the right edge, wrapping as
+ * needed.
+ */
 export function OgText({
   text,
   rtl,
@@ -186,9 +251,9 @@ export function OgText({
         lineHeight,
       }}
     >
-      {bidiRuns(plain).map((run, i) =>
-        RTL_CHAR.test(run) ? <ArabicWord key={i} word={run} /> : <span key={i}>{run}</span>,
-      )}
+      {bidiRuns(plain).map((run, i) => (
+        <Run key={i} run={run} />
+      ))}
     </div>
   );
 }

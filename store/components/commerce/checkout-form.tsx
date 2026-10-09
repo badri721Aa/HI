@@ -17,15 +17,17 @@ import { useI18n } from "@/components/providers/i18n-provider";
 import { Amount } from "@/components/commerce/price";
 import { buttonStyles } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/ui/icons";
-import { REGION_CONFIG } from "@/lib/site";
+import { REGION_CONFIG, site } from "@/lib/site";
 import { currencyForRegion } from "@/lib/currency";
 import { usePrefs } from "@/lib/store/prefs";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import {
   LIMITS,
   buildOrderLink,
+  checkOrderEssentials,
   isOtherCity,
   normalizeDigits,
+  orderLinkOverflow,
   type OrderErrorKey,
   type OrderInput,
   type ValidationResult,
@@ -94,6 +96,29 @@ export function CharCount({ id, value, max }: { id?: string; value: number; max:
       className={cn("font-mono text-xs tabular transition-colors duration-200", value >= max * 0.9 ? "text-warn" : "text-fg-muted")}
     >
       {value}/{max}
+    </span>
+  );
+}
+
+/**
+ * Inline parts joined by a middle dot that never dangles at a line end: each
+ * part wraps as a unit with its dot in front, and the dot that would open a
+ * line falls in a clipped gutter at the inline start. Mirrors in RTL.
+ */
+export function DotList({ parts, className }: { parts: ReactNode[]; className?: string }) {
+  return (
+    <span className={cn("block overflow-x-clip", className)}>
+      <span className="-ms-4 flex flex-wrap">
+        {parts.map((part, i) => (
+          <span key={i} className="min-w-0">
+            <span aria-hidden className="inline-block w-4 text-center">
+              ·
+            </span>
+            {part}
+            {/* Keeps the parts separate words for assistive tech; a space at a line end takes no room. */}{" "}
+          </span>
+        ))}
+      </span>
     </span>
   );
 }
@@ -220,7 +245,8 @@ function setValidatorState(next: ValidatorState) {
 
 /**
  * Order validation uses zod (~27 KB gzipped), so it isn't part of the page:
- * it loads when the order drawer opens. Never rejects; a failed load can be retried.
+ * it loads when the order drawer opens. Never rejects; a failed load can be
+ * retried, and until then checkOrderEssentials() stands in.
  */
 export function loadOrderValidator(): Promise<void> {
   validatorLoad ??= import("@/lib/whatsapp/schema").then(
@@ -285,6 +311,9 @@ function writeDraft(draft: Draft) {
 
 const inRegion = (region: Region, city: string) => REGION_CONFIG[region].cities.some((c) => c.id === city);
 
+/** Before step 2 there's no reference yet; one of the same length keeps the size check exact. */
+const REF_PLACEHOLDER = `${site.orderPrefix}-00000`;
+
 /**
  * Everything step 2 of the order drawer needs, derived on every render from
  * the cart, the region and what the visitor typed: the exact WhatsApp
@@ -317,20 +346,20 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
   // Past the URL limit the receipt drops SKUs and dimensions; the preview shows whichever is sent.
   const link = buildOrderLink(line.e164, { ref: orderRef ?? "", region, locale, lines, customer });
 
-  const errors: Record<string, OrderErrorKey> = { ...validate?.({ region, lines, customer, website }).errors };
+  // Without the full validator (its chunk failed to load), the essentials are still checked.
+  const input: OrderInput = { region, lines, customer, website };
+  const errors: Record<string, OrderErrorKey> = {
+    ...(validate ? validate(input) : failed ? checkOrderEssentials(input) : undefined)?.errors,
+  };
   // Some in-app browsers truncate very long links. If shorter notes would fix it, flag the notes;
-  // if the order itself is too long (many pieces, especially in Arabic), ask to split it.
-  if (!link.fits) {
-    const withoutNotes = buildOrderLink(line.e164, {
-      ref: orderRef ?? "",
-      region,
-      locale,
-      lines,
-      customer: { ...customer, notes: "" },
-    });
-    if (customer.notes?.trim() && withoutNotes.fits) errors["customer.notes"] ??= "notes_too_long";
-    else errors.link = "too_many_lines";
-  }
+  // if the order itself is too long (many pieces, especially in Arabic), ask to split it. When the
+  // pieces alone are too long, no details can help, so the items step says so before step 2.
+  const overflow = link.fits
+    ? null
+    : orderLinkOverflow(line.e164, { ref: orderRef ?? REF_PLACEHOLDER, region, locale, lines, customer });
+  if (overflow === "notes") errors["customer.notes"] ??= "notes_too_long_for_link";
+  else if (overflow) errors.link = "too_many_lines";
+  if (overflow === "pieces") errors.lines ??= "too_many_lines";
 
   const lineErrors: Record<number, OrderErrorKey> = {};
   for (const [path, key] of Object.entries(errors)) {
@@ -374,6 +403,8 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
     lineErrors,
     /** Order-level error (empty cart, too many lines). */
     orderError: errors.lines as OrderErrorKey | undefined,
+    /** The pieces alone make the message too long to send: flagged on the items step, before any details. */
+    orderTooLong: overflow === "pieces",
     /** Problems no field owns (link too long, honeypot filled): shown only after a send attempt. */
     formError: attempted ? (errors.link ?? errors.website) : undefined,
     fieldError: (field: CheckoutField): OrderErrorKey | undefined =>
@@ -738,7 +769,7 @@ export function CheckoutSend({
       <div className="mt-1 flex min-h-11 items-center justify-between gap-4">
         <p id={destId} className="text-xs text-fg-muted">
           {copy.sendTo}{" "}
-          <span dir="ltr" className="font-mono tabular text-fg">
+          <span dir="ltr" className="whitespace-nowrap font-mono tabular text-fg">
             {checkout.line.display}
           </span>
         </p>

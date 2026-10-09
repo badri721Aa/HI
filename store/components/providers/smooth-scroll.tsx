@@ -3,11 +3,12 @@
 import Lenis from "lenis";
 import { useEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { isScrollLocked as drawerLocked, scrollDriver, scrollToId } from "@/lib/scroll";
+import { anchorTop, isScrollLocked as drawerLocked, scrollDriver, scrollToId, scrollToTop } from "@/lib/scroll";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 
-/** Fixed header height at rest; anchors land just below it (matches scrollToId). */
-const HEADER_OFFSET = 72;
+// The header and footer import it from here.
+export { scrollToTop };
+
 /**
  * While the 3D scene drives Lenis (`scrollDriver.external`), this loop still
  * steps in if the scene stops calling `raf` for this long (paused or
@@ -50,22 +51,12 @@ function whenScrollable(id: string, run: (el: HTMLElement) => void, maxFrames = 
   };
 }
 
-/** Instantly puts `el` just below the fixed header. */
+/** Instantly puts `el` just below the fixed header (the html's scroll-padding-top, as scrollToId uses). */
 function jumpTo(el: HTMLElement) {
+  const top = anchorTop(el);
   const lenis = scrollDriver.lenis;
-  if (lenis) {
-    lenis.scrollTo(el, { offset: -HEADER_OFFSET, immediate: true, force: true });
-  } else {
-    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET, behavior: "instant" });
-  }
-}
-
-/** Scrolls to the top of the page: smooth by default, instant with reduced motion or `immediate`. */
-export function scrollToTop({ immediate = false }: { immediate?: boolean } = {}) {
-  const instant = immediate || prefersReduced();
-  const lenis = scrollDriver.lenis;
-  if (lenis) lenis.scrollTo(0, { immediate: instant, force: true, duration: 1.2 });
-  else window.scrollTo({ top: 0, behavior: instant ? "instant" : "smooth" });
+  if (lenis) lenis.scrollTo(top, { immediate: true, force: true });
+  else window.scrollTo({ top, behavior: "instant" });
 }
 
 /**

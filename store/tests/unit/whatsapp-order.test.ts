@@ -6,6 +6,7 @@ import {
   LIMITS,
   MAX_LINES,
   MAX_QTY,
+  checkOrderEssentials,
   cityName,
   isOtherCity,
   priceOrder,
@@ -216,6 +217,49 @@ describe("validateOrder", () => {
   });
 });
 
+describe("checkOrderEssentials (stand-in when the zod chunk fails to load)", () => {
+  const blankCustomer = { name: "", phone: "", city: "", area: "", notes: "" };
+
+  it("passes a complete order, as validateOrder does", () => {
+    expect(checkOrderEssentials(order())).toEqual({ ok: true, errors: {} });
+    expect(checkOrderEssentials(order({ region: "AE", customer: { name: "Omar", city: "dubai" } })).ok).toBe(true);
+    expect(checkOrderEssentials(withCustomer({ city: "other-bh", area: "Sanad, block 743" })).ok).toBe(true);
+  });
+
+  it("never lets a blank order through", () => {
+    const result = checkOrderEssentials(order({ customer: blankCustomer }));
+    expect(result.ok).toBe(false);
+    expect(result.errors).toEqual({ "customer.name": "name_required", "customer.city": "city_required" });
+  });
+
+  it("agrees with validateOrder on name, city and area", () => {
+    const inputs: OrderInput[] = [
+      order({ customer: blankCustomer }),
+      withCustomer({ name: "  " }),
+      withCustomer({ name: "A" }),
+      withCustomer({ city: "" }),
+      withCustomer({ city: "dubai" }),
+      withCustomer({ city: "atlantis" }),
+      withCustomer({ city: "other-bh", area: "" }),
+      withCustomer({ city: "other-bh", area: "   " }),
+      order({ region: "AE", customer: { name: "Omar", city: "manama" } }),
+      order({ lines: [] }),
+      order({ lines: [{ ...phoneCase, note: "" }, clicker, { ...phoneCase, note: "  " }] }),
+    ];
+    const essentials = ["customer.name", "customer.city", "customer.area", "lines", "lines.0.note", "lines.2.note"];
+    for (const input of inputs) {
+      const full = validateOrder(input).errors;
+      const pick = (errors: Record<string, OrderErrorKey>) =>
+        Object.fromEntries(essentials.filter((path) => errors[path]).map((path) => [path, errors[path]]));
+      expect(pick(checkOrderEssentials(input).errors), JSON.stringify(input.customer)).toEqual(pick(full));
+    }
+  });
+
+  it("counts a name of invisible characters as empty", () => {
+    expect(checkOrderEssentials(withCustomer({ name: "\u200F\u200F" })).errors["customer.name"]).toBe("name_required");
+  });
+});
+
 describe("error dictionary", () => {
   // Typed so the compiler flags a new OrderErrorKey that is missing here.
   const ALL_KEYS: Record<OrderErrorKey, true> = {
@@ -234,6 +278,7 @@ describe("error dictionary", () => {
     area_required: true,
     area_too_long: true,
     notes_too_long: true,
+    notes_too_long_for_link: true,
     spam: true,
   };
 
