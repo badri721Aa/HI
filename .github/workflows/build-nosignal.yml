@@ -1,0 +1,50 @@
+name: Build Nosignal.exe
+
+on:
+  push:
+    branches: [ 'claude/sleepy-clarke-tb2lf0' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout this repo (mod files)
+        uses: actions/checkout@v4
+        with:
+          path: mods
+
+      - name: Clone LuaTools source
+        run: git clone --depth 1 https://github.com/madoiscool/LuaTools C:\NosignalBuild
+
+      - name: Apply Nosignal mods
+        shell: cmd
+        run: |
+          copy /Y mods\src\LuaToolsGui\AppConfig.cs                        C:\NosignalBuild\src\LuaToolsGui\AppConfig.cs
+          copy /Y mods\src\LuaToolsGui\App.xaml                            C:\NosignalBuild\src\LuaToolsGui\App.xaml
+          copy /Y mods\src\LuaToolsGui\App.xaml.cs                         C:\NosignalBuild\src\LuaToolsGui\App.xaml.cs
+          copy /Y mods\src\LuaToolsGui\MainWindow.xaml                     C:\NosignalBuild\src\LuaToolsGui\MainWindow.xaml
+          copy /Y mods\src\LuaToolsGui\LuaToolsGui.csproj                  C:\NosignalBuild\src\LuaToolsGui\LuaToolsGui.csproj
+          copy /Y mods\src\LuaToolsGui\FamousGames.cs                      C:\NosignalBuild\src\LuaToolsGui\FamousGames.cs
+          copy /Y mods\src\LuaToolsGui\Services\AuthService.cs             C:\NosignalBuild\src\LuaToolsGui\Services\AuthService.cs
+          if not exist C:\NosignalBuild\src\LuaToolsGui\ViewModels mkdir C:\NosignalBuild\src\LuaToolsGui\ViewModels
+          if not exist C:\NosignalBuild\src\LuaToolsGui\Views mkdir C:\NosignalBuild\src\LuaToolsGui\Views
+          copy /Y mods\src\LuaToolsGui\ViewModels\FamousGamesViewModel.cs  C:\NosignalBuild\src\LuaToolsGui\ViewModels\FamousGamesViewModel.cs
+          copy /Y mods\src\LuaToolsGui\Views\FamousGamesView.xaml          C:\NosignalBuild\src\LuaToolsGui\Views\FamousGamesView.xaml
+          copy /Y mods\src\LuaToolsGui\Views\FamousGamesView.xaml.cs      C:\NosignalBuild\src\LuaToolsGui\Views\FamousGamesView.xaml.cs
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build Nosignal.exe
+        working-directory: C:\NosignalBuild
+        run: dotnet publish src\LuaToolsGui\LuaToolsGui.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o C:\NosignalBuild\output
+
+      - name: Upload Nosignal.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nosignal-exe
+          path: C:\NosignalBuild\output\Nosignal.exe
+          retention-days: 7
