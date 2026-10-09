@@ -259,6 +259,7 @@ export function CartDrawer() {
     <Drawer
       open={open}
       onClose={close}
+      closeOnBack
       title={copy.title}
       description={empty ? undefined : pieceCount(priced.itemCount, locale, copy.pieces)}
       testId="cart-drawer"

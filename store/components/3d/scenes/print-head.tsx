@@ -12,7 +12,8 @@ import { readLive, type Live } from "../core/live";
  * sock, a steel heat break, a finned aluminium heat sink and a fan on its
  * back. The group's origin is the nozzle tip; it never rotates (a printer
  * head translates), so its orientation stays fixed while it orbits a part.
- * A tiny cyan-white point light at the tip lights the fresh layer.
+ * A tiny cyan-white point light at the tip lights the fresh layer, and a
+ * soft additive halo (a camera-facing quad, no texture) stands in for bloom.
  */
 
 const MM = 0.01;
@@ -38,6 +39,32 @@ function finProfile(): THREE.Vector2[] {
   pts.push(new THREE.Vector2(FINS.core, top - 0.4), new THREE.Vector2(FINS.core - 0.4, top), new THREE.Vector2(0, top));
   return pts.map((p) => p.multiplyScalar(MM));
 }
+
+/* Tip halo: a quad expanded in view space around the tip, radial falloff, additive. */
+const GLOW_VERT = /* glsl */ `
+uniform float uSize;
+varying vec2 vGlow;
+void main() {
+  vGlow = position.xy * 2.0;
+  vec4 mv = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
+  mv.xy += position.xy * uSize;
+  gl_Position = projectionMatrix * mv;
+}
+`;
+const GLOW_FRAG = /* glsl */ `
+uniform vec3 uColor;
+uniform float uStrength;
+varying vec2 vGlow;
+void main() {
+  float r2 = dot( vGlow, vGlow );
+  float a = ( exp( - r2 * 6.0 ) * 0.75 + exp( - r2 * 22.0 ) * 0.25 ) * ( 1.0 - smoothstep( 0.6, 1.0, r2 ) ) * uStrength;
+  if ( a < 0.002 ) discard;
+  gl_FragColor = vec4( uColor, a );
+  #include <colorspace_fragment>
+}
+`;
+/** Peak opacity of the tip halo. */
+const GLOW_STRENGTH = 0.38;
 
 function setOpacity(materials: readonly THREE.Material[], o: number) {
   for (const m of materials) m.opacity = o;
@@ -93,13 +120,25 @@ export function PrintHead({ ref, position, scale = 1, opacity = 1, light = 1 }: 
       // The molten bead at the tip.
       { geometry: new THREE.SphereGeometry(0.65 * MM, 12, 8), material: tip, position: [0, 0.1 * MM, 0] },
     ];
-    return { meshes, materials, tip };
+    const glow = new THREE.ShaderMaterial({
+      vertexShader: GLOW_VERT,
+      fragmentShader: GLOW_FRAG,
+      uniforms: { uSize: { value: 0.16 }, uColor: { value: new THREE.Color("#7de3ee") }, uStrength: { value: 0 } },
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const glowQuad = new THREE.PlaneGeometry(1, 1);
+    return { meshes, materials, tip, glow, glowQuad };
   }, []);
 
   useEffect(
     () => () => {
       for (const m of parts.meshes) m.geometry.dispose();
       for (const m of parts.materials) m.dispose();
+      parts.glow.dispose();
+      parts.glowQuad.dispose();
     },
     [parts],
   );
@@ -109,6 +148,7 @@ export function PrintHead({ ref, position, scale = 1, opacity = 1, light = 1 }: 
     live.current = parts;
   }, [parts]);
   const tipLight = useRef<THREE.PointLight>(null);
+  const glowMesh = useRef<THREE.Mesh>(null);
   const shown = useRef(-1);
 
   useFrame((state) => {
@@ -121,10 +161,10 @@ export function PrintHead({ ref, position, scale = 1, opacity = 1, light = 1 }: 
       setOpacity(p.materials, o);
     }
     const l = Math.min(Math.max(readLive(light), 0), 1) * o;
-    if (tipLight.current) {
-      const flicker = 0.92 + 0.08 * Math.sin(state.clock.elapsedTime * 37) * Math.sin(state.clock.elapsedTime * 13);
-      tipLight.current.intensity = 0.5 * l * flicker;
-    }
+    const flicker = 0.92 + 0.08 * Math.sin(state.clock.elapsedTime * 37) * Math.sin(state.clock.elapsedTime * 13);
+    if (tipLight.current) tipLight.current.intensity = 0.5 * l * flicker;
+    p.glow.uniforms.uStrength.value = GLOW_STRENGTH * l * flicker;
+    if (glowMesh.current) glowMesh.current.visible = l > 0.002;
   });
 
   return (
@@ -135,6 +175,16 @@ export function PrintHead({ ref, position, scale = 1, opacity = 1, light = 1 }: 
         ))}
       </group>
       <pointLight ref={tipLight} color="#c8f6fb" intensity={0} distance={0.32} decay={2} position={[0, 0.6 * MM, 0]} />
+      {/* The vertex shader sizes the quad in view space, so bounds-based culling would be wrong. */}
+      <mesh
+        ref={glowMesh}
+        geometry={parts.glowQuad}
+        material={parts.glow}
+        position={[0, 0.6 * MM, 0]}
+        renderOrder={6}
+        frustumCulled={false}
+        visible={false}
+      />
     </group>
   );
 }

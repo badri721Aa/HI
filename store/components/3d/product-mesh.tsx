@@ -8,6 +8,7 @@ import type { ColorOption, MaterialId, ShowcaseProduct } from "@/types";
 import { readLive as read, type Live } from "./core/live";
 import { getGeometry, getModelInfo, getWireframeGeometry } from "./geometry";
 import {
+  createHotHaloMaterial,
   createPrintDepthMaterial,
   createPrintMaterial,
   setPrintClip,
@@ -40,6 +41,8 @@ const COLOR_TAU = 0.066;
 const GLOW_TAU = 0.14;
 /** Hot-band emissive intensity at hot = 1. */
 const HOT_INTENSITY = 2.4;
+/** Peak opacity of the halo around the hot band (a soft cyan bloom stand-in). */
+const HALO_STRENGTH = 0.32;
 
 export type { Live };
 
@@ -135,12 +138,14 @@ export function ProductMesh({
     [finish, pattern, quality, product.layerHeight, layerStrength],
   );
   const depthMaterial = useMemo(() => createPrintDepthMaterial(material), [material]);
+  const halo = useMemo(() => createHotHaloMaterial(material), [material]);
   useEffect(
     () => () => {
       material.dispose();
       depthMaterial.dispose();
+      halo.dispose();
     },
-    [material, depthMaterial],
+    [material, depthMaterial, halo],
   );
 
   const lines = useMemo(() => {
@@ -193,10 +198,10 @@ export function ProductMesh({
 
   // Imperative handles. three.js objects are mutated only through refs (in
   // effects and frame callbacks), never during render.
-  const live = useRef<{ material: PrintMaterial; bulb: typeof bulb; lines: typeof lines } | null>(null);
+  const live = useRef<{ material: PrintMaterial; bulb: typeof bulb; lines: typeof lines; halo: typeof halo } | null>(null);
   useLayoutEffect(() => {
-    live.current = { material, bulb, lines };
-  }, [material, bulb, lines]);
+    live.current = { material, bulb, lines, halo };
+  }, [material, bulb, lines, halo]);
 
   // Colour: the material starts at whatever is on screen and eases to the target.
   const shown = useRef<THREE.Color | null>(null);
@@ -217,6 +222,7 @@ export function ProductMesh({
   }, [material, lamp]);
 
   const occluderRef = useRef<THREE.Mesh>(null);
+  const haloRef = useRef<THREE.Mesh>(null);
   const linesRef = useRef<THREE.Group>(null);
   const light = useRef<THREE.PointLight>(null);
   const bulbMesh = useRef<THREE.Mesh>(null);
@@ -245,7 +251,11 @@ export function ProductMesh({
     const frac = clip ? clip.get() : clipHeight;
     const clipping = frac !== null && frac !== undefined && Number.isFinite(frac) && frac < 1;
     setPrintClip(m, frac, info.height);
-    u.uHotIntensity.value = HOT_INTENSITY * Math.max(read(hot), 0);
+    const heat = Math.max(read(hot), 0);
+    u.uHotIntensity.value = HOT_INTENSITY * heat;
+    const haloOn = clipping ? Math.min(heat, 1) : 0;
+    r.halo.uniforms.uHaloStrength.value = HALO_STRENGTH * haloOn;
+    if (haloRef.current) haloRef.current.visible = haloOn > 0.002;
     const trail = hotTrail ? hotTrail.get() : null;
     if (trail === null) u.uHotTrail.value.y = 0;
     else u.uHotTrail.value.set(trail, 1);
@@ -288,13 +298,18 @@ export function ProductMesh({
           </group>
         </>
       ) : (
-        <mesh
-          geometry={geometry}
-          material={material}
-          customDepthMaterial={shadows ? depthMaterial : undefined}
-          castShadow={shadows}
-          receiveShadow={quality === "high"}
-        />
+        <>
+          <mesh
+            geometry={geometry}
+            material={material}
+            customDepthMaterial={shadows ? depthMaterial : undefined}
+            castShadow={shadows}
+            receiveShadow={quality === "high"}
+          />
+          {clip || clipHeight !== undefined ? (
+            <mesh ref={haloRef} geometry={geometry} material={halo} renderOrder={5} visible={false} />
+          ) : null}
+        </>
       )}
       {lamp && bulb && !wireframe ? (
         <>

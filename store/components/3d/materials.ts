@@ -16,6 +16,12 @@ import { CORNER_HALF, STAR_HALF } from "./core/pattern";
  *   shaded as the wall's cross-section, so walls read as solid.
  * - Mashrabiya: an eight-point-star lattice cut out of the lamp shade on its
  *   cylindrical UVs, with fwidth-based edges and alpha-to-coverage.
+ * - Material grain: hash noise in object space (no textures), a slow
+ *   brightness drift between bands of layers plus a fine surface grain in
+ *   colour and roughness, each faded out before it gets too small to resolve.
+ * - Light follows the cursor a little: the shared uMouse uniform tilts the
+ *   view direction used for specular and reflections by at most ~10°, so
+ *   highlights slide across the piece without the diffuse shading moving.
  *
  * SPACE: uClipY is in OBJECT space (model units, 0 = the base of the piece),
  * so a scaled, rotated or moved product still clips against its own height.
@@ -86,6 +92,19 @@ export const HOT_COLOR = "#7de3ee";
 
 const MM = 0.01;
 
+/**
+ * Smoothed pointer, -1…1 on each axis (y down), shared by every print
+ * material. SceneRoot writes it each frame; it stays at 0 for touch input
+ * and under reduced motion.
+ */
+export const printPointer = { value: new THREE.Vector2(0, 0) };
+
+/** Specular tilt per unit of pointer offset: tan(10°). */
+const POINTER_TILT = 0.176;
+/** Height of a brightness-drift band and size of a grain cell (model units). */
+const DRIFT_BAND = 2.4 * MM;
+const GRAIN_CELL = 1.2 * MM;
+
 /** Visual layer spacing in model units: clamp(layerHeight × 3, 0.45 mm, 1.2 mm). */
 export function layerSpacing(layerHeight: number): number {
   return Math.min(Math.max(layerHeight * 3, 0.45), 1.2) * MM;
@@ -143,6 +162,37 @@ float printLattice( vec2 uv ) {
 #endif
 `;
 
+const NOISE_FN = /* glsl */ `
+// Hashes without sine (stable precision on mobile GPUs).
+float printHash11( float p ) {
+  p = fract( p * 0.1031 );
+  p *= p + 33.33;
+  p *= p + p;
+  return fract( p );
+}
+float printHash13( vec3 p3 ) {
+  p3 = fract( p3 * 0.1031 );
+  p3 += dot( p3, p3.zyx + 31.32 );
+  return fract( ( p3.x + p3.y ) * p3.z );
+}
+float printValue1( float x ) {
+  float i = floor( x );
+  float u = fract( x );
+  return mix( printHash11( i ), printHash11( i + 1.0 ), u * u * ( 3.0 - 2.0 * u ) );
+}
+float printValue3( vec3 p ) {
+  vec3 i = floor( p );
+  vec3 u = fract( p );
+  u = u * u * ( 3.0 - 2.0 * u );
+  return mix(
+    mix( mix( printHash13( i ), printHash13( i + vec3( 1, 0, 0 ) ), u.x ),
+         mix( printHash13( i + vec3( 0, 1, 0 ) ), printHash13( i + vec3( 1, 1, 0 ) ), u.x ), u.y ),
+    mix( mix( printHash13( i + vec3( 0, 0, 1 ) ), printHash13( i + vec3( 1, 0, 1 ) ), u.x ),
+         mix( printHash13( i + vec3( 0, 1, 1 ) ), printHash13( i + vec3( 1, 1, 1 ) ), u.x ), u.y ),
+    u.z );
+}
+`;
+
 const FRAG_DECL = /* glsl */ `
 uniform float uClipY;
 uniform vec3 uHotColor;
@@ -153,11 +203,13 @@ uniform float uLayer;
 uniform float uLayerStrength;
 uniform float uTime;
 uniform vec3 uInnerGlow;
+uniform vec2 uMouse;
 varying vec3 vPrintPos;
 varying vec2 vPrintUv;
 varying vec3 vPrintUp;
 varying float vPrintNy;
 ${PATTERN_FN}
+${NOISE_FN}
 `;
 
 const FRAG_MAIN = /* glsl */ `
@@ -165,6 +217,7 @@ const FRAG_MAIN = /* glsl */ `
   float printDy = fwidth( vPrintPos.y );
   vec2 printInfillQ = vec2( vPrintPos.x + vPrintPos.z, vPrintPos.x - vPrintPos.z ) * ( 0.70710678 / ${f(4 * MM)} );
   float printInfillAa = max( fwidth( printInfillQ.x ), 1.0e-5 );
+  float printSpan = max( printDy, max( fwidth( vPrintPos.x ), fwidth( vPrintPos.z ) ) );
   #ifdef PRINT_PATTERN
     float printSd = printLattice( vPrintUv );
     float printAa = max( fwidth( printSd ), 1.0e-5 ) * 0.75;
@@ -189,8 +242,17 @@ const FRAG_MAIN = /* glsl */ `
   float printLayerAmt = uLayerStrength * printWall * smoothstep( 2.0, 4.0, printPx );
   float printPhase = 6.28318530718 * vPrintPos.y / uLayer;
   float printSeam = 0.5 + 0.5 * cos( printPhase );
-  float printGroove = printSeam * printSeam;
+  // Each layer's line is a little deeper or shallower than the next.
+  float printGroove = printSeam * printSeam * ( 0.7 + 0.6 * printHash11( floor( vPrintPos.y / uLayer + 0.5 ) ) );
   diffuseColor.rgb *= 1.0 - 0.1 * printLayerAmt * printGroove;
+
+  // Material grain: a slow drift between bands of layers and a fine grain,
+  // faded out before they shrink below ~3 px (no shimmer at small sizes).
+  float printDrift = ( printValue1( vPrintPos.y / ${f(DRIFT_BAND)} ) - 0.5 )
+    * ( 1.0 - smoothstep( 0.2, 0.4, printDy / ${f(DRIFT_BAND)} ) );
+  float printGrain = ( printValue3( vPrintPos / ${f(GRAIN_CELL)} ) - 0.5 )
+    * ( 1.0 - smoothstep( 0.3, 0.6, printSpan / ${f(GRAIN_CELL)} ) );
+  diffuseColor.rgb *= 1.0 + 0.05 * printDrift + 0.06 * printGrain;
 
   #ifdef DOUBLE_SIDED
     // Back faces are only visible through the cut or a lattice hole: shade
@@ -207,7 +269,18 @@ const FRAG_MAIN = /* glsl */ `
 `;
 
 const FRAG_ROUGH = /* glsl */ `
-  roughnessFactor = clamp( roughnessFactor + printLayerAmt * 0.14 * ( printGroove - 0.4 ), 0.03, 1.0 );
+  roughnessFactor = clamp( roughnessFactor + printLayerAmt * 0.14 * ( printGroove - 0.4 ) + 0.08 * printGrain, 0.03, 1.0 );
+`;
+
+/* The view direction the lights see, tilted towards the cursor (specular and reflections only). */
+const VIEW_DIR_LINE = "vec3 geometryViewDir = ( isOrthographic ) ? vec3( 0, 0, 1 ) : normalize( vViewPosition );";
+const VIEW_DIR_TILT = /* glsl */ `
+{
+  vec2 printM = uMouse;
+  float printMl = length( printM );
+  if ( printMl > 1.0 ) printM /= printMl;
+  geometryViewDir = normalize( geometryViewDir + vec3( printM.x, - printM.y, 0.0 ) * ${f(POINTER_TILT)} );
+}
 `;
 
 const FRAG_NORMAL = /* glsl */ `
@@ -237,6 +310,16 @@ function patch(src: string, anchor: string, add: string, after = true): string {
     return src;
   }
   return src.replace(anchor, after ? `${anchor}\n${add}` : `${add}\n${anchor}`);
+}
+
+/** Expands `#include <name>` so a line inside the chunk can be patched. */
+function replaceInclude(src: string, name: keyof typeof THREE.ShaderChunk, edit: (chunk: string) => string): string {
+  const include = `#include <${name}>`;
+  if (!src.includes(include)) {
+    if (process.env.NODE_ENV !== "production") console.error(`[print-material] shader include not found: ${include}`);
+    return src;
+  }
+  return src.replace(include, edit(THREE.ShaderChunk[name]));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -350,6 +433,7 @@ export function createPrintMaterial(opts: PrintMaterialOptions): PrintMaterial {
 
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
+    shader.uniforms.uMouse = printPointer;
     let vs = shader.vertexShader;
     vs = patch(vs, "#include <common>", VERT_DECL);
     vs = patch(vs, "#include <beginnormal_vertex>", VERT_NORMAL);
@@ -361,11 +445,12 @@ export function createPrintMaterial(opts: PrintMaterialOptions): PrintMaterial {
     fs = patch(fs, "#include <roughnessmap_fragment>", FRAG_ROUGH);
     fs = patch(fs, "#include <normal_fragment_maps>", FRAG_NORMAL);
     fs = patch(fs, "#include <emissivemap_fragment>", FRAG_EMISSIVE);
+    fs = replaceInclude(fs, "lights_fragment_begin", (chunk) => patch(chunk, VIEW_DIR_LINE, VIEW_DIR_TILT));
     shader.fragmentShader = fs;
   };
   // One program per variant of the injected code (the pattern adds a define;
   // finish and quality change which physical features are compiled in).
-  m.customProgramCacheKey = () => `lu-print-v1:${pattern}:${m.userData.finish}:${m.userData.quality}`;
+  m.customProgramCacheKey = () => `lu-print-v2:${pattern}:${m.userData.finish}:${m.userData.quality}`;
   return m;
 }
 
@@ -397,6 +482,72 @@ export function createPrintDepthMaterial(source: PrintMaterial): THREE.MeshDepth
   };
   m.customProgramCacheKey = () => `lu-print-depth-v1:${pattern}`;
   return m;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hot-band halo                                                              */
+/* -------------------------------------------------------------------------- */
+
+const HALO_VERT = /* glsl */ `
+uniform float uHaloGrow;
+varying float vHaloY;
+varying vec3 vHaloNormal;
+varying vec3 vHaloView;
+void main() {
+  vHaloY = position.y;
+  vec4 mv = modelViewMatrix * vec4( position + normal * uHaloGrow, 1.0 );
+  vHaloNormal = normalize( normalMatrix * normal );
+  vHaloView = - mv.xyz;
+  gl_Position = projectionMatrix * mv;
+}
+`;
+
+const HALO_FRAG = /* glsl */ `
+uniform float uClipY;
+uniform vec3 uHotColor;
+uniform float uHaloWidth;
+uniform float uHaloStrength;
+varying float vHaloY;
+varying vec3 vHaloNormal;
+varying vec3 vHaloView;
+void main() {
+  if ( uClipY > 1.0e5 ) discard;
+  float d = ( vHaloY - uClipY ) / uHaloWidth;
+  float band = exp( - d * d );
+  float rim = 1.0 - abs( dot( normalize( vHaloNormal ), normalize( vHaloView ) ) );
+  float a = band * ( 0.3 + 0.7 * rim * rim ) * uHaloStrength;
+  if ( a < 0.002 ) discard;
+  gl_FragColor = vec4( uHotColor, a );
+  #include <colorspace_fragment>
+}
+`;
+
+export type HaloMaterial = THREE.ShaderMaterial & { uniforms: { uHaloStrength: { value: number } } };
+
+/**
+ * A cheap bloom stand-in for the hot band: the piece's own geometry, pushed
+ * out a little along its normals and drawn additively in the hot colour,
+ * fading away above and below the cut and brightest towards the silhouette
+ * (a fresnel shell). Shares uClipY and uHotColor with `source`; drive
+ * uHaloStrength (0 = off) per frame and hide the mesh when it is 0.
+ */
+export function createHotHaloMaterial(source: PrintMaterial): HaloMaterial {
+  const { uClipY, uHotColor } = source.userData.uniforms;
+  return new THREE.ShaderMaterial({
+    vertexShader: HALO_VERT,
+    fragmentShader: HALO_FRAG,
+    uniforms: {
+      uClipY,
+      uHotColor,
+      uHaloGrow: { value: 1.2 * MM },
+      uHaloWidth: { value: 3.5 * MM },
+      uHaloStrength: { value: 0 },
+    },
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+  }) as HaloMaterial;
 }
 
 /** Points the lattice uniforms at a lamp's layout (see getModelInfo().lamp.pattern). */
