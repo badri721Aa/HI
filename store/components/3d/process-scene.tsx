@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { SHOWCASE } from "@/content/showcase";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
+import { useSceneDemand } from "./scene-demand";
 import { ProductSilhouette } from "./silhouette";
 import { ThreeBoundary } from "./scenes/three-boundary";
 import { useWebGLSupport } from "./webgl-support";
@@ -23,6 +24,7 @@ const PIECE = SHOWCASE.lamp;
 export function ProcessScene({ progress, className }: { progress: { get(): number }; className?: string }) {
   const supported = useWebGLSupport();
   const reduced = useReducedMotion();
+  useSceneDemand(supported === true);
 
   if (supported === null) return <div className={className} />;
   const fallback = <ProcessFallback className={className} />;

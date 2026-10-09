@@ -19,7 +19,7 @@ import { SoundToggle } from "./sound-toggle";
 import { CartButton } from "./cart-button";
 import { MobileNav, MOBILE_NAV_ID } from "./mobile-nav";
 
-/** Scroll distance (px) after which the header turns into frosted glass and compacts. */
+/** Scroll distance (px) after which the header gets its blurred ink bar and compacts. */
 const SCROLLED_AT = 8;
 
 function subscribeScroll(cb: () => void) {
@@ -54,8 +54,8 @@ function MenuIcon({ className }: { className?: string }) {
 }
 
 /**
- * Fixed site header. Transparent over the top of the page, frosted glass with
- * a hairline once scrolled (and 72 → 60px tall). Section links in the middle
+ * Fixed site header. Transparent over the top of the page, a blurred ink bar
+ * with a hairline once scrolled (and 72 → 60px tall). Section links in the middle
  * on large screens with an underline that follows the section in view; region,
  * language, sound and the order button at the end. Small screens get the
  * logo, the order button and a menu.
@@ -85,21 +85,27 @@ export function SiteHeader() {
 
   return (
     // layoutRoot: the underline's layout animation is measured relative to this fixed bar, not the scrolling page.
-    <motion.header layoutRoot data-scrolled={scrolled ? "" : undefined} className="fixed inset-x-0 top-0 z-40">
-      {/* Soft scrim keeps the controls legible over the hero before the glass appears. */}
+    // Padded below the status bar when the page runs edge to edge (viewport-fit=cover, home-screen app).
+    <motion.header
+      layoutRoot
+      data-scrolled={scrolled ? "" : undefined}
+      className="fixed inset-x-0 top-0 z-40 pt-[env(safe-area-inset-top)]"
+    >
+      {/* Soft scrim keeps the controls legible over the hero before the bar appears. */}
       <div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-x-0 top-0 h-24 bg-linear-to-b from-ink-950/45 to-transparent transition-opacity",
+          "pointer-events-none absolute inset-x-0 top-0 h-[calc(6rem+env(safe-area-inset-top))] bg-linear-to-b from-ink-950/45 to-transparent transition-opacity",
           ease,
           scrolled ? "opacity-0" : "opacity-100",
         )}
       />
-      {/* Frosted glass + hairline, faded in rather than transitioning the blur itself. */}
+      {/* Its own near-opaque ink with a plain blur (no saturation boost, so photos scrolling under it don't
+          smear colour into the bar). Faded in rather than transitioning the blur itself. */}
       <div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-0 border-b border-line bg-ink-950/70 backdrop-blur-xl backdrop-saturate-150 transition-opacity",
+          "pointer-events-none absolute inset-0 border-b border-line bg-ink-950/85 backdrop-blur-xl transition-opacity",
           ease,
           scrolled ? "opacity-100" : "opacity-0",
         )}

@@ -65,13 +65,34 @@ export function ProductPhoto({
 
 const SWIPE_DISTANCE = 48;
 const SWIPE_VELOCITY = 420;
+const MAX_ZOOM = 1.6;
+/** Below this the zoom would barely move, so the photo doesn't zoom at all. */
+const MIN_ZOOM = 1.15;
+
+/**
+ * How far a photo can be magnified before it runs out of pixels: the loaded
+ * file's width over the width it is drawn at, in device pixels. naturalWidth
+ * is the file the browser actually fetched (next/image never upscales), so
+ * a small original or a retina screen leaves little or no headroom.
+ */
+function zoomHeadroom(well: HTMLElement, img: HTMLImageElement | null | undefined) {
+  if (!img?.naturalWidth || !img.naturalHeight) return 1;
+  const { width, height } = well.getBoundingClientRect();
+  const ratio = img.naturalWidth / img.naturalHeight;
+  const contain = img.style.objectFit === "contain";
+  const drawn = contain ? Math.min(width, height * ratio) : Math.max(width, height * ratio);
+  return img.naturalWidth / (drawn * (window.devicePixelRatio || 1));
+}
 
 /**
  * Product photos: a 4:5 main image (cross-fades between photos) and, when
  * there is more than one, a row of thumbnail buttons. Arrow keys on the
  * thumbnails step through the photos (mirrored in RTL); on touch the main
- * image can be swiped; on fine pointers hovering the main image zooms 1.6×
- * towards the cursor.
+ * image can be swiped; on fine pointers hovering the main image zooms
+ * towards the cursor, as far as the photo's resolution allows (up to 1.6×).
+ *
+ * On the page (large screens) the well keeps its 4:5 shape and fits the
+ * viewport under the header with the thumbnails, so nothing is cropped.
  */
 export function ProductGallery({
   product,
@@ -96,6 +117,7 @@ export function ProductGallery({
   const active = Math.min(index, Math.max(0, count - 1));
 
   const zoomRef = useRef<HTMLDivElement>(null);
+  const zoomScale = useRef(1);
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const imageSizes =
@@ -113,25 +135,35 @@ export function ProductGallery({
   const onThumbKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const forward = dir === "rtl" ? "ArrowLeft" : "ArrowRight";
     const backward = dir === "rtl" ? "ArrowRight" : "ArrowLeft";
-    if (e.key === forward) go(active + 1, true);
-    else if (e.key === backward) go(active - 1, true);
+    // Up/Down too: on the product page the thumbnails stand in a column on large screens.
+    if (e.key === forward || e.key === "ArrowDown") go(active + 1, true);
+    else if (e.key === backward || e.key === "ArrowUp") go(active - 1, true);
     else if (e.key === "Home") go(0, true);
     else if (e.key === "End") go(count - 1, true);
     else return;
     e.preventDefault();
   };
 
-  /* Hover zoom: scale on enter, transform-origin follows the pointer (fine pointers only). */
-  const zoomTo = (e: PointerEvent<HTMLDivElement>, scale: number | null) => {
+  /* Hover zoom: the scale is fixed on enter, then transform-origin follows the pointer (fine pointers only). */
+  const zoomFollow = (e: PointerEvent<HTMLDivElement>) => {
     const el = zoomRef.current;
-    if (!el || !fine || e.pointerType !== "mouse") return;
+    if (!el || zoomScale.current === 1 || e.pointerType !== "mouse") return;
     const r = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * 100;
     const y = ((e.clientY - r.top) / r.height) * 100;
     el.style.transformOrigin = `${x.toFixed(1)}% ${y.toFixed(1)}%`;
-    if (scale !== null) el.style.scale = String(scale);
+    el.style.scale = String(zoomScale.current);
+  };
+  const zoomIn = (e: PointerEvent<HTMLDivElement>) => {
+    if (!fine || e.pointerType !== "mouse") return;
+    const img = zoomRef.current?.querySelector<HTMLImageElement>(`[data-photo="${active}"] img`);
+    const scale = Math.min(MAX_ZOOM, zoomHeadroom(e.currentTarget, img));
+    zoomScale.current = scale >= MIN_ZOOM ? scale : 1;
+    e.currentTarget.style.cursor = zoomScale.current > 1 ? "zoom-in" : "";
+    zoomFollow(e);
   };
   const unzoom = () => {
+    zoomScale.current = 1;
     if (zoomRef.current) zoomRef.current.style.scale = "1";
   };
 
@@ -149,23 +181,29 @@ export function ProductGallery({
 
   return (
     <div
+      data-testid="product-gallery"
       className={cn(
-        // Page, large screens: fill the column, but keep the photo (and thumbnails) within the viewport under
-        // the header; when height is short the well may crop up to ~10% rather than shrink to a sliver.
+        // Page, large screens: as wide as the column allows while the well still fits under the header and
+        // breadcrumb (~12rem), at its own 4:5 so the photo is never cropped. Thumbnails become a rail at the
+        // start side (4rem + gap), so they don't take height from the photo.
         variant === "page" &&
-          (multiple ? "lg:max-w-[min(100%,calc((100svh-13rem)*0.9))]" : "lg:max-w-[min(100%,calc((100svh-8rem)*0.9))]"),
+          (multiple
+            ? "lg:grid lg:max-w-[min(100%,calc((100svh-12rem)*0.8+4.75rem))] lg:grid-cols-[4rem_minmax(0,1fr)] lg:gap-x-3"
+            : "lg:max-w-[min(100%,calc((100svh-12rem)*0.8))]"),
         className,
       )}
     >
       <div
+        data-testid="product-photo"
         className={cn(
           "relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-line bg-ink-900",
-          variant === "drawer" && "max-h-[min(56svh,34rem)]",
-          variant === "page" && (multiple ? "lg:max-h-[calc(100svh-13rem)]" : "lg:max-h-[calc(100svh-8rem)]"),
-          fine && "cursor-zoom-in",
+          // Quick view: a shorter, centre-cropped photo on phones so the name and options show without scrolling.
+          variant === "drawer" && "max-h-[min(40svh,22rem)] sm:max-h-[min(56svh,34rem)]",
+          variant === "page" && "lg:max-h-[calc(100svh-12rem)]",
+          variant === "page" && multiple && "lg:col-start-2 lg:row-start-1",
         )}
-        onPointerEnter={(e) => zoomTo(e, 1.6)}
-        onPointerMove={(e) => zoomTo(e, null)}
+        onPointerEnter={zoomIn}
+        onPointerMove={zoomFollow}
         onPointerLeave={unzoom}
         onPointerCancel={unzoom}
       >
@@ -181,6 +219,7 @@ export function ProductGallery({
             {images.map((image, i) => (
               <div
                 key={image.src}
+                data-photo={i}
                 aria-hidden={i !== active || undefined}
                 className={cn(
                   "absolute inset-0 transition-opacity duration-500 ease-out-expo",
@@ -196,9 +235,9 @@ export function ProductGallery({
         {multiple ? (
           <span
             aria-hidden
-            className="pointer-events-none absolute bottom-3 start-3 rounded-full bg-ink-950/60 px-2.5 py-1 font-mono text-[0.6875rem] text-fg tabular backdrop-blur-md"
+            className="pointer-events-none absolute bottom-3 start-3 rounded-full bg-ink-950/60 px-2.5 py-1 text-[0.6875rem] text-fg backdrop-blur-md"
           >
-            <span dir="ltr">
+            <span dir="ltr" className="font-mono tabular">
               {String(active + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}
             </span>
           </span>
@@ -206,7 +245,12 @@ export function ProductGallery({
       </div>
 
       {multiple ? (
-        <div role="group" aria-label={t.commerce.product.photos} onKeyDown={onThumbKeyDown} className="mt-3 flex gap-2">
+        <div
+          role="group"
+          aria-label={t.commerce.product.photos}
+          onKeyDown={onThumbKeyDown}
+          className={cn("mt-3 flex gap-2", variant === "page" && "lg:col-start-1 lg:row-start-1 lg:mt-0 lg:flex-col")}
+        >
           {images.map((image, i) => {
             const current = i === active;
             return (

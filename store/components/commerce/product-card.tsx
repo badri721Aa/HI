@@ -41,7 +41,9 @@ export type ProductCardAction = "quick-view" | "page";
  * `variant="feature"` is the large editorial card: full-width on phones, a
  * photo + text spread on tablets, and on large screens a tall card whose
  * photo fills whatever height its grid area gives it (the parent must give
- * it a height, e.g. a 2-row span).
+ * it a height, e.g. a 2-row span). `wellClassName` lets a grid reshape the
+ * default 4:5 well (e.g. `lg:aspect-square`); the studio shots are centred,
+ * so a centred crop keeps the whole piece.
  */
 export function ProductCard({
   product,
@@ -49,6 +51,7 @@ export function ProductCard({
   action = "quick-view",
   sizes,
   className,
+  wellClassName,
 }: {
   product: Product;
   variant?: "default" | "feature";
@@ -56,6 +59,7 @@ export function ProductCard({
   /** next/image sizes for the photo; defaults suit the collection grid. */
   sizes?: string;
   className?: string;
+  wellClassName?: string;
 }) {
   const { t, locale } = useI18n();
   const currency = useCurrency();
@@ -70,7 +74,9 @@ export function ProductCard({
   const category = CATEGORIES.find((c) => c.id === product.category)?.name[locale];
   const photoSizes =
     sizes ??
-    (feature ? "(min-width: 1024px) 62vw, (min-width: 640px) 46vw, 92vw" : "(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 46vw");
+    (feature
+      ? "(min-width: 1360px) 632px, (min-width: 1024px) 47vw, (min-width: 640px) 46vw, 92vw"
+      : "(min-width: 1360px) 300px, (min-width: 1024px) 23vw, (min-width: 640px) 45vw, 46vw");
 
   /* Cursor highlight over the photo (fine pointers): --mx/--my on the well, once per frame. */
   const wellRef = useRef<HTMLDivElement>(null);
@@ -118,9 +124,11 @@ export function ProductCard({
       */}
       <div
         ref={wellRef}
+        data-cursor="view"
         className={cn(
           "pointer-events-none relative isolate z-[2] aspect-[4/5] overflow-hidden rounded-2xl border border-line bg-ink-900 transition-colors duration-500 ease-out-expo group-hover/card:border-line-strong",
           feature && "lg:aspect-auto lg:min-h-0 lg:flex-1",
+          wellClassName,
         )}
       >
         <div className="absolute inset-0 transition-[scale] duration-[600ms] ease-out-expo group-hover/card:scale-[1.03]">
@@ -189,6 +197,7 @@ export function ProductCard({
             <Link
               href={href}
               onClick={onLinkClick}
+              data-cursor="view"
               aria-haspopup={action === "quick-view" ? "dialog" : undefined}
               className={cn(
                 "outline-none after:absolute after:inset-0 after:z-[1] after:rounded-2xl after:content-['']",
@@ -209,10 +218,13 @@ export function ProductCard({
           </p>
         </div>
 
+        {/* Narrow cards (the 4-up collection grid) keep the tagline to one line, so two rows fit a screen. */}
         <p
           className={cn(
             "mt-1.5 text-sm leading-relaxed text-fg-muted",
-            feature ? "line-clamp-2 max-w-md sm:mt-3 sm:line-clamp-none sm:text-[0.9375rem]" : "hidden @3xs/card:line-clamp-2",
+            feature
+              ? "line-clamp-2 max-w-md sm:mt-3 sm:line-clamp-none sm:text-[0.9375rem]"
+              : "hidden @3xs/card:line-clamp-1 @xs/card:line-clamp-2",
           )}
         >
           {product.tagline[locale]}

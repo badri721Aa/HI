@@ -12,10 +12,11 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
 /**
- * Bahrain / UAE segmented control. Shows each region's currency code (BHD,
- * AED) in mono; switching re-prices the whole site and routes orders to that
- * region's WhatsApp line. Region names are in each option's label, and a
- * hover tooltip spells out the current choice.
+ * Bahrain / UAE segmented control; switching re-prices the whole site and
+ * routes orders to that region's WhatsApp line. The compact header version
+ * shows the currency codes (BHD, AED) in mono, with the region names in each
+ * option's label and a hover tooltip spelling out the current choice. The
+ * large menu version names the region next to its code ("Bahrain BHD").
  */
 export function RegionSwitch({ size = "sm", className }: { size?: "sm" | "lg"; className?: string }) {
   const { t, locale } = useI18n();
@@ -51,11 +52,14 @@ export function RegionSwitch({ size = "sm", className }: { size?: "sm" | "lg"; c
               type="button"
               data-testid={`region-${r}`}
               aria-pressed={selected}
-              aria-label={`${t.common.region[r]} · ${CURRENCY_LABEL[currency][locale]}`}
+              // The large variant names the region on screen; the compact one shows only the code.
+              aria-label={large ? undefined : `${t.common.region[r]} · ${CURRENCY_LABEL[currency][locale]}`}
               onClick={() => choose(r)}
               className={cn(
-                "relative isolate inline-flex items-center justify-center rounded-full font-mono uppercase tabular transition-colors duration-300",
-                large ? "h-11 min-w-[4.75rem] px-4 text-xs tracking-[0.12em]" : "h-8 min-w-[3.25rem] px-3 text-[0.6875rem] tracking-[0.1em]",
+                "relative isolate inline-flex items-center justify-center rounded-full transition-colors duration-300",
+                large
+                  ? "h-11 min-w-[4.75rem] gap-2 px-4 text-sm"
+                  : "h-8 min-w-[3.25rem] px-3 font-mono text-[0.6875rem] uppercase tracking-[0.1em] tabular",
                 // Grow the hit area to 44px tall without changing the compact look.
                 !large && "before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']",
                 selected ? "text-fg" : "text-fg-muted hover:text-fg",
@@ -69,7 +73,13 @@ export function RegionSwitch({ size = "sm", className }: { size?: "sm" | "lg"; c
                   className="absolute inset-0 -z-10 rounded-full bg-white/[0.07] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.06)] ring-1 ring-line-strong"
                 />
               ) : null}
-              <span dir="ltr">{currency}</span>
+              {large ? <span>{t.common.region[r]}</span> : null}
+              <span
+                dir="ltr"
+                className={cn(large && "font-mono text-[0.6875rem] tracking-[0.1em] tabular", large && !selected && "text-fg-subtle")}
+              >
+                {currency}
+              </span>
             </button>
           );
         })}

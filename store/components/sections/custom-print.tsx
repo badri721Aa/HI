@@ -64,15 +64,13 @@ export function CustomPrint() {
       {/* grid-cols-1 is minmax(0, 1fr): the form can't push the column wider than a 360px screen. */}
       <div className="shell grid grid-cols-1 gap-14 lg:grid-cols-12 lg:gap-x-6">
         <div className="lg:sticky lg:top-28 lg:col-span-5 lg:self-start">
-          <Reveal>
-            <SectionHeader index="04" eyebrow={copy.eyebrow} title={copy.title} body={copy.body} id="custom-title" />
-          </Reveal>
+          <SectionHeader index="04" eyebrow={copy.eyebrow} title={copy.title} body={copy.body} id="custom-title" />
 
           <Reveal delay={0.08} y={12}>
             <ul className="mt-12 grid grid-cols-2 gap-x-6 border-b border-line font-mono text-[0.8125rem] leading-snug">
               {copy.examples.map((example, i) => (
                 <li key={example} className="flex items-baseline gap-3 border-t border-line py-3.5">
-                  <span className="tabular text-platinum">{pad(i + 1)}</span>
+                  <span dir="ltr" className="tabular text-platinum">{pad(i + 1)}</span>
                   <span className="text-fg">{example}</span>
                 </li>
               ))}

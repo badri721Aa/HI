@@ -24,7 +24,8 @@ export function ProductPageView({ product, locale }: { product: Product; locale:
               product={product}
               variant="page"
               preload
-              sizes="(min-width: 1360px) 620px, (min-width: 1024px) 46vw, (min-width: 640px) 36rem, 92vw"
+              // Desktop asks for ~1.6× the drawn width so hover zoom has real pixels (originals are 1000px wide).
+              sizes="(min-width: 1024px) 920px, (min-width: 640px) 36rem, 92vw"
               className="max-w-xl"
             />
           </div>

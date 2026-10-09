@@ -12,7 +12,7 @@ const BASE =
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    "bg-fg text-ink-950 hover:bg-white shadow-[0_0_0_1px_rgb(255_255_255/0.12),0_10px_40px_-14px_rgb(125_227_238/0.45)] hover:shadow-[0_0_0_1px_rgb(255_255_255/0.2),0_14px_48px_-12px_rgb(125_227_238/0.6)]",
+    "bg-fg text-ink-950 hover:bg-white shadow-[0_0_0_1px_rgb(255_255_255/0.12),0_8px_24px_-12px_rgb(0_0_0/0.8)] hover:shadow-[0_0_0_1px_rgb(255_255_255/0.2),0_8px_24px_-12px_rgb(0_0_0/0.8)]",
   secondary: "glass text-fg hover:border-line-strong hover:bg-ink-700/70",
   ghost: "text-fg-muted hover:bg-white/[0.04] hover:text-fg",
 };

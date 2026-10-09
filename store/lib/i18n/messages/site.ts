@@ -39,6 +39,12 @@ export const siteCopy = defineMessages({
       title: "You're offline.",
       body: "Reconnect to browse the collection. You can still reach us on:",
     },
+    /** Labels the desktop cursor ring shows over `data-cursor="<key>"` elements. */
+    cursor: {
+      view: "View",
+      drag: "Drag",
+      open: "Open",
+    },
   },
   ar: {
     meta: {
@@ -76,6 +82,11 @@ export const siteCopy = defineMessages({
     offline: {
       title: "أنت غير متصل.",
       body: "أعد الاتصال لتصفح المجموعة. ويمكنك التواصل معنا على:",
+    },
+    cursor: {
+      view: "عرض",
+      drag: "اسحب",
+      open: "فتح",
     },
   },
 });

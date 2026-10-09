@@ -5,6 +5,7 @@ import { useI18n } from "@/components/providers/i18n-provider";
 import { MATERIALS } from "@/content/catalog";
 import { SHOWCASE } from "@/content/showcase";
 import { fmt } from "@/lib/i18n";
+import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { usePrintState } from "@/lib/store/print";
 import { cn } from "@/lib/utils";
 
@@ -27,17 +28,25 @@ const selectMinutesLeft = (s: { minutesLeft: number }) => s.minutesLeft;
 /**
  * Slicer-style readout for the hero print. Values come from usePrintState,
  * which the 3D scene writes at ~10 Hz; only this component re-renders.
+ * With reduced motion the scene shows the finished piece, so does this.
  * The whole readout is a simulation, so it is hidden from assistive tech.
+ *
+ * Widths are in px, not rem: the Arabic root font is larger, and the scene
+ * frames itself around this card's footprint, which must stay small on phones.
  */
 export function HeroHud({ className }: { className?: string }) {
   const { t, locale } = useI18n();
   const hud = t.home.hero.hud;
   const units = t.common.units;
 
-  const progress = usePrintState(selectProgress);
-  const layer = usePrintState(selectLayer);
+  const reduced = useReducedMotion();
+  const liveProgress = usePrintState(selectProgress);
+  const liveLayer = usePrintState(selectLayer);
   const totalLayers = usePrintState(selectTotalLayers);
-  const minutesLeft = usePrintState(selectMinutesLeft);
+  const liveMinutesLeft = usePrintState(selectMinutesLeft);
+  const progress = reduced ? 1 : liveProgress;
+  const layer = reduced ? totalLayers : liveLayer;
+  const minutesLeft = reduced ? 0 : liveMinutesLeft;
 
   const complete = progress >= 0.999;
   const total = Math.max(1, Math.round(totalLayers));
@@ -51,7 +60,7 @@ export function HeroHud({ className }: { className?: string }) {
     <div
       aria-hidden="true"
       className={cn(
-        "glass w-[13.5rem] rounded-xl p-3 font-mono text-[11px] leading-4 text-fg-muted shadow-[0_18px_40px_-24px_rgb(0_0_0/0.9)] sm:w-[15.5rem] sm:p-3.5 sm:text-xs",
+        "glass w-[152px] rounded-xl p-3 font-mono text-[11px] leading-4 text-fg-muted shadow-[0_18px_40px_-24px_rgb(0_0_0/0.9)] sm:w-[248px] sm:p-3.5 sm:text-xs",
         className,
       )}
     >

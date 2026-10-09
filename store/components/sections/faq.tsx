@@ -37,8 +37,7 @@ export function Faq() {
     <section id="faq" aria-labelledby="faq-title" className="relative py-28 md:py-40">
       <div className="shell grid gap-12 lg:grid-cols-12 lg:gap-x-6">
         <div className="lg:col-span-5 lg:self-start lg:sticky lg:top-28">
-          <Reveal>
-            <SectionHeader index={INDEX} eyebrow={copy.eyebrow} title={copy.title} id="faq-title" />
+          <SectionHeader index={INDEX} eyebrow={copy.eyebrow} title={copy.title} id="faq-title">
             <div className="mt-8">
               <ButtonLink
                 href={generateWhatsAppLink(line.e164, buildHelloMessage(locale))}
@@ -49,7 +48,7 @@ export function Faq() {
                 {t.common.actions.chatWhatsApp}
               </ButtonLink>
             </div>
-          </Reveal>
+          </SectionHeader>
         </div>
 
         <div className="lg:col-span-7 lg:col-start-6 xl:col-span-6 xl:col-start-7">

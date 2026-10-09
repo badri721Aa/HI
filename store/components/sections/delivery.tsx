@@ -7,8 +7,9 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { Reveal } from "@/components/motion/reveal";
 import { Spotlight } from "@/components/motion/spotlight";
+import { useRegion } from "@/lib/hooks/use-region";
 import { HOURS, REGION_CONFIG, WHATSAPP_LINES } from "@/lib/site";
-import { formatCurrency } from "@/lib/currency";
+import { CURRENCY_LABEL, formatCurrency } from "@/lib/currency";
 import { buildHelloMessage, generateWhatsAppLink } from "@/lib/whatsapp";
 import { fmt } from "@/lib/i18n";
 import { OpenStatus } from "./open-status";
@@ -53,15 +54,28 @@ function scheduleGroups(hours: typeof HOURS) {
 const SCHEDULE = scheduleGroups(HOURS);
 
 export function Delivery() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const copy = t.home.delivery;
+  const region = useRegion();
 
   return (
     <section id="delivery" aria-labelledby="delivery-title" className="relative py-28 md:py-40">
       <div className="shell">
-        <Reveal>
-          <SectionHeader index="05" eyebrow={copy.eyebrow} title={copy.title} id="delivery-title" />
-        </Reveal>
+        <SectionHeader
+          index="05"
+          eyebrow={copy.eyebrow}
+          title={copy.title}
+          id="delivery-title"
+          aside={
+            // Whether the visitor's own region is answering right now; both regions are detailed below.
+            <div className="border-s border-line ps-5">
+              <p className="eyebrow">
+                {copy.hours} · {REGION_CONFIG[region].name[locale]}
+              </p>
+              <OpenStatus region={region} className="mt-3 text-base" />
+            </div>
+          }
+        />
 
         {/* Three steps in a row, divided by hairlines. */}
         <ol className="mt-14 grid border-y border-line md:mt-20 md:grid-cols-3">
@@ -72,7 +86,9 @@ export function Delivery() {
             >
               <Reveal delay={i * 0.06} y={14}>
                 <div className="flex items-center gap-3">
-                  <span className="tabular font-mono text-sm text-fg-subtle">{pad(i + 1)}</span>
+                  <span dir="ltr" className="tabular font-mono text-sm text-fg-subtle">
+                    {pad(i + 1)}
+                  </span>
                   <span aria-hidden className="h-px w-6 bg-line-strong" />
                 </div>
                 <h3 className="mt-6 text-xl font-semibold tracking-[-0.02em] text-fg md:text-[1.375rem]">{step.title}</h3>
@@ -111,8 +127,9 @@ function RegionCard({ region }: { region: Region }) {
         <h3 className="text-[1.75rem] font-semibold leading-tight tracking-[-0.03em] text-fg md:text-[2rem]">
           {config.name[locale]}
         </h3>
-        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-muted" dir="ltr">
-          {region} · {config.currency}
+        {/* The currency prices are shown in for this region: "BHD", or "د.ب" in Arabic. */}
+        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-muted rtl:text-xs">
+          {CURRENCY_LABEL[config.currency][locale]}
         </span>
       </div>
       <p className="mt-3 max-w-sm text-[0.9375rem] leading-relaxed text-fg-muted">{copy.coverage[region]}</p>

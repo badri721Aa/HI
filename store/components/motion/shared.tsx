@@ -26,16 +26,20 @@ const CSS = `
 @keyframes lu-word {
   from { opacity: 0; transform: translate3d(0, 0.38em, 0); filter: blur(8px); }
 }
+@keyframes lu-part {
+  from { opacity: 0; transform: translate3d(0, 16px, 0); filter: blur(8px); }
+}
 .lu-reveal { animation: lu-reveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 .lu-word { display: inline-block; animation: lu-word 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
-[${WAIT_ATTR}].lu-reveal, [${WAIT_ATTR}] .lu-word { animation: none; opacity: 0; }
+.lu-part { animation: lu-part 0.8s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--lu-i, 0) * 80ms) backwards; }
+[${WAIT_ATTR}].lu-reveal, [${WAIT_ATTR}] .lu-word, [${WAIT_ATTR}] .lu-part { animation: none; opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .lu-reveal, .lu-word { animation: none !important; }
-  [${WAIT_ATTR}].lu-reveal, [${WAIT_ATTR}] .lu-word { opacity: 1; }
+  .lu-reveal, .lu-word, .lu-part { animation: none !important; }
+  [${WAIT_ATTR}].lu-reveal, [${WAIT_ATTR}] .lu-word, [${WAIT_ATTR}] .lu-part { opacity: 1; }
 }
 `;
 
-/** Keyframes for Reveal and SplitText. React hoists it into <head> once (deduped by href). */
+/** Keyframes for Reveal, SplitText and SectionHeader. React hoists it into <head> once (deduped by href). */
 export function MotionStyles() {
   return (
     <style href="lu-motion" precedence="lu-motion">

@@ -29,7 +29,9 @@ const getServerSnapshot = () => null;
 /**
  * Whether the region's WhatsApp lines are answered right now.
  * The status is only computed in the browser, after hydration; until then a
- * neutral placeholder of the same height holds the space.
+ * neutral placeholder of the same height holds the space. Not a live region:
+ * it fills in on load rather than in answer to anything the visitor did, so
+ * announcing it (once per card) would only be noise.
  */
 export function OpenStatus({ region, className }: { region: Region; className?: string }) {
   const { t } = useI18n();
@@ -81,7 +83,7 @@ export function OpenStatus({ region, className }: { region: Region; className?: 
   }
 
   return (
-    <p aria-live="polite" className={cn("flex min-h-5 items-center gap-2.5 text-sm leading-5", className)}>
+    <p className={cn("flex min-h-5 items-center gap-2.5 text-sm leading-5", className)}>
       {content}
     </p>
   );

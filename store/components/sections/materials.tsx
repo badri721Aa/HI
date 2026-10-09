@@ -32,21 +32,40 @@ const SWATCHES = MATERIALS.reduce(
   {} as Record<MaterialId, ColorOption[]>,
 );
 
-/*
- * Bento placement. md: the lead card spans the row, the rest pair up.
- * lg: the lead card takes the first half over two rows, Silk and PETG stack
- * beside it, and Resin, TPU and the heat note share the last row.
- */
-const PLACEMENT: Partial<Record<MaterialId, string>> = {
-  "pla-matte": "md:col-span-6 lg:col-span-3 lg:row-span-2",
-  "pla-silk": "md:col-span-3",
-  petg: "md:col-span-3",
-  resin: "md:col-span-3 lg:col-span-2",
-  tpu: "md:col-span-3 lg:col-span-2",
-};
 const LEAD: MaterialId = "pla-matte";
-/** Lead card first, whatever the catalog order, so the bento never leaves holes. */
+/** Lead card first, whatever the catalog order. */
 const ORDERED = [...MATERIALS].sort((a, b) => Number(b.id === LEAD) - Number(a.id === LEAD));
+
+/* Static class maps so Tailwind sees every span. */
+const MD_SPAN = { 3: "md:col-span-3", 6: "md:col-span-6" } as const;
+const LG_SPAN = { 2: "lg:col-span-2", 3: "lg:col-span-3", 6: "lg:col-span-6" } as const;
+
+/**
+ * Bento placement on a 6-column grid, derived from the number of cells (the
+ * materials plus the heat note) so it can never leave a hole.
+ * md: the lead card spans the row, the rest pair up (an odd one out spans the row).
+ * lg: the lead card takes the first half over two rows with two cards stacked
+ * beside it; whatever is left shares the last rows, up to three per row.
+ */
+function bento(cells: number): string[] {
+  const rest = cells - 1;
+  const beside = rest >= 2 ? 2 : 0;
+  const md = (i: number) => (i === 0 || (i === cells - 1 && rest % 2 === 1) ? MD_SPAN[6] : MD_SPAN[3]);
+
+  // Leftovers after the lead and its two neighbours, in rows of at most three (4 → 2 + 2, 5 → 3 + 2).
+  const left = rest - beside;
+  const rows = Math.ceil(left / 3);
+  const lg: string[] = [beside ? "lg:col-span-3 lg:row-span-2" : LG_SPAN[6], ...Array<string>(beside).fill(LG_SPAN[3])];
+  for (let r = 0, placed = 0; r < rows; r++) {
+    const inRow = Math.ceil((left - placed) / (rows - r));
+    lg.push(...Array<string>(inRow).fill(LG_SPAN[(6 / inRow) as 2 | 3 | 6]));
+    placed += inRow;
+  }
+  return lg.map((span, i) => cn(md(i), span));
+}
+
+/** The materials then the heat note. */
+const PLACEMENT = bento(ORDERED.length + 1);
 
 /** Card surface: hairline ring with a lit top edge; the ring strengthens on hover and the spotlight follows the cursor. */
 const CARD =
@@ -60,13 +79,17 @@ export function Materials() {
   return (
     <section id="materials" aria-labelledby="materials-title" className="relative py-28 md:py-40">
       <div className="shell">
-        <Reveal>
-          <SectionHeader index="03" eyebrow={copy.eyebrow} title={copy.title} body={copy.body} id="materials-title" />
-        </Reveal>
+        <SectionHeader
+          index="03"
+          eyebrow={copy.eyebrow}
+          title={copy.title}
+          id="materials-title"
+          aside={<p className="max-w-md text-[1.0625rem] leading-relaxed text-fg-muted">{copy.body}</p>}
+        />
 
         <div className="mt-14 grid grid-cols-1 gap-3 md:mt-20 md:grid-cols-6 md:gap-4">
           {ORDERED.map((material, i) => (
-            <Reveal key={material.id} delay={i * 0.06} className={cn("h-full", PLACEMENT[material.id])}>
+            <Reveal key={material.id} delay={i * 0.06} className={cn("h-full", PLACEMENT[i])}>
               {material.id === LEAD ? (
                 <Tilt max={4} className="h-full">
                   <MaterialCard material={material} lead />
@@ -77,9 +100,10 @@ export function Materials() {
             </Reveal>
           ))}
 
-          <Reveal delay={ORDERED.length * 0.06} className="h-full md:col-span-6 lg:col-span-2">
+          <Reveal delay={ORDERED.length * 0.06} className={cn("@container/note h-full", PLACEMENT[ORDERED.length])}>
+            {/* Wide (a full row): icon and text side by side; otherwise stacked, icon on top. */}
             <div
-              className="relative flex h-full flex-col gap-5 overflow-hidden rounded-2xl p-6 edge-light md:flex-row md:items-center md:p-7 lg:flex-col lg:items-start lg:justify-between lg:gap-10"
+              className="relative flex h-full flex-col justify-between gap-5 overflow-hidden rounded-2xl p-6 edge-light md:p-7 @xl/note:flex-row @xl/note:items-center @xl/note:justify-start @xl/note:gap-6"
               style={{
                 // Diagonal infill hatching, the way a slicer fills the inside of a part.
                 backgroundImage:
@@ -117,7 +141,7 @@ function MaterialCard({ material, lead = false }: { material: MaterialInfo; lead
         )}
       >
         <div className={cn("flex flex-col", lead && "md:col-start-1 md:row-start-1")}>
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h3
               className={cn(
                 "font-semibold tracking-[-0.025em] text-fg",
@@ -126,9 +150,9 @@ function MaterialCard({ material, lead = false }: { material: MaterialInfo; lead
             >
               {material.name[locale]}
             </h3>
-            <span className="mt-1.5 shrink-0 font-mono text-[11px] uppercase tracking-[0.14em] text-fg-muted" dir="ltr">
-              {material.id}
-            </span>
+            <p className="shrink-0 font-mono text-xs text-fg-muted rtl:font-sans rtl:text-sm">
+              {fmt(copy.softens, { n: material.heatC })}
+            </p>
           </div>
           <p
             className={cn(
@@ -159,9 +183,8 @@ function MaterialCard({ material, lead = false }: { material: MaterialInfo; lead
             ))}
           </div>
 
-          <div className="mt-5 flex items-center justify-between gap-4 border-t border-line pt-4">
-            <p className="font-mono text-xs text-fg-muted rtl:font-sans rtl:text-sm">{fmt(copy.softens, { n: material.heatC })}</p>
-            {swatches.length ? (
+          {swatches.length ? (
+            <div className="mt-5 flex justify-end border-t border-line pt-4">
               <ul aria-label={fmt(t.home.collection.colours, { n: swatches.length })} className="flex -space-x-1">
                 {swatches.map((c) => (
                   <li
@@ -174,8 +197,8 @@ function MaterialCard({ material, lead = false }: { material: MaterialInfo; lead
                   </li>
                 ))}
               </ul>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </Spotlight>

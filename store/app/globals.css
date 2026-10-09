@@ -65,9 +65,11 @@ html[lang="ar"] {
   --font-mono: var(--font-jetbrains), var(--font-tajawal), ui-monospace, monospace;
   font-size: 106.25%;
 }
-/* The mono face's wide space glyph spreads Arabic words apart; Arabic labels use the sans stack. */
-html[lang="ar"] .eyebrow {
+/* The mono face's wide space and period glyphs spread Arabic apart ("د . ب"), so on /ar mono text and
+   labels use the sans stack. Latin-only mono values (phones, SKUs, refs) carry dir="ltr" and stay mono. */
+html[lang="ar"] :is(.font-mono:not([dir="ltr"]), .eyebrow) {
   font-family: var(--font-sans);
+  letter-spacing: normal;
 }
 /* Letter-spacing breaks Arabic letter joining. */
 html[lang="ar"] * {
@@ -78,6 +80,8 @@ html[lang="ar"] * {
   html {
     color-scheme: dark;
     background: var(--color-ink-950);
+    /* Opening a drawer hides the scrollbar; keep its gutter so the page and header don't shift. */
+    scrollbar-gutter: stable;
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
   }
@@ -168,17 +172,19 @@ html[lang="ar"] * {
   }
 }
 
-/* Page container: 16px gutters on phones, wider on desktop. */
+/* Page container: 16px gutters on phones, wider on desktop, and clear of a landscape notch. */
 @utility shell {
+  --gutter: 1rem;
   width: 100%;
   max-width: 1360px;
   margin-inline: auto;
-  padding-inline: 1rem;
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
   @media (width >= 48rem) {
-    padding-inline: 2rem;
+    --gutter: 2rem;
   }
   @media (width >= 80rem) {
-    padding-inline: 3rem;
+    --gutter: 3rem;
   }
 }
 

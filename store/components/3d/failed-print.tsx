@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { SHOWCASE } from "@/content/showcase";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
+import { useSceneDemand } from "./scene-demand";
 import { ProductSilhouette } from "./silhouette";
 import { ThreeBoundary } from "./scenes/three-boundary";
 import { FAILED_CLIP, FAILED_TANGLE } from "./scenes/failed-tangle";
@@ -24,6 +25,7 @@ const PIECE = SHOWCASE.vase;
 export function FailedPrint({ className }: { className?: string }) {
   const supported = useWebGLSupport();
   const reduced = useReducedMotion();
+  useSceneDemand(supported === true);
 
   if (supported === null) return <div className={className} />;
   const fallback = <FailedFallback className={className} />;

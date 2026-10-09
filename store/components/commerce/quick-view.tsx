@@ -13,12 +13,13 @@ import { ProductDetails } from "./product-details";
 import { ProductGallery } from "./product-gallery";
 
 /**
- * The quick-view drawer, driven by useUI().quickView (a product slug).
- * Photos, then the full ProductDetails (the drawer title is the product
- * name, so details start with the tagline), then a link to the product page.
- * Remounts its content per product so picks and quantities never leak from
- * one piece to the next, and keeps showing the last product while the
- * drawer slides out.
+ * The quick-view drawer (a bottom sheet on phones), driven by
+ * useUI().quickView (a product slug). Photos, then the full ProductDetails
+ * (the drawer title is the product name, so details start with the tagline)
+ * with its quantity and "Add to order" pinned in the drawer's sticky footer,
+ * then a link to the product page. Back closes it. Remounts its content per
+ * product so picks and quantities never leak from one piece to the next, and
+ * keeps showing the last product while the drawer slides out.
  */
 export function QuickView() {
   const { t, locale } = useI18n();
@@ -45,11 +46,12 @@ export function QuickView() {
       testId="quick-view"
       title={current ? current.name[locale] : ""}
       description={category}
+      closeOnBack
     >
       {current ? (
         <div key={current.slug} className="px-5 pb-8 pt-5 sm:px-6">
           <ProductGallery product={current} variant="drawer" />
-          <ProductDetails product={current} variant="drawer" className="mt-6" />
+          <ProductDetails product={current} variant="drawer" orderBar="footer" className="mt-6" />
           <Link
             href={`/${locale}/products/${current.slug}`}
             onClick={(e) => {

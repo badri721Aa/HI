@@ -57,6 +57,11 @@ function plateMaterial(half: number) {
     clearcoat: 0.35,
     clearcoatRoughness: 0.5,
     envMapIntensity: 0.9,
+    // A piece's base sits exactly on y = 0: push the plate back in depth so
+    // the first layer always wins instead of z-fighting into a starburst.
+    polygonOffset: true,
+    polygonOffsetFactor: 2,
+    polygonOffsetUnits: 2,
   });
   const uniforms = {
     uPlateHalf: { value: half },

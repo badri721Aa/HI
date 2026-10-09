@@ -67,15 +67,8 @@ export function SiteFooter() {
     <footer className="relative overflow-hidden">
       <div className="shell">
         {/* Notify card */}
-        <div className="relative overflow-hidden rounded-2xl bg-ink-900 p-6 edge-light md:p-10 lg:p-12">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 end-0 w-2/3 [mask-image:linear-gradient(to_left,black,transparent)] rtl:[mask-image:linear-gradient(to_right,black,transparent)]"
-            style={{
-              backgroundImage: "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.03) 0 1px, transparent 1px 11px)",
-            }}
-          />
-          <div className="relative grid gap-8 md:grid-cols-[1fr_auto] md:items-end md:gap-12">
+        <div className="rounded-2xl bg-ink-900 p-6 edge-light md:p-10 lg:p-12">
+          <div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-end md:gap-12">
             <div>
               <h2 className="text-[clamp(1.75rem,3.2vw,2.75rem)] font-semibold leading-[1.04] tracking-[-0.035em] text-fg">
                 {f.notify.title}
@@ -186,18 +179,25 @@ export function SiteFooter() {
           <p className="text-sm text-fg-subtle">
             <Rights template={f.rights} year={year} brand={site.name} />
           </p>
-          <Button variant="ghost" size="sm" onClick={backToTop} className="-ms-4 sm:ms-0 sm:-me-4">
+          <Button variant="ghost" size="sm" onClick={backToTop} className="-ms-4 h-11 sm:ms-0 sm:-me-4 sm:h-9">
             {t.common.actions.backToTop}
             <ArrowUp aria-hidden strokeWidth={1.5} className="size-4" />
           </Button>
         </div>
       </div>
 
-      {/* The one decorative flourish: a huge, barely-there wordmark, cropped by the page edge. */}
+      {/* The one decorative flourish: a barely-there wordmark set edge to edge across the page container.
+          "3D BH" in Instrument Sans semibold is 2.6em wide at -0.06em tracking, and 2.9em on /ar, where
+          globals.css resets letter-spacing. */}
       <div aria-hidden className="pointer-events-none select-none overflow-hidden">
-        <p className="shell -mb-[0.24em] text-[18vw] font-semibold lowercase leading-[0.9] tracking-[-0.06em] text-white/[0.03]">
-          {site.name}
-        </p>
+        <div className="shell @container">
+          <p
+            dir="ltr"
+            className="whitespace-nowrap pb-[2cqi] text-[38.5cqi] font-semibold leading-[0.8] tracking-[-0.06em] text-white/[0.03] rtl:text-[34.5cqi]"
+          >
+            {site.name}
+          </p>
+        </div>
       </div>
     </footer>
   );
@@ -233,7 +233,7 @@ function SectionLink({ id, locale, children }: { id: string; locale: Locale; chi
     <li>
       <Link
         href={`/${locale}#${id}`}
-        className="inline-flex min-h-11 items-center text-[0.9375rem] text-fg-muted transition-colors duration-200 hover:text-fg md:min-h-10"
+        className="inline-flex min-h-11 items-center text-[0.9375rem] text-fg-muted transition-colors duration-200 hover:text-fg"
       >
         {children}
       </Link>

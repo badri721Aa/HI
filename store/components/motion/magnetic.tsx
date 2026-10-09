@@ -6,7 +6,7 @@ import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { useFinePointer } from "./shared";
 
-const SPRING = { stiffness: 200, damping: 15, mass: 0.5 };
+const SPRING = { stiffness: 150, damping: 15, mass: 0.1 };
 
 /**
  * Pulls its children toward the cursor while it hovers the element (desktop,

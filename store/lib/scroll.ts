@@ -11,10 +11,30 @@ import type Lenis from "lenis";
  * calls `lenis.raf(t)` from R3F's `addEffect` *before* rendering. That keeps
  * DOM-tracked 3D views locked to the page with no one-frame lag.
  */
-export const scrollDriver: { lenis: Lenis | null; external: boolean } = {
+export const scrollDriver: { lenis: Lenis | null; external: boolean; locks: number } = {
   lenis: null,
   external: false,
+  /** Open drawers holding the page still. A Lenis created while this is > 0 must start stopped. */
+  locks: 0,
 };
+
+/** Freezes page scrolling (native and Lenis). Nested calls share one lock; pair each with unlockScroll(). */
+export function lockScroll() {
+  if (scrollDriver.locks++ > 0) return;
+  scrollDriver.lenis?.stop();
+  document.documentElement.style.overflow = "hidden";
+}
+
+export function unlockScroll() {
+  scrollDriver.locks = Math.max(0, scrollDriver.locks - 1);
+  if (scrollDriver.locks > 0) return;
+  scrollDriver.lenis?.start();
+  document.documentElement.style.overflow = "";
+}
+
+export function isScrollLocked() {
+  return scrollDriver.locks > 0;
+}
 
 export function getLenis(): Lenis | null {
   return scrollDriver.lenis;

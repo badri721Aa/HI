@@ -26,9 +26,7 @@ export function Reviews() {
   return (
     <section id="reviews" aria-labelledby="reviews-title" className="relative overflow-hidden py-28 md:py-40">
       <div className="shell">
-        <Reveal>
-          <SectionHeader index="06" eyebrow={copy.eyebrow} title={copy.title} id="reviews-title" />
-        </Reveal>
+        <SectionHeader index="06" eyebrow={copy.eyebrow} title={copy.title} id="reviews-title" />
       </div>
 
       {marquee ? (

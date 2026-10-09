@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { getDictionary } from "@/lib/i18n";
-import { cartDrawer, expect, gotoHome, header, productCard, quickView, test } from "./fixtures";
+import { cartDrawer, expect, gotoHome, header, openQuickView, productCard, quickView, test } from "./fixtures";
 
 const focusIsInside = (dialog: Locator) => dialog.evaluate((el) => el.contains(document.activeElement));
 
@@ -61,5 +61,35 @@ test.describe("keyboard", () => {
     await expect
       .poll(() => page.evaluate(() => !!document.activeElement?.closest("main") || document.activeElement?.tagName === "MAIN"))
       .toBe(true);
+  });
+});
+
+test.describe("drawers", () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoHome(page, "en");
+  });
+
+  test("the quick view keeps Add to order in view, as a bottom sheet on phones", async ({ page, isMobile }) => {
+    await openQuickView(page, "hex-phone-case");
+    const dialog = quickView(page);
+    expect(await dialog.getAttribute("data-sheet")).toBe(isMobile ? "" : null);
+    await expect(dialog.getByTestId("add-to-order")).toBeInViewport({ ratio: 1 });
+  });
+
+  test("Back closes the quick view without leaving the page; Escape leaves history as it was", async ({ page }) => {
+    const url = page.url();
+    const layerEntry = () => page.evaluate(() => (history.state as Record<string, unknown> | null)?.__layer ?? null);
+
+    await openQuickView(page, "keycap-clicker");
+    await page.goBack();
+    await expect(quickView(page)).toBeHidden();
+    expect(page.url()).toBe(url);
+
+    await openQuickView(page, "keycap-clicker");
+    await expect.poll(layerEntry).not.toBeNull();
+    await page.keyboard.press("Escape");
+    await expect(quickView(page)).toBeHidden();
+    await expect.poll(layerEntry).toBeNull();
+    expect(page.url()).toBe(url);
   });
 });

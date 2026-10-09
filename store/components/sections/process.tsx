@@ -73,13 +73,24 @@ export function Process() {
       className="relative [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:h-[320vh]"
     >
       <div className="[@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:sticky [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:top-0 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:h-[100svh]">
-        <div className="shell grid grid-cols-1 gap-y-10 py-28 md:py-40 lg:grid-cols-12 lg:gap-x-6 lg:gap-y-12 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:h-full [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:content-center [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:gap-y-9 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:pb-6 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:pt-[72px]">
-          <Reveal className="lg:col-span-6 lg:row-start-1 lg:self-end xl:col-span-5">
-            <SectionHeader index="02" eyebrow={copy.eyebrow} title={copy.title} id="process-title" />
-          </Reveal>
+        {/*
+          Stage: the copy starts a fixed distance under the header and the steps get the remaining height (1fr),
+          so the title never moves when a longer step opens, and there is no centring gap above the section.
+        */}
+        <div className="shell grid grid-cols-1 gap-y-10 py-28 md:py-40 lg:grid-cols-12 lg:gap-x-6 lg:gap-y-12 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:h-full [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:grid-rows-[auto_minmax(0,1fr)] [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:gap-y-9 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:pb-6 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:pt-24">
+          <SectionHeader
+            index="02"
+            eyebrow={copy.eyebrow}
+            title={copy.title}
+            id="process-title"
+            className="lg:col-span-6 lg:row-start-1 lg:self-end xl:col-span-5"
+          />
 
-          {/* Scene: sticky under the header on small screens (when tall enough), columns 7–12 on large ones. */}
-          <div className="relative z-[1] -mx-4 bg-ink-950 px-4 py-3 md:-mx-8 md:px-8 max-lg:[@media(min-height:37.5rem)]:sticky max-lg:[@media(min-height:37.5rem)]:top-[72px] lg:col-span-6 lg:col-start-7 lg:row-span-2 lg:row-start-1 lg:mx-0 lg:self-center lg:bg-transparent lg:px-0 lg:py-0">
+          {/*
+            Scene: sticky under the (scrolled, 60px) header on small screens when tall enough, so no strip of
+            the steps shows between the two; columns 7–12 on large ones, top-aligned with the title on stage.
+          */}
+          <div className="relative z-[1] -mx-4 bg-ink-950 px-4 py-3 md:-mx-8 md:px-8 max-lg:[@media(min-height:37.5rem)]:sticky max-lg:[@media(min-height:37.5rem)]:top-15 lg:col-span-6 lg:col-start-7 lg:row-span-2 lg:row-start-1 lg:mx-0 lg:self-center lg:bg-transparent lg:px-0 lg:py-0 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:self-start">
             <div aria-hidden className="relative h-[48svh] min-h-72 lg:h-[min(68svh,640px)]">
               <ProcessScene progress={reduced ? DONE : progress} className="size-full" />
               <Corners />
@@ -114,7 +125,10 @@ export function Process() {
                   />
                   <Reveal delay={i * 0.06} y={14}>
                     <div className="flex items-baseline gap-4">
-                      <span className="tabular font-mono text-sm text-fg-subtle transition-colors duration-300 group-data-[active=true]:text-glow">
+                      <span
+                        dir="ltr"
+                        className="tabular font-mono text-sm text-fg-subtle transition-colors duration-300 group-data-[active=true]:text-glow"
+                      >
                         {pad(i + 1)}
                       </span>
                       <h3 className="text-xl font-semibold tracking-[-0.02em] text-fg transition-colors duration-300 md:text-[1.375rem] [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:text-fg-subtle [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:group-data-[active=true]:text-fg">
@@ -158,7 +172,7 @@ function SceneCaption({ active, title }: { active: number; title: string }) {
   return (
     <div aria-hidden className="mt-3 flex items-center justify-between gap-4 font-mono text-xs text-fg-muted">
       <span className="flex items-center gap-2">
-        <span className="tabular text-fg" dir="ltr">
+        <span className="tabular font-mono text-fg" dir="ltr">
           {pad(active + 1)} / {pad(STEP_COUNT)}
         </span>
         <span className="h-px w-4 bg-line-strong" />

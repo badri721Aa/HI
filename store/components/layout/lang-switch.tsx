@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Locale } from "@/types";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { LOCALES } from "@/lib/i18n";
+import { useUI } from "@/lib/store/ui";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
@@ -20,9 +20,12 @@ export function localizedPath(pathname: string | null, to: Locale): string {
 }
 
 /**
- * Link to the current page in the other language. Remembers the choice in
- * the `lang` cookie (read by proxy.ts for `/`). Pass `hash` to land on the
- * same home-page section after switching.
+ * Link to the current page in the other language. A plain link on purpose:
+ * the switch loads a fresh document, so <html lang/dir>, fonts and client
+ * state start over, and the old language's tree (with its WebGL canvas)
+ * isn't kept alive in a hidden Activity as a client navigation would.
+ * Remembers the choice in the `lang` cookie (read by proxy.ts for `/`).
+ * Pass `hash` to land on the same home-page section after switching.
  */
 export function LangSwitch({
   className,
@@ -36,18 +39,20 @@ export function LangSwitch({
 }) {
   const { locale, t } = useI18n();
   const pathname = usePathname();
+  const setNavOpen = useUI((s) => s.setNavOpen);
   const other: Locale = locale === "en" ? "ar" : "en";
   const href = localizedPath(pathname, other) + (hash ? `#${hash}` : "");
 
   return (
-    <Link
+    <a
       href={href}
       hrefLang={other}
-      aria-label={t.common.actions.switchLanguageLabel}
       data-testid="lang-switch"
       onClick={() => {
         document.cookie = `lang=${other}; path=/; max-age=31536000; samesite=lax`;
         playSound("switch");
+        // A page restored from the back/forward cache shouldn't come back with the menu open.
+        setNavOpen(false);
       }}
       className={cn(
         "inline-flex items-center justify-center rounded-full transition-colors duration-300",
@@ -60,11 +65,16 @@ export function LangSwitch({
       <span
         lang={other}
         dir={other === "ar" ? "rtl" : "ltr"}
-        // English pages don't carry the Arabic face in their font stack.
-        className={other === "ar" ? "font-[family-name:var(--font-tajawal)] text-[1.08em] font-medium" : undefined}
+        className={cn(
+          // English pages don't carry the Arabic face in their font stack. Tajawal's tall ascent lifts its
+          // letters above the centre line of the neighbouring Latin controls, so it is set a little lower.
+          other === "ar" && "translate-y-px font-[family-name:var(--font-tajawal)] text-[1.08em] font-medium leading-none",
+        )}
       >
         {t.common.actions.switchLanguage}
       </span>
-    </Link>
+      {/* The accessible name starts with the visible label (voice control), then says what it does. */}
+      <span className="sr-only"> ({t.common.actions.switchLanguageLabel})</span>
+    </a>
   );
 }

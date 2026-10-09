@@ -78,6 +78,8 @@ const _ext = [0, 0, 0, 0];
 /**
  * Solves the framing for a camera orbiting `target` (looking at it) at the
  * given azimuth/elevation, so `points` fill `rect` of a box with `aspect`.
+ * `minDistance` caps how close the camera may come (the points are then
+ * centred in the rect, smaller than it).
  */
 export function solveFraming(
   points: readonly THREE.Vector3[],
@@ -88,6 +90,7 @@ export function solveFraming(
   aspect: number,
   rect: FrameRect,
   out: Framing,
+  minDistance = 0,
 ): Framing {
   orbitDirection(azimuth, elevation, _dir);
   _fwd.copy(_dir).negate();
@@ -105,6 +108,7 @@ export function solveFraming(
     if (extents(points, target, mid, tanX, tanY, _ext) && _ext[1] - _ext[0] <= w && _ext[3] - _ext[2] <= h) hi = mid;
     else lo = mid;
   }
+  hi = Math.max(hi, minDistance);
   extents(points, target, hi, tanX, tanY, _ext);
   // Centre of the rectangle and of the points, in NDC; the lens shift moves one onto the other.
   const cx = rect.l + rect.r - 1;

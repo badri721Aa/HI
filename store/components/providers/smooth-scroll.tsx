@@ -3,7 +3,7 @@
 import Lenis from "lenis";
 import { useEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { scrollDriver, scrollToId } from "@/lib/scroll";
+import { isScrollLocked as drawerLocked, scrollDriver, scrollToId } from "@/lib/scroll";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 
 /** Fixed header height at rest; anchors land just below it (matches scrollToId). */
@@ -24,7 +24,7 @@ function prefersReduced() {
 
 /** A drawer (or anything else) holds the page scroll lock. */
 function isScrollLocked() {
-  return document.documentElement.style.overflow === "hidden" || Boolean(scrollDriver.lenis?.isStopped);
+  return drawerLocked() || document.documentElement.style.overflow === "hidden" || Boolean(scrollDriver.lenis?.isStopped);
 }
 
 /**
@@ -135,6 +135,9 @@ export function SmoothScroll({ children }: { children: ReactNode }) {
       baseRaf(time);
     };
     scrollDriver.lenis = lenis;
+    // A drawer can lock the page before this effect runs (child effects first, e.g. a menu still open
+    // across a remount); a Lenis born unlocked would scroll behind it.
+    if (scrollDriver.locks > 0) lenis.stop();
 
     let frame = 0;
     const loop = (time: number) => {

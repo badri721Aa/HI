@@ -22,10 +22,10 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 const LINES = Object.values(WHATSAPP_LINES);
 
 /**
- * Full-height menu for small screens, built on the shared Drawer: large
- * section links, region and language, and the three WhatsApp lines.
- * Section links close the menu; SmoothScroll then scrolls once the drawer
- * has released the page.
+ * Menu for small screens, built on the shared Drawer (a bottom sheet on
+ * phones): large section links, region and language, and the three WhatsApp
+ * lines. Back closes it. Section links close the menu; SmoothScroll then
+ * scrolls once the drawer has released the page.
  */
 export function MobileNav({ activeId, langHash }: { activeId?: string | null; langHash?: string }) {
   const { locale, t } = useI18n();
@@ -38,20 +38,15 @@ export function MobileNav({ activeId, langHash }: { activeId?: string | null; la
     playSound("close");
   };
 
-  // The menu only exists below lg; close it if the window grows past that, or on back/forward.
+  // The menu only exists below lg; close it if the window grows past that.
   useEffect(() => {
     if (!open) return;
     const mq = window.matchMedia("(min-width: 64rem)");
     const onChange = () => {
       if (mq.matches) setNavOpen(false);
     };
-    const onPop = () => setNavOpen(false);
     mq.addEventListener("change", onChange);
-    window.addEventListener("popstate", onPop);
-    return () => {
-      mq.removeEventListener("change", onChange);
-      window.removeEventListener("popstate", onPop);
-    };
+    return () => mq.removeEventListener("change", onChange);
   }, [open, setNavOpen]);
 
   const enter = (i: number) =>
@@ -73,6 +68,7 @@ export function MobileNav({ activeId, langHash }: { activeId?: string | null; la
       description={t.common.brandLine}
       side="end"
       testId="mobile-nav"
+      closeOnBack
     >
       <div id={MOBILE_NAV_ID} className="flex min-h-full flex-col px-5 pb-10 pt-3 sm:px-6">
         <nav aria-label={t.common.menu.sections}>
