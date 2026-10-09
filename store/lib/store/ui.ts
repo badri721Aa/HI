@@ -5,7 +5,10 @@ import { create } from "zustand";
 export interface Toast {
   id: number;
   title: string;
+  /** May contain "{ref}", filled with `ref`. */
   body?: string;
+  /** An order reference, kept on one line and left to right (it would break at its hyphen in Arabic). */
+  ref?: string;
 }
 
 interface UIState {
@@ -29,7 +32,8 @@ export const useUI = create<UIState>()((set) => ({
   navOpen: false,
   quickView: null,
   toasts: [],
-  setCartOpen: (cartOpen) => set(cartOpen ? { cartOpen, quickView: null } : { cartOpen }),
+  // The open cart is the confirmation; an "Added" toast would only cover its first line.
+  setCartOpen: (cartOpen) => set(cartOpen ? { cartOpen, quickView: null, toasts: [] } : { cartOpen }),
   setNavOpen: (navOpen) => set({ navOpen }),
   openQuickView: (quickView) => set({ quickView, cartOpen: false }),
   closeQuickView: () => set({ quickView: null }),

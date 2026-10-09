@@ -1,6 +1,15 @@
 "use client";
 
-import { useId, useRef, useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ComponentProps,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, ChevronDown, CircleAlert } from "lucide-react";
 import { REGIONS, type Customer, type OrderLine, type Region } from "@/types";
@@ -14,11 +23,12 @@ import { usePrefs } from "@/lib/store/prefs";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import {
   LIMITS,
-  buildWhatsAppMessagePayload,
-  generateWhatsAppLink,
-  isWithinUrlLimit,
-  validateOrder,
+  buildOrderLink,
+  isOtherCity,
+  normalizeDigits,
   type OrderErrorKey,
+  type OrderInput,
+  type ValidationResult,
 } from "@/lib/whatsapp";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
@@ -88,6 +98,30 @@ export function CharCount({ id, value, max }: { id?: string; value: number; max:
   );
 }
 
+/**
+ * Focuses a form field without the browser's minimal scroll-into-view, then
+ * centres the field (label, control and message) in its scroller, so the
+ * message isn't left under a sticky footer.
+ */
+export function focusField(el: HTMLElement | null | undefined, reduced: boolean) {
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  (el.closest<HTMLElement>("[data-field]") ?? el).scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
+}
+
+/**
+ * Enter in a single-line field moves to the next field, as the keyboard's
+ * "next" key promises (a form with no submit button never submits on Enter).
+ */
+export function enterToNextField(e: KeyboardEvent<HTMLFormElement>) {
+  if (e.key !== "Enter" || e.nativeEvent.isComposing || !(e.target instanceof HTMLInputElement)) return;
+  e.preventDefault();
+  const fields = Array.from(e.currentTarget.elements).filter(
+    (el): el is HTMLElement => el.matches("input, select, textarea") && !el.matches(":disabled") && (el as HTMLElement).tabIndex >= 0,
+  );
+  fields[fields.indexOf(e.target) + 1]?.focus();
+}
+
 /** Label row (with an optional "optional" tag and an end slot), control, hint and error. */
 export function Field({
   id,
@@ -115,11 +149,17 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <div className={className}>
+    <div data-field className={className}>
       <div className="flex items-baseline justify-between gap-3">
         <label htmlFor={id} className="text-sm font-medium text-fg">
           {label}
-          {optional ? <span className="ms-1.5 text-xs font-normal text-fg-muted">{optional}</span> : null}
+          {/* A real space: Arabic letters would join across the tag, and the accessible name would fuse. */}
+          {optional ? (
+            <>
+              {" "}
+              <span className="text-xs font-normal text-fg-muted">{optional}</span>
+            </>
+          ) : null}
         </label>
         {aside}
       </div>
@@ -161,6 +201,43 @@ export function Select({ className, children, value, ...props }: ComponentProps<
       />
     </div>
   );
+}
+
+/* -------------------------------------------------------- validation */
+
+type ValidateOrder = (input: OrderInput) => ValidationResult;
+type ValidatorState = { validate?: ValidateOrder; failed: boolean };
+
+const VALIDATOR_IDLE: ValidatorState = { failed: false };
+let validatorState = VALIDATOR_IDLE;
+let validatorLoad: Promise<void> | undefined;
+const validatorListeners = new Set<() => void>();
+
+function setValidatorState(next: ValidatorState) {
+  validatorState = next;
+  validatorListeners.forEach((listener) => listener());
+}
+
+/**
+ * Order validation uses zod (~27 KB gzipped), so it isn't part of the page:
+ * it loads when the order drawer opens. Never rejects; a failed load can be retried.
+ */
+export function loadOrderValidator(): Promise<void> {
+  validatorLoad ??= import("@/lib/whatsapp/schema").then(
+    (m) => setValidatorState({ validate: m.validateOrder, failed: false }),
+    () => {
+      validatorLoad = undefined;
+      setValidatorState({ failed: true });
+    },
+  );
+  return validatorLoad;
+}
+
+function subscribeValidator(listener: () => void) {
+  validatorListeners.add(listener);
+  return () => {
+    validatorListeners.delete(listener);
+  };
 }
 
 /* ------------------------------------------------------------- state */
@@ -222,6 +299,7 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
   const baseId = useId();
   const setPrefsRegion = usePrefs((s) => s.setRegion);
   const line = useWhatsAppLine(region);
+  const { validate, failed } = useSyncExternalStore(subscribeValidator, () => validatorState, () => VALIDATOR_IDLE);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [website, setWebsite] = useState("");
   const [touched, setTouched] = useState<ReadonlySet<CheckoutField>>(() => new Set());
@@ -236,18 +314,21 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
     area: draft.area,
     notes: draft.notes,
   };
-  const message = buildWhatsAppMessagePayload({ ref: orderRef ?? "", region, locale, lines, customer });
-  const href = generateWhatsAppLink(line.e164, message);
+  // Past the URL limit the receipt drops SKUs and dimensions; the preview shows whichever is sent.
+  const link = buildOrderLink(line.e164, { ref: orderRef ?? "", region, locale, lines, customer });
 
-  const errors: Record<string, OrderErrorKey> = { ...validateOrder({ region, lines, customer, website }).errors };
+  const errors: Record<string, OrderErrorKey> = { ...validate?.({ region, lines, customer, website }).errors };
   // Some in-app browsers truncate very long links. If shorter notes would fix it, flag the notes;
   // if the order itself is too long (many pieces, especially in Arabic), ask to split it.
-  if (!isWithinUrlLimit(href)) {
-    const withoutNotes = generateWhatsAppLink(
-      line.e164,
-      buildWhatsAppMessagePayload({ ref: orderRef ?? "", region, locale, lines, customer: { ...customer, notes: "" } }),
-    );
-    if (customer.notes?.trim() && isWithinUrlLimit(withoutNotes)) errors["customer.notes"] ??= "notes_too_long";
+  if (!link.fits) {
+    const withoutNotes = buildOrderLink(line.e164, {
+      ref: orderRef ?? "",
+      region,
+      locale,
+      lines,
+      customer: { ...customer, notes: "" },
+    });
+    if (customer.notes?.trim() && withoutNotes.fits) errors["customer.notes"] ??= "notes_too_long";
     else errors.link = "too_many_lines";
   }
 
@@ -266,7 +347,9 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
     website: `${baseId}-website`,
   };
 
-  const update = (field: CheckoutField, value: string) => {
+  const update = (field: CheckoutField, raw: string) => {
+    // Arabic keyboards type ٣٩٨٥…: keep the preview and the message in Western digits.
+    const value = field === "phone" ? normalizeDigits(raw) : raw;
     const next = { ...draft, [field]: value };
     setDraft(next);
     writeDraft(next);
@@ -279,8 +362,14 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
     website,
     setWebsite,
     line,
-    message,
-    href,
+    message: link.message,
+    href: link.href,
+    /** The compact receipt (no SKUs or dimensions) is the one being sent. */
+    compact: link.compact,
+    /** "loading" until the validator (zod) arrives; "failed" if it could not be loaded. */
+    validation: validate ? ("ready" as const) : failed ? ("failed" as const) : ("loading" as const),
+    /** "Other area": the address becomes required. */
+    areaRequired: isOtherCity(customer.city),
     errors,
     lineErrors,
     /** Order-level error (empty cart, too many lines). */
@@ -322,15 +411,18 @@ export type Checkout = ReturnType<typeof useCheckout>;
 /* ------------------------------------------------------------- step 2 */
 
 /** Bahrain / UAE as two halves of a pill, with the currency each one prices in. */
-function RegionChoice({
+export function RegionChoice({
   region,
   onChange,
   labelledBy,
+  testIdPrefix = "checkout-",
   className,
 }: {
   region: Region;
   onChange: (region: Region) => void;
   labelledBy: string;
+  /** Test ids are `${testIdPrefix}region-<id>`. */
+  testIdPrefix?: string;
   className?: string;
 }) {
   const { locale, dir } = useI18n();
@@ -352,7 +444,7 @@ function RegionChoice({
             role="radio"
             aria-checked={selected}
             tabIndex={selected ? 0 : -1}
-            data-testid={`checkout-region-${r}`}
+            data-testid={`${testIdPrefix}region-${r}`}
             onClick={() => onChange(r)}
             onKeyDown={(e) => radioKeyNav(e, i, REGIONS.length, dir, (n) => onChange(REGIONS[n]))}
             className={cn(
@@ -363,7 +455,7 @@ function RegionChoice({
             {selected ? (
               <motion.span
                 aria-hidden
-                layoutId={`checkout-region-${pillId}`}
+                layoutId={`region-choice-${pillId}`}
                 transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 36 }}
                 className="absolute inset-0 -z-10 rounded-full bg-white/[0.07] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.06)] ring-1 ring-line-strong"
               />
@@ -434,7 +526,12 @@ export function CheckoutForm({ checkout, region, onBack }: { checkout: Checkout;
         </div>
       ) : null}
 
-      <form noValidate onSubmit={(e) => e.preventDefault()} className="relative mt-8 grid gap-6 border-t border-line pt-7">
+      <form
+        noValidate
+        onSubmit={(e) => e.preventDefault()}
+        onKeyDown={enterToNextField}
+        className="relative mt-8 grid gap-6 border-t border-line pt-7"
+      >
         <Field
           id={ids.name}
           label={copy.name}
@@ -507,7 +604,7 @@ export function CheckoutForm({ checkout, region, onBack }: { checkout: Checkout;
         <Field
           id={ids.area}
           label={copy.area}
-          optional={copy.optional}
+          optional={checkout.areaRequired ? undefined : copy.optional}
           error={errMessage("area")}
           errorId={errId("area")}
           errorTestId="error-area"
@@ -515,6 +612,7 @@ export function CheckoutForm({ checkout, region, onBack }: { checkout: Checkout;
           <input
             {...control("area")}
             type="text"
+            required={checkout.areaRequired}
             autoComplete="street-address"
             enterKeyHint="next"
             maxLength={LIMITS.area}
@@ -586,6 +684,7 @@ export function CheckoutSend({
   checkout,
   orderRef,
   total,
+  totalLabel,
   sent,
   onSend,
   onClear,
@@ -593,6 +692,8 @@ export function CheckoutSend({
   checkout: Checkout;
   orderRef: string | null;
   total: number;
+  /** "Subtotal" or "Total": what `total` is. Defaults to Subtotal (delivery is quoted in the chat). */
+  totalLabel?: string;
   sent: boolean;
   onSend: (e: MouseEvent<HTMLAnchorElement>) => void;
   onClear: () => void;
@@ -606,7 +707,10 @@ export function CheckoutSend({
     <div>
       <div className="flex items-baseline justify-between gap-4">
         <p className="text-xs text-fg-muted">{orderRef ? <OrderRefLabel template={copy.orderRef} value={orderRef} /> : null}</p>
-        <Amount value={total} className="text-[0.9375rem] font-medium text-fg" />
+        <p className="text-xs text-fg-muted">
+          {totalLabel ?? copy.subtotal}{" "}
+          <Amount value={total} className="text-[0.9375rem] font-medium text-fg" />
+        </p>
       </div>
 
       {checkout.formError ? (

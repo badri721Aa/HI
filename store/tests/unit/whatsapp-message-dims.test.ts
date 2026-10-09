@@ -61,6 +61,21 @@ describe("order message with measured sizes", () => {
     expect(msg).toContain("   65.00 د.إ\n");
   });
 
+  it("keeps the size name but drops the dimensions in the compact receipt", () => {
+    const msg = buildWhatsAppMessagePayload({
+      ref: "X-00000",
+      region: "BH",
+      locale: "en",
+      lines: [{ slug: vase.slug, colorId: "bone", sizeId: "m", qty: 2 }],
+      customer,
+      compact: true,
+    });
+    expect(msg).toContain("1. Ripple Vase — Medium, Bone\n");
+    expect(msg).not.toContain("150×150×220");
+    expect(msg).not.toContain(vase.sku);
+    expect(msg).toContain("   2 × 9.500 BHD = 19.000 BHD\n");
+  });
+
   it("passes the dims through priceOrder", () => {
     const [line] = priceOrder([{ slug: vase.slug, colorId: "bone", sizeId: "s", qty: 1 }], "BH", "en").lines;
     expect(line.dims).toEqual({ w: 120, d: 120, h: 160 });

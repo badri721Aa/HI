@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Locale } from "@/types";
 import type { Dictionary } from "@/lib/i18n";
@@ -12,10 +12,11 @@ import { useUI } from "@/lib/store/ui";
 import { useRegion } from "@/lib/hooks/use-region";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { createOrderRef, priceOrder } from "@/lib/whatsapp";
+import { trackOrderSent } from "@/lib/whatsapp/track";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { CartEmpty, CartLines, CartSummary, orderTotals } from "./cart-lines";
-import { CheckoutForm, CheckoutSend, useCheckout } from "./checkout-form";
+import { CheckoutForm, CheckoutSend, focusField, loadOrderValidator, useCheckout } from "./checkout-form";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 const EASE_IN = [0.4, 0, 1, 1] as const;
@@ -103,8 +104,10 @@ export function CartDrawer() {
   const lines = useCart((s) => s.lines);
   const setQty = useCart((s) => s.setQty);
   const removeLine = useCart((s) => s.remove);
+  const setNote = useCart((s) => s.setNote);
   const clearCart = useCart((s) => s.clear);
   const region = useRegion();
+  const reduced = useReducedMotion();
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const [step, setStep] = useState<Step>(1);
@@ -129,8 +132,25 @@ export function CartDrawer() {
     }
   }
 
+  // Validation (zod) is fetched on first open, well before anyone can press send.
+  useEffect(() => {
+    if (open) void loadOrderValidator();
+  }, [open]);
+
   const checkout = useCheckout({ region, lines, orderRef });
   const priced = priceOrder(lines, region, locale);
+
+  // Send pressed before the validator arrived: focus the first problem as soon as it can be known.
+  const focusPending = useRef(false);
+  const focusFirstInvalid = useEffectEvent(() => {
+    const field = checkout.firstInvalidField();
+    if (field) focusField(document.getElementById(checkout.ids[field]), reduced);
+  });
+  useEffect(() => {
+    if (checkout.validation !== "ready" || !focusPending.current) return;
+    focusPending.current = false;
+    focusFirstInvalid();
+  }, [checkout.validation]);
   const totals = orderTotals(priced, region);
   const empty = lines.length === 0;
   const current: Step = empty ? 1 : step;
@@ -176,6 +196,15 @@ export function CartDrawer() {
 
   const onSend = (e: MouseEvent<HTMLAnchorElement>) => {
     checkout.markAttempted();
+    if (checkout.validation === "loading") {
+      // Only on a very slow connection. Errors (if any) show once the validator lands; a valid order needs a second tap.
+      e.preventDefault();
+      playSound("tap");
+      focusPending.current = true;
+      void loadOrderValidator();
+      return;
+    }
+    // If the validator could not load at all, let the order through rather than block it.
     if (firstLineError !== undefined || checkout.orderError) {
       e.preventDefault();
       playSound("tap");
@@ -187,13 +216,23 @@ export function CartDrawer() {
     if (field || checkout.errors.link || checkout.errors.website) {
       e.preventDefault();
       playSound("tap");
-      if (field) document.getElementById(checkout.ids[field])?.focus();
+      if (field) focusField(document.getElementById(checkout.ids[field]), reduced);
       return;
     }
     // Valid: let the link open WhatsApp. Keep the cart; they may not press send there.
     playSound("send");
     setSent(true);
-    toast({ title: copy.sentTitle, body: fmt(copy.sentBody, { ref: orderRef ?? "" }) });
+    toast({ title: copy.sentTitle, body: copy.sentBody, ref: orderRef ?? "" });
+    trackOrderSent({
+      region,
+      line: checkout.line.id,
+      items: priced.itemCount,
+      lines: priced.lines.length,
+      currency: priced.currency,
+      subtotal: priced.subtotal,
+      lang: locale,
+      compact: checkout.compact,
+    });
   };
 
   const onClear = () => {
@@ -216,10 +255,6 @@ export function CartDrawer() {
     removeLine(index);
   };
 
-  const onNote = (index: number, note: string) => {
-    useCart.setState((s) => ({ lines: s.lines.map((l, i) => (i === index ? { ...l, note } : l)) }));
-  };
-
   return (
     <Drawer
       open={open}
@@ -227,26 +262,30 @@ export function CartDrawer() {
       title={copy.title}
       description={empty ? undefined : pieceCount(priced.itemCount, locale, copy.pieces)}
       testId="cart-drawer"
+      // Empty: no 0.000 subtotal or dead Continue; the empty state has its own ways forward.
       footer={
-        <StepSwap id={`footer-${current}`} direction={direction}>
-          {current === 1 ? (
-            <CartSummary
-              totals={totals}
-              disabled={empty}
-              error={showLineErrors && checkout.orderError ? t.common.errors[checkout.orderError] : undefined}
-              onContinue={onContinue}
-            />
-          ) : (
-            <CheckoutSend
-              checkout={checkout}
-              orderRef={orderRef}
-              total={totals.total ?? totals.subtotal}
-              sent={sent}
-              onSend={onSend}
-              onClear={onClear}
-            />
-          )}
-        </StepSwap>
+        empty ? undefined : (
+          <StepSwap id={`footer-${current}`} direction={direction}>
+            {current === 1 ? (
+              <CartSummary
+                totals={totals}
+                disabled={empty}
+                error={showLineErrors && checkout.orderError ? t.common.errors[checkout.orderError] : undefined}
+                onContinue={onContinue}
+              />
+            ) : (
+              <CheckoutSend
+                checkout={checkout}
+                orderRef={orderRef}
+                total={totals.total ?? totals.subtotal}
+                totalLabel={totals.total !== null ? copy.total : copy.subtotal}
+                sent={sent}
+                onSend={onSend}
+                onClear={onClear}
+              />
+            )}
+          </StepSwap>
+        )
       }
     >
       <div ref={bodyRef} className="min-h-full">
@@ -265,7 +304,7 @@ export function CartDrawer() {
                 setQty(index, qty);
               }}
               onRemove={onRemove}
-              onNote={onNote}
+              onNote={setNote}
               onNavigate={close}
             />
           )}

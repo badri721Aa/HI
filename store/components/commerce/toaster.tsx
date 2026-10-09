@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type FocusEvent, type Ref } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FocusEvent,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { useI18n } from "@/components/providers/i18n-provider";
@@ -80,6 +89,22 @@ export function Toaster() {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+/** The body with its "{ref}" filled in: mono, left to right and unbroken, in either language. */
+function bodyWithRef(body: string, ref?: string): ReactNode {
+  if (!body.includes("{ref}")) return body;
+  const [before, after = ""] = body.split("{ref}");
+  if (!ref) return `${before}${after}`;
+  return (
+    <>
+      {before}
+      <span dir="ltr" className="whitespace-nowrap font-mono text-[0.8125rem] tabular text-fg">
+        {ref}
+      </span>
+      {after}
+    </>
   );
 }
 
@@ -166,7 +191,9 @@ function ToastCard({
         <span aria-hidden className="mt-[0.4375rem] size-1.5 shrink-0 rounded-full bg-ok" />
         <div className="min-w-0 flex-1 py-px">
           <p className="text-sm font-medium leading-snug text-fg">{toast.title}</p>
-          {toast.body ? <p className="mt-1 text-sm leading-relaxed text-fg-muted">{toast.body}</p> : null}
+          {toast.body ? (
+            <p className="mt-1 text-sm leading-relaxed text-fg-muted">{bodyWithRef(toast.body, toast.ref)}</p>
+          ) : null}
         </div>
         <button
           type="button"

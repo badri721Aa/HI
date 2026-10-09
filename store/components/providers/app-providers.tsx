@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { MotionConfig } from "motion/react";
 import type { Locale } from "@/types";
 import { I18nProvider } from "@/components/providers/i18n-provider";
 import { SmoothScroll } from "@/components/providers/smooth-scroll";
@@ -13,10 +14,15 @@ function readGeoCookie(): string | null {
   return match ? match[1] : null;
 }
 
+const persisted = [useCart, usePrefs] as const;
+
 /**
  * Client-side app state: translations, smooth scroll, persisted stores, and a
  * one-time region guess (from the geo cookie set by proxy.ts, or /api/region)
  * for visitors who haven't picked Bahrain or the UAE themselves.
+ *
+ * The stores follow other tabs: a product opened in a new tab and added
+ * there must not be wiped by the next add in this one.
  */
 export function AppProviders({ locale, children }: { locale: Locale; children: ReactNode }) {
   useEffect(() => {
@@ -35,14 +41,32 @@ export function AppProviders({ locale, children }: { locale: Locale; children: R
       }
       if (!cancelled && !usePrefs.getState().region) usePrefs.getState().setRegion(countryToRegion(country), false);
     });
+
+    const onStorage = (e: StorageEvent) => {
+      for (const store of persisted) {
+        if (e.key === null || e.key === store.persist.getOptions().name) void store.persist.rehydrate();
+      }
+    };
+    // Belt and braces for browsers that throttle storage events in background tabs.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") for (const store of persisted) void store.persist.rehydrate();
+    };
+    window.addEventListener("storage", onStorage);
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("storage", onStorage);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 
   return (
-    <I18nProvider locale={locale}>
-      <SmoothScroll>{children}</SmoothScroll>
-    </I18nProvider>
+    // Under prefers-reduced-motion, motion skips transform and layout animations everywhere (drawers, toasts, pills).
+    <MotionConfig reducedMotion="user">
+      <I18nProvider locale={locale}>
+        <SmoothScroll>{children}</SmoothScroll>
+      </I18nProvider>
+    </MotionConfig>
   );
 }

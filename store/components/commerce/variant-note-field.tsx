@@ -1,12 +1,14 @@
 "use client";
 
 import { useId, type Ref } from "react";
+import { useI18n } from "@/components/providers/i18n-provider";
 import { LIMITS } from "@/lib/whatsapp/order";
 import { cn } from "@/lib/utils";
+import { FieldError, inputStyles } from "./checkout-form";
 
 /**
  * The per-item detail a product asks for (e.g. "iPhone model"). Visible
- * label, `dir="auto"` so Arabic and Latin answers both read naturally, and an
+ * label, the same 16px input as the checkout (so iOS never zooms), and an
  * inline error tied to the input with aria-describedby. The parent decides
  * when to show the error (after a blur or an add attempt).
  */
@@ -32,6 +34,7 @@ export function VariantNoteField({
   inputRef?: Ref<HTMLInputElement>;
   className?: string;
 }) {
+  const { dir } = useI18n();
   const id = useId();
   const errorId = `${id}-error`;
   const remaining = LIMITS.note - value.length;
@@ -45,6 +48,7 @@ export function VariantNoteField({
         {/* Only near the limit: a quiet mono countdown. */}
         <span
           aria-hidden
+          dir="ltr"
           className={cn(
             "font-mono text-[0.6875rem] text-fg-muted tabular transition-opacity duration-300",
             remaining <= 10 ? "opacity-100" : "opacity-0",
@@ -67,21 +71,18 @@ export function VariantNoteField({
         autoComplete="off"
         autoCapitalize="words"
         spellCheck={false}
-        dir="auto"
+        // Empty, it follows the page (the Arabic placeholder reads right to left); an answer finds its own direction.
+        dir={value ? "auto" : dir}
         required={required}
         aria-required={required || undefined}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className={cn(
-          "mt-2 h-12 w-full rounded-xl border bg-ink-800 px-4 text-[0.9375rem] text-fg transition-colors duration-200 placeholder:text-fg-subtle",
-          "hover:border-line-strong focus:border-line-strong",
-          error ? "border-danger/60" : "border-line",
-        )}
+        className={cn(inputStyles, "mt-2 h-12")}
       />
       {error ? (
-        <p id={errorId} data-testid="error-note" className="mt-2 text-sm text-danger">
+        <FieldError id={errorId} testId="error-note">
           {error}
-        </p>
+        </FieldError>
       ) : null}
     </div>
   );

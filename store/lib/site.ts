@@ -29,14 +29,14 @@ export const WHATSAPP_LINES: Record<WhatsAppLineId, WhatsAppLine> = {
     region: "BH",
     e164: "+97339858885",
     display: "+973 3985 8885",
-    label: { en: "Bahrain · Line 1", ar: "البحرين · الخط ١" },
+    label: { en: "Bahrain · Line 1", ar: "البحرين · الخط 1" },
   },
   "bh-secondary": {
     id: "bh-secondary",
     region: "BH",
     e164: "+97363669666",
     display: "+973 6366 9666",
-    label: { en: "Bahrain · Line 2", ar: "البحرين · الخط ٢" },
+    label: { en: "Bahrain · Line 2", ar: "البحرين · الخط 2" },
   },
   ae: {
     id: "ae",

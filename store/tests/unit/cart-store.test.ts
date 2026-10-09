@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { OrderLine } from "@/types";
 import { MAX_LINES, MAX_QTY } from "@/lib/whatsapp";
 import { selectCount, useCart } from "@/lib/store/cart";
+import { useUI } from "@/lib/store/ui";
 
 const clicker: OrderLine = { slug: "keycap-clicker", colorId: "yellow", sizeId: "one", qty: 1 };
 const shifter: OrderLine = { slug: "gear-shifter", colorId: "black-red", sizeId: "one", qty: 1 };
@@ -98,6 +99,73 @@ describe("cart add", () => {
   });
 });
 
+describe("cart add result", () => {
+  it("is added when everything asked for went in", () => {
+    expect(cart().add(clicker)).toBe("added");
+    expect(cart().add({ ...clicker, qty: 3 })).toBe("added");
+    expect(lines()[0].qty).toBe(4);
+  });
+
+  it("is capped when a merge hits MAX_QTY", () => {
+    cart().add({ ...clicker, qty: MAX_QTY - 2 });
+    expect(cart().add({ ...clicker, qty: 5 })).toBe("capped");
+    expect(lines()[0].qty).toBe(MAX_QTY);
+    // Already at the cap: nothing more goes in, and it still says so.
+    expect(cart().add(clicker)).toBe("capped");
+    expect(lines()[0].qty).toBe(MAX_QTY);
+  });
+
+  it("is added when a merge lands exactly on MAX_QTY", () => {
+    cart().add({ ...clicker, qty: MAX_QTY - 2 });
+    expect(cart().add({ ...clicker, qty: 2 })).toBe("added");
+    expect(lines()[0].qty).toBe(MAX_QTY);
+  });
+
+  it("is capped when a new line asks for more than MAX_QTY", () => {
+    expect(cart().add({ ...clicker, qty: MAX_QTY + 1 })).toBe("capped");
+    expect(lines()[0].qty).toBe(MAX_QTY);
+  });
+
+  it("is full when the order already has MAX_LINES lines, and nothing changes", () => {
+    for (let i = 0; i < MAX_LINES; i++) expect(cart().add(phoneCase(`iPhone ${i}`))).toBe("added");
+    const before = lines();
+    expect(cart().add(phoneCase("iPhone 99"))).toBe("full");
+    expect(lines()).toBe(before);
+    // A merge into an existing line still works when full.
+    expect(cart().add(phoneCase("iPhone 3"))).toBe("added");
+  });
+});
+
+describe("cart setNote", () => {
+  it("changes the note of one line", () => {
+    cart().add(phoneCase("iPhone 13"));
+    cart().add(clicker);
+    cart().setNote(0, "  iPhone 13 mini ");
+    expect(lines()).toEqual([phoneCase("iPhone 13 mini"), clicker]);
+  });
+
+  it("folds the line into an identical one, summing (and capping) the quantity", () => {
+    cart().add(phoneCase("iPhone 15", 2));
+    cart().add(clicker);
+    cart().add(phoneCase("iPhone 51", 3));
+    cart().setNote(2, "iphone 15");
+    expect(lines()).toEqual([phoneCase("iPhone 15", 5), clicker]);
+
+    cart().add(phoneCase("iPhone 16", MAX_QTY));
+    cart().setNote(2, "iPhone 15");
+    expect(lines()).toEqual([phoneCase("iPhone 15", MAX_QTY), clicker]);
+  });
+
+  it("drops an empty note and ignores a missing index", () => {
+    cart().add(phoneCase("iPhone 13"));
+    cart().setNote(0, "   ");
+    expect(lines()[0]).not.toHaveProperty("note");
+    const before = lines();
+    cart().setNote(4, "x");
+    expect(lines()).toBe(before);
+  });
+});
+
 describe("cart setQty", () => {
   beforeEach(() => {
     cart().add(clicker);
@@ -186,8 +254,81 @@ describe("cart persistence", () => {
     expect(lines()).toEqual([clicker, phoneCase("iPhone 15", 2)]);
   });
 
+  const restore = async (saved: unknown) => {
+    localStorage.setItem(key(), JSON.stringify({ version: useCart.persist.getOptions().version, state: { lines: saved } }));
+    await useCart.persist.rehydrate();
+    return lines();
+  };
+
+  it("clamps restored quantities to 1…MAX_QTY", async () => {
+    expect(
+      await restore([
+        { ...clicker, qty: 35 },
+        { ...shifter, qty: 0 },
+        { ...phoneCase("iPhone 15"), qty: 2.7 },
+        { ...phoneCase("iPhone 13"), qty: "lots" },
+      ]),
+    ).toEqual([
+      { ...clicker, qty: MAX_QTY },
+      { ...shifter, qty: 1 },
+      phoneCase("iPhone 15", 2),
+      phoneCase("iPhone 13", 1),
+    ]);
+  });
+
+  it("folds duplicate lines (same variant and note, any case) into one", async () => {
+    expect(
+      await restore([
+        phoneCase("iPhone 15", 2),
+        clicker,
+        phoneCase(" IPHONE 15 ", 3),
+        { ...clicker, qty: 19 },
+        { ...clicker, note: "" },
+      ]),
+    ).toEqual([phoneCase("iPhone 15", 5), { ...clicker, qty: MAX_QTY }]);
+  });
+
+  it("drops malformed entries and keeps at most MAX_LINES lines", async () => {
+    const many = Array.from({ length: MAX_LINES + 5 }, (_, i) => phoneCase(`iPhone ${i}`));
+    const restored = await restore([null, 42, "x", { slug: 7 }, { ...clicker, colorId: undefined }, ...many]);
+    expect(restored).toHaveLength(MAX_LINES);
+    expect(restored[0]).toEqual(phoneCase("iPhone 0"));
+    expect(await restore("not an array")).toEqual([]);
+  });
+
+  it("keeps this tab's lines when a re-sync finds nothing stored", async () => {
+    cart().add(clicker);
+    localStorage.clear();
+    await useCart.persist.rehydrate();
+    expect(lines()).toEqual([clicker]);
+  });
+
+  it("picks up what another tab saved", async () => {
+    cart().add(clicker);
+    // Another tab adds a piece and saves the whole cart.
+    localStorage.setItem(
+      key(),
+      JSON.stringify({ version: useCart.persist.getOptions().version, state: { lines: [clicker, shifter] } }),
+    );
+    await useCart.persist.rehydrate();
+    cart().add(phoneCase("iPhone 15"));
+    expect(lines()).toEqual([clicker, shifter, phoneCase("iPhone 15")]);
+  });
+
   it("restores an empty cart from missing or empty storage", async () => {
     await useCart.persist.rehydrate();
     expect(lines()).toEqual([]);
+  });
+});
+
+describe("opening the cart", () => {
+  it("clears pending toasts, so an 'Added' toast doesn't cover the first line", () => {
+    useUI.getState().toast({ title: "Added to your order" });
+    expect(useUI.getState().toasts).toHaveLength(1);
+    useUI.getState().setCartOpen(true);
+    expect(useUI.getState()).toMatchObject({ cartOpen: true, toasts: [] });
+    useUI.getState().toast({ title: "WhatsApp is open" });
+    useUI.getState().setCartOpen(false);
+    expect(useUI.getState().toasts).toHaveLength(1);
   });
 });

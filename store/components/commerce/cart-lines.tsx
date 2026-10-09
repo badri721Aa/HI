@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
-import type { ColorOption, Locale, OrderLine, Product, Region, SizeOption } from "@/types";
+import type { OrderLine, Region } from "@/types";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { Amount } from "@/components/commerce/price";
 import { QtyStepper } from "@/components/commerce/qty-stepper";
@@ -14,7 +14,7 @@ import { ButtonLink, buttonStyles } from "@/components/ui/button";
 import { REGION_CONFIG, vat } from "@/lib/site";
 import { fromMinor, toMinor } from "@/lib/currency";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
-import { LIMITS, type OrderErrorKey, type PricedLine, type PricedOrder } from "@/lib/whatsapp";
+import { LIMITS, variantLabel, type OrderErrorKey, type PricedLine, type PricedOrder } from "@/lib/whatsapp";
 import { fmt } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { FieldError, describedBy, inputStyles } from "./checkout-form";
@@ -26,24 +26,6 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 /** Same identity the cart uses to merge lines: product, variant and (case-insensitive) note. */
 export function lineKey(line: OrderLine): string {
   return [line.slug, line.colorId, line.sizeId, (line.note ?? "").trim().toLowerCase()].join("|");
-}
-
-/** "One size" style names carry no information when they're the only option. */
-const silentSize = (size: SizeOption) => /^(one|one-size|default)$/.test(size.id) || /^one size$/i.test(size.name.en);
-const silentColour = (colour: ColorOption) => /^(one|default)$/.test(colour.id);
-
-/**
- * "Fitted to your iPhone · Sky blue". A part is left out when the product
- * offers only that one option and it says nothing ("One size"); a sole
- * option that does describe the piece ("Fitted to your iPhone", "Yellow") stays.
- */
-export function variantLabel(product: Product, line: OrderLine, locale: Locale): string {
-  const size = product.sizes.find((s) => s.id === line.sizeId);
-  const colour = product.colors.find((c) => c.id === line.colorId);
-  const parts: string[] = [];
-  if (size && !(product.sizes.length === 1 && silentSize(size))) parts.push(size.name[locale]);
-  if (colour && !(product.colors.length === 1 && silentColour(colour))) parts.push(colour.name[locale]);
-  return parts.join(" · ");
 }
 
 export interface OrderTotals {
@@ -154,6 +136,8 @@ function CartLineItem({
   const variant = variantLabel(product, line, locale);
   const image = product.images[0];
   const needsNote = Boolean(product.variantNote?.required) && !line.note?.trim();
+  // An iPhone model typed wrong can be fixed here instead of removing and re-adding the piece.
+  const [editingNote, setEditingNote] = useState(false);
 
   return (
     <motion.li
@@ -205,9 +189,17 @@ function CartLineItem({
                 </Link>
               </h3>
               {variant ? <p className="mt-1 text-sm leading-snug text-fg-muted">{variant}</p> : null}
-              {priced.note ? (
+              {priced.note && !editingNote ? (
                 <p className="mt-0.5 text-sm leading-snug text-fg-muted">
-                  {priced.note.label}: <span className="text-fg">{priced.note.value}</span>
+                  {priced.note.label}: <span className="text-fg">{priced.note.value}</span>{" "}
+                  <button
+                    type="button"
+                    onClick={() => setEditingNote(true)}
+                    aria-label={`${t.common.actions.edit}: ${priced.note.label}`}
+                    className="relative ms-1 text-[0.8125rem] underline decoration-line-strong underline-offset-4 transition-colors before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] hover:text-fg hover:decoration-fg-muted"
+                  >
+                    {t.common.actions.edit}
+                  </button>
                 </p>
               ) : null}
             </div>
@@ -221,14 +213,16 @@ function CartLineItem({
             </div>
           </div>
 
-          {needsNote && product.variantNote ? (
+          {(needsNote || editingNote) && product.variantNote ? (
             <LineNote
               index={index}
               label={product.variantNote.label[locale]}
               placeholder={product.variantNote.placeholder[locale]}
+              initial={editingNote ? line.note : undefined}
               invalid={Boolean(error)}
               errorId={error ? errorId : undefined}
               onCommit={onNote}
+              onDone={() => setEditingNote(false)}
             />
           ) : null}
 
@@ -256,33 +250,53 @@ function CartLineItem({
 }
 
 /**
- * A required per-item detail (e.g. iPhone model) that's missing from a line,
- * typed straight into the cart. Committed on blur, so typing never re-keys
- * the line under the cursor.
+ * A per-item detail (e.g. iPhone model) typed straight into the cart: a
+ * required one that's missing, or an existing one being corrected (`initial`,
+ * focused on mount). Committed on blur or Enter, so typing never re-keys the
+ * line under the cursor; clearing an existing note keeps the old one.
  */
 function LineNote({
   index,
   label,
   placeholder,
+  initial,
   invalid,
   errorId,
   onCommit,
+  onDone,
 }: {
   index: number;
   label: string;
   placeholder: string;
+  initial?: string;
   invalid: boolean;
   errorId?: string;
   onCommit: (note: string) => void;
+  onDone?: () => void;
 }) {
   const id = useId();
-  const [value, setValue] = useState("");
+  const { dir } = useI18n();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState(initial ?? "");
+  const editing = initial !== undefined;
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const commit = () => {
+    const next = value.trim();
+    if (next && next !== initial?.trim()) onCommit(next);
+    onDone?.();
+  };
+
   return (
     <div className="mt-3">
       <label htmlFor={id} className="text-[0.8125rem] font-medium text-fg">
         {label}
       </label>
       <input
+        ref={inputRef}
         id={id}
         data-line-note={index}
         type="text"
@@ -290,10 +304,17 @@ function LineNote({
         maxLength={LIMITS.note}
         placeholder={placeholder}
         autoComplete="off"
+        enterKeyHint="done"
+        // Empty, it follows the page (an Arabic placeholder reads right to left); typed text finds its own direction.
+        dir={value ? "auto" : dir}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={() => {
-          if (value.trim()) onCommit(value.trim());
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
         }}
+        onBlur={commit}
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy(errorId)}
         className={cn(inputStyles, "mt-1.5 h-11")}

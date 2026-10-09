@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { OrderLine } from "@/types";
 import { getDictionary } from "@/lib/i18n";
+import * as barrel from "@/lib/whatsapp";
 import {
   LIMITS,
   MAX_LINES,
   MAX_QTY,
   cityName,
+  isOtherCity,
   priceOrder,
   sanitizeText,
-  validateOrder,
   type OrderErrorKey,
   type OrderInput,
 } from "@/lib/whatsapp";
+import { validateOrder } from "@/lib/whatsapp/schema";
 
 const clicker: OrderLine = { slug: "keycap-clicker", colorId: "yellow", sizeId: "one", qty: 1 };
 const cell: OrderLine = { slug: "plant-cell-model", colorId: "multicolour", sizeId: "one", qty: 1 };
@@ -122,8 +124,13 @@ describe("validateOrder", () => {
 
   it("name_required at customer.name", () => {
     expectError(withCustomer({ name: "" }), "customer.name", "name_required");
-    expectError(withCustomer({ name: "A" }), "customer.name", "name_required");
     expectError(withCustomer({ name: "     " }), "customer.name", "name_required");
+  });
+
+  it("name_too_short for a single letter", () => {
+    expectError(withCustomer({ name: "A" }), "customer.name", "name_too_short");
+    expectError(withCustomer({ name: " ع " }), "customer.name", "name_too_short");
+    expect(validateOrder(withCustomer({ name: "Al" })).ok).toBe(true);
   });
 
   it("name_too_long at customer.name", () => {
@@ -136,6 +143,29 @@ describe("validateOrder", () => {
       expectError(withCustomer({ phone }), "customer.phone", "phone_invalid");
     },
   );
+
+  it("accepts phone numbers typed in Arabic-Indic or Eastern Arabic-Indic digits", () => {
+    expect(validateOrder(withCustomer({ phone: "٣٩٨٥ ٨٨٨٥" })).ok).toBe(true);
+    expect(validateOrder(withCustomer({ phone: "+٩٧٣ ٣٣٣٣ ٤٤٤٤" })).ok).toBe(true);
+    expect(validateOrder(withCustomer({ phone: "۰۵۰ ۴۶۴ ۴۵۰۲" })).ok).toBe(true);
+    expectError(withCustomer({ phone: "٣٩٨" }), "customer.phone", "phone_invalid");
+  });
+
+  it("area_required when the city is 'Other area' and there is no address", () => {
+    expectError(withCustomer({ city: "other-bh", area: "" }), "customer.area", "area_required");
+    expectError(withCustomer({ city: "other-bh", area: "   " }), "customer.area", "area_required");
+    expectError(order({ customer: { name: "Fatima", city: "other-bh" } }), "customer.area", "area_required");
+    expect(validateOrder(withCustomer({ city: "other-bh", area: "Sanad, block 743" })).ok).toBe(true);
+  });
+
+  it("does not ask for an address for a named city", () => {
+    expect(validateOrder(withCustomer({ city: "riffa", area: "" })).ok).toBe(true);
+  });
+
+  it("reports area_required alongside other errors", () => {
+    const result = validateOrder(order({ customer: { name: "", city: "other-bh" } }));
+    expect(result.errors).toMatchObject({ "customer.name": "name_required", "customer.area": "area_required" });
+  });
 
   it("city_required when the city is missing", () => {
     expectError(withCustomer({ city: "" }), "customer.city", "city_required");
@@ -177,6 +207,7 @@ describe("validateOrder", () => {
       order({ lines: [] }),
       order({ lines: [{ ...clicker, qty: 0 }, { ...clicker, slug: "x" }, { ...phoneCase, note: "" }] }),
       order({ customer: { name: "", phone: "1", city: "dubai", area: "a".repeat(99), notes: "n".repeat(999) } }),
+      order({ customer: { name: "A", city: "other-bh" } }),
       order({ website: "x" }),
     ];
     for (const input of inputs) {
@@ -196,9 +227,11 @@ describe("error dictionary", () => {
     note_required: true,
     note_too_long: true,
     name_required: true,
+    name_too_short: true,
     name_too_long: true,
     phone_invalid: true,
     city_required: true,
+    area_required: true,
     area_too_long: true,
     notes_too_long: true,
     spam: true,
@@ -280,6 +313,22 @@ describe("priceOrder", () => {
 
   it("leaves dims undefined for the real products", () => {
     for (const line of priceOrder([clicker, cell, phoneCase], "BH", "en").lines) expect(line.dims).toBeUndefined();
+  });
+});
+
+describe("isOtherCity", () => {
+  it("is true only for the catch-all area ids", () => {
+    expect(isOtherCity("other-bh")).toBe(true);
+    expect(isOtherCity("manama")).toBe(false);
+    expect(isOtherCity("")).toBe(false);
+    expect(isOtherCity(undefined)).toBe(false);
+  });
+});
+
+describe("barrel", () => {
+  it("keeps zod-backed validation out of @/lib/whatsapp (it loads on demand)", () => {
+    expect("validateOrder" in barrel).toBe(false);
+    expect("orderSchema" in barrel).toBe(false);
   });
 });
 

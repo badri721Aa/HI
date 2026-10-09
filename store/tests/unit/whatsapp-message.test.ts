@@ -9,6 +9,7 @@ import {
   MAX_WHATSAPP_URL_LENGTH,
   buildCustomRequestMessage,
   buildHelloMessage,
+  buildOrderLink,
   buildWhatsAppMessagePayload,
   createOrderRef,
   generateWhatsAppLink,
@@ -35,6 +36,9 @@ const phoneCase: OrderLine = {
   note: "iPhone 15 Pro",
 };
 const fatima: Customer = { name: "Fatima Ali", phone: "+973 3985 8885", city: "manama", area: "Block 338", notes: "Ring twice" };
+const RLM = "\u200F";
+const LRI = "\u2066";
+const PDI = "\u2069";
 
 function message(lines: OrderLine[], opts: { region?: Region; locale?: Locale; customer?: Customer } = {}) {
   return buildWhatsAppMessagePayload({
@@ -60,16 +64,16 @@ describe("buildWhatsAppMessagePayload (English)", () => {
         "",
         `*Order ${REF}*`,
         "",
-        "1. Keycap Clicker — One size, Yellow",
+        "1. Keycap Clicker — Yellow",
         "   2 × 1.000 BHD = 2.000 BHD",
         `   ${sku("keycap-clicker")}`,
-        "2. Hex Phone Case — Fitted to your iPhone, Sky blue",
+        "2. Hex Phone Case — Sky blue",
         "   iPhone model: iPhone 15 Pro",
         "   2.000 BHD",
         `   ${sku("hex-phone-case")}`,
         "",
         "Subtotal: 4.000 BHD",
-        "Delivery: to be confirmed in this chat",
+        "Delivery fee: to be confirmed in this chat",
         "",
         "Name: Fatima Ali",
         "Phone: +973 3985 8885",
@@ -85,13 +89,20 @@ describe("buildWhatsAppMessagePayload (English)", () => {
     expect(lines).toContain(`*Order ${REF}*`);
   });
 
-  it("numbers every line and shows size and colour without empty brackets", () => {
+  it("numbers every line and shows the colour, leaving out a size there was no choice of", () => {
     const msg = message([clicker, cell, phoneCase]);
-    expect(msg).toContain("1. Keycap Clicker — One size, Yellow\n");
-    expect(msg).toContain("2. Plant Cell Model — One size, Multicolour\n");
-    expect(msg).toContain("3. Hex Phone Case — Fitted to your iPhone, Sky blue\n");
+    expect(msg).toContain("1. Keycap Clicker — Yellow\n");
+    expect(msg).toContain("2. Plant Cell Model — Multicolour\n");
+    expect(msg).toContain("3. Hex Phone Case — Sky blue\n");
+    expect(msg).not.toContain("One size");
+    expect(msg).not.toContain("Fitted to your iPhone");
     expect(msg).not.toContain("()");
     expect(msg).not.toMatch(/\d+×\d+×\d+/);
+  });
+
+  it("leaves out any sole size, named or not (the shop knows its own piece)", () => {
+    const dumpling: OrderLine = { slug: "dumpling-steamer", colorId: "pink-bamboo", sizeId: "small", qty: 1 };
+    expect(message([dumpling])).toContain("\n1. Dumpling in a Steamer — Pink & bamboo\n");
   });
 
   it("prints the iPhone model under the phone case, cleaned", () => {
@@ -117,9 +128,18 @@ describe("buildWhatsAppMessagePayload (English)", () => {
 
   it("says delivery is confirmed in the chat and shows no total while the fee is unknown", () => {
     const lines = message([clicker]).split("\n");
-    expect(lines).toContain("Delivery: to be confirmed in this chat");
+    expect(lines).toContain("Delivery fee: to be confirmed in this chat");
     expect(lines.some((l) => l.startsWith("Total"))).toBe(false);
     expect(lines.some((l) => l.startsWith("VAT"))).toBe(false);
+  });
+
+  it("prints a phone typed in Arabic-Indic digits with Western digits", () => {
+    const msg = message([clicker], { customer: { ...fatima, phone: "٣٩٨٥ ٨٨٨٥" } });
+    expect(msg).toContain("\nPhone: 3985 8885\n");
+  });
+
+  it("adds no direction marks to English messages", () => {
+    expect(message([clicker, phoneCase])).not.toMatch(/[\u200E\u200F\u2066-\u2069]/);
   });
 
   it("leaves out optional customer fields that are empty", () => {
@@ -165,16 +185,16 @@ describe("buildWhatsAppMessagePayload (Arabic)", () => {
         "",
         `*طلب رقم ${REF}*`,
         "",
-        "1. ميدالية الكيكاب — مقاس واحد، أصفر",
+        "1. ميدالية الكيكاب — أصفر",
         "   2 × 10.00 د.إ = 20.00 د.إ",
-        `   ${sku("keycap-clicker")}`,
-        "2. كفر الخلايا السداسية — حسب موديل الآيفون، أزرق سماوي",
+        `${RLM}   ${sku("keycap-clicker")}`,
+        "2. كفر الخلايا السداسية — أزرق سماوي",
         "   موديل الآيفون: iPhone 15 Pro",
         "   20.00 د.إ",
-        `   ${sku("hex-phone-case")}`,
+        `${RLM}   ${sku("hex-phone-case")}`,
         "",
         "المجموع الفرعي: 40.00 د.إ",
-        "التوصيل: يُؤكد في هذه المحادثة",
+        "رسوم التوصيل: تُحدد في هذه المحادثة",
         "",
         "الاسم: فاطمة",
         "التوصيل إلى: دبي، الإمارات",
@@ -189,11 +209,64 @@ describe("buildWhatsAppMessagePayload (Arabic)", () => {
     expect(msg).toContain("   2 × 1.000 د.ب = 2.000 د.ب");
     expect(msg).toContain("المجموع الفرعي: 5.000 د.ب");
     expect(msg).toContain("الاسم: Fatima Ali");
-    expect(msg).toContain("الهاتف: +973 3985 8885");
+    expect(msg).toContain(`الهاتف: ${LRI}+973 3985 8885${PDI}`);
     expect(msg).toContain("التوصيل إلى: المنامة، البحرين — Block 338");
     expect(msg).toContain("ملاحظات: Ring twice");
     expect(msg).not.toContain("BHD");
     expect(msg).not.toMatch(/\b(Subtotal|Delivery|Name|Phone|Notes|Order)\b/);
+  });
+});
+
+describe("Arabic text direction", () => {
+  /** First strong directional character of a line: what WhatsApp uses to align it. */
+  const firstStrong = (line: string) => /[A-Za-z\u0600-\u06FF\u200F]/.exec(line)?.[0];
+
+  it("starts every line that would open with Latin (the SKU) with a right-to-left mark", () => {
+    const msg = message([clicker, cell, phoneCase], { locale: "ar" });
+    const lines = msg.split("\n");
+    for (const slug of ["keycap-clicker", "plant-cell-model", "hex-phone-case"]) {
+      expect(lines).toContain(`${RLM}   ${sku(slug)}`);
+    }
+    for (const line of lines) {
+      const first = firstStrong(line);
+      if (first) expect(first, line).not.toMatch(/[A-Za-z]/);
+    }
+  });
+
+  it("does not mark lines that already start with Arabic", () => {
+    const lines = message([clicker], { locale: "ar" }).split("\n");
+    expect(lines.filter((l) => l.startsWith(RLM))).toHaveLength(1);
+  });
+
+  it("isolates the phone number so its digit groups keep their order", () => {
+    const msg = message([clicker], { locale: "ar", customer: { ...fatima, phone: "3333 4444" } });
+    expect(msg).toContain(`\nالهاتف: ${LRI}3333 4444${PDI}\n`);
+  });
+
+  it("isolates and normalises a phone typed in Arabic-Indic digits", () => {
+    const msg = message([clicker], { locale: "ar", customer: { ...fatima, phone: "+٩٧٣ ٣٣٣٣ ٤٤٤٤" } });
+    expect(msg).toContain(`\nالهاتف: ${LRI}+973 3333 4444${PDI}\n`);
+  });
+
+  it("never lets the customer's own bidi controls through, only the builder's", () => {
+    const msg = message([clicker], { locale: "ar", customer: { ...fatima, phone: "\u2066\u202E3333 4444\u2069" } });
+    expect(msg).toContain(`الهاتف: ${LRI}3333 4444${PDI}`);
+    expect(msg.match(/\u2066/g)).toHaveLength(1);
+  });
+
+  it("keeps the custom request's lines right to left too", () => {
+    const msg = buildCustomRequestMessage({
+      ref: `${PREFIX}-AB12C`,
+      region: "BH",
+      locale: "ar",
+      description: "A replacement knob",
+      quantity: 1,
+      customer: { name: "Fatima", city: "manama" },
+    });
+    for (const line of msg.split("\n")) {
+      const first = firstStrong(line);
+      if (first) expect(first, line).not.toMatch(/[A-Za-z]/);
+    }
   });
 });
 
@@ -296,6 +369,68 @@ describe("maximal order", () => {
   });
 });
 
+describe("buildOrderLink (compact receipt)", () => {
+  const phone = resolveLine("BH").e164;
+  const input = (lines: OrderLine[], customer: Customer, locale: Locale = "en") => ({
+    ref: REF,
+    region: "BH" as const,
+    locale,
+    lines,
+    customer,
+  });
+  const textOf = (href: string) => decodeURIComponent(href.split("?text=")[1] ?? "");
+  const isSkuLine = (line: string) => PRODUCTS.some((p) => line.replace(RLM, "") === `   ${p.sku}`);
+
+  /** 20 phone cases with Arabic models, and Arabic notes grown until the full receipt is just past the limit. */
+  function justPastTheLimit() {
+    const lines = Array.from({ length: MAX_LINES }, (_, i) => ({ ...phoneCase, qty: 2, note: `آيفون ${i} برو ماكس` }));
+    for (let n = 0; n <= LIMITS.notes; n += 5) {
+      const customer: Customer = { name: "فاطمة علي", city: "riffa", area: "مجمع 939", notes: "ب".repeat(n) };
+      const full = generateWhatsAppLink(phone, buildWhatsAppMessagePayload(input(lines, customer, "ar")));
+      if (!isWithinUrlLimit(full)) return { lines, customer };
+    }
+    throw new Error("no order in range is past the limit");
+  }
+
+  it("sends the full receipt when it fits", () => {
+    const link = buildOrderLink(phone, input([clicker, phoneCase], fatima));
+    expect(link).toMatchObject({ compact: false, fits: true });
+    expect(link.message).toBe(message([clicker, phoneCase]));
+    expect(textOf(link.href)).toBe(link.message);
+  });
+
+  it("the compact receipt is the full one without its SKU lines", () => {
+    const full = message([clicker, cell, phoneCase]);
+    const compact = buildWhatsAppMessagePayload({ ...input([clicker, cell, phoneCase], fatima), compact: true });
+    expect(compact.split("\n")).toEqual(full.split("\n").filter((line) => !isSkuLine(line)));
+    for (const slug of ["keycap-clicker", "plant-cell-model", "hex-phone-case"]) expect(compact).not.toContain(sku(slug));
+  });
+
+  it("switches to the compact receipt past the limit, and the link carries exactly that text", () => {
+    const { lines, customer } = justPastTheLimit();
+    const link = buildOrderLink(phone, input(lines, customer, "ar"));
+    expect(link).toMatchObject({ compact: true, fits: true });
+    expect(link.href.length).toBeLessThanOrEqual(MAX_WHATSAPP_URL_LENGTH);
+    expect(link.message).toBe(buildWhatsAppMessagePayload({ ...input(lines, customer, "ar"), compact: true }));
+    expect(textOf(link.href)).toBe(link.message);
+    expect(link.message).not.toContain(sku("hex-phone-case"));
+    // Names, variants, notes, quantities and prices all stay.
+    expect(link.message).toContain(`${MAX_LINES}. كفر الخلايا السداسية — أزرق سماوي`);
+    expect(link.message).toContain(`آيفون ${MAX_LINES - 1} برو ماكس`);
+    expect(link.message).toContain("   2 × 2.000 د.ب = 4.000 د.ب");
+    expect(link.message).toContain("المجموع الفرعي: 80.000 د.ب");
+    expect(link.message).toContain("فاطمة علي");
+  });
+
+  it("reports that it doesn't fit when even the compact receipt is too long", () => {
+    const lines = Array.from({ length: MAX_LINES }, (_, i) => ({ ...phoneCase, note: `${i}${"ب".repeat(LIMITS.note)}`.slice(0, LIMITS.note) }));
+    const customer: Customer = { name: "ب".repeat(LIMITS.name), city: "riffa", notes: "ب".repeat(LIMITS.notes) };
+    const link = buildOrderLink(phone, input(lines, customer, "ar"));
+    expect(link).toMatchObject({ compact: true, fits: false });
+    expect(textOf(link.href)).toBe(link.message);
+  });
+});
+
 describe("createOrderRef", () => {
   it("is the order prefix plus five Crockford base32 characters", () => {
     for (let i = 0; i < 500; i++) expect(createOrderRef()).toMatch(REF_PATTERN);
@@ -346,7 +481,7 @@ describe("buildCustomRequestMessage", () => {
         "Name: Fatima",
         "Deliver to: Manama, Bahrain",
         "",
-        "I'll send reference photos or a 3D file in this chat.",
+        "I can send photos or a 3D file here if needed.",
       ].join("\n"),
     );
   });
@@ -356,10 +491,13 @@ describe("buildCustomRequestMessage", () => {
     expect(buildCustomRequestMessage({ ...base, material: undefined })).toContain("\nMaterial: Not sure, please advise\n");
   });
 
-  it("says no rush when there is no date", () => {
-    expect(buildCustomRequestMessage({ ...base, neededBy: "" })).toContain("\nNeeded by: No rush\n");
-    expect(buildCustomRequestMessage({ ...base, neededBy: "   " })).toContain("\nNeeded by: No rush\n");
-    expect(buildCustomRequestMessage(base)).toContain("\nNeeded by: No rush\n");
+  it("leaves out the date when none was given, rather than saying there's no rush", () => {
+    for (const neededBy of ["", "   ", undefined]) {
+      const msg = buildCustomRequestMessage({ ...base, neededBy });
+      expect(msg).not.toContain("Needed by");
+      expect(msg).not.toContain("No rush");
+      expect(msg).toContain("\nQuantity: 1\n\nName: Fatima\n");
+    }
   });
 
   it.each([
@@ -394,7 +532,8 @@ describe("buildCustomRequestMessage", () => {
     });
     expect(msg).toContain(`*طلب مخصص رقم ${PREFIX}-AB12C*`);
     expect(msg).toContain("الخامة: PLA حريري");
-    expect(msg).toContain("مطلوب قبل: لا يوجد استعجال");
+    expect(msg).not.toContain("مطلوب قبل");
+    expect(msg).not.toContain("استعجال");
     expect(msg).toContain("التوصيل إلى: أبوظبي، الإمارات");
     expect(buildCustomRequestMessage({ ...base, locale: "ar" })).toContain("الخامة: غير متأكد، أرجو الاقتراح");
   });

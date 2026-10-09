@@ -50,4 +50,24 @@ test.describe("Arabic", () => {
       .poll(async () => waText(await send.getAttribute("href")) === ((await preview.textContent()) ?? ""))
       .toBe(true);
   });
+
+  test("a phone typed with Arabic-Indic digits is accepted and sent in Western digits", async ({ page, waRequests }) => {
+    await gotoHome(page, "ar");
+    await addToOrder(page, clicker.slug);
+    const drawer = await goToCheckout(page);
+    // Line names use Western digits like the rest of the Arabic site.
+    await expect(drawer.getByTestId("line-bh-primary")).toContainText("الخط 1");
+
+    await fillCheckout(page, { name: "فاطمة", city: "manama" });
+    const phone = drawer.getByTestId("checkout-phone");
+    await phone.fill("٣٩٨٥ ٨٨٨٥");
+    await expect(phone).toHaveValue("3985 8885");
+    const preview = drawer.getByTestId("whatsapp-preview");
+    await expect(preview).toContainText("3985 8885");
+
+    await drawer.getByTestId("checkout-send").click();
+    await expect(drawer.getByTestId("error-phone")).toHaveCount(0);
+    await expect.poll(() => waRequests.length).toBeGreaterThan(0);
+    expect(waText(waRequests[0])).toContain("3985 8885");
+  });
 });

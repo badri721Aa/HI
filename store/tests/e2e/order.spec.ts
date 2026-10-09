@@ -87,6 +87,23 @@ test.describe("order flow", () => {
     expect(waText(waRequests[0])).toBe(waText(href));
   });
 
+  test("'Other area' needs an address before the order can be sent", async ({ page, waRequests }) => {
+    await gotoHome(page, "en");
+    await addToOrder(page, clicker.slug);
+    const drawer = await goToCheckout(page);
+    await fillCheckout(page, { name: "Fatima Ali", city: "other-bh" });
+
+    await drawer.getByTestId("checkout-send").click();
+    await expect(drawer.getByTestId("error-area")).toContainText(t.common.errors.area_required);
+    await expect(drawer.getByTestId("checkout-area")).toBeFocused();
+    expect(waRequests).toEqual([]);
+
+    await drawer.getByTestId("checkout-area").fill("Sanad, block 743");
+    await expect(drawer.getByTestId("whatsapp-preview")).toContainText("Other area, Bahrain — Sanad, block 743");
+    await drawer.getByTestId("checkout-send").click();
+    await expect.poll(() => waRequests.length).toBeGreaterThan(0);
+  });
+
   test("keeps the order reference stable while the form is edited", async ({ page }) => {
     await gotoHome(page, "en");
     await addToOrder(page, clicker.slug);

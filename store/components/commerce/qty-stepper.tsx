@@ -27,7 +27,8 @@ export function QtyStepper({
   const { t } = useI18n();
   const btn = cn(
     "inline-flex items-center justify-center text-fg-muted transition-colors hover:text-fg disabled:opacity-30 disabled:hover:text-fg-muted",
-    size === "sm" ? "size-9" : "size-11",
+    // sm looks 36px but keeps a 44px hit area.
+    size === "sm" ? "relative size-9 before:absolute before:-inset-1 before:content-['']" : "size-11",
   );
   return (
     <div

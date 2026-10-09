@@ -1,10 +1,7 @@
-import { z } from "zod";
 import type { Currency, Customer, Locale, OrderLine, Product, Region } from "@/types";
-import { REGIONS } from "@/types";
 import { getProduct } from "@/content/catalog";
 import { REGION_CONFIG } from "@/lib/site";
 import { currencyForRegion, fromMinor, priceFor, toMinor } from "@/lib/currency";
-import { isPlausiblePhone } from "./phone";
 
 export const MAX_QTY = 20;
 export const MAX_LINES = 20;
@@ -12,7 +9,7 @@ export const LIMITS = { name: 60, phone: 24, area: 80, notes: 400, note: 40 } as
 
 /**
  * Validation error keys. The UI maps each to a translated message via the
- * `errors` dictionary, so keep these in sync with lib/i18n/dictionaries.
+ * `errors` dictionary (lib/i18n/messages/common.ts), so keep the two in sync.
  */
 export type OrderErrorKey =
   | "cart_empty"
@@ -23,14 +20,14 @@ export type OrderErrorKey =
   | "note_required"
   | "note_too_long"
   | "name_required"
+  | "name_too_short"
   | "name_too_long"
   | "phone_invalid"
   | "city_required"
+  | "area_required"
   | "area_too_long"
   | "notes_too_long"
   | "spam";
-
-const err = (key: OrderErrorKey) => ({ message: key });
 
 /** Strips control characters, trims, and collapses runs of blank lines. */
 export function sanitizeText(input: string | undefined | null, max: number): string {
@@ -42,76 +39,24 @@ export function sanitizeText(input: string | undefined | null, max: number): str
     .slice(0, max);
 }
 
-export const orderLineSchema = z
-  .object({
-    slug: z.string().min(1),
-    colorId: z.string().min(1),
-    sizeId: z.string().min(1),
-    qty: z.number().int(err("qty_invalid")).min(1, err("qty_invalid")).max(MAX_QTY, err("qty_invalid")),
-    note: z.string().trim().max(LIMITS.note, err("note_too_long")).optional(),
-  })
-  .superRefine((line, ctx) => {
-    const product = getProduct(line.slug);
-    if (!product) {
-      ctx.addIssue({ code: "custom", message: "unknown_product", path: ["slug"] });
-      return;
-    }
-    if (!product.colors.some((c) => c.id === line.colorId)) {
-      ctx.addIssue({ code: "custom", message: "unknown_variant", path: ["colorId"] });
-    }
-    if (!product.sizes.some((s) => s.id === line.sizeId)) {
-      ctx.addIssue({ code: "custom", message: "unknown_variant", path: ["sizeId"] });
-    }
-    if (product.variantNote?.required && !line.note?.trim()) {
-      ctx.addIssue({ code: "custom", message: "note_required", path: ["note"] });
-    }
-  });
+/** "Other area" style choices: the city alone doesn't say where to deliver. */
+export function isOtherCity(cityId: string | undefined | null): boolean {
+  return !!cityId && cityId.startsWith("other-");
+}
 
-export const customerSchema = z.object({
-  name: z.string().trim().min(2, err("name_required")).max(LIMITS.name, err("name_too_long")),
-  phone: z
-    .string()
-    .trim()
-    .max(LIMITS.phone, err("phone_invalid"))
-    .optional()
-    .refine((v) => !v || isPlausiblePhone(v), err("phone_invalid")),
-  city: z.string().trim().min(1, err("city_required")),
-  area: z.string().trim().max(LIMITS.area, err("area_too_long")).optional(),
-  notes: z.string().trim().max(LIMITS.notes, err("notes_too_long")).optional(),
-});
-
-export const orderSchema = z
-  .object({
-    region: z.enum(REGIONS),
-    lines: z.array(orderLineSchema).min(1, err("cart_empty")).max(MAX_LINES, err("too_many_lines")),
-    customer: customerSchema,
-    /** Honeypot. Real people never see or fill this field. */
-    website: z.string().max(0, err("spam")).optional(),
-  })
-  .superRefine((order, ctx) => {
-    const cities = REGION_CONFIG[order.region].cities;
-    if (order.customer.city && !cities.some((c) => c.id === order.customer.city)) {
-      ctx.addIssue({ code: "custom", message: "city_required", path: ["customer", "city"] });
-    }
-  });
-
-export type OrderInput = z.input<typeof orderSchema>;
+/** What validateOrder() checks (lib/whatsapp/schema.ts, loaded on demand so zod stays off first load). */
+export interface OrderInput {
+  region: Region;
+  lines: OrderLine[];
+  customer: Customer;
+  /** Honeypot. Real people never see or fill this field. */
+  website?: string;
+}
 
 export interface ValidationResult {
   ok: boolean;
   /** First error per field path, e.g. { "customer.name": "name_required" }. */
   errors: Record<string, OrderErrorKey>;
-}
-
-export function validateOrder(input: OrderInput): ValidationResult {
-  const result = orderSchema.safeParse(input);
-  if (result.success) return { ok: true, errors: {} };
-  const errors: Record<string, OrderErrorKey> = {};
-  for (const issue of result.error.issues) {
-    const path = issue.path.join(".") || "_";
-    if (!errors[path]) errors[path] = issue.message as OrderErrorKey;
-  }
-  return { ok: false, errors };
 }
 
 export interface PricedLine {

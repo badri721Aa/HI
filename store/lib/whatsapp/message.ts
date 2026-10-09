@@ -3,6 +3,9 @@ import { REGION_CONFIG, site, vat } from "@/lib/site";
 import { formatCurrency, fromMinor, toMinor } from "@/lib/currency";
 import { getMaterial } from "@/content/catalog";
 import { LIMITS, cityName, priceOrder, sanitizeText } from "./order";
+import { generateWhatsAppLink, isWithinUrlLimit } from "./link";
+import { normalizeDigits } from "./phone";
+import { silentColour } from "./variant";
 
 /* Crockford base32 without I, L, O, U: easy to read out over the phone. */
 const REF_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -21,7 +24,7 @@ const T = {
     subtotal: "Subtotal",
     vat: (pct: number) => `VAT ${pct}%`,
     total: "Total",
-    delivery: "Delivery",
+    delivery: "Delivery fee",
     deliveryChat: "to be confirmed in this chat",
     name: "Name",
     phone: "Phone",
@@ -37,8 +40,7 @@ const T = {
     quantity: "Quantity",
     neededBy: "Needed by",
     notSure: "Not sure, please advise",
-    noRush: "No rush",
-    attachLater: "I'll send reference photos or a 3D file in this chat.",
+    attachLater: "I can send photos or a 3D file here if needed.",
     hello: (brand: string) => `Hi ${brand}, I have a question.`,
   },
   ar: {
@@ -47,8 +49,8 @@ const T = {
     subtotal: "المجموع الفرعي",
     vat: (pct: number) => `ضريبة القيمة المضافة ${pct}%`,
     total: "الإجمالي",
-    delivery: "التوصيل",
-    deliveryChat: "يُؤكد في هذه المحادثة",
+    delivery: "رسوم التوصيل",
+    deliveryChat: "تُحدد في هذه المحادثة",
     name: "الاسم",
     phone: "الهاتف",
     deliverTo: "التوصيل إلى",
@@ -63,11 +65,29 @@ const T = {
     quantity: "الكمية",
     neededBy: "مطلوب قبل",
     notSure: "غير متأكد، أرجو الاقتراح",
-    noRush: "لا يوجد استعجال",
-    attachLater: "سأرسل صوراً مرجعية أو ملفاً ثلاثي الأبعاد في هذه المحادثة.",
+    attachLater: "يمكنني إرسال صور أو ملف ثلاثي الأبعاد هنا عند الحاجة.",
     hello: (brand: string) => `مرحباً ${brand}، لدي استفسار.`,
   },
 } as const;
+
+/*
+ * WhatsApp sets each line's direction from its first strong character. In
+ * an Arabic message, a line that opens with Latin (a SKU) would flip to the
+ * left, so it gets a right-to-left mark; a phone number is isolated so its
+ * digit groups keep their order.
+ */
+const RLM = "\u200F";
+const LRI = "\u2066";
+const PDI = "\u2069";
+const LATIN = /[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]/;
+const FIRST_STRONG = /[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFC]/;
+
+function rtlLine(line: string): string {
+  const first = FIRST_STRONG.exec(line)?.[0];
+  return first && LATIN.test(first) ? `${RLM}${line}` : line;
+}
+
+const finish = (out: string[], locale: Locale) => (locale === "ar" ? out.map(rtlLine) : out).join("\n");
 
 function addressLine(region: Region, customer: Pick<Customer, "city" | "area">, locale: Locale): string {
   // No city yet (live preview before one is picked): print just the region, not ", Bahrain".
@@ -82,10 +102,12 @@ export interface OrderMessageInput {
   locale: Locale;
   lines: OrderLine[];
   customer: Customer;
+  /** Leaves out SKUs and dimensions, for orders whose full receipt is past the link limit. */
+  compact?: boolean;
 }
 
 /** Plain-text order receipt, formatted to read well in a WhatsApp chat bubble. */
-export function buildWhatsAppMessagePayload({ ref, region, locale, lines, customer }: OrderMessageInput): string {
+export function buildWhatsAppMessagePayload({ ref, region, locale, lines, customer, compact = false }: OrderMessageInput): string {
   const t = T[locale];
   const priced = priceOrder(lines, region, locale);
   const { currency } = priced;
@@ -94,15 +116,20 @@ export function buildWhatsAppMessagePayload({ ref, region, locale, lines, custom
   const out: string[] = [t.greeting(site.name), "", `*${t.order} ${ref}*`, ""];
 
   priced.lines.forEach((p, i) => {
-    const dims = p.dims ? ` (${p.dims.w}×${p.dims.d}×${p.dims.h} ${t.mm})` : "";
-    out.push(`${i + 1}. ${p.product.name[locale]} — ${p.sizeName}${dims}${sep}${p.colorName}`);
+    const dims = p.dims && !compact ? ` (${p.dims.w}×${p.dims.d}×${p.dims.h} ${t.mm})` : "";
+    // A sole size tells the shop nothing ("One size", "Fitted to your iPhone") unless it carries measurements.
+    const variant: string[] = [];
+    if (p.product.sizes.length > 1 || dims) variant.push(`${p.sizeName}${dims}`);
+    const colour = p.product.colors.find((c) => c.id === p.line.colorId);
+    if (!(p.product.colors.length === 1 && colour && silentColour(colour))) variant.push(p.colorName);
+    out.push(`${i + 1}. ${p.product.name[locale]}${variant.length ? ` — ${variant.join(sep)}` : ""}`);
     if (p.note) out.push(`   ${p.note.label}: ${p.note.value}`);
     out.push(
       p.line.qty > 1
         ? `   ${p.line.qty} × ${fmt(p.unitPrice)} = ${fmt(p.lineTotal)}`
         : `   ${fmt(p.unitPrice)}`,
     );
-    out.push(`   ${p.product.sku}`);
+    if (!compact) out.push(`   ${p.product.sku}`);
   });
 
   out.push("", `${t.subtotal}: ${fmt(priced.subtotal)}`);
@@ -121,13 +148,37 @@ export function buildWhatsAppMessagePayload({ ref, region, locale, lines, custom
   }
 
   out.push("", `${t.name}: ${sanitizeText(customer.name, LIMITS.name)}`);
-  const phone = sanitizeText(customer.phone, LIMITS.phone);
-  if (phone) out.push(`${t.phone}: ${phone}`);
+  const phone = normalizeDigits(sanitizeText(customer.phone, LIMITS.phone));
+  if (phone) out.push(`${t.phone}: ${locale === "ar" ? `${LRI}${phone}${PDI}` : phone}`);
   out.push(`${t.deliverTo}: ${addressLine(region, customer, locale)}`);
   const notes = sanitizeText(customer.notes, LIMITS.notes);
   if (notes) out.push(`${t.notes}: ${notes}`);
 
-  return out.join("\n");
+  return finish(out, locale);
+}
+
+export interface OrderLink {
+  /** The exact text the link carries: show this in the preview. */
+  message: string;
+  href: string;
+  /** True when the full receipt was too long and the compact one is used. */
+  compact: boolean;
+  /** False when even the compact receipt is past MAX_WHATSAPP_URL_LENGTH. */
+  fits: boolean;
+}
+
+/**
+ * The order's wa.me link. Uses the full receipt when it fits the URL limit,
+ * otherwise the compact one (no SKUs or dimensions; names, variants, notes,
+ * quantities and prices stay).
+ */
+export function buildOrderLink(phone: string, input: Omit<OrderMessageInput, "compact">): OrderLink {
+  const full = buildWhatsAppMessagePayload(input);
+  const fullHref = generateWhatsAppLink(phone, full);
+  if (isWithinUrlLimit(fullHref)) return { message: full, href: fullHref, compact: false, fits: true };
+  const message = buildWhatsAppMessagePayload({ ...input, compact: true });
+  const href = generateWhatsAppLink(phone, message);
+  return { message, href, compact: true, fits: isWithinUrlLimit(href) };
 }
 
 export interface CustomRequestInput {
@@ -163,11 +214,12 @@ export function buildCustomRequestMessage(input: CustomRequestInput): string {
   const colour = sanitizeText(input.colour, CUSTOM_LIMITS.colour);
   if (colour) out.push(`${t.colour}: ${colour}`);
   out.push(`${t.quantity}: ${Math.max(1, Math.floor(input.quantity) || 1)}`);
-  out.push(`${t.neededBy}: ${sanitizeText(input.neededBy, CUSTOM_LIMITS.neededBy) || t.noRush}`);
+  const neededBy = sanitizeText(input.neededBy, CUSTOM_LIMITS.neededBy);
+  if (neededBy) out.push(`${t.neededBy}: ${neededBy}`);
   out.push("", `${t.name}: ${sanitizeText(input.customer.name, LIMITS.name)}`);
   out.push(`${t.deliverTo}: ${addressLine(input.region, input.customer, loc)}`);
   out.push("", t.attachLater);
-  return out.join("\n");
+  return finish(out, loc);
 }
 
 /** Opening line for a general enquiry ("Chat on WhatsApp" buttons). */

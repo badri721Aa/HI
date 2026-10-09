@@ -3,7 +3,7 @@
 import { Fragment, useId, useState, type MouseEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Paperclip } from "lucide-react";
-import type { MaterialId } from "@/types";
+import type { MaterialId, Region } from "@/types";
 import { MATERIALS } from "@/content/catalog";
 import { useI18n } from "@/components/providers/i18n-provider";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -11,12 +11,22 @@ import { buttonStyles } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { Reveal } from "@/components/motion/reveal";
 import { QtyStepper } from "@/components/commerce/qty-stepper";
-import { CharCount, Field, Select, describedBy, inputStyles } from "@/components/commerce/checkout-form";
+import {
+  CharCount,
+  Field,
+  RegionChoice,
+  Select,
+  describedBy,
+  enterToNextField,
+  focusField,
+  inputStyles,
+} from "@/components/commerce/checkout-form";
 import { LinePicker, useWhatsAppLine } from "@/components/commerce/line-picker";
 import { REGION_CONFIG, site } from "@/lib/site";
 import { useRegion } from "@/lib/hooks/use-region";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { useUI } from "@/lib/store/ui";
+import { usePrefs } from "@/lib/store/prefs";
 import {
   CUSTOM_LIMITS,
   LIMITS,
@@ -27,7 +37,7 @@ import {
   isWithinUrlLimit,
   sanitizeText,
 } from "@/lib/whatsapp";
-import { fmt } from "@/lib/i18n";
+import { trackCustomSent } from "@/lib/whatsapp/track";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +48,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 type CustomField = "what" | "name" | "city";
 /** Document order: the first invalid one gets focus on send. */
 const CUSTOM_FIELDS: readonly CustomField[] = ["what", "name", "city"];
-type CustomError = "what" | "name" | "city" | "tooLong";
+type CustomError = "what" | "name" | "nameShort" | "city" | "tooLong";
 
 /**
  * 04 · Custom prints. The pitch and a few examples on one side; on the
@@ -51,7 +61,8 @@ export function CustomPrint() {
 
   return (
     <section id="custom" aria-labelledby="custom-title" className="relative py-28 md:py-40">
-      <div className="shell grid gap-14 lg:grid-cols-12 lg:gap-x-6">
+      {/* grid-cols-1 is minmax(0, 1fr): the form can't push the column wider than a 360px screen. */}
+      <div className="shell grid grid-cols-1 gap-14 lg:grid-cols-12 lg:gap-x-6">
         <div className="lg:sticky lg:top-28 lg:col-span-5 lg:self-start">
           <Reveal>
             <SectionHeader index="04" eyebrow={copy.eyebrow} title={copy.title} body={copy.body} id="custom-title" />
@@ -117,7 +128,9 @@ function CustomForm() {
   const cartCopy = t.commerce.cart;
   const region = useRegion();
   const line = useWhatsAppLine(region);
+  const setPrefsRegion = usePrefs((s) => s.setRegion);
   const toast = useUI((s) => s.toast);
+  const reduced = useReducedMotion();
   const baseId = useId();
   const id = (field: string) => `${baseId}-${field}`;
 
@@ -156,7 +169,9 @@ function CustomForm() {
   const errors: Partial<Record<CustomField, CustomError>> = {};
   if (sanitizeText(what, CUSTOM_LIMITS.description).length < 3) errors.what = "what";
   else if (!isWithinUrlLimit(href)) errors.what = "tooLong";
-  if (sanitizeText(name, LIMITS.name).length < 2) errors.name = "name";
+  const nameLength = sanitizeText(name, LIMITS.name).length;
+  if (nameLength === 0) errors.name = "name";
+  else if (nameLength < 2) errors.name = "nameShort";
   if (!city) errors.city = "city";
 
   const shown = (field: CustomField) => (touched.has(field) ? errors[field] : undefined);
@@ -172,6 +187,11 @@ function CustomForm() {
     if (!requestRef) setRequestRef(createOrderRef());
   };
 
+  const changeRegion = (next: Region) => {
+    if (next !== region) playSound("switch");
+    setPrefsRegion(next, true);
+  };
+
   const onSend = (e: MouseEvent<HTMLAnchorElement>) => {
     begin();
     setTouched(new Set(CUSTOM_FIELDS));
@@ -179,11 +199,12 @@ function CustomForm() {
     if (first || !message) {
       e.preventDefault();
       playSound("tap");
-      if (first) document.getElementById(id(first))?.focus();
+      if (first) focusField(document.getElementById(id(first)), reduced);
       return;
     }
     playSound("send");
-    toast({ title: cartCopy.sentTitle, body: fmt(copy.sentBody, { ref: requestRef ?? "" }) });
+    toast({ title: cartCopy.sentTitle, body: copy.sentBody, ref: requestRef ?? "" });
+    trackCustomSent({ region, line: line.id, lang: locale });
   };
 
   const aria = (field: CustomField, ...extra: (string | undefined)[]) => ({
@@ -199,6 +220,7 @@ function CustomForm() {
       noValidate
       aria-labelledby={id("title")}
       onSubmit={(e) => e.preventDefault()}
+      onKeyDown={enterToNextField}
       onFocus={begin}
       className="relative rounded-2xl border border-line bg-ink-900 p-5 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.05)] sm:p-7 md:p-9"
     >
@@ -312,7 +334,29 @@ function CustomForm() {
 
       <div className="mt-9 border-t border-line pt-7">
         <p className="eyebrow">{copy.details}</p>
-        <div className="mt-5 grid gap-6 sm:grid-cols-2 sm:gap-x-4">
+
+        {/* Where it's for decides the line and the city list, so it's chosen here, not only in the header. */}
+        <div className="mt-5">
+          <p id={id("region")} className="text-sm font-medium text-fg">
+            {cartCopy.region}
+          </p>
+          <RegionChoice
+            region={region}
+            onChange={changeRegion}
+            labelledBy={id("region")}
+            testIdPrefix="custom-"
+            className="mt-2 sm:max-w-sm"
+          />
+        </div>
+
+        {REGION_CONFIG[region].lines.length > 1 ? (
+          <div className="mt-6">
+            <p className="text-sm font-medium text-fg">{cartCopy.sendTo}</p>
+            <LinePicker region={region} testIdPrefix="custom-" label={cartCopy.sendTo} className="mt-2 sm:max-w-md" />
+          </div>
+        ) : null}
+
+        <div className="mt-6 grid gap-6 sm:grid-cols-2 sm:gap-x-4">
           <Field
             id={id("name")}
             label={copy.name}
@@ -375,40 +419,43 @@ function CustomForm() {
       </div>
 
       <div className="mt-9 border-t border-line pt-6">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <p className="text-sm text-fg-muted">
-            {copy.sendingTo}{" "}
-            {/* "Bahrain · Line 1 · +973 3985 8885", with room around each separator. */}
-            {[...line.label[locale].split(" · "), line.display].map((part, i, parts) => (
-              <Fragment key={i}>
-                {i === parts.length - 1 ? (
-                  <span dir="ltr" className="font-mono tabular text-fg">
-                    {part}
-                  </span>
-                ) : (
-                  <span className="text-fg">{part}</span>
-                )}
-                {i < parts.length - 1 ? (
-                  <span aria-hidden className="mx-1.5 text-fg-muted">
-                    ·
-                  </span>
-                ) : null}
-              </Fragment>
-            ))}
-          </p>
-          <LinePicker region={region} variant="compact" testIdPrefix="custom-" label={copy.sendingTo} />
-        </div>
+        <p id={id("dest")} className="text-sm text-fg-muted">
+          {copy.sendingTo}{" "}
+          {/* "Bahrain · Line 1 · +973 3985 8885", with room around each separator. */}
+          {[...line.label[locale].split(" · "), line.display].map((part, i, parts) => (
+            <Fragment key={i}>
+              {i === parts.length - 1 ? (
+                <span dir="ltr" className="font-mono tabular text-fg">
+                  {part}
+                </span>
+              ) : (
+                <span className="text-fg">{part}</span>
+              )}
+              {i < parts.length - 1 ? (
+                <span aria-hidden className="mx-1.5 text-fg-muted">
+                  ·
+                </span>
+              ) : null}
+            </Fragment>
+          ))}
+        </p>
 
         <a
           data-testid="custom-send"
           href={href}
           target="_blank"
           rel="noopener noreferrer"
+          aria-describedby={id("dest")}
           onClick={onSend}
           onAuxClick={(e) => {
             if (e.button === 1) onSend(e);
           }}
-          className={buttonStyles({ variant: "primary", size: "lg", className: "mt-6 w-full sm:w-auto" })}
+          className={buttonStyles({
+            variant: "primary",
+            size: "lg",
+            // On a narrow phone the label wraps instead of widening the form.
+            className: "mt-6 w-full max-sm:h-auto max-sm:min-h-13 max-sm:whitespace-normal max-sm:px-5 max-sm:py-3 max-sm:text-center sm:w-auto",
+          })}
         >
           <WhatsAppIcon className="size-5" />
           {copy.send}

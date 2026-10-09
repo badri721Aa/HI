@@ -22,6 +22,8 @@ test.describe("custom print form", () => {
     expect(text).toContain("Fatima Ali");
     expect(text).toMatch(ORDER_REF);
     expect(text).not.toMatch(/undefined|NaN|null/);
+    // Nothing the customer didn't say: no invented deadline.
+    expect(text).not.toContain("No rush");
 
     await send.click();
     await expect.poll(() => waRequests.length).toBeGreaterThan(0);
@@ -41,5 +43,26 @@ test.describe("custom print form", () => {
       .toMatch(/^custom-(what|name|city)$/);
     expect(opened).toEqual([]);
     expect(waRequests).toEqual([]);
+  });
+
+  test("the region and the Bahrain line are chosen in the form itself", async ({ page }) => {
+    const form = page.getByTestId("custom-form");
+    await form.scrollIntoViewIfNeeded();
+    const send = form.getByTestId("custom-send");
+
+    // Bahrain by default, with both lines offered.
+    await form.getByTestId("custom-line-bh-secondary").click();
+    await expect(form.getByTestId("custom-line-bh-secondary")).toHaveAttribute("aria-checked", "true");
+    await expect(send).toHaveAttribute("href", /^https:\/\/wa\.me\/97363669666/);
+
+    // The UAE: its own line, its own cities, no Bahrain line choice.
+    await form.getByTestId("custom-region-AE").click();
+    await expect(form.getByTestId("custom-region-AE")).toHaveAttribute("aria-checked", "true");
+    await expect(form.getByTestId("custom-line-bh-primary")).toBeHidden();
+    await setField(form.getByTestId("custom-what"), "A nameplate in Arabic calligraphy");
+    await setField(form.getByTestId("custom-name"), "Omar");
+    await setField(form.getByTestId("custom-city"), "dubai");
+    await expect(send).toHaveAttribute("href", /^https:\/\/wa\.me\/971504644502\?text=/);
+    await expect.poll(async () => waText(await send.getAttribute("href"))).toContain("Dubai, UAE");
   });
 });

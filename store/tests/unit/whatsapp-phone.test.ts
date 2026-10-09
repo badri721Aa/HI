@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { WHATSAPP_LINES } from "@/lib/site";
-import { isPlausiblePhone, toWaDigits } from "@/lib/whatsapp";
+import { isPlausiblePhone, normalizeDigits, toWaDigits } from "@/lib/whatsapp";
+
+describe("normalizeDigits", () => {
+  it("turns Arabic-Indic digits into 0–9", () => {
+    expect(normalizeDigits("٠١٢٣٤٥٦٧٨٩")).toBe("0123456789");
+    expect(normalizeDigits("٣٩٨٥ ٨٨٨٥")).toBe("3985 8885");
+  });
+
+  it("turns Eastern Arabic-Indic (Persian/Urdu) digits into 0–9", () => {
+    expect(normalizeDigits("۰۱۲۳۴۵۶۷۸۹")).toBe("0123456789");
+  });
+
+  it("leaves everything else alone", () => {
+    expect(normalizeDigits("+973 3985-8885")).toBe("+973 3985-8885");
+    expect(normalizeDigits("مجمع ١٢ Block 3")).toBe("مجمع 12 Block 3");
+    expect(normalizeDigits("")).toBe("");
+  });
+});
 
 describe("toWaDigits", () => {
   it.each([
@@ -41,6 +58,14 @@ describe("toWaDigits", () => {
     expect(toWaDigits("\u200E+971\u200B50 464 4502\u200F")).toBe("971504644502");
   });
 
+  it("reads Arabic-Indic and mixed digits", () => {
+    expect(toWaDigits("٣٩٨٥ ٨٨٨٥")).toBe("39858885");
+    expect(toWaDigits("+٩٧٣ ٣٣٣٣ ٤٤٤٤")).toBe("97333334444");
+    expect(toWaDigits("+973 ٣٩٨٥ 8885")).toBe("97339858885");
+    expect(toWaDigits("٠٠٩٧١ ٠٥٠ ٤٦٤ ٤٥٠٢")).toBe("971504644502");
+    expect(toWaDigits("۰۰۹۷۳۳۹۸۵۸۸۸۵")).toBe("97339858885");
+  });
+
   it("returns an empty string when there are no digits", () => {
     expect(toWaDigits("")).toBe("");
     expect(toWaDigits("call me")).toBe("");
@@ -64,6 +89,12 @@ describe("isPlausiblePhone", () => {
     expect(isPlausiblePhone("1234567")).toBe(true);
     expect(isPlausiblePhone("123456789012345")).toBe(true);
     expect(isPlausiblePhone("3985 8885")).toBe(true);
+  });
+
+  it("accepts numbers typed with an Arabic keyboard", () => {
+    expect(isPlausiblePhone("٣٩٨٥ ٨٨٨٥")).toBe(true);
+    expect(isPlausiblePhone("+٩٧٣ ٣٣٣٣ ٤٤٤٤")).toBe(true);
+    expect(isPlausiblePhone("٣٩٨")).toBe(false);
   });
 
   it("rejects fewer than 7 digits", () => {
