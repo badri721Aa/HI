@@ -34,6 +34,7 @@ export const commerce = defineMessages({
       askMessage: "Hi {brand}, I have a question about the {name} ({sku}).",
       availability: "Availability",
       photos: "Product photos",
+      photoKind: { cutout: "Edited background", original: "Original photo" },
       breadcrumb: "Breadcrumb",
     },
     cart: {
@@ -137,6 +138,7 @@ export const commerce = defineMessages({
       askMessage: "مرحباً {brand}، لدي سؤال عن {name} ({sku}).",
       availability: "التوفر",
       photos: "صور المنتج",
+      photoKind: { cutout: "خلفية معدّلة", original: "الصورة الأصلية" },
       breadcrumb: "مسار التنقل",
     },
     cart: {

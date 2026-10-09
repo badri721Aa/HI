@@ -121,6 +121,20 @@ export const REGION_CONFIG: Record<Region, RegionConfig> = {
 export const vat = { enabled: false } as const;
 
 /**
+ * A short note for customers, shown at the top of the order drawer and the
+ * delivery section, e.g. { en: "Closed for Eid 6–9 June. Orders sent now are
+ * printed from 10 June.", ar: "مغلق لعطلة العيد من 6 إلى 9 يونيو. الطلبات المرسلة الآن تُطبع من 10 يونيو." }.
+ * null shows nothing.
+ */
+export const NOTICE: L10n | null = null;
+
+/**
+ * Set to true once the owner confirms HOURS. Until then the site publishes no
+ * opening hours: no schedule, no live "Replying now" status, nothing in JSON-LD.
+ */
+export const HOURS_CONFIRMED = false;
+
+/**
  * CONFIRM: hours the WhatsApp lines are answered, in each region's local time.
  * Day indexes follow JavaScript: 0 = Sunday … 6 = Saturday.
  */

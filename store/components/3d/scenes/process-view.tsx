@@ -21,7 +21,8 @@ import { KEY_POSITION, Studio } from "./studio";
  * through React state), with the Lattice lamp:
  *
  *   0.00–0.25  Model   CAD hidden-line wireframe in a dimensioned bounding box
- *   0.25–0.50  Slice   contours stack up, layer by layer, under a sweeping plane
+ *   0.25–0.50  Slice   contours stack up, layer by layer, under a sweeping plane,
+ *                      inside a faint ghost of the model and its box
  *   0.50–0.75  Print   the part rises under the hotend, hot layer glowing
  *   0.75–1.00  Finish  a light sweeps across, then the bulb comes on
  *
@@ -34,6 +35,9 @@ const DIMS = PIECE.sizes[0].dims;
 const H = DIMS.h / 100;
 const R = Math.min(DIMS.w, DIMS.d) / 200;
 const PIECE_LAYOUT = lampLayout(DIMS);
+
+/** Opacity of the model's ghost (wireframe and box) while it is being sliced. */
+const GHOST = 0.17;
 
 /* Mirrors of the CSS tokens. */
 const PLATINUM = "#8f939c";
@@ -62,6 +66,7 @@ const _sweep = new THREE.Vector3();
 
 interface Sim {
   clip: number | null;
+  occlude: boolean;
   hot: number;
   trail: number | null;
   wire: number;
@@ -147,6 +152,7 @@ function ProcessContent({
 
   const sim = useRef<Sim>({
     clip: null,
+    occlude: true,
     hot: 0,
     trail: null,
     wire: 0,
@@ -165,6 +171,7 @@ function ProcessContent({
       hot: { get: () => sim.current.hot },
       trail: { get: () => sim.current.trail },
       wire: { get: () => sim.current.wire },
+      occlude: { get: () => sim.current.occlude },
       glow: { get: () => sim.current.glow },
       head: { get: () => sim.current.head },
     }),
@@ -203,9 +210,12 @@ function ProcessContent({
     );
     state.scene.environmentRotation.y = azimuth;
 
-    // 1 · Model: wireframe and dimensioned box.
-    s.wire = 1 - range(p, 0.19, 0.27);
-    g.boxMat.opacity = 0.5 * (1 - range(p, 0.16, 0.25));
+    // 1 · Model: wireframe and dimensioned box. 2 · They stay on as a faint
+    // ghost (without hidden-line removal) while the slices stack up inside.
+    const ghost = GHOST * (1 - range(p, 0.47, 0.52));
+    s.wire = Math.max(1 - range(p, 0.19, 0.27), ghost);
+    s.occlude = p < 0.25;
+    g.boxMat.opacity = Math.max(0.5 * (1 - range(p, 0.16, 0.25)), 0.9 * ghost);
     if (box.current) box.current.visible = g.boxMat.opacity > 0.002;
 
     // 2 · Slice: contours stack up under the plane; 3 · they stay ahead of the print as a preview.
@@ -271,7 +281,7 @@ function ProcessContent({
       <directionalLight ref={sweepLight} intensity={0} color="#ffffff" />
       <BuildPlate size={PLATE} shadowRadius={PIECE_LAYOUT.ringR} />
 
-      <ProductMesh product={PIECE} colorId={COLOR} wireframe wireOpacity={sources.wire} />
+      <ProductMesh product={PIECE} colorId={COLOR} wireframe wireOpacity={sources.wire} occlude={sources.occlude} />
       <lineSegments ref={box} geometry={guides.box} material={guides.boxMat} renderOrder={3} />
       <lineSegments ref={rings} geometry={guides.contours.geometry} material={guides.ringMat} renderOrder={3} />
       <lineSegments ref={activeRing} geometry={guides.active} material={guides.activeMat} renderOrder={4} />

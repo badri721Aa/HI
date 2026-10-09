@@ -63,6 +63,12 @@ export interface ProductImage {
   /** Tiny base64 preview for next/image placeholder="blur". */
   blurDataURL: string;
   alt: L10n;
+  /**
+   * "cutout": the cover, with the background replaced and colours corrected.
+   * "original": the shop's own photo, only cropped and resized.
+   * The gallery labels each, so customers can tell them apart.
+   */
+  kind: "cutout" | "original";
 }
 
 /** A free-text detail the customer must give per item, e.g. their iPhone model. */

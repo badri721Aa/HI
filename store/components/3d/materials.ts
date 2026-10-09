@@ -259,6 +259,12 @@ const FRAG_MAIN = /* glsl */ `
     // them as the part's cross-section. While printing, a 45° infill grid
     // shows inside solid parts and the freshest ~2 mm of wall glows.
     if ( ! gl_FrontFacing ) {
+      #ifndef PRINT_PATTERN
+        // A closed piece shows back faces only through the cut, just under
+        // it. Anywhere else they can only z-fight with the front faces where
+        // the surface folds behind itself (a dotted line along the ridges).
+        if ( printClipOn < 0.5 || printBelow > ${f(6 * MM)} ) discard;
+      #endif
       vec2 printCell = abs( fract( printInfillQ ) - 0.5 );
       float printLine = 1.0 - smoothstep( 0.07 - printInfillAa, 0.07 + printInfillAa, 0.5 - max( printCell.x, printCell.y ) );
       printLine *= 1.0 - smoothstep( 0.15, 0.6, printInfillAa );

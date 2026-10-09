@@ -47,23 +47,23 @@ export const home = defineMessages({
       steps: [
         {
           title: "Model",
-          body: "Each piece starts as a parametric model, tuned until the walls, curves and tolerances are right for printing.",
-          meta: "Wall 1.2 mm · Tolerance ±0.2 mm",
+          body: "Each piece starts as a 3D model, adjusted until the walls, curves and fit are right for printing.",
+          meta: "Your file or ours",
         },
         {
           title: "Slice",
-          body: "The model is cut into hundreds of layers, 0.05 to 0.24 mm thick, and the nozzle's path is planned for every one.",
-          meta: "1,500 layers for the lamp",
+          body: "The model is cut into hundreds of thin layers, and the nozzle's path is planned for every one.",
+          meta: "Fractions of a millimetre per layer",
         },
         {
           title: "Print",
-          body: "A nozzle at 210°C lays each layer down, switching colours mid-print when a piece needs more than one. Small pieces take under an hour; bigger ones run through the night.",
-          meta: "0.4 mm nozzle · 210°C",
+          body: "A heated nozzle melts the plastic and lays each layer on the last. A keyring can be done in under an hour; bigger pieces take much of a day.",
+          meta: "One layer at a time",
         },
         {
           title: "Finish",
-          body: "Supports come off, edges are cleaned, and every piece is checked before it is packed and handed to the courier.",
-          meta: "Checked by hand",
+          body: "Supports come off and edges are cleaned by hand, then the piece is packed for delivery.",
+          meta: "Finished by hand",
         },
       ],
     },
@@ -108,7 +108,7 @@ export const home = defineMessages({
         },
         {
           q: "How long does an order take?",
-          a: "Pieces marked as ready ship within a day or two. Made-to-order pieces show their production time on the product, plus delivery.",
+          a: "Every piece is printed to order, and we confirm the date in the WhatsApp chat before we start. Once it's ready, delivery takes 1–2 days in Bahrain and 2–4 days in the UAE.",
         },
         {
           q: "Which iPhone models do the cases fit?",
@@ -121,6 +121,10 @@ export const home = defineMessages({
         {
           q: "Will it melt in the heat?",
           a: "PLA softens around 55°C, which a parked car in summer easily passes. Indoors it is fine. For cars, balconies or sunny windows we print in PETG.",
+        },
+        {
+          q: "How do I clean a print?",
+          a: "Wipe it with a soft, slightly damp cloth. Keep it out of the dishwasher and away from hot water: PLA starts to soften around 55°C.",
         },
         {
           q: "Can you print my own file?",
@@ -176,23 +180,23 @@ export const home = defineMessages({
       steps: [
         {
           title: "النمذجة",
-          body: "تبدأ كل قطعة بنموذج بارامتري نضبطه حتى تصبح الجدران والانحناءات والتفاوتات مناسبة للطباعة.",
-          meta: "سماكة الجدار 1.2 مم · تفاوت ±0.2 مم",
+          body: "تبدأ كل قطعة بنموذج ثلاثي الأبعاد نعدّله حتى تصبح الجدران والانحناءات والمقاسات مناسبة للطباعة.",
+          meta: "ملفك أو تصميمنا",
         },
         {
           title: "التقطيع",
-          body: "يُقسَّم النموذج إلى مئات الطبقات بسماكة بين 0.05 و0.24 مم، ويُخطَّط مسار الفوهة لكل طبقة.",
-          meta: "1,500 طبقة للمصباح",
+          body: "يُقسَّم النموذج إلى مئات الطبقات الرقيقة، ويُخطَّط مسار الفوهة لكل طبقة.",
+          meta: "أجزاء من المليمتر لكل طبقة",
         },
         {
           title: "الطباعة",
-          body: "تضع فوهة بحرارة 210°م كل طبقة فوق الأخرى، وتبدّل اللون أثناء الطباعة حين تحتاج القطعة أكثر من لون. القطع الصغيرة تُطبع في أقل من ساعة، والكبيرة تستمر طوال الليل.",
-          meta: "فوهة 0.4 مم · 210°م",
+          body: "تُذيب فوهة ساخنة البلاستيك وتضع كل طبقة فوق التي قبلها. الميدالية قد تُطبع في أقل من ساعة، والقطع الأكبر تأخذ معظم اليوم.",
+          meta: "طبقة بعد طبقة",
         },
         {
           title: "التشطيب",
-          body: "نزيل الدعامات وننظف الحواف ونفحص كل قطعة قبل تغليفها وتسليمها للمندوب.",
-          meta: "فحص يدوي",
+          body: "نزيل الدعامات وننظف الحواف يدوياً، ثم نغلّف القطعة للتوصيل.",
+          meta: "تشطيب يدوي",
         },
       ],
     },
@@ -236,7 +240,7 @@ export const home = defineMessages({
         },
         {
           q: "كم يستغرق الطلب؟",
-          a: "القطع الجاهزة تُشحن خلال يوم أو يومين. أما القطع التي تُصنع عند الطلب فمدة تجهيزها مذكورة في صفحة المنتج، يضاف إليها وقت التوصيل.",
+          a: "كل قطعة تُطبع عند الطلب، ونؤكد الموعد معك في محادثة واتساب قبل أن نبدأ. بعد تجهيزها يستغرق التوصيل يوماً إلى يومين في البحرين، ومن يومين إلى أربعة أيام في الإمارات.",
         },
         {
           q: "ما موديلات الآيفون التي تناسبها الكفرات؟",
@@ -249,6 +253,10 @@ export const home = defineMessages({
         {
           q: "هل تذوب القطع في الحر؟",
           a: "يلين الـPLA عند نحو 55°م، وهي حرارة تتجاوزها السيارة المتوقفة في الصيف بسهولة. داخل المنزل لا مشكلة. للسيارات والشرفات والنوافذ المشمسة نطبع من PETG.",
+        },
+        {
+          q: "كيف أنظف القطعة؟",
+          a: "امسحها بقطعة قماش ناعمة مبللة قليلاً. لا تضعها في غسالة الصحون ولا في الماء الساخن، فالـPLA يبدأ باللين عند نحو 55°م.",
         },
         {
           q: "هل تطبعون ملفاتي الخاصة؟",

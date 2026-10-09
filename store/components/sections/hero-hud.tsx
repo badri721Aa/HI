@@ -31,8 +31,10 @@ const selectMinutesLeft = (s: { minutesLeft: number }) => s.minutesLeft;
  * With reduced motion the scene shows the finished piece, so does this.
  * The whole readout is a simulation, so it is hidden from assistive tech.
  *
- * Widths are in px, not rem: the Arabic root font is larger, and the scene
- * frames itself around this card's footprint, which must stay small on phones.
+ * Phones get a one-line strip across the bottom of the print box (the scene
+ * then frames the piece above it); larger screens get the full card. Sizes
+ * are in px, not rem: the Arabic root font is larger, and the scene frames
+ * itself around this element's footprint.
  */
 export function HeroHud({ className }: { className?: string }) {
   const { t, locale } = useI18n();
@@ -56,58 +58,78 @@ export function HeroHud({ className }: { className?: string }) {
   const timeLeft = fmt(hud.time, { h: Math.floor(mins / 60), m: String(mins % 60).padStart(2, "0") });
   const fill = Math.min(1, Math.max(0, progress));
 
+  const status = (
+    <span className="flex shrink-0 items-center gap-2 text-fg rtl:font-sans">
+      <span
+        className={cn(
+          "size-1.5 shrink-0 rounded-full transition-colors duration-300",
+          complete ? "bg-ok" : "bg-glow shadow-[0_0_6px_1px_var(--color-glow)]",
+        )}
+      />
+      {complete ? hud.complete : hud.printing}
+    </span>
+  );
+  const percent = (
+    <span className="tabular shrink-0 text-fg-muted" dir="ltr">
+      {Math.round(fill * 100)}%
+    </span>
+  );
+  const layerCount = (
+    <span dir="ltr">
+      {String(currentLayer).padStart(digits, "0")}
+      <span className="text-fg-muted">/{total}</span>
+    </span>
+  );
+
   return (
     <div
       aria-hidden="true"
       className={cn(
-        "glass w-[152px] rounded-xl p-3 font-mono text-[11px] leading-4 text-fg-muted shadow-[0_18px_40px_-24px_rgb(0_0_0/0.9)] sm:w-[248px] sm:p-3.5 sm:text-xs",
+        "glass rounded-xl px-3 py-2.5 font-mono text-[11px] leading-4 text-fg-muted shadow-[0_18px_40px_-24px_rgb(0_0_0/0.9)] sm:w-[248px] sm:p-3.5 sm:text-xs",
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-3">
-        <span className="flex items-center gap-2 text-fg rtl:font-sans">
-          <span
-            className={cn(
-              "size-1.5 shrink-0 rounded-full transition-colors duration-300",
-              complete ? "bg-ok" : "bg-glow shadow-[0_0_6px_1px_var(--color-glow)]",
-            )}
-          />
-          {complete ? hud.complete : hud.printing}
-        </span>
-        <span className="tabular text-fg-muted" dir="ltr">
-          {Math.round(fill * 100)}%
-        </span>
+      {/* Phones: status, progress bar and layer count on one line. */}
+      <div className="flex items-center gap-3 sm:hidden">
+        {status}
+        {percent}
+        <Bar fill={fill} className="min-w-6 flex-1" />
+        <span className="tabular shrink-0 text-fg">{layerCount}</span>
       </div>
 
-      <dl className="mt-2.5 grid gap-1 border-t border-line pt-2.5">
-        <Row label={hud.layer}>
-          <span dir="ltr">
-            {String(currentLayer).padStart(digits, "0")}
-            <span className="text-fg-muted">/{total}</span>
-          </span>
-        </Row>
-        {/* Values with Arabic units follow the page direction, like the rest of the Arabic copy. */}
-        <Row label={hud.layerHeight} className="hidden sm:flex">
-          {LAYER_HEIGHT_MM.toFixed(2)} {units.mm}
-        </Row>
-        <Row label={hud.nozzle} className="hidden sm:flex">
-          {NOZZLE_C}
-          {units.celsius}
-        </Row>
-        {MATERIAL ? (
-          <Row label={hud.material} className="hidden sm:flex">
-            {MATERIAL.name[locale]}
+      <div className="hidden sm:block">
+        <div className="flex items-center justify-between gap-3">
+          {status}
+          {percent}
+        </div>
+
+        <dl className="mt-2.5 grid gap-1 border-t border-line pt-2.5">
+          <Row label={hud.layer}>{layerCount}</Row>
+          {/* Values with Arabic units follow the page direction, like the rest of the Arabic copy. */}
+          <Row label={hud.layerHeight}>
+            {LAYER_HEIGHT_MM.toFixed(2)} {units.mm}
           </Row>
-        ) : null}
-        <Row label={hud.timeLeft}>{timeLeft}</Row>
-      </dl>
+          <Row label={hud.nozzle}>
+            {NOZZLE_C}
+            {units.celsius}
+          </Row>
+          {MATERIAL ? <Row label={hud.material}>{MATERIAL.name[locale]}</Row> : null}
+          <Row label={hud.timeLeft}>{timeLeft}</Row>
+        </dl>
 
-      <div className="mt-3 h-0.5 overflow-hidden rounded-full bg-line">
-        <div
-          className="h-full origin-left rounded-full bg-glow transition-transform duration-150 ease-linear rtl:origin-right motion-reduce:transition-none"
-          style={{ transform: `scaleX(${fill})` }}
-        />
+        <Bar fill={fill} className="mt-3" />
       </div>
+    </div>
+  );
+}
+
+function Bar({ fill, className }: { fill: number; className?: string }) {
+  return (
+    <div className={cn("h-0.5 overflow-hidden rounded-full bg-line", className)}>
+      <div
+        className="h-full origin-left rounded-full bg-glow transition-transform duration-150 ease-linear rtl:origin-right motion-reduce:transition-none"
+        style={{ transform: `scaleX(${fill})` }}
+      />
     </div>
   );
 }

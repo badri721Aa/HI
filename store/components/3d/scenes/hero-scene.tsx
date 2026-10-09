@@ -120,9 +120,10 @@ export interface HudZone {
 
 /**
  * Where the composition may go: beside the HUD (towards the end side) or
- * above it. The one that frames the finished piece larger wins.
+ * above it. Scored over the whole print, finished piece and dolly together,
+ * so a layout that leaves room to come closer on the first layers wins.
  */
-function chooseRect(width: number, height: number, zone: HudZone, aspect: number, target: THREE.Vector3): FrameRect {
+function chooseRect(width: number, height: number, zone: HudZone, aspect: number): FrameRect {
   const zw = zone.width > 0 ? (zone.width + HUD_GAP_PX) / width : 0;
   const zh = zone.height > 0 ? (zone.height + HUD_GAP_PX) / height : 0;
   const options: FrameRect[] = [];
@@ -130,12 +131,15 @@ function chooseRect(width: number, height: number, zone: HudZone, aspect: number
   if (zh < 0.62) options.push({ l: SIDE, r: 1 - SIDE, t: TOP, b: Math.min(BOTTOM, 1 - zh) });
   if (options.length === 0) return { l: SIDE, r: 1 - SIDE, t: TOP, b: BOTTOM };
   const probe: Framing = { distance: 0, offsetX: 0, offsetY: 0 };
+  const full = new THREE.Vector3(0, targetY(1), 0);
+  const early = new THREE.Vector3(0, targetY(EARLY), 0);
   let best = options[0];
-  let bestDistance = Infinity;
+  let bestScore = Infinity;
   for (const rect of options) {
-    solveFraming(fitPoints(1), target, AZIMUTH, ELEVATION, FOV, aspect, rect, probe);
-    if (probe.distance < bestDistance) {
-      bestDistance = probe.distance;
+    const d = solveFraming(fitPoints(1), full, AZIMUTH, ELEVATION, FOV, aspect, rect, probe).distance;
+    const score = d + solveFraming(fitPoints(EARLY), early, AZIMUTH, ELEVATION, FOV, aspect, rect, probe, d / MAX_DOLLY).distance;
+    if (score < bestScore) {
+      bestScore = score;
       best = rect;
     }
   }
@@ -292,7 +296,7 @@ function HeroContent({
     if (layout !== s.layout) {
       s.layout = layout;
       _target.set(0, targetY(1), 0);
-      s.rect = mirrorRect(chooseRect(width, height, z, aspect, _target), rtl);
+      s.rect = mirrorRect(chooseRect(width, height, z, aspect), rtl);
       solveFraming(fitPoints(1), _target, AZIMUTH, ELEVATION, FOV, aspect, s.rect, s.framing);
       s.fullDistance = s.framing.distance;
       s.framed = -1;

@@ -232,16 +232,21 @@ export function ProductGallery({
           </div>
         </motion.div>
 
-        {multiple ? (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute bottom-3 start-3 rounded-full bg-ink-950/60 px-2.5 py-1 text-[0.6875rem] text-fg backdrop-blur-md"
-          >
-            <span dir="ltr" className="font-mono tabular">
-              {String(active + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}
-            </span>
-          </span>
-        ) : null}
+        {/* Which photo this is: the edited cover or the shop's original. Thumbnails carry it for screen readers. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-3 start-3 flex items-center gap-1.5 rounded-full bg-ink-950/60 px-2.5 py-1 text-[0.6875rem] text-fg backdrop-blur-md"
+        >
+          {multiple ? (
+            <>
+              <span dir="ltr" className="font-mono tabular">
+                {String(active + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}
+              </span>
+              <span className="text-fg-subtle">·</span>
+            </>
+          ) : null}
+          {images[active] ? <span data-testid="photo-kind">{t.commerce.product.photoKind[images[active].kind]}</span> : null}
+        </span>
       </div>
 
       {multiple ? (
@@ -260,7 +265,7 @@ export function ProductGallery({
                   thumbRefs.current[i] = el;
                 }}
                 type="button"
-                aria-label={image.alt[locale]}
+                aria-label={`${image.alt[locale]} (${t.commerce.product.photoKind[image.kind]})`}
                 aria-current={current ? "true" : undefined}
                 onClick={() => go(i)}
                 className={cn(

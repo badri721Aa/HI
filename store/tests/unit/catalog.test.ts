@@ -147,6 +147,13 @@ describe("catalog: photos", () => {
     for (const p of PRODUCTS) expect(p.images.length, p.slug).toBeGreaterThan(0);
   });
 
+  it("leads with the edited cover and always includes the shop's original photo", () => {
+    for (const p of PRODUCTS) {
+      expect(p.images[0].kind, p.slug).toBe("cutout");
+      expect(p.images.some((i) => i.kind === "original"), p.slug).toBe(true);
+    }
+  });
+
   it("points every image at a real file under public/ whose size matches the declared one", () => {
     for (const p of PRODUCTS) {
       for (const image of p.images) {

@@ -7,8 +7,9 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { Reveal } from "@/components/motion/reveal";
 import { Spotlight } from "@/components/motion/spotlight";
+import { OwnerNotice } from "@/components/commerce/owner-notice";
 import { useRegion } from "@/lib/hooks/use-region";
-import { HOURS, REGION_CONFIG, WHATSAPP_LINES } from "@/lib/site";
+import { HOURS, HOURS_CONFIRMED, REGION_CONFIG, WHATSAPP_LINES } from "@/lib/site";
 import { CURRENCY_LABEL, formatCurrency } from "@/lib/currency";
 import { buildHelloMessage, generateWhatsAppLink } from "@/lib/whatsapp";
 import { fmt } from "@/lib/i18n";
@@ -67,15 +68,21 @@ export function Delivery() {
           title={copy.title}
           id="delivery-title"
           aside={
-            // Whether the visitor's own region is answering right now; both regions are detailed below.
-            <div className="border-s border-line ps-5">
-              <p className="eyebrow">
-                {copy.hours} · {REGION_CONFIG[region].name[locale]}
-              </p>
-              <OpenStatus region={region} className="mt-3 text-base" />
-            </div>
+            HOURS_CONFIRMED ? (
+              // Whether the visitor's own region is answering right now; both regions are detailed below.
+              <div className="border-s border-line ps-5">
+                <p className="eyebrow">
+                  {copy.hours} · {REGION_CONFIG[region].name[locale]}
+                </p>
+                <OpenStatus region={region} className="mt-3 text-base" />
+              </div>
+            ) : (
+              <RegionLine region={region} />
+            )
           }
         />
+
+        <OwnerNotice className="mt-10 max-w-2xl" />
 
         {/* Three steps in a row, divided by hairlines. */}
         <ol className="mt-14 grid border-y border-line md:mt-20 md:grid-cols-3">
@@ -148,7 +155,7 @@ function RegionCard({ region }: { region: Region }) {
       <div className="mt-8">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <p className="eyebrow">{copy.lines}</p>
-          <OpenStatus region={region} />
+          {HOURS_CONFIRMED ? <OpenStatus region={region} /> : null}
         </div>
         <ul className="mt-3 border-t border-line">
           {config.lines.map((id) => {
@@ -180,21 +187,45 @@ function RegionCard({ region }: { region: Region }) {
         </ul>
       </div>
 
-      <div className="mt-auto pt-8">
-        <p className="eyebrow">{copy.hours}</p>
-        <dl className="mt-3 grid gap-1.5 text-sm">
-          {SCHEDULE.map((g) => (
-            <div key={g.from} className="flex items-baseline justify-between gap-4">
-              <dt className="text-fg-muted">
-                {g.from === g.to ? t.common.weekdays[g.from] : `${t.common.weekdays[g.from]}–${t.common.weekdays[g.to]}`}
-              </dt>
-              <dd className="tabular font-mono text-fg" dir="ltr">
-                {g.slot[0]}–{g.slot[1]}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </div>
+      {HOURS_CONFIRMED ? (
+        <div className="mt-auto pt-8">
+          <p className="eyebrow">{copy.hours}</p>
+          <dl className="mt-3 grid gap-1.5 text-sm">
+            {SCHEDULE.map((g) => (
+              <div key={g.from} className="flex items-baseline justify-between gap-4">
+                <dt className="text-fg-muted">
+                  {g.from === g.to ? t.common.weekdays[g.from] : `${t.common.weekdays[g.from]}–${t.common.weekdays[g.to]}`}
+                </dt>
+                <dd className="tabular font-mono text-fg" dir="ltr">
+                  {g.slot[0]}–{g.slot[1]}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
     </Spotlight>
+  );
+}
+
+/** The visitor's region and its first WhatsApp line: shown instead of opening hours until they are confirmed. */
+function RegionLine({ region }: { region: Region }) {
+  const { t, locale } = useI18n();
+  const line = WHATSAPP_LINES[REGION_CONFIG[region].lines[0]];
+  return (
+    <div className="border-s border-line ps-5">
+      <p className="eyebrow">
+        {t.home.delivery.lines} · {REGION_CONFIG[region].name[locale]}
+      </p>
+      <a
+        href={generateWhatsAppLink(line.e164, buildHelloMessage(locale))}
+        target="_blank"
+        rel="noopener noreferrer"
+        dir="ltr"
+        className="mt-3 inline-flex min-h-11 items-center font-mono text-base tabular text-fg transition-colors hover:text-platinum"
+      >
+        {line.display}
+      </a>
+    </div>
   );
 }

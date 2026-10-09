@@ -38,8 +38,9 @@ npm run dev          # http://localhost:3000  → redirects to /en or /ar
 | WhatsApp numbers | `lib/site.ts` → `WHATSAPP_LINES` |
 | Cities per region, delivery days, delivery fee, VAT rate | `lib/site.ts` → `REGION_CONFIG` |
 | Show VAT on orders (only if VAT-registered) | `lib/site.ts` → `vat.enabled` |
-| WhatsApp reply hours | `lib/site.ts` → `HOURS` |
-| Products, prices, stock, colours, sizes | `content/catalog.ts` |
+| WhatsApp reply hours | `lib/site.ts` → `HOURS`. They stay hidden (no schedule, no "Replying now") until you set `HOURS_CONFIRMED = true` |
+| A note for customers, e.g. a holiday closure (shown in the order drawer and the delivery section) | `lib/site.ts` → `NOTICE` (`null` hides it) |
+| Products, prices, stock, colours, sizes, photos | `content/catalog.ts` (each photo is `"cutout"` for the edited cover or `"original"` for your own photo; the gallery labels them) |
 | Materials | `content/catalog.ts` → `MATERIALS` |
 | Customer reviews (section hidden while empty) | `content/reviews.ts` |
 | All site text (English and Arabic) | `lib/i18n/messages/*.ts` |

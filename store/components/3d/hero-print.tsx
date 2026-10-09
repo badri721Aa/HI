@@ -48,8 +48,8 @@ function HeroFallback({ className }: { className?: string }) {
   }, []);
   return (
     <div className={cn("relative", className)}>
-      {/* Roughly the 3D composition: beside the HUD on phones, above it on large screens. */}
-      <div className="absolute bottom-[4%] end-[2%] start-[46%] top-[4%] lg:bottom-[32%] lg:end-[18%] lg:start-[18%] lg:top-[3%]">
+      {/* Roughly the 3D composition, clear of the HUD: above its strip on phones, beside its card on tablets, above it on large screens. */}
+      <div className="absolute bottom-[18%] end-[10%] start-[10%] top-[4%] sm:bottom-[4%] sm:end-[2%] sm:start-[42%] lg:bottom-[32%] lg:end-[18%] lg:start-[18%] lg:top-[3%]">
         <ProductSilhouette kind={PIECE.model} color={PIECE.colors[0].hex} plate className="size-full" />
       </div>
     </div>

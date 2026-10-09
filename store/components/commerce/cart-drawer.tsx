@@ -15,6 +15,7 @@ import { createOrderRef, priceOrder } from "@/lib/whatsapp";
 import { trackOrderSent } from "@/lib/whatsapp/track";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { OwnerNotice } from "./owner-notice";
 import { CartEmpty, CartLines, CartSummary, orderTotals } from "./cart-lines";
 import { CheckoutForm, CheckoutSend, focusField, loadOrderValidator, useCheckout } from "./checkout-form";
 
@@ -290,6 +291,7 @@ export function CartDrawer() {
       }
     >
       <div ref={bodyRef} className="min-h-full">
+        {empty ? null : <OwnerNotice className="mb-6" />}
         <StepSwap id={current === 1 ? (empty ? "empty" : "items") : "details"} direction={direction}>
           {current === 2 ? (
             <CheckoutForm checkout={checkout} region={region} onBack={onBack} />
