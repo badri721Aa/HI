@@ -54,6 +54,8 @@ test.describe("custom print form", () => {
     await form.getByTestId("custom-line-bh-secondary").click();
     await expect(form.getByTestId("custom-line-bh-secondary")).toHaveAttribute("aria-checked", "true");
     await expect(send).toHaveAttribute("href", /^https:\/\/wa\.me\/97363669666/);
+    // The visible dots are decorative: the parts must still read as separate words.
+    await expect(send).toHaveAccessibleDescription("Sending to Bahrain Line 2 +973 6366 9666");
 
     // The UAE: its own line, its own cities, no Bahrain line choice.
     await form.getByTestId("custom-region-AE").click();
@@ -63,6 +65,7 @@ test.describe("custom print form", () => {
     await setField(form.getByTestId("custom-name"), "Omar");
     await setField(form.getByTestId("custom-city"), "dubai");
     await expect(send).toHaveAttribute("href", /^https:\/\/wa\.me\/971504644502\?text=/);
+    await expect(send).toHaveAccessibleDescription("Sending to UAE +971 50 464 4502");
     await expect.poll(async () => waText(await send.getAttribute("href"))).toContain("Dubai, UAE");
   });
 });

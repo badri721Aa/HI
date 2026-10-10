@@ -90,7 +90,7 @@ export function Process() {
             Scene: sticky under the (scrolled, 60px) header on small screens when tall enough, so no strip of
             the steps shows between the two; columns 7–12 on large ones, top-aligned with the title on stage.
           */}
-          <div className="relative z-[1] -mx-4 bg-ink-950 px-4 py-3 md:-mx-8 md:px-8 max-lg:[@media(min-height:37.5rem)]:sticky max-lg:[@media(min-height:37.5rem)]:top-15 lg:col-span-6 lg:col-start-7 lg:row-span-2 lg:row-start-1 lg:mx-0 lg:self-center lg:bg-transparent lg:px-0 lg:py-0 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:self-start">
+          <div className="relative z-[1] -mx-4 bg-ink-950 px-4 py-3 md:-mx-8 md:px-8 max-lg:[@media(min-height:37.5rem)]:sticky max-lg:[@media(min-height:37.5rem)]:top-[calc(3.75rem+env(safe-area-inset-top))] lg:col-span-6 lg:col-start-7 lg:row-span-2 lg:row-start-1 lg:mx-0 lg:self-center lg:bg-transparent lg:px-0 lg:py-0 [@media(min-width:64rem)_and_(min-height:40rem)_and_(prefers-reduced-motion:no-preference)]:self-start">
             <div aria-hidden className="relative h-[48svh] min-h-72 lg:h-[min(68svh,640px)]">
               <ProcessScene progress={reduced ? DONE : progress} className="size-full" />
               <Corners />

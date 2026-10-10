@@ -189,13 +189,28 @@ export function buildOrderLink(phone: string, input: Omit<OrderMessageInput, "co
  */
 export type OrderLinkOverflow = "notes" | "details" | "pieces";
 
-const NO_DETAILS: Customer = { name: "", phone: "", city: "", area: "", notes: "" };
+/**
+ * The shortest details a valid order can carry: a two-letter name in the
+ * page's script and the region's shortest named city ("other" cities need an
+ * address, so they are never shorter). If the pieces don't fit even with
+ * these, no details the customer could type would make the order sendable.
+ */
+function minimalDetails(region: Region, locale: Locale): Customer {
+  const encoded = (id: string) => encodeURIComponent(cityName(region, id, locale)).length;
+  const cities = REGION_CONFIG[region].cities.filter((c) => !c.id.startsWith("other"));
+  const city = cities.reduce((a, b) => (encoded(b.id) < encoded(a.id) ? b : a)).id;
+  return { name: locale === "ar" ? "أب" : "Al", phone: "", city, area: "", notes: "" };
+}
 
 export function orderLinkOverflow(phone: string, input: Omit<OrderMessageInput, "compact">): OrderLinkOverflow | null {
   const fits = (customer: Customer) => buildOrderLink(phone, { ...input, customer }).fits;
+  const piecesFit = () => fits(minimalDetails(input.region, input.locale));
+  const { name, city, notes } = input.customer;
+  // Details not filled in yet (the items step): judge the pieces with the shortest details that could be valid.
+  if ((name?.trim().length ?? 0) < 2 || !city) return piecesFit() ? null : "pieces";
   if (fits(input.customer)) return null;
-  if (input.customer.notes?.trim() && fits({ ...input.customer, notes: "" })) return "notes";
-  return fits(NO_DETAILS) ? "details" : "pieces";
+  if (notes?.trim() && fits({ ...input.customer, notes: "" })) return "notes";
+  return piecesFit() ? "details" : "pieces";
 }
 
 export interface CustomRequestInput {

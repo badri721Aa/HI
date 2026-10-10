@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Customer, Locale, OrderLine, Region } from "@/types";
 import { PRODUCTS } from "@/content/catalog";
-import { site } from "@/lib/site";
+import { REGION_CONFIG, site } from "@/lib/site";
 import {
   LIMITS,
   MAX_LINES,
@@ -463,8 +463,28 @@ describe("buildOrderLink (compact receipt)", () => {
       expect(orderLinkOverflow(phone, input(lines, { ...shortDetails, notes: "ب" }, "ar"))).toBe("pieces");
     });
 
+    it("says 'pieces' on the items step when even the shortest valid details won't fit", () => {
+      // Trim the full Arabic cart one character at a time until it fits with no details at all
+      // but still not with the shortest name and city the form accepts.
+      const cart = (cut: number) =>
+        Array.from({ length: MAX_LINES }, (_, i) => {
+          const len = LIMITS.note - Math.floor(cut / MAX_LINES) - (i < cut % MAX_LINES ? 1 : 0);
+          return { ...phoneCase, qty: MAX_QTY, note: `${i} ${"ب".repeat(LIMITS.note)}`.slice(0, len) };
+        });
+      const cities = REGION_CONFIG.BH.cities.filter((c) => !c.id.startsWith("other"));
+      const shortest = cities.reduce((a, b) => (encodeURIComponent(b.name.ar).length < encodeURIComponent(a.name.ar).length ? b : a));
+      const empty: Customer = { name: "", city: "" };
+      const minimal: Customer = { name: "أب", city: shortest.id };
+      const fits = (cut: number, c: Customer) => buildOrderLink(phone, input(cart(cut), c, "ar")).fits;
+      let cut = 0;
+      while (cut < MAX_LINES * 30 && !(fits(cut, empty) && !fits(cut, minimal))) cut++;
+      expect(fits(cut, empty) && !fits(cut, minimal), "no cart sits between the two limits").toBe(true);
+      expect(orderLinkOverflow(phone, input(cart(cut), empty, "ar"))).toBe("pieces");
+      expect(orderLinkOverflow(phone, input(cart(MAX_LINES * 30), empty, "ar"))).toBeNull();
+    });
+
     it("says 'details' when the pieces fit on their own but not with what was typed", () => {
-      const n = mostThatFit({ name: "", city: "" });
+      const n = mostThatFit(shortDetails);
       const long: Customer = { name: "ب".repeat(LIMITS.name), city: "other-bh", area: "ب".repeat(LIMITS.area) };
       const lines = longLines(n);
       expect(buildOrderLink(phone, input(lines, long, "ar")).fits).toBe(false);

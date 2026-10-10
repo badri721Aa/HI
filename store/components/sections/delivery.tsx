@@ -72,7 +72,8 @@ export function Delivery() {
               // Whether the visitor's own region is answering right now; both regions are detailed below.
               <div className="border-s border-line ps-5">
                 <p className="eyebrow">
-                  {copy.hours} · {REGION_CONFIG[region].name[locale]}
+                  {/* A no-break space keeps the dot with the word before it on a narrow phone. */}
+                  {copy.hours}&nbsp;· {REGION_CONFIG[region].name[locale]}
                 </p>
                 <OpenStatus region={region} className="mt-3 text-base" />
               </div>
@@ -216,7 +217,7 @@ function RegionLine({ region }: { region: Region }) {
   return (
     <div className="border-s border-line ps-5">
       <p className="eyebrow">
-        {t.home.delivery.lines} · {REGION_CONFIG[region].name[locale]}
+        {t.home.delivery.lines}&nbsp;· {REGION_CONFIG[region].name[locale]}
       </p>
       <a
         href={generateWhatsAppLink(line.e164, buildHelloMessage(locale))}

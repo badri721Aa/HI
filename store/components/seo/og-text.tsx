@@ -143,6 +143,41 @@ export type BidiRun = {
   after?: string;
 };
 
+const CLOSER: Record<string, string> = { "(": ")", "[": "]", "{": "}", "«": "»", "\u201C": "\u201D", "\u2018": "\u2019" };
+const OPENER = Object.fromEntries(Object.entries(CLOSER).map(([o, c]) => [c, o]));
+const SYMMETRIC = new Set(['"', "'"]);
+
+/** Opened minus closed: > 0 when `text` leaves `open` unclosed, < 0 when it closes one it never opened. */
+function depth(text: string, open: string, close: string): number {
+  let d = 0;
+  for (const c of text) d += c === open ? 1 : c === close ? -1 : 0;
+  return d;
+}
+
+const odd = (text: string, quote: string) => Array.from(text).filter((c) => c === quote).length % 2 === 1;
+
+/**
+ * Keeps an edge bracket or quote inside the run when its partner is inside:
+ * "PLA (PETG)" and '"3D" BH' stay whole instead of losing one half to the edge.
+ */
+function keepPaired(lead: string, core: string, trail: string): [string, string, string] {
+  while (trail) {
+    const c = trail[0];
+    const open = OPENER[c];
+    if (!(open ? depth(core, open, c) > 0 : SYMMETRIC.has(c) && odd(core, c))) break;
+    core += c;
+    trail = trail.slice(1);
+  }
+  while (lead) {
+    const c = lead[lead.length - 1];
+    const close = CLOSER[c];
+    if (!(close ? depth(core, c, close) < 0 : SYMMETRIC.has(c) && odd(core, c))) break;
+    core = c + core;
+    lead = lead.slice(0, -1);
+  }
+  return [lead, core, trail];
+}
+
 /** A word as [leading punctuation, the word itself, trailing punctuation]. */
 function splitEdges(word: string): [string, string, string] {
   const [, lead = "", core = "", trail = ""] = SPLIT_EDGES.exec(word) ?? [];
@@ -161,12 +196,15 @@ export function bidiRuns(text: string): BidiRun[] {
   // Judged without the edges: "(R)،" is a Latin word, despite the Arabic comma.
   const dirs = words.map(([, w]) => (RTL_CHAR.test(w) ? "R" : LTR_CHAR.test(w) ? "L" : "N"));
   const runs: BidiRun[] = [];
-  const run = (lead: string, text: string, trail: string, rtl: boolean): BidiRun => ({
-    text,
-    rtl,
-    ...(lead ? { before: rtlNeutral(lead) } : {}),
-    ...(trail ? { after: rtlNeutral(trail) } : {}),
-  });
+  const run = (edgeLead: string, edgeText: string, edgeTrail: string, rtl: boolean): BidiRun => {
+    const [lead, text, trail] = keepPaired(edgeLead, edgeText, edgeTrail);
+    return {
+      text,
+      rtl,
+      ...(lead ? { before: rtlNeutral(lead) } : {}),
+      ...(trail ? { after: rtlNeutral(trail) } : {}),
+    };
+  };
   let i = 0;
   while (i < words.length) {
     if (dirs[i] !== "L") {

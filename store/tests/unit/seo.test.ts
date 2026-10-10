@@ -300,6 +300,12 @@ describe("bidiRuns (Arabic share card text)", () => {
     expect(bidiRuns("كلمة (")[1]).toEqual({ text: ")", rtl: false });
   });
 
+  it("keeps a bracket or quote whose partner is inside the run", () => {
+    expect(bidiRuns("كلمة PLA (PETG)")[1]).toEqual({ text: "PLA (PETG)", rtl: false });
+    expect(bidiRuns('كلمة "3D" BH')[1]).toEqual({ text: '"3D" BH', rtl: false });
+    expect(bidiRuns("كلمة PLA (PETG).")[1]).toEqual({ text: "PLA (PETG)", rtl: false, after: "." });
+  });
+
   it("splits only the outer edges of a left-to-right run", () => {
     expect(bidiRuns("من PLA، PETG.")).toEqual([
       { text: "من", rtl: true },

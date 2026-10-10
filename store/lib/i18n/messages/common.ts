@@ -2,7 +2,7 @@ import { defineMessages } from "../config";
 
 export const common = defineMessages({
   en: {
-    brandLine: "3D-printed objects · Bahrain & UAE",
+    brandLine: "3D-printed objects ·\u00a0Bahrain\u00a0&\u00a0UAE",
     skipToContent: "Skip to content",
     nav: {
       collection: "Collection",
@@ -91,7 +91,7 @@ export const common = defineMessages({
     },
   },
   ar: {
-    brandLine: "قطع مطبوعة ثلاثية الأبعاد · البحرين والإمارات",
+    brandLine: "قطع مطبوعة ثلاثية الأبعاد ·\u00a0البحرين\u00a0والإمارات",
     skipToContent: "انتقل إلى المحتوى",
     nav: {
       collection: "المجموعة",

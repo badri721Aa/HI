@@ -4,7 +4,7 @@ import { defineMessages } from "../config";
 export const home = defineMessages({
   en: {
     hero: {
-      eyebrow: "3D-printed objects · Bahrain & UAE",
+      eyebrow: "3D-printed objects ·\u00a0Bahrain\u00a0&\u00a0UAE",
       titleLines: ["Objects,", "printed layer", "by layer."],
       body: "Phone cases, fidget toys, gifts and school models, printed to order. Pick a piece, send the order on WhatsApp, and we deliver across Bahrain and the UAE.",
       hud: {
@@ -139,7 +139,7 @@ export const home = defineMessages({
   },
   ar: {
     hero: {
-      eyebrow: "قطع مطبوعة ثلاثية الأبعاد · البحرين والإمارات",
+      eyebrow: "قطع مطبوعة ثلاثية الأبعاد ·\u00a0البحرين\u00a0والإمارات",
       titleLines: ["قطعٌ تُطبع", "طبقةً", "فوق طبقة."],
       body: "كفرات جوال وألعاب فدجت وهدايا ومجسمات مدرسية تُطبع عند الطلب. اختر قطعتك وأرسل طلبك عبر واتساب، ونوصله إليك في البحرين والإمارات.",
       hud: {

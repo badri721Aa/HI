@@ -357,7 +357,7 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
   // Some in-app browsers truncate very long links. If shorter notes would fix it, flag the notes;
   // if the order itself is too long (many pieces, especially in Arabic), ask to split it. When the
   // pieces alone are too long, no details can help, so the items step says so before step 2.
-  const overflow = link.fits ? null : orderLinkOverflow(line.e164, { ref, region, locale, lines, customer });
+  const overflow = orderLinkOverflow(line.e164, { ref, region, locale, lines, customer });
   if (overflow === "notes") errors["customer.notes"] ??= "notes_too_long_for_link";
   else if (overflow) errors.link = "too_many_lines";
   if (overflow === "pieces") errors.lines ??= "too_many_lines";
