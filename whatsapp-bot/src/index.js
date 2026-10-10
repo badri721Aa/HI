@@ -44,6 +44,7 @@ async function start() {
   // Pick the message ID up front and remember it, so the echo of our own message is ignored.
   const send = sock.sendMessage.bind(sock)
   sock.sendMessage = (jid, content, options = {}) => {
+    if (config.label && typeof content.text === 'string') content = { ...content, text: `🤖 *${config.botName}*\n${content.text}` }
     const messageId = options.messageId || generateMessageIDV2(sock.user?.id)
     sentByBot.add(messageId)
     if (sentByBot.size > 5000) sentByBot.delete(sentByBot.values().next().value)

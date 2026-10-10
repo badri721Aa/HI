@@ -16,6 +16,9 @@ normally; the bot just runs alongside as another linked device.
 What that means in practice:
 
 - The bot's replies are sent **from your account**: people see your name and photo.
+  Each bot message starts with a **🤖 BOT** header so people can tell it apart from you
+  (`BOT_NAME` / `BOT_LABEL` in `.env`). For a truly separate name and photo, link a second number
+  and use `!setbotname` — don't use it on your personal number, it renames *you*.
 - **Commands you type yourself also work.** In `self` mode, only you can use the bot.
 - Set `ALLOWED_GROUPS` so the bot only acts in the groups you choose, not all your chats.
 

@@ -17,7 +17,10 @@ export const config = {
   allowedGroups: list(process.env.ALLOWED_GROUPS),
   // Answer commands in private chats too (owner commands always work in private).
   allowDms: process.env.ALLOW_DMS === 'on',
-  botName: process.env.BOT_NAME || 'GroupBot',
+  botName: process.env.BOT_NAME || 'BOT',
+  // Start every bot message with a "🤖 BOT" header, so people can tell bot replies from your own
+  // messages when it runs on your personal number.
+  label: process.env.BOT_LABEL !== 'off',
   // Defaults for new groups; admins can change them per group with commands.
   welcome: process.env.WELCOME !== 'off',
   antiLink: process.env.ANTI_LINK === 'on',
