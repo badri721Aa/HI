@@ -1,6 +1,16 @@
 import type { Page } from "@playwright/test";
 import { PRODUCTS, getProduct } from "@/content/catalog";
-import { escapeRegExp, expect, expectCartCount, test, waitForHydration } from "./fixtures";
+import {
+  closeDialogs,
+  escapeRegExp,
+  expect,
+  expectCartCount,
+  gotoHome,
+  openQuickView,
+  quickView,
+  test,
+  waitForHydration,
+} from "./fixtures";
 
 const cell = getProduct("plant-cell-model")!;
 const gear = getProduct("gear-shifter")!;
@@ -99,12 +109,52 @@ test.describe("product page", () => {
     expect(await scale()).toBe(1);
   });
 
+  test("never draws a photo larger than its file", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Phone wells are narrower than every photo.");
+    await page.goto(`/en/products/${gear.slug}`);
+    await waitForHydration(page);
+    const gallery = page.getByTestId("product-gallery");
+    // The 440px original and the 674px landscape set would be blown up in the ~540px well at 1440×900.
+    for (const [i, image] of gear.images.entries()) {
+      await gallery.getByRole("button", { name: image.alt.en }).click();
+      const img = gallery.getByTestId("product-photo").locator(`[data-photo="${i}"] img`);
+      await expect(img).toBeVisible();
+      const box = await img.evaluate((el: HTMLImageElement) => [el.offsetWidth, el.offsetHeight]);
+      expect(box[0], image.src).toBeLessThanOrEqual(image.width);
+      expect(box[1], image.src).toBeLessThanOrEqual(image.height);
+    }
+  });
+
   test("every product has a page", async ({ page, isMobile }) => {
     test.skip(isMobile, "Covered on desktop.");
     for (const product of PRODUCTS) {
       const response = await page.goto(`/en/products/${product.slug}`);
       expect(response?.status(), product.slug).toBe(200);
       await expect(page.getByRole("heading", { level: 1, name: product.name.en })).toBeVisible();
+    }
+  });
+});
+
+test.describe("quick view", () => {
+  test("shows the price beside 'Add to order' as it opens, on a laptop screen and on phones", async ({ page, isMobile }) => {
+    // 1366×768 is the shortest common laptop: the photo there pushed the price below the pinned footer.
+    if (!isMobile) await page.setViewportSize({ width: 1366, height: 768 });
+    await gotoHome(page);
+    for (const slug of ["dumpling-steamer", "gear-shifter"]) {
+      await closeDialogs(page);
+      await openQuickView(page, slug);
+      const price = quickView(page).getByTestId("product-price");
+      await expect(price).toBeVisible();
+      // Not just in the DOM: nothing (such as the footer) covers its middle, and it ends on screen.
+      await expect
+        .poll(() =>
+          price.evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return !!at && el.contains(at) && r.bottom <= window.innerHeight;
+          }),
+        )
+        .toBe(true);
     }
   });
 });

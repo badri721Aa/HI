@@ -84,7 +84,7 @@ export interface PricedOrder {
  * validator (./schema, loaded on demand) could not be loaded, so a failed
  * chunk never lets a blank order through. Keys and paths match validateOrder.
  */
-export function checkOrderEssentials({ region, lines, customer }: OrderInput): ValidationResult {
+export function checkOrderEssentials({ region, lines, customer, website }: OrderInput): ValidationResult {
   const errors: Record<string, OrderErrorKey> = {};
   if (lines.length === 0) errors.lines = "cart_empty";
   lines.forEach((line, i) => {
@@ -97,6 +97,7 @@ export function checkOrderEssentials({ region, lines, customer }: OrderInput): V
   const city = customer.city?.trim() ?? "";
   if (!REGION_CONFIG[region]?.cities.some((c) => c.id === city)) errors["customer.city"] = "city_required";
   else if (isOtherCity(city) && !sanitizeText(customer.area, LIMITS.area)) errors["customer.area"] = "area_required";
+  if (website) errors.website = "spam";
   return { ok: Object.keys(errors).length === 0, errors };
 }
 

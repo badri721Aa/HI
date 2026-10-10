@@ -110,8 +110,9 @@ export function DotList({ parts, className }: { parts: ReactNode[]; className?: 
     <span className={cn("block overflow-x-clip", className)}>
       <span className="-ms-4 flex flex-wrap">
         {parts.map((part, i) => (
-          <span key={i} className="min-w-0">
-            <span aria-hidden className="inline-block w-4 text-center">
+          // The dot sits in the part's own start padding, so a part that wraps continues inside the visible edge.
+          <span key={i} className="min-w-0 ps-4">
+            <span aria-hidden className="-ms-4 inline-block w-4 select-none text-center">
               ·
             </span>
             {part}
@@ -311,7 +312,7 @@ function writeDraft(draft: Draft) {
 
 const inRegion = (region: Region, city: string) => REGION_CONFIG[region].cities.some((c) => c.id === city);
 
-/** Before step 2 there's no reference yet; one of the same length keeps the size check exact. */
+/** Before step 2 there's no reference yet; one of the same length keeps the items step's size check exact. */
 const REF_PLACEHOLDER = `${site.orderPrefix}-00000`;
 
 /**
@@ -344,7 +345,9 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
     notes: draft.notes,
   };
   // Past the URL limit the receipt drops SKUs and dimensions; the preview shows whichever is sent.
-  const link = buildOrderLink(line.e164, { ref: orderRef ?? "", region, locale, lines, customer });
+  // The message is only shown once the real reference exists, so the placeholder never reaches the screen.
+  const ref = orderRef ?? REF_PLACEHOLDER;
+  const link = buildOrderLink(line.e164, { ref, region, locale, lines, customer });
 
   // Without the full validator (its chunk failed to load), the essentials are still checked.
   const input: OrderInput = { region, lines, customer, website };
@@ -354,9 +357,7 @@ export function useCheckout({ region, lines, orderRef }: { region: Region; lines
   // Some in-app browsers truncate very long links. If shorter notes would fix it, flag the notes;
   // if the order itself is too long (many pieces, especially in Arabic), ask to split it. When the
   // pieces alone are too long, no details can help, so the items step says so before step 2.
-  const overflow = link.fits
-    ? null
-    : orderLinkOverflow(line.e164, { ref: orderRef ?? REF_PLACEHOLDER, region, locale, lines, customer });
+  const overflow = link.fits ? null : orderLinkOverflow(line.e164, { ref, region, locale, lines, customer });
   if (overflow === "notes") errors["customer.notes"] ??= "notes_too_long_for_link";
   else if (overflow) errors.link = "too_many_lines";
   if (overflow === "pieces") errors.lines ??= "too_many_lines";

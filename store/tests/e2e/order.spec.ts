@@ -1,7 +1,7 @@
 import type { Locator } from "@playwright/test";
 import { getProduct } from "@/content/catalog";
 import { getDictionary } from "@/lib/i18n";
-import { LIMITS } from "@/lib/whatsapp";
+import { LIMITS, MAX_LINES, MAX_QTY } from "@/lib/whatsapp";
 import {
   ORDER_REF,
   addToOrder,
@@ -19,6 +19,7 @@ import {
 } from "./fixtures";
 
 const t = getDictionary("en");
+const ar = getDictionary("ar");
 const clicker = getProduct("keycap-clicker")!;
 const phoneCase = getProduct("hex-phone-case")!;
 
@@ -115,6 +116,78 @@ test.describe("order flow", () => {
     await drawer.getByTestId("checkout-name").fill("Fatima Ali");
     await expect(preview).toContainText("Fatima Ali");
     await expect(preview).toContainText(ref!);
+  });
+});
+
+test.describe("when the validator can't be downloaded", () => {
+  test.skip(({ isMobile }) => isMobile, "The checkout logic is the same on both; it runs on desktop.");
+  // A service worker would answer chunk requests out of the page's sight.
+  test.use({ serviceWorkers: "block" });
+
+  test("a blank order still never goes out, and the download is retried on send", async ({ page, waRequests }) => {
+    let attempts = 0;
+    await page.route("**/_next/static/chunks/**", async (route) => {
+      const response = await route.fetch();
+      const body = await response.text();
+      // zod is only in the on-demand validator chunk: fail that one, every time.
+      if (!body.includes("ZodError")) return route.fulfill({ response, body });
+      attempts++;
+      return route.abort();
+    });
+
+    await gotoHome(page, "en");
+    await addToOrder(page, clicker.slug);
+    const drawer = await goToCheckout(page);
+    const send = drawer.getByTestId("checkout-send");
+
+    // The essentials are checked without zod: an empty name and no city hold the send.
+    await send.click();
+    await expect(drawer.getByTestId("error-name")).toContainText(t.common.errors.name_required);
+    await expect(drawer.getByTestId("error-city")).toContainText(t.common.errors.city_required);
+    await expect(drawer.getByTestId("checkout-name")).toBeFocused();
+    expect(waRequests).toEqual([]);
+
+    // The errors above mean the load has failed; the next send tries it again.
+    const tried = attempts;
+    await drawer.getByTestId("checkout-name").fill("A");
+    await send.click();
+    await expect(drawer.getByTestId("error-name")).toContainText(t.common.errors.name_too_short);
+    await expect.poll(() => attempts).toBeGreaterThan(tried);
+    expect(waRequests).toEqual([]);
+
+    await fillCheckout(page, { name: "Fatima Ali", city: "manama" });
+    await send.click();
+    await expect.poll(() => waRequests.length).toBeGreaterThan(0);
+    expect(waText(waRequests[0])).toContain("Name: Fatima Ali");
+    expect(waText(waRequests[0])).toContain("Manama, Bahrain");
+  });
+});
+
+test.describe("an order too long for one WhatsApp message", () => {
+  test("is flagged on the items step, before any details are asked for", async ({ page }) => {
+    // The cart's cap of lines, each a different 40-character Arabic model at the top quantity: allowed in
+    // the cart, but past the link limit in Arabic whatever the customer types.
+    const lines = Array.from({ length: MAX_LINES }, (_, i) => ({
+      slug: phoneCase.slug,
+      colorId: phoneCase.colors[0].id,
+      sizeId: phoneCase.sizes[0].id,
+      qty: MAX_QTY,
+      note: `${i} ${"ب".repeat(LIMITS.note)}`.slice(0, LIMITS.note),
+    }));
+    // The cart store's localStorage key (lib/store/cart.ts).
+    await page.addInitScript((saved) => {
+      window.localStorage.setItem("3dbh-cart", JSON.stringify({ state: { lines: saved }, version: 1 }));
+    }, lines);
+
+    await gotoHome(page, "ar");
+    const cart = await openCart(page);
+    await expect(cart.getByTestId("cart-line")).toHaveCount(MAX_LINES);
+    await expect(cart.getByRole("alert")).toContainText(ar.common.errors.too_many_lines);
+
+    // Continue stays on the items step: no form to fill for an order that can't be sent.
+    await cart.getByTestId("checkout-continue").click();
+    await expect(cart.getByRole("alert")).toContainText(ar.common.errors.too_many_lines);
+    await expect(cart.getByTestId("checkout-name")).toHaveCount(0);
   });
 });
 

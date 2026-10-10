@@ -232,7 +232,7 @@ describe("checkOrderEssentials (stand-in when the zod chunk fails to load)", () 
     expect(result.errors).toEqual({ "customer.name": "name_required", "customer.city": "city_required" });
   });
 
-  it("agrees with validateOrder on name, city and area", () => {
+  it("agrees with validateOrder on name, city, area, notes required by a piece, and the honeypot", () => {
     const inputs: OrderInput[] = [
       order({ customer: blankCustomer }),
       withCustomer({ name: "  " }),
@@ -245,8 +245,9 @@ describe("checkOrderEssentials (stand-in when the zod chunk fails to load)", () 
       order({ region: "AE", customer: { name: "Omar", city: "manama" } }),
       order({ lines: [] }),
       order({ lines: [{ ...phoneCase, note: "" }, clicker, { ...phoneCase, note: "  " }] }),
+      order({ website: "https://spam.example" }),
     ];
-    const essentials = ["customer.name", "customer.city", "customer.area", "lines", "lines.0.note", "lines.2.note"];
+    const essentials = ["customer.name", "customer.city", "customer.area", "lines", "lines.0.note", "lines.2.note", "website"];
     for (const input of inputs) {
       const full = validateOrder(input).errors;
       const pick = (errors: Record<string, OrderErrorKey>) =>

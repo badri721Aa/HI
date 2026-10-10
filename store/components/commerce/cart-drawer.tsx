@@ -141,14 +141,15 @@ export function CartDrawer() {
   const checkout = useCheckout({ region, lines, orderRef });
   const priced = priceOrder(lines, region, locale);
 
-  // Send pressed before the validator arrived: focus the first problem as soon as it can be known.
+  // Send pressed before the validator arrived: focus the first problem as soon as it can be known
+  // (from the full check, or from the essentials if the validator failed to load).
   const focusPending = useRef(false);
   const focusFirstInvalid = useEffectEvent(() => {
     const field = checkout.firstInvalidField();
     if (field) focusField(document.getElementById(checkout.ids[field]), reduced);
   });
   useEffect(() => {
-    if (checkout.validation !== "ready" || !focusPending.current) return;
+    if (checkout.validation === "loading" || !focusPending.current) return;
     focusPending.current = false;
     focusFirstInvalid();
   }, [checkout.validation]);

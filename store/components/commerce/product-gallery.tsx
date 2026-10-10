@@ -68,8 +68,9 @@ export function ProductPhoto({
   return (
     <div
       className={cn(
+        // A faint centre light on the plain well, so the inset photo sits in a lit studio rather than a void.
         "absolute inset-0 grid place-items-center p-[6%] [container-type:size]",
-        "bg-[radial-gradient(closest-side,rgb(255_255_255/0.035),transparent)]",
+        "bg-radial-[closest-side] from-fg/4 to-transparent",
         className,
       )}
     >

@@ -274,11 +274,12 @@ export function ProductDetails({
   const SpecsHeading = page ? "h2" : "h3";
   const inFooter = orderBar === "footer";
 
-  const price = (textClass: string) => (
-    <p data-testid="product-price" className={cn("font-mono tabular text-fg", textClass)}>
+  /** "2.000 BHD × 2 = 4.000 BHD"; `qtyClassName` can move the "× 2 = …" part (e.g. onto its own line). */
+  const price = (className: string, qtyClassName?: string) => (
+    <p data-testid="product-price" className={cn("font-mono tabular text-fg", className)}>
       <Price size={size} />
       {qty > 1 ? (
-        <span className="text-[0.8125rem] text-fg-muted">
+        <span className={cn("text-[0.8125rem] text-fg-muted", qtyClassName)}>
           {" "}
           × {qty} = <Price size={size} qty={qty} className="text-fg" />
         </span>
@@ -357,8 +358,14 @@ export function ProductDetails({
 
       {inFooter ? (
         <DrawerFooter>
-          {price("text-lg leading-6")}
-          <AddToOrderBar order={order} className="mt-3" />
+          {/*
+            Phones: the price on its own line over the bar (the sheet is too narrow for all three). From sm the
+            drawer fits one row, the price first as a compact column with any "× 2 = …" under it.
+          */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            {price("text-lg leading-6 sm:shrink-0 sm:text-base sm:leading-5", "sm:block sm:text-[0.6875rem] sm:leading-4")}
+            <AddToOrderBar order={order} className="min-w-0 sm:flex-1" />
+          </div>
         </DrawerFooter>
       ) : orderBar ? (
         <AddToOrderBar order={order} className="mt-6" />

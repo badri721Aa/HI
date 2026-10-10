@@ -17,9 +17,9 @@ import { ProductGallery } from "./product-gallery";
  * useUI().quickView (a product slug). Photos, then the full ProductDetails
  * (the drawer title is the product name, so details start with the tagline)
  * with its price, quantity and "Add to order" pinned in the drawer's sticky
- * footer, then a link to the product page. Back closes it. Remounts its content per
- * product so picks and quantities never leak from one piece to the next, and
- * keeps showing the last product while the drawer slides out.
+ * footer, then a link to the product page. Back closes it. Remounts its
+ * content per product so picks and quantities never leak from one piece to
+ * the next, and keeps showing the last product while the drawer slides out.
  */
 export function QuickView() {
   const { t, locale } = useI18n();
