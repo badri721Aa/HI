@@ -1,78 +1,109 @@
 # WhatsApp Group Bot
 
-A bot for your WhatsApp group, built on [Baileys](https://github.com/WhiskeySockets/Baileys).
-It logs in as a **linked device** (like WhatsApp Web) on a phone number you choose.
+A bot for your WhatsApp group with **284 commands** and **14 automatic features** —
+moderation, games, an economy, stickers, polls, reminders, text tools, calculators,
+converters and more. Full list: **[COMMANDS.md](COMMANDS.md)**.
 
-> ⚠️ Baileys is unofficial. Use a **spare number** for the bot, not your personal one:
-> WhatsApp can ban numbers that act like spam bots.
+Built on [Baileys](https://github.com/WhiskeySockets/Baileys): it links to a WhatsApp
+account as a **linked device**, the same way WhatsApp Web does.
+
+## Using your own number (no new SIM)
+
+Every WhatsApp account needs a phone number, but **the bot can use the number you already
+have**. Link it to your own WhatsApp exactly like WhatsApp Web. Your phone keeps working
+normally; the bot just runs alongside as another linked device.
+
+What that means in practice:
+
+- The bot's replies are sent **from your account**: people see your name and photo.
+- **Commands you type yourself also work.** In `self` mode, only you can use the bot.
+- Set `ALLOWED_GROUPS` so the bot only acts in the groups you choose, not all your chats.
+
+> ⚠️ **Ban risk:** Baileys is unofficial. WhatsApp can ban numbers that behave like spam
+> bots. Keep it to your own groups, don't mass-message, and don't add strangers.
+> If losing your personal number would be a big problem, link a spare number instead.
+> (You can also link a home landline or an old SIM — WhatsApp can verify by voice call.)
 
 ## Setup
 
-Requires Node.js 22+.
+You need **Node.js 22 or newer** on a computer or server that stays on.
 
 ```bash
 cd whatsapp-bot
 npm install
-cp .env.example .env   # optional: edit settings
+cp .env.example .env    # then edit .env (optional)
 npm start
 ```
 
-On first run a QR code is shown in the terminal. On the bot's phone open
-**WhatsApp → Linked devices → Link a device** and scan it.
-(Or set `PHONE_NUMBER` in `.env` to get an 8-character pairing code instead.)
+On first start a **QR code** appears in the terminal. On your phone open
+**WhatsApp → Settings → Linked devices → Link a device** and scan it.
+Prefer a code? Set `PHONE_NUMBER` in `.env`, restart, then choose
+**Link with phone number instead** on your phone and type the 8-character code.
 
 The login is saved in `auth/`, so later starts connect automatically.
-Delete `auth/` to log in with a different number.
+Delete `auth/` to unlink and start over.
 
-Then **add the bot's number to your group** and make it a **group admin**
-(needed for kick, promote/demote, lock/unlock and anti-link).
+Finally, in your group: make sure the linked number is a **group admin**
+(needed for kick, mute, anti-link, etc.). Then type `!help`.
 
-## Commands
+## Quick tour
 
-| Command | Who | What it does |
-|---|---|---|
-| `!help` | everyone | List commands |
-| `!ping` | everyone | Check the bot is alive |
-| `!rules` | everyone | Show the group rules (`GROUP_RULES`) |
-| `!info` | everyone | Group name, member and admin count |
-| `!id` | everyone | Show this group's ID |
-| `!tagall [message]` | admins | Mention every member |
-| `!kick @user` | admins | Remove members (mention or reply to their message) |
-| `!promote @user` / `!demote @user` | admins | Change admin status |
-| `!lock` / `!unlock` | admins | Admins-only messaging on/off |
-
-Plus automatic welcome/goodbye messages and optional link blocking.
+| Try | What happens |
+|---|---|
+| `!help` / `!menu` | Command categories / everything |
+| `!tagall Meeting at 8` | Mentions every member |
+| `!poll Dinner? \| Pizza \| Sushi` | Native WhatsApp poll |
+| `!sticker` (as caption or reply to an image) | Makes a sticker |
+| `!trivia`, `!hangman`, `!ttt @friend` | Games — answer by just typing |
+| `!daily`, `!work`, `!slots 100` | Earn and gamble virtual coins |
+| `!remind 30m call mom` | Reminder in the group |
+| `!warn @user spam` | Warning; auto-removal at the limit |
+| `!antilink on`, `!welcome on` | Per-group moderation switches |
+| `!mode self` | Only you can use the bot |
 
 ## Settings (`.env`)
 
 | Variable | Default | |
 |---|---|---|
-| `PREFIX` | `!` | Command prefix |
-| `PHONE_NUMBER` | — | Log in by pairing code instead of QR (digits only, with country code) |
-| `ALLOWED_GROUPS` | all groups | Comma-separated group IDs to respond in (get one with `!id`) |
-| `WELCOME` | `on` | Welcome/goodbye messages |
-| `ANTI_LINK` | `off` | Delete links from non-admins |
-| `GROUP_RULES` | sample rules | Text for `!rules` |
+| `PHONE_NUMBER` | — | Link by pairing code instead of QR (digits, with country code) |
+| `BOT_MODE` | `public` | `public` = everyone, `self` = only you |
+| `OWNER_NUMBERS` | — | Extra owners, comma-separated |
+| `PREFIX` | `!` | Command prefix (also changeable with `!setprefix`) |
+| `ALLOWED_GROUPS` | all groups | Group IDs to work in (get one with `!id`) |
+| `ALLOW_DMS` | `off` | Let anyone use commands in private chat |
+| `WELCOME` / `ANTI_LINK` | `on` / `off` | Defaults for new groups |
+| `GROUP_RULES` | sample rules | Default text for `!rules` |
 
-## Adding a command
-
-Add an entry to `src/commands.js`:
-
-```js
-hello: {
-  description: 'Say hi',
-  run: ({ reply, args }) => reply(`Hi ${args.join(' ') || 'there'}!`),
-},
-```
+Group data (warnings, XP, coins, notes, reminders) is stored in `data/db.json`.
+Owners can download a copy with `!backup`.
 
 ## Keeping it running 24/7
 
-The bot needs an always-on process (it can't run on Vercel/serverless).
-Options: a cheap VPS, a Raspberry Pi, or a host like Railway/Render/Fly.io with a
-persistent disk for `auth/`. On a VPS, [pm2](https://pm2.keymetrics.io/) keeps it alive:
+It needs a machine that stays on (it can't run on Vercel/serverless): an old laptop,
+a Raspberry Pi, or a small VPS. [pm2](https://pm2.keymetrics.io/) restarts it if it crashes:
 
 ```bash
 npm i -g pm2
 pm2 start npm --name wa-bot -- start
 pm2 save && pm2 startup
 ```
+
+## For developers
+
+- `npm test` runs every command through the real handler against a fake WhatsApp connection.
+- `npm run docs` regenerates `COMMANDS.md`.
+- Add a command by adding an object to any file in `src/commands/`:
+
+```js
+{
+  name: 'hello',
+  desc: 'Say hi',
+  usage: '[name]',
+  run: ({ reply, text }) => reply(`Hi ${text || 'there'}!`),
+}
+```
+
+Flags: `admin: true` (group admins), `owner: true`, `botAdmin: true`, `groupOnly: true`.
+
+Web lookups (`!weather`, `!wiki`, `!translate`, …) use free public APIs and need internet
+access on the bot's machine.
