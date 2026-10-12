@@ -1,0 +1,41 @@
+{
+ "version_id": "2.0.0",
+ "summary": "SOLO: FPS-tuned, crash-fixed, with more performance, QoL and adventure mods",
+ "_base": "apply on top of SOLO_1.0.1-fps (already has the duplicate Sodium, FPS Reducer, Ksyxis, Atmosfera and Fullbright removed)",
+ "_rules": "Sodium stays at 0.8.12 (Iris 1.10.7 breaks on 0.8.13+, Nvidium beta13 needs 0.8.12). Anything failing the Fabric check is dropped automatically.",
+ "remove": [],
+ "enable": [],
+ "replace": {
+  "resourcepacks/3D Buckets and Fish 1.21.5.zip": "Fs5uTSUN",
+  "mods/sodium-extra-fabric-0.9.3+mc1.21.11.jar.disabled": "sodium-extra"
+ },
+ "add": [
+  "ONZm0H7Y",
+  "structure-layout-optimizer",
+  "language-reload",
+  "appleskin",
+  "better-ping-display-fabric",
+  "legendary-tooltips",
+  "crafting-tweaks",
+  "universal-graves",
+  "trade-cycling",
+  "waystones",
+  "yungs-better-dungeons",
+  "yungs-better-mineshafts",
+  "yungs-better-strongholds",
+  "yungs-better-ocean-monuments",
+  "yungs-better-desert-temples",
+  "yungs-better-nether-fortresses",
+  "yungs-better-jungle-temples",
+  "yungs-better-witch-huts",
+  "yungs-extras",
+  "dungeons-and-taverns",
+  "explorify",
+  "nullscape",
+  "farmers-delight-refabricated"
+ ],
+ "pin": {
+  "sodium-extra": "mc1.21.11-0.9.1+fabric"
+ },
+ "_sodium_extra": "0.9.2+ require sodium >=0.8.13 (verified from source tags); 0.9.1 requires >=0.8.1"
+}

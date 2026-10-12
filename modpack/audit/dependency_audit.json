@@ -1,0 +1,3264 @@
+[
+ {
+  "path": "mods/[fabric]ctov-1.21.11-3.6.2a.jar",
+  "mod_id": "ctov",
+  "mod_version": "3.6.2a",
+  "repo": "https://github.com/ChoiceTheorem/ChoiceTheorem-s-overhauled-village",
+  "ref": "refs/heads/1.21.11 @ 0fc1d6c8923acd0177a5f927801aeb0939190e54 (commit 'CTOV update 3.6.2a Hotfix for lithostitched update')",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabric": "*",
+   "minecraft": ">=1.21",
+   "lithostitched": ">=1.6.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "cloth-config"
+  ],
+  "status": "resolved",
+  "notes": "No tags exist for this version. The 1.21.11 branch history has two commits with mod_version=3.6.2a (0fc1d6c and 2804264), and both carry 1.21.1 gradle props. fabric.mod.json depends is identical in those commits and in the 1.21.11-lineage commits (ec1fb96/c88341a, MC 1.21.11, cloth_fabric_version=21.11.151), so the constraints are reliable. 'fabric' is the legacy Fabric API id. Needs the Lithostitched mod at 1.6.0 or newer. The cloth-config-fabric jar is bundled via 'modApi include'. No breaks."
+ },
+ {
+  "path": "mods/Axiom-5.4.2-for-MC1.21.11.jar",
+  "mod_id": "axiom",
+  "mod_version": "5.4.2",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "closed_source",
+  "notes": "Axiom (Moulberry) is closed source, so there is no public fabric.mod.json to read. Inspect the jar directly if needed."
+ },
+ {
+  "path": "mods/blur-fabric-6.3.1+1.21.11.jar",
+  "mod_id": "blur",
+  "mod_version": "6.3.1",
+  "repo": "https://github.com/Motschen/Blur",
+  "ref": "refs/heads/multiversion @ 3507b81754ed93ec744ca5e45d1146b51081fc9f (commit 'chore: bump version' to 6.3.1)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11",
+   "midnightlib": ">=1.9.3"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "midnightlib"
+  ],
+  "status": "resolved",
+  "notes": "Blur+ by MidnightDust uses stonecutter. ${minecraft} resolves to versions/1.21.11-fabric mod.mc_dep_fabric='>=1.21.11'. There is no fabricloader, fabric-api or java entry. midnightlib 1.9.3+1.21.11-fabric is bundled via include(midnightlib). The current branch HEAD (7f57397) still has mod.version=6.3.1 and the same depends. No tags exist for 6.x."
+ },
+ {
+  "path": "mods/cicada-lib-0.14.3+1.21.9-1.21.10.jar",
+  "mod_id": "cicada",
+  "mod_version": "0.14.3+1.21.9-1.21.10",
+  "repo": "https://github.com/enjarai/cicada-lib",
+  "ref": "refs/tags/0.14.3+1.21.9-1.21.10",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "java": ">=17",
+   "minecraft": ">=1.21.9-",
+   "fabricloader": ">=0.15.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "org.yaml:snakeyaml:2.2 (non-mod library)"
+  ],
+  "status": "resolved",
+  "notes": "${target_minecraft} resolves to versions/1.21.9 mod.target='>=1.21.9-'. Loader metadata allows 1.21.11, but this jar was built for 1.21.9/1.21.10 (yarn 1.21.9+build.1, fabric_api 0.133.13+1.21.9), so it may hit runtime incompatibilities on 1.21.11. The loader will not block it."
+ },
+ {
+  "path": "mods/CrashAssistant-fabric-1.21.5-1.21.11-1.11.12.jar",
+  "mod_id": "crash_assistant",
+  "mod_version": "1.11.12",
+  "repo": "https://github.com/KostromDan/Crash-Assistant",
+  "ref": "refs/heads/1.21.5-1.21.8 @ e83a88993679b0e98e22b6a9acac98b343c8c5f0 (commit '1.11.12')",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.16.10",
+   "minecraft": ">=1.21.5 <1.22",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "No tags exist. The Fabric module lives only on branch 1.21.5-1.21.8; the 1.21.9-1.21.11 branch has no fabric dir. That branch HEAD has version=1.11.12, minecraft_version_range_fabric='>=1.21.5 <1.22' and fabric_loader_version=0.16.10, which matches the jar name. Fabric API is used at build time but not declared in depends. Libraries are shadow-bundled, not jar-in-jar mods."
+ },
+ {
+  "path": "mods/easy-deepslate-mining-1.21.11-1.0.0.jar",
+  "mod_id": "",
+  "mod_version": "1.0.0",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "No public GitHub source found. GitHub repo and code searches for easy-deepslate-mining, easy_deepslate_mining and easydeepslatemining returned nothing, and the web search found only a ModDex listing (Fabric/NeoForge, v1.0.0). Inspect the jar's fabric.mod.json directly."
+ },
+ {
+  "path": "mods/entity_sound_features-0.8.1-1.21.9-fabric.jar",
+  "mod_id": "entity_sound_features",
+  "mod_version": "0.8.1",
+  "repo": "https://github.com/Traben-0/Entity_Sound_Features",
+  "ref": "refs/tags/v0.8.1",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": "*",
+   "minecraft": "*",
+   "entity_texture_features": ">=7.1",
+   "entity_model_features": ">=3.2"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The fabric.mod.json depends block is literal; only version and access are expanded. The jar was built for 1.21.9 (mainProject=1.21.9-fabric), but minecraft='*', so the loader will not block it on 1.21.11; runtime compatibility is not guaranteed. It hard-requires ETF 7.1 or newer and EMF 3.2 or newer to be present."
+ },
+ {
+  "path": "mods/fast-ip-ping-v1.0.11-mc1.21.11-fabric.jar",
+  "mod_id": "fastipping",
+  "mod_version": "1.0.11",
+  "repo": "https://github.com/Fallen-Breath/fast-ip-ping",
+  "ref": "refs/tags/v1.0.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.11.4",
+   "minecraft": ">=1.21.11 <1.22"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "${minecraft_dependency} resolves from versions/1.21.11-fabric/gradle.properties. It needs no Fabric API."
+ },
+ {
+  "path": "mods/fusion-1.3.14-fabric-mc1.21.11.jar",
+  "mod_id": "fusion",
+  "mod_version": "1.3.14",
+  "repo": "https://github.com/SuperMartijn642/Fusion",
+  "ref": "refs/heads/fabric-1.21.11 @ 44f909efee8661d453d4fad8eb72b00d628a001d (commit 'Update version to 1.3.14')",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.0",
+   "fabric": ">=0.140.0",
+   "minecraft": ">=1.21.11 <1.22",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "No tags exist. The version-bump commit was found on branch fabric-1.21.11. Placeholders resolve from gradle.properties at that commit. 'fabric' is the legacy Fabric API id (fabric-api provides it), so Fabric API 0.140.0 or newer is required."
+ },
+ {
+  "path": "mods/ImmersiveUI-FABRIC-0.3.6+1.21.11.jar",
+  "mod_id": "immersiveui",
+  "mod_version": "0.3.6",
+  "repo": "https://github.com/Octo-Studios/immersive-ui",
+  "ref": "refs/heads/1.21.11 @ 0228af6b6ffa09b9d7b8efb4a605d97ddfc7a790 (commit 'bump version', mod_version=0.3.6)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11",
+   "java": ">=21",
+   "shatterlib": ">=0.6.0.5",
+   "fabric-api": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "No tags exist; the 1.21.11 branch HEAD is the 0.3.6 version bump. It requires ShatterLib 0.6.0.5 or newer, which is not bundled; the build uses shatterlib-fabric 0.6.0.5+1.21.11. Architectury API 19.0.1 is used at compile time but is not declared in depends. There is no fabricloader constraint."
+ },
+ {
+  "path": "mods/LetMeDespawn-1.21.11-x-fabric-1.6.2.jar",
+  "mod_id": "letmedespawn",
+  "mod_version": "1.6.2",
+  "repo": "https://github.com/frikinjay/let-me-despawn",
+  "ref": "refs/heads/main @ b37f7ccee129d0500a9bd8d4d7ba513b7056f887 (mod_version=1.4.4, MC 1.21)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.16.7",
+   "minecraft": "~1.21",
+   "java": ">=21",
+   "almanac": ">=1.0.2"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "The public repo only has main (1.4.4 for MC 1.21), forge and forge-1.12; the source for 1.6.2 / 1.21.11 is not pushed. The depends shown are from main 1.4.4 and are only indicative. In particular, minecraft '~1.21' would not literally be what the 1.21.11 build ships, and the almanac library requirement probably persists. Verify against the jar's fabric.mod.json."
+ },
+ {
+  "path": "mods/modmenu-17.0.1-beta.1.jar",
+  "mod_id": "modmenu",
+  "mod_version": "17.0.1-beta.1",
+  "repo": "https://github.com/TerraformersMC/ModMenu",
+  "ref": "refs/tags/v17.0.1-beta.1",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabric-resource-loader-v1": "*",
+   "fabric-screen-api-v1": "*",
+   "fabric-key-binding-api-v1": "*",
+   "fabric-lifecycle-events-v1": "*",
+   "fabricloader": ">=0.17.2",
+   "minecraft": ">=1.21.11 <26"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "fabric-api-base",
+   "fabric-resource-loader-v1",
+   "fabric-screen-api-v1",
+   "fabric-key-binding-api-v1",
+   "fabric-lifecycle-events-v1",
+   "placeholder-api"
+  ],
+  "status": "resolved",
+  "notes": "The depends block is literal, with no placeholders. includeMod bundles the listed Fabric API modules from fabric_version 0.140.0+1.21.11 and Text Placeholder API (eu.pb4:placeholder-api 2.8.2+1.21.10)."
+ },
+ {
+  "path": "mods/NoChatReports-FABRIC-1.21.11-v2.18.0.jar",
+  "mod_id": "nochatreports",
+  "mod_version": "1.21.11-v2.18.0",
+  "repo": "https://github.com/Aizistral-Studios/No-Chat-Reports",
+  "ref": "refs/heads/26.1-Unified @ 99eb97f4559843a6bd839644af5669cfb5f1244e (commit 'Build 1.21.11-v2.18.0 coming right up')",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.17.2",
+   "fabric-api": "*",
+   "minecraft": [
+    ">=1.21.9"
+   ],
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "No release tags exist for modern versions. The exact build commit was found in the 26.1-Unified branch history. The depends block is literal; the build used fabric_version 0.139.5+1.21.11. Cloth Config and Mod Menu are optional integrations and are not declared."
+ },
+ {
+  "path": "mods/PresenceFootsteps-1.12.4+1.21.11.jar",
+  "mod_id": "presencefootsteps",
+  "mod_version": "1.12.4+1.21.11",
+  "repo": "https://github.com/Sollace/Presence-Footsteps",
+  "ref": "refs/tags/1.12.4+1.21.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": "=1.21.11",
+   "fabricloader": ">=0.17.3",
+   "java": ">=21",
+   "fabric-api": ">=0.139.1+1.21.11",
+   "kirin": ">=1.21.4+1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "kirin"
+  ],
+  "status": "resolved",
+  "notes": "Placeholders resolve from build.gradle expand: minecraftVersion=minecraft_version_range '=1.21.11', loaderVersion '>=0.17.3', fabricVersion '>=0.139.1+1.21.11', kirinVersion '>=1.21.4+1.21.11'. Kirin is bundled via include. suggests: minelp >=4.15.0-beta.7+1.21.10."
+ },
+ {
+  "path": "mods/seamlesssleep-fabric-1.21.11-2.6.2.jar",
+  "mod_id": "seamlesssleep",
+  "mod_version": "2.6.2",
+  "repo": "https://github.com/GabrielFl4/Seamless-Sleep-MultiLoader",
+  "ref": "refs/heads/1.21.11 @ 04f3e7a0db027b27af6b6715e66a2462bc139c6d (commit '2.6.2 - Better Clouds implementation!')",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "fabric-api": "*",
+   "minecraft": "1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "com.electronwill.night-config:core 3.8.2 (library)",
+   "com.electronwill.night-config:toml 3.8.2 (library)"
+  ],
+  "status": "resolved",
+  "notes": "No tags exist. The 2.6.2 commit was found in the 1.21.11 branch history. Placeholders resolve from gradle.properties at that commit: fabric_loader_version=0.18.4, fabric_minecraft_version_range=1.21.11, java_version=21. suggests: modmenu, yet_another_config_lib_v3. Minecraft is pinned to exactly 1.21.11."
+ },
+ {
+  "path": "mods/smoothgui-fabric-2.0.5+mc1.21.11.jar",
+  "mod_id": "smoothgui",
+  "mod_version": "2.0.5",
+  "repo": "https://github.com/Ezzenix/SmoothGui",
+  "ref": "refs/heads/main @ 270a1c61dd5c127f605dcab1a5eec23de009ccac (last commit with mod.version=2.0.5)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": "*",
+   "minecraft": ">=1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "emlib"
+  ],
+  "status": "resolved",
+  "notes": "No tags exist. The project uses stonecutter with the stonecraft plugin, so ${minecraftVersion} is the current stonecutter version, 1.21.11 (no supported_to in versions/dependencies/1.21.11.properties). emlib 1.0.1+1.21.11-fabric is bundled via include. It declares no Fabric API dependency."
+ },
+ {
+  "path": "mods/status-effect-bars-1.0.10.jar",
+  "mod_id": "status-effect-bars",
+  "mod_version": "1.0.10",
+  "repo": "https://github.com/A5b84/status-effect-bars",
+  "ref": "refs/tags/v1.0.10",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "minecraft": ">=1.21.11- <26",
+   "java": ">=21",
+   "cloth-config2": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The depends block is literal. It hard-requires Cloth Config (id cloth-config2), which is not bundled. suggests: modmenu. Built against cloth-config 21.11.151 and Fabric API 0.140.0+1.21.11, but fabric-api is not declared in depends."
+ },
+ {
+  "path": "mods/veinminer-fabric-2.11.2+1.21.11.jar",
+  "mod_id": "veinminer",
+  "mod_version": "2.11.2",
+  "repo": "https://github.com/MiraculixxT/Veinminer",
+  "ref": "refs/heads/backport/1.21.11 @ e5bdd62f1a5d8db31272d43de4c2dfc8512d08f3 (gradle.properties version=2.11.2, gameVersion=1.21.11)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.19.0",
+   "minecraft": "1.21.11",
+   "java": ">=21",
+   "fabric-api": "*",
+   "fabric-language-kotlin": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "fabric-permissions-api-v0"
+  ],
+  "status": "resolved",
+  "notes": "No 2.11.2 tag exists; the tags are 2.11.1 and 2.12.0, which target 26.x and require java >=25. The backport/1.21.11 branch HEAD has version 2.11.2. ${mcversion} resolves to fabricSupportedVersions='1.21.11'. It requires Fabric Loader 0.19.0 or newer (the pack has 0.19.3) and Fabric Language Kotlin, which is not bundled. me.lucko fabric-permissions-api 0.6.1 is bundled via include, along with the internal core/common modules."
+ },
+ {
+  "path": "mods/AccurateBlockPlacement-Reborn-1.4.5+mc-1.21.9-1.21.11.jar",
+  "mod_id": "accurateblockplacement",
+  "mod_version": "1.4.5+mc-1.21.9-1.21.11",
+  "repo": "https://github.com/KadTheHunter/AccurateBlockPlacement-Reborn",
+  "ref": "56da084e997b53f6e0d5f92868b3ef208b597b02 (branch 1.21.9-1.21.11)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.9 <=1.21.11",
+   "fabricloader": ">=0.16.9",
+   "fabric-api": "*",
+   "java": ">=21"
+  },
+  "breaks": {
+   "nmc": "*"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The tag 1.4.5 points at the 26.1-26.2 build, so I used the commit on branch 1.21.9-1.21.11 whose gradle.properties sets mod_version = 1.4.5+mc-1.21.9-1.21.11. The depends block has no placeholders. Suggests cloth-config >=16.0.141 and modmenu >=12.0.0. Built against loader 0.17.3 and fabric-api 0.140.2+1.21.11."
+ },
+ {
+  "path": "mods/BadOptimizations-2.4.1-1.21.11.jar",
+  "mod_id": "badoptimizations",
+  "mod_version": "2.4.1",
+  "repo": "https://github.com/imthosea/BadOptimizations",
+  "ref": "refs/heads/1.21.11 (f0536c427398e121c27ad44b561f1434a0ad81e1)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "minecraft": ">=1.21.10",
+   "fabricloader": ">=0.15.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "mixinextras"
+  ],
+  "status": "resolved",
+  "notes": "The repo is imthosea/BadOptimizations; thosea/BadOptimizations does not exist. There are no tags. At the 1.21.11 branch head, gradle.properties has mod_version=2.4.1 and minecraft_version=1.21.11. The depends block is literal with no placeholders. It bundles mixinextras-fabric 0.2.2 by jar-in-jar. It does not depend on fabric-api."
+ },
+ {
+  "path": "mods/bobby-5.2.11.1+mc1.21.11.jar",
+  "mod_id": "bobby",
+  "mod_version": "5.2.11.1+mc1.21.11",
+  "repo": "https://github.com/Johni0702/bobby",
+  "ref": "refs/tags/v5.2.11.1+mc1.21.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.16.9",
+   "minecraft": "~1.21.9"
+  },
+  "breaks": {
+   "sodium": "<0.6.0"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "fabric-api-base",
+   "fabric-command-api-v2"
+  ],
+  "status": "resolved",
+  "notes": "minecraft ~1.21.9 means >=1.21.9 <1.22, so 1.21.11 is allowed. Suggests cloth-config2 ^20.0.149 and modmenu ^17.0.0-alpha.1. It also bundles configurate-core, configurate-hocon (4.1.2), geantyref 1.3.13 and typesafe config 1.4.2 as plain libraries. It does not require full fabric-api, only the two bundled modules."
+ },
+ {
+  "path": "mods/cleanhud-2.0.1-mc1.21.11.jar",
+  "mod_id": "",
+  "mod_version": "2.0.1",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "No public source found. GitHub repo search and code search for cleanhud / clean_hud / \"Clean HUD\" in fabric.mod.json files found nothing. The only GitHub cleanhud is Aufco/cleanhud, a 1.21.4 Forge mod and not this one. Web search did not turn up a source link either. Check the jar's fabric.mod.json directly."
+ },
+ {
+  "path": "mods/CreativeCore_FABRIC_v2.14.11_mc1.21.11.jar",
+  "mod_id": "creativecore",
+  "mod_version": "2.14.11",
+  "repo": "https://github.com/CreativeMD/CreativeCore",
+  "ref": "refs/heads/1.21.x (8d663de3916936fd469f54a9fffb2bf4eb29e09f)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "fabric-api": "*",
+   "minecraft": ">=1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There is no release tag. The 1.21.x branch head commit is 'Bumped version to 2.14.11', and src/fabric/resources/fabric.mod.json hardcodes version 2.14.11, so this almost certainly is the release metadata. The depends block has no placeholders."
+ },
+ {
+  "path": "mods/EasyAnvils-v21.11.1-mc1.21.11-Fabric.jar",
+  "mod_id": "easyanvils",
+  "mod_version": "21.11.1",
+  "repo": "https://github.com/Fuzss/easyanvils",
+  "ref": "refs/heads/1.21.11 (ab6bae616d54d955cf717d832e41c4da21c98a9d)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "minecraft": ">=1.21.11- <1.21.12-",
+   "fabricloader": ">=0.18.0",
+   "fabric-api": ">=0.141.2",
+   "forgeconfigapiport": "*",
+   "puzzleslib": ">=21.11.4"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "The repo has no fabric.mod.json; Fuzss' convention plugin generates it. Branch 1.21.11 has mod.version=21.11.1, and its CHANGELOG has v21.11.1 dated 2026-07-03. The tag v21.11.1-mc1.21.11/fabric points to a commit that holds only README/docs files. Required deps from gradle.properties: fabricapi, forgeconfigapiport, puzzleslib. The generator is ModJsonConfigurator.kt in multiloader-convention-plugins 1.0-SNAPSHOT build 20260104-15 (from Fuzss/modresources). It writes minecraft as \">=${minecraft}- <${patch+1}-\", fabricloader as \">=fabricloader-min\", fabric-api as \">=fabricapi-min\", puzzleslib as \">=puzzleslib-min\", and other required deps as \"*\". I filled the min values from sharedcatalogs 1.21.11-SNAPSHOT build 20260126.133021-8, the latest snapshot before the 2026-07-03 release: minecraft=1.21.11, fabricloader-min=0.18.0, fabricapi-min=0.141.2, puzzleslib-min=21.11.4. Status is partial because which snapshot was resolved at build time is inferred, not read. Key runtime requirements: Puzzles Lib >=21.11.4 and Forge Config API Port."
+ },
+ {
+  "path": "mods/entity_texture_features_1.21.11-fabric-7.1.jar",
+  "mod_id": "entity_texture_features",
+  "mod_version": "7.1",
+  "repo": "https://github.com/Traben-0/Entity_Texture_Features",
+  "ref": "refs/tags/v7.1",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": "*",
+   "minecraft": "*"
+  },
+  "breaks": {
+   "optifabric": "*",
+   "entity_model_features": "<3.1",
+   "entity_sound_features": "<0.8"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "This is a Stonecutter multi-version repo with a versions/1.21.11-fabric target. One fabric.mod.json is shared across all targets; only version and accessWidener are templated. It has no fabric-api dependency. Suggests modmenu. The pack's EMF must be >=3.1 and ESF (if present) >=0.8."
+ },
+ {
+  "path": "mods/fast-totem-1.0.0.jar",
+  "mod_id": "",
+  "mod_version": "1.0.0",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "No public source found. GitHub repo and code searches for fast-totem / fasttotem / \"Fast Totem\" turned up no Minecraft Fabric mod. Third-party listings describe a client-side Fabric mod (Shift+click to put a totem in the offhand) supporting 1.21.11, released around 2026-01-07, but give no source link. Check the jar's fabric.mod.json directly."
+ },
+ {
+  "path": "mods/fzzy_config-0.7.6+1.21.11.jar",
+  "mod_id": "fzzy_config",
+  "mod_version": "0.7.6+1.21.11",
+  "repo": "https://github.com/fzzyhmstrs/fconfig",
+  "ref": "a0e989510367d41cda9d1487e69db198ea277a52 (commit '0.7.6' on branch 1.21.11)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.1",
+   "fabric": "*",
+   "fabric-language-kotlin": ">=1.12.1+kotlin.2.0.20",
+   "minecraft": ">=1.21.10",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "fabric-permissions-api-v0"
+  ],
+  "status": "resolved",
+  "notes": "The branch head is already 0.7.7, so I used the commit where gradle.properties sets modVersion = 0.7.6. Placeholders resolve from gradle.properties: loaderVersion=0.18.1, fabricKotlinVersion=1.12.1+kotlin.2.0.20. 'fabric' is the legacy id that fabric-api provides. It requires Fabric Language Kotlin. It bundles tomlkt-jvm 0.3.7, jankson 1.2.3 and fabric-permissions-api 0.6.1 by jar-in-jar."
+ },
+ {
+  "path": "mods/InventoryParticles-3.0.0+1.21.11+fabric.jar",
+  "mod_id": "inventory_particles",
+  "mod_version": "3.0.0+1.21.11+fabric",
+  "repo": "https://github.com/LopyMine/Inventory-Particles",
+  "ref": "5ef672140d64f3932328a05f4662f006a22f06e4 (branch the-hell-3.0.0)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "mossylib": ">=1.5.0+1.21.11+fabric",
+   "fabricloader": ">=0.19.3",
+   "minecraft": ">=1.21.11",
+   "java": ">=21",
+   "fabric-api": "*"
+  },
+  "breaks": {
+   "particle_effects": "<1.4.0",
+   "inventory_interactions": "<1.2.0"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "At this commit data.mod_version = 3.0.0. fabric.mod.json and the 1.21.11 properties do not change again until the 3.1.0 commit, so this metadata matches any 3.0.0 build. Placeholders are filled by LopyMine's external 'mossy' gradle plugin 3.12.0, which I did not read, so the resolved values are inferred. ${fabric_loader} = build.fabric_loader 0.19.3, which is exactly the pack's loader. ${mossylib} = dep.mossylib 1.5.0+1.21.11+fabric in versions/fabric-1.21.11/gradle.properties; the plugin might normalise this string. ${minecraft} is 1.21.11 from the version spec, ${java} is 21 (max_java_version=21), and ${fabric_api_id} is assumed to be fabric-api. It requires MossyLib. Optional: modmenu, yacl, inventory-interactions, particle-effects."
+ },
+ {
+  "path": "mods/libIPN-fabric-1.21.11-6.6.3.jar",
+  "mod_id": "libipn",
+  "mod_version": "6.6.3",
+  "repo": "https://github.com/blackd/libIPN",
+  "ref": "refs/heads/master (a4f5025f40bd6ceef5f363ee23640c8ab0ce5a14), module libIPN/fabric-1.21.6",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabric-resource-loader-v0": "*",
+   "fabricloader": ">=0.15.11",
+   "minecraft": ">=1.21.6-beta.3 <1.22",
+   "fabric-language-kotlin": ">=1.11.0+kotlin.2.0.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "The source for 6.6.3 / 1.21.11 is not public. Tags stop at v6.2.0, and master was last updated 2025-06-17 with fabric modules only up to 1.21.6; blackd/Inventory-Profiles is similarly stale. The depends shown are from the newest available module (libIPN/fabric-1.21.6) for reference only; the real 6.6.3 constraints may differ. It reliably requires Fabric Language Kotlin and fabric-api (at least fabric-resource-loader-v0). Check the jar itself for exact values."
+ },
+ {
+  "path": "mods/moreculling-fabric-1.21.11-1.6.2.jar",
+  "mod_id": "moreculling",
+  "mod_version": "1.6.2",
+  "repo": "https://github.com/FxMorin/MoreCulling",
+  "ref": "refs/tags/v1.6.2",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.15.0",
+   "minecraft": ">=1.21",
+   "java": ">=21",
+   "cloth-config": ">=16.0.0"
+  },
+  "breaks": {
+   "sodium": "<=0.6.6"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "conditional-mixin",
+   "mixinsquared"
+  ],
+  "status": "resolved",
+  "notes": "At the tag, gradle.properties has minecraft_version=1.21.11 and mod_version=1.6.2. The depends block is literal with no placeholders. It requires Cloth Config. Suggests sodium >=0.6.7, built against sodium 0.8.0-beta.1+mc1.21.11-pre5. It bundles conditional-mixin-fabric 0.6.3 and mixinsquared-fabric 0.2.0."
+ },
+ {
+  "path": "mods/noisium-fabric-2.8.3+mc1.21.11.jar",
+  "mod_id": "noisium",
+  "mod_version": "2.8.3",
+  "repo": "https://github.com/coredex-source/noisium-forked",
+  "ref": "71e8ce159b4139ef1ab95a634a3aeb9e78a3d273 (branch 1.21.11)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "minecraft": "1.21.11"
+  },
+  "breaks": {
+   "biox": "*"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "mixinextras"
+  ],
+  "status": "resolved",
+  "notes": "2.8.x is the NoisiumForked continuation by coredex-source; the original Steveplays28/noisium is archived and stops at 2.7.0+mc1.21.6. I used the commit where gradle.properties has mod_version=2.8.3; the branch head is already 2.8.4. Placeholders resolve to fabric_loader_version=0.18.4 and supported_minecraft_version=1.21.11. Suggests c2me. Uses cloth-config for its config screen, but it is not declared in depends."
+ },
+ {
+  "path": "mods/prickle-fabric-1.21.11-21.11.1.jar",
+  "mod_id": "prickle",
+  "mod_version": "21.11.1",
+  "repo": "https://github.com/Darkhax-Minecraft/PrickleMC",
+  "ref": "refs/heads/1.21.11 (eb7c34d1a94bcf83aeb211c2f1d838896dd664cb)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "minecraft": "1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The repo is Darkhax-Minecraft/PrickleMC; Darkhax/Prickle is the plain-Java format library. There are no tags. The branch has one 1.21.11 commit ('Port to Minecraft 1.21.11'). The version is version=21.11 plus the CI BUILD_NUMBER, which gives 21.11.1. Placeholders resolve from gradle.properties: fabric_loader_version=0.18.4, minecraft_version=1.21.11, java_version=21. It has no fabric-api dependency."
+ },
+ {
+  "path": "mods/Searchables-fabric-1.21.11-1.0.4.jar",
+  "mod_id": "searchables",
+  "mod_version": "1.0.4",
+  "repo": "https://github.com/jaredlll08/searchables",
+  "ref": "refs/heads/1.21.11 (3627f29873ea90d3cfde26e2695ca071fe5a5373)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "java": ">=21",
+   "minecraft": "1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "recommends": {},
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The version is Versions.MOD '1.0' plus the build number, which gives 1.0.4. Placeholders resolve from buildSrc Versions.kt: FABRIC_LOADER=0.18.2, JAVA=21, MINECRAFT=1.21.11. Versions.kt and fabric.mod.json have not changed since the 'Updated to 1.21.11' commit (2025-12-14), so the values hold for 1.0.4. Recommends fabric-api '*', which is not required."
+ },
+ {
+  "path": "mods/smoothscroll-2.6.7.jar",
+  "mod_id": "smoothscroll",
+  "mod_version": "2.6.7",
+  "repo": "https://github.com/SmajloSlovakian/Minecraft-Smooth-Scrolling",
+  "ref": "refs/heads/1.21.11 (166710876f25926b965b4acb17c69fdf082bdfe6)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.14.21",
+   "minecraft": "1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. At the 1.21.11 branch head, gradle.properties has mod_version=2.6.7. The head commit 'backport fabric 0.19.0+ chat mask fix' matches the 2.6.7 changelog. The depends block is literal. It has no fabric-api dependency."
+ },
+ {
+  "path": "mods/SubtleEffects-fabric-1.21.11-1.14.0.jar",
+  "mod_id": "subtle_effects",
+  "mod_version": "1.14.0",
+  "repo": "https://github.com/MincraftEinstein/SubtleEffects",
+  "ref": "refs/heads/1.21.11 (cab9a9bf646fb6807a427c95fad82c01aaeed47b)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "fabric-api": ">=0.141.3+1.21.11",
+   "minecraft": ">=1.21.11 <1.22",
+   "java": ">=21",
+   "fzzy_config": ">=0.7.3+1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The 1.21.11 branch head merges 'Incremented version to 1.14.0', and gradle.properties has version=1.14.0, so this is very likely the release commit. Placeholders resolve from gradle.properties: fabric_version=0.18.4, fabric_api_version=0.141.3+1.21.11, minecraft_version=1.21.11, max_minecraft_version=1.22, java_version=21, fzzy_config_version=0.7.3+1.21.11. It requires fabric-api >=0.141.3 and Fzzy Config >=0.7.3; the pack's 0.7.6 satisfies that."
+ },
+ {
+  "path": "mods/visuality-0.7.13+1.21.11.jar",
+  "mod_id": "visuality",
+  "mod_version": "0.7.13+1.21.11",
+  "repo": "https://github.com/PinkGoosik/visuality",
+  "ref": "refs/tags/0.7.13+1.21.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": "*",
+   "fabric-api": "*",
+   "cloth-config": "*",
+   "minecraft": ">=1.21.11 <1.22",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "minecraft_version_range resolves from gradle.properties to >=1.21.11 <1.22. It requires fabric-api and Cloth Config. It compiles against local basic-math 0.6.1 and modmenu jars, but they are not declared in depends."
+ },
+ {
+  "path": "mods/AdvancementPlaques-1.21.11-fabric-1.7.0.jar",
+  "mod_id": "advancementplaques",
+  "mod_version": "1.7.0",
+  "repo": "https://github.com/AHilyard/AdvancementPlaques",
+  "ref": "refs/heads/1.21.11-multi (697678c66597fe56542b54dea7cf25b945eb0fba, 2026-05-21)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.16.0",
+   "fabric-api": "*",
+   "minecraft": "=1.21.11",
+   "java": ">=21",
+   "iceberg": ">=1.4.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags, so I read the branch head. Its gradle.properties has modVersion=1.7.0, which matches the filename. The depends values are literal in the file, not placeholders. The mod hard-requires Iceberg >=1.4.0 (AHilyard/Iceberg), which must be in the pack. It also has \"conflicts\": {\"canvas\": \"*\"} (a soft conflict, not a break) and suggests jade >=13.2.0, waila, toastmanager and advancementscreenshot >=4.8. Built against loader 0.19.2 and fabric-api 0.141.3+1.21.11."
+ },
+ {
+  "path": "mods/balm-fabric-1.21.11-21.11.9.1.jar",
+  "mod_id": "balm",
+  "mod_version": "21.11.9.1",
+  "repo": "https://github.com/TwelveIterationMods/Balm",
+  "ref": "refs/tags/v21.11.9.1",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "fabric-api": ">=0.140.0+1.21.11",
+   "minecraft": ">=1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [
+   "balm-fabric"
+  ],
+  "bundled_ids": [
+   "kuma_api"
+  ],
+  "status": "resolved",
+  "notes": "I resolved the placeholders from gradle/libs.versions.toml (fabricLoader=0.18.4, fabricApi=0.140.0+1.21.11, minecraft=1.21.11) and from gradle.properties (java_version=21), using the multiloader-common.gradle expand map. fabric/dependencies.gradle bundles kuma-api-fabric 21.11.12 via include(). I inferred its mod id 'kuma_api' and did not check it."
+ },
+ {
+  "path": "mods/BorderlessFullscreen-v2.2.1-mc1.21.9.jar",
+  "mod_id": "",
+  "mod_version": "2.2.1",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "I found no public GitHub source. Web search found Modrinth project UIexcMP1 ('Borderless Fullscreen', GPL-3.0), whose 2.2.1 variants include one listed for 1.21.9-1.21.11. No source link turned up, and Modrinth can't be reached from here. The filename targets mc1.21.9 while the pack runs 1.21.11, so the minecraft constraint needs checking in the jar itself."
+ },
+ {
+  "path": "mods/cloth-config-21.11.153-fabric.jar",
+  "mod_id": "cloth-config",
+  "mod_version": "21.11.153",
+  "repo": "https://github.com/shedaniel/cloth-config",
+  "ref": "refs/heads/v21.11 (ed6045b77a9eabb4a68706043e23dc80843f78d3, 2025-12-21)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.14.0",
+   "minecraft": ">=1.21.9-"
+  },
+  "breaks": {},
+  "provides": [
+   "cloth-config2"
+  ],
+  "bundled_ids": [
+   "cloth-basic-math"
+  ],
+  "status": "resolved",
+  "notes": "There are no tags. The version is base_version 21.11 plus the CI build number (153), so I can't pin an exact commit and read the v21.11 branch head. The depends values are literal. The fabric build bundles me.shedaniel.cloth:basic-math:0.6.1 via include() (mod id cloth-basic-math). Built with fabric_loader 0.18.2 and fabric-api 0.139.4+1.21.11, but fabric-api is not a declared dependency."
+ },
+ {
+  "path": "mods/cristellib-fabric-1.21.11-3.1.7.jar",
+  "mod_id": "cristellib",
+  "mod_version": "3.1.7",
+  "repo": "https://github.com/Cristelknight/Cristel-Lib",
+  "ref": "refs/heads/1.21.11 (a6d45fea2d853c56a8e82ce1a5e8204a2b6b6301, 2026-06-13 'version bump 3.1.7')",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.5",
+   "fabric-api": ">=0.141.4+1.21.11",
+   "minecraft": ">=1.21.11"
+  },
+  "breaks": {
+   "t_and_t": "<=1.13.8"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The branch head is the commit 'version bump 3.1.7' with mod_version=3.1.7, so it almost certainly matches. Placeholders came from gradle.properties: fabric_loader_min_version=0.18.5, fabric_api_version=0.141.4+1.21.11, minecraft_version=1.21.11. mod_id is taken from archives_name=cristellib. It requires fabric-api >=0.141.4+1.21.11, which is a relatively high floor. It breaks Towns and Towers <=1.13.8; the pack has 1.13.9, which is OK. It bundles the jankson 1.2.3 library, which is not a mod."
+ },
+ {
+  "path": "mods/easyelytratakeoff-1.21.11-4.5.jar",
+  "mod_id": "easyelytratakeoff",
+  "mod_version": "4.5",
+  "repo": "https://github.com/Serilum/Easy-Elytra-Takeoff",
+  "ref": "refs/heads/1.21.11 (41b4b296565322be2c6c0c38f222dbc9714e7ec6, 2026-03-27)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.15.0",
+   "fabric-api": "*",
+   "minecraft": ">=1.21",
+   "java": ">=21",
+   "collective": ">=8.13"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags, so I used the 1.21.11 branch. fabric.mod.json hardcodes \"version\": \"4.5\", which matches the filename. It requires Serilum's Collective >=8.13, which must be in the pack."
+ },
+ {
+  "path": "mods/entityculling-fabric-1.10.5-mc1.21.11.jar",
+  "mod_id": "entityculling",
+  "mod_version": "1.10.5",
+  "repo": "https://github.com/tr7zw/EntityCulling",
+  "ref": "refs/tags/1.10.5 (c87c146dcad35102f07a24a67e71ae1e4f23b507) + template tr7zw/ProcessedModTemplate master (fabric.mod.json last changed 96023d7, 2026-04-29)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": "1.21.x",
+   "fabric-api": "*"
+  },
+  "breaks": {
+   "tlskincape": "*"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "trender",
+   "transition"
+  ],
+  "status": "resolved",
+  "notes": "The 1.21.11-fabric target is listed in legacy.json at tag 1.10.5. fabric.mod.json comes from tr7zw/ProcessedModTemplate. Its fabric.mod.json was last changed before the tag date, so master matches what the build used. The template's minecraft_version_range_fabric is minecraft_dependency=1.21.x and fabric_api_name=fabric-api, both from versions/1.21.11-fabric/gradle.properties. The breaks block is {tlskincape:*} plus $breaks$, which EntityCulling leaves empty. There is no fabricloader or java entry. With the addTRenderLib/addTRansitionLib and includeLibs flags it bundles TRender and TRansition; I did not check the exact mod ids. The occlusionculling library is bundled too."
+ },
+ {
+  "path": "mods/faster_ghast-0.2.jar",
+  "mod_id": "",
+  "mod_version": "0.2",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "I found no GitHub source. The closest match is the Modrinth data pack 'Faster Happy Ghast' (slug faster_ghast, CC0-1.0), probably shipped as a mod jar. Other similarly named projects (Jom3a-J/FasterHappyGhast, karfakias/FastOrSlowHappyGhast) target 26.x and are different mods. Inspect the jar's fabric.mod.json directly."
+ },
+ {
+  "path": "mods/geckolib-fabric-1.21.11-5.4.5.jar",
+  "mod_id": "geckolib",
+  "mod_version": "5.4.5",
+  "repo": "https://github.com/bernie-g/geckolib",
+  "ref": "refs/heads/1.21.11 (9daf2cef0dda524363e17a2b369758dbed836d91, 2026-03-05)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18",
+   "fabric-api": ">=0.139.4+1.21.11",
+   "java": ">=17",
+   "minecraft": ">=1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. At the branch head libs.versions.toml has geckolib=5.4.5, which matches. Values come from buildSrc/geckolib-convention.gradle.kts and libs.versions.toml: fabric-range=0.18, fabric-api-range=0.139.4+1.21.11, minecraft=1.21.11. The java >=17 entry is literal."
+ },
+ {
+  "path": "mods/InventoryProfilesNext-fabric-1.21.11-2.2.6.jar",
+  "mod_id": "inventoryprofilesnext",
+  "mod_version": "2.2.6",
+  "repo": "https://github.com/blackd/Inventory-Profiles",
+  "ref": "refs/heads/all-in-one (a0b16d955128421a6c6f07ef3238d974ebd58785, 2025-06-17)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabric-resource-loader-v0": "*",
+   "minecraft": ">=@MC_VER@ <@MC_VER_MAX@",
+   "fabric-language-kotlin": ">=@FABRIC_LANGUAGE_KOTLIN@",
+   "libipn": ">=@LIBIPN_VERSION@ <@LIBIPN_VERSION_MAX@"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "The public source stops at 1.21.6: the latest tag is v2.0.4, the default branch all-in-one was last updated 2025-06-17, and platforms go only up to fabric-1.21.6. No 2.2.x or 1.21.11 source is public, so I couldn't resolve the @...@ placeholders for this jar. The template still shows the hard requirements: fabric-language-kotlin, libIPN (blackd/libIPN, with both an upper and a lower bound), fabric-resource-loader-v0, and a bounded minecraft range."
+ },
+ {
+  "path": "mods/litematica-fabric-1.21.11-0.26.13.jar",
+  "mod_id": "litematica",
+  "mod_version": "0.26.13",
+  "repo": "https://github.com/sakura-ryoko/litematica",
+  "ref": "refs/tags/1.21.11-0.26.13",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": "1.21.11",
+   "malilib": ">=0.27.17- <0.28.0-"
+  },
+  "breaks": {
+   "malilib": "<0.27.17-"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "conditional-mixin"
+  ],
+  "status": "resolved",
+  "notes": "The 1.21.x ports live in sakura-ryoko's fork, not maruohon/litematica. The depends values are literal; only the version is expanded. It needs malilib 0.27.17 or later and below 0.28.0. It bundles me.fallenbreath:conditional-mixin-fabric 0.6.4 via include(). There is no fabricloader constraint; it was built with loader 0.19.3."
+ },
+ {
+  "path": "mods/MossyLib-1.5.0+1.21.11+fabric.jar",
+  "mod_id": "mossylib",
+  "mod_version": "1.5.0",
+  "repo": "https://github.com/LopyMine/MossyLib",
+  "ref": "d7a4c23b728f1b01466b80a99630033fe100e721 (master history, 2026-06-21 'v1.5.0 update')",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.19.2",
+   "minecraft": ">=1.21.11",
+   "java": ">=21",
+   "fabric-api": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. d7a4c23 is the only commit with data.mod_version=1.5.0; the next gradle.properties change bumps it to 1.6.0. The placeholders are filled in by LopyMine/MossyPlugin's ProcessResourcesManager: fabric_loader comes from build.fabric_loader=0.19.2, minecraft is the project's MC version (1.21.11), java is the plugin's java index (21 for 1.21.11; max_java_version=21), and fabric_api_id is 'fabric-api' for MC above 1.19.1. modmenu and yacl are optional only (fabric.depends_optional); no incompatibilities are declared."
+ },
+ {
+  "path": "mods/noxesium-fabric-3.0.0.jar",
+  "mod_id": "noxesium",
+  "mod_version": "3.0.0",
+  "repo": "https://github.com/Noxcrew/noxesium",
+  "ref": "refs/tags/v3.0.0",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabric": "*",
+   "fabricloader": ">=0.18.1",
+   "fabric-api": ">=0.140.0",
+   "minecraft": ">=1.21.11"
+  },
+  "breaks": {
+   "sodium": "<0.8.0"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "adventure-platform-fabric"
+  ],
+  "status": "resolved",
+  "notes": "The depends and breaks values are literal in fabric/src/main/resources/fabric.mod.json. The 'fabric' id is provided by Fabric API. It also suggests sodium >=0.8.0. fabric/build.gradle.kts bundles adventure-platform-fabric 6.8.0 (includeMod), plus the noxesium api module and the prtree library."
+ },
+ {
+  "path": "mods/Prism-1.21.11-fabric-1.1.0.jar",
+  "mod_id": "prism",
+  "mod_version": "1.1.0",
+  "repo": "https://github.com/AHilyard/Prism",
+  "ref": "refs/heads/1.21.11-multi (6495d50b42344deca807068d0fd80d972b608069, 2026-05-21)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.16.0",
+   "fabric-api": "*",
+   "minecraft": "=1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. At the branch head gradle.properties has modVersion=1.1.0, which matches. The depends values are literal, and modId=prism comes from gradle.properties."
+ },
+ {
+  "path": "mods/servercore-fabric-1.5.15+1.21.11.jar",
+  "mod_id": "servercore",
+  "mod_version": "1.5.15+1.21.11",
+  "repo": "https://github.com/Wesley1808/ServerCore",
+  "ref": "refs/heads/ver/1.21.11 (49a7635e756b7047348b8f8c48054eb406709f64, 2025-12-09 'Bump version')",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.17.0",
+   "minecraft": ">=1.21.11-",
+   "fabric-api-base": "*",
+   "fabric-command-api-v2": "*",
+   "fabric-lifecycle-events-v1": "*"
+  },
+  "breaks": {
+   "cardboard": "*"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "fabric-permissions-api-v0",
+   "placeholder-api"
+  ],
+  "status": "resolved",
+  "notes": "Only tag v1.5.0 exists. At the branch head mod_version=1.5.15, which matches. The depends values are literal. It bundles me.lucko:fabric-permissions-api 0.6.0 and eu.pb4:placeholder-api 2.8.1+1.21.10 via include(), plus the snakeyaml and dazzleconf libraries."
+ },
+ {
+  "path": "mods/smoothswapping-0.9.8-1.21.11-fabric.jar",
+  "mod_id": "smoothswapping",
+  "mod_version": "0.9.8",
+  "repo": "https://github.com/Schauweg/Smooth-Swapping",
+  "ref": "refs/heads/1.21.11/dev (ae022d22264337dde6a2caa24984fb5a94a7b836, 2025-12-09 'Bump version')",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.14.21",
+   "minecraft": ">=1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. At the branch head mod_version=0.9.8, which matches. The depends values are literal, and fabric-api is not declared even though it was built against 0.139.4+1.21.11."
+ },
+ {
+  "path": "mods/t_and_t-fabric-neoforge-1.13.9.jar",
+  "mod_id": "t_and_t",
+  "mod_version": "1.13.9",
+  "repo": "https://github.com/Cristelknight/Towns-and-Towers",
+  "ref": "refs/heads/main (e2622a5d2cb1601717ee492758ec1fabb30ccf2d, 1.13.5 for 1.21.4) - closest template; 1.13.9 not in public history",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=${fabric_loader_min_version}",
+   "fabric": "*",
+   "minecraft": ">=${minecraft_version}",
+   "cristellib": ">=${cristellib_version}"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "Versions 1.13.6-1.13.9 are not in the public repo. The main branch stops at 1.13.5 (MC 1.21.4), the 26.1 branch history jumps from 1.13.5 to 1.13.10, and the 1.21.1 branch is at 1.13.11. I couldn't resolve the placeholders for 1.13.9, so the depends shown are the template keys. The mod hard-requires Cristel Lib and Fabric API ('fabric' on main, 'fabric-api' on newer branches) and has a minecraft >= floor. Newer branches use fabric_loader_min_version=0.18.5 and cristellib 3.1.x, which suggests 1.13.9 needs a recent cristellib. Cristel Lib 3.1.7 breaks t_and_t <=1.13.8, so 1.13.9 is allowed."
+ },
+ {
+  "path": "mods/VisualWorkbench-v21.11.1-mc1.21.11-Fabric.jar",
+  "mod_id": "visualworkbench",
+  "mod_version": "21.11.1",
+  "repo": "https://github.com/Fuzss/visualworkbench",
+  "ref": "refs/tags/v21.11.1-mc1.21.11/fabric (f530c28b12041239e5268f3044ddd1e2a011c624, 2025-12-24)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11- <1.21.12-",
+   "fabricloader": ">=0.18.0",
+   "fabric-api": ">=0.140.0",
+   "forgeconfigapiport": "*",
+   "puzzleslib": ">=21.11.4"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There is no static fabric.mod.json. Fuzss's multiloader-convention-plugins (fabric/ModJsonConfigurator.kt) generates it from 1.21.11/gradle.properties, which marks fabricapi, forgeconfigapiport and puzzleslib as required. I took the version mins from the Fuzss/modresources sharedcatalogs 1.21.11-SNAPSHOT catalog published closest before the tag (20251224.104539-6): fabricloader-min=0.18.0, fabricapi-min=0.140.0, puzzleslib-min=21.11.4, minecraft=1.21.11. The minecraft range is >=X- <incrementPatch(X)-. Choosing the snapshot by date is an inference. Puzzles Lib and Forge Config API Port must be in the pack."
+ },
+ {
+  "path": "mods/afk-cinematics-1.0.2+1.21.11.jar",
+  "mod_id": "",
+  "mod_version": "1.0.2+1.21.11",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "closed_source",
+  "notes": "The likely project repo is https://github.com/spunkyinsaan/afk-cinematics. Its only branch, main (b9b0a5034e06962cb5914b658d23acfb97ae21a4), holds just a README.md that says it 'does not expose implementation internals', so there is no fabric.mod.json to read. The README lists Minecraft 1.21.11, Fabric, Java 21+ and names no other required mods (it does not mention Fabric API). The mod_id is unknown."
+ },
+ {
+  "path": "mods/BetterAdvancements-Fabric-1.21.11-0.4.8.54.jar",
+  "mod_id": "betteradvancements",
+  "mod_version": "0.4.8.54",
+  "repo": "https://github.com/way2muchnoise/BetterAdvancements",
+  "ref": "4998c6eb8a35ef6cef74461e0a022c09979e2f66",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.15",
+   "fabric-api": "*",
+   "minecraft": "1.21.x",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The repo has no tags and no 1.21.11 branch. I read the last 1.21.11 commit in the 26.1 branch history (gradle.properties: minecraftVersion=1.21.11, specificationVersion=0.4.8, fabricVersion=0.141.3+1.21.11). fabric.mod.json is the same at 52f3541 ('update to 1.21.11'). The trailing .54 is a CI build number. The Fabric build uses cloth-config (modApi 21.11.153) and modmenu, but fabric.mod.json does not declare them."
+ },
+ {
+  "path": "mods/BridgingMod-2.6.4+1.21.11.fabric-release.jar",
+  "mod_id": "bridgingmod",
+  "mod_version": "2.6.4+1.21.11",
+  "repo": "https://github.com/squeeglii/BridgingMod",
+  "ref": "8732aa98397894ea537b91af31499b8b894bc1bb",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "fabric": "*",
+   "minecraft": ">=1.21.11",
+   "java": ">=17",
+   "yet_another_config_lib_v3": ">=3.8.1+1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no release tags. I read the last 1.21.11 commit on branch 'latest' (Feb 9 2026), before the 26.1 port. The repo's mod_version is still 2.6.3 there, so 2.6.4 was probably built from this tree with a local version bump. Placeholders resolve as follows: minecraft is '>=' plus the first supported_minecraft_versions entry (publishing.gradle), and yacl_version is 3.8.1+1.21.11. The 'fabric' id is Fabric API's legacy alias. YACL (yet_another_config_lib_v3) is a hard dependency, and modmenu is only recommended."
+ },
+ {
+  "path": "mods/Clumps-fabric-1.21.11-29.0.0.1.jar",
+  "mod_id": "clumps",
+  "mod_version": "29.0.0.1",
+  "repo": "https://github.com/jaredlll08/Clumps",
+  "ref": "refs/heads/1.21.11 (ddf3979e3c7f249b7abdb6bbfc887e6957c4d84a)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "java": ">=21",
+   "minecraft": "1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The branch tip is the 'Port to 1.21.11' commit. Values come from buildSrc Versions.kt: MOD=29.0.0 (the .1 is a build number), FABRIC_LOADER=0.18.2, JAVA=21, MINECRAFT=1.21.11. fabric.mod.json does not declare fabric-api, but the CurseForge/Modrinth upload metadata marks fabric-api as required."
+ },
+ {
+  "path": "mods/DayCount-1.3.5-mc1.21.9.jar",
+  "mod_id": "",
+  "mod_version": "1.3.5",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "I found no public source repo; listing sites show an MIT license but no source link. The listings say the 1.3.5 build targets MC 1.21.9-1.21.11 and, since 1.3.0, uses Cloth Config API and Mod Menu for configuration, so cloth-config is probably required. That is unverified. The jar's fabric.mod.json should be checked for its minecraft range, since the filename says mc1.21.9."
+ },
+ {
+  "path": "mods/EasyMagic-v21.11.0-mc1.21.11-Fabric.jar",
+  "mod_id": "easymagic",
+  "mod_version": "21.11.0",
+  "repo": "https://github.com/Fuzss/easymagic",
+  "ref": "refs/tags/v21.11.0-mc1.21.11/fabric",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11- <1.21.12-",
+   "fabricloader": ">=0.18.0",
+   "fabric-api": ">=0.140.0",
+   "forgeconfigapiport": "*",
+   "puzzleslib": ">=21.11.3"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There is no fabric.mod.json in the repo; Fuzs's gradle plugin generates it. I read the generator, ModJsonConfigurator.kt in multiloader-convention-plugins-1.0-20251215.173446-14-sources.jar from the public Fuzss/modresources repo. Its rules: minecraft is '>=X- <X.patch+1-', fabricloader is '>=' fabricloader-min, fabric-api is '>=' fabricapi-min, puzzleslib is '>=' puzzleslib-min, and other required deps are '*'. Values come from the sharedcatalogs 1.21.11-SNAPSHOT catalog published Dec 17 2025 14:32 UTC, just before the tag commit (Dec 17 2025 19:19 +0100). puzzleslib-min was 21.11.2 in the Dec 15 catalog and 21.11.4 in the Dec 20 one, so the exact value depends on build time, but 21.11.3 is most likely. No java entry is generated. Required: Puzzles Lib, Forge Config API Port, Fabric API."
+ },
+ {
+  "path": "mods/Essential_1-4-1-1_fabric_1-21-11.jar",
+  "mod_id": "",
+  "mod_version": "1.4.1.1",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "closed_source",
+  "notes": "Closed source, per the task instructions; I did not look anything up."
+ },
+ {
+  "path": "mods/fastquit-3.1.3+mc1.21.11.jar",
+  "mod_id": "fastquit",
+  "mod_version": "3.1.3+mc1.21.11",
+  "repo": "https://github.com/KingContaria/FastQuit",
+  "ref": "refs/tags/3.1.3+mc1.21.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.16.9",
+   "minecraft": ">=1.21.11",
+   "fabric-resource-loader-v0": "*",
+   "cloth-config": "*",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The depends values are hard-coded in fabric.mod.json. cloth-config is a hard dependency and is not bundled (it is modImplementation, not include; built against 21.11.151). modmenu is only suggested."
+ },
+ {
+  "path": "mods/harvest-with-ease-fabric-1.21.11-9.4.0.jar",
+  "mod_id": "harvest_with_ease",
+  "mod_version": "9.4.0",
+  "repo": "https://github.com/Crystal-Nest/harvest-with-ease",
+  "ref": "refs/tags/v1.21.11-9.4.0",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.3",
+   "fabric-api": "*",
+   "minecraft": "~1.21.11",
+   "java": ">=21",
+   "cobweb": "^1.4.0",
+   "forgeconfigapiport": "^21.6.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Placeholders resolve from gradle.properties: fabric_loader_version=0.18.3, minecraft_version=1.21.11, java_version=21, cobweb_version=1.4.0. The forgeconfigapiport range is hard-coded as ^21.6.0 (built against 21.11.0). It needs the Crystal Nest 'cobweb' library and Forge Config API Port, and neither is bundled."
+ },
+ {
+  "path": "mods/InvMove-0.9.3+1.21.11-Fabric.jar",
+  "mod_id": "invmove",
+  "mod_version": "0.9.3",
+  "repo": "https://github.com/PieKing1215/InvMove",
+  "ref": "refs/tags/v0.9.3",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabric-key-binding-api-v1": "*",
+   "fabricloader": "*",
+   "minecraft": ">=1.21.11",
+   "cloth-config": ">=21"
+  },
+  "breaks": {
+   "invmove_compat": "<0.4.0"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "This is a Stonecutter build. Values come from versions/1.21.11/gradle.properties (minecraft_min=1.21.11, cloth_min=21) and the root gradle.properties (compat_min=0.4.0). cloth_id resolves to 'cloth-config' for MC 1.18 and later. cloth-config is a hard dependency."
+ },
+ {
+  "path": "mods/lithium-fabric-0.21.4+mc1.21.11.jar",
+  "mod_id": "lithium",
+  "mod_version": "0.21.4+mc1.21.11",
+  "repo": "https://github.com/CaffeineMC/lithium",
+  "ref": "refs/tags/mc1.21.11-0.21.4",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.15.1",
+   "minecraft": "1.21.11"
+  },
+  "breaks": {
+   "optifabric": "*"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The depends values are hard-coded; only ${version} is expanded. It does not depend on fabric-api and embeds no Fabric API modules (fabric-transfer-api-v1 is compile-only)."
+ },
+ {
+  "path": "mods/MouseTweaks-fabric-mc1.21.11-2.30.jar",
+  "mod_id": "mousetweaks",
+  "mod_version": "2.30",
+  "repo": "https://github.com/YaLTeR/MouseTweaks",
+  "ref": "55d06d4c896cc1b3de11e94c2b8fbd6feae0e17d",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "fabric-api": "*",
+   "minecraft": "~1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. I read the master-history commit 'Update to Minecraft 1.21.11 (#196)'. Its gradle.properties has modVersion=2.30, fabricMcVersion=1.21.11, fabricLoaderVersion=0.18.2, modJavaVersion=21. fabric.mod.json and gradle.properties are unchanged through 60881e1, the last commit before master moved to 26.1."
+ },
+ {
+  "path": "mods/nvidium-0.4.3-beta13-1.21.11.jar",
+  "mod_id": "nvidium",
+  "mod_version": "0.4.3-beta13-1.21.11",
+  "repo": "https://github.com/MCRcortex/nvidium",
+  "ref": "refs/heads/1.21.11 (e600501ab840ba821bbea8bb36616feec8e476ef)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.17.2",
+   "minecraft": [
+    "1.21.11"
+   ],
+   "sodium": [
+    "=0.8.11",
+    "=0.8.12"
+   ]
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The 1.21.11 branch tip ('Sodium 0.8.12') has mod_version=0.4.3-beta13-1.21.11 in gradle.properties, exactly matching the filename. The depends values are hard-coded. Sodium is pinned to exactly 0.8.11 or 0.8.12, so it is compatible with the pack's sodium 0.8.12. Nvidium needs an NVIDIA GPU with mesh shaders and disables itself otherwise."
+ },
+ {
+  "path": "mods/punchy-2.7d-fabric-1.21.11.jar",
+  "mod_id": "",
+  "mod_version": "2.7d",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "I found no public source repo. The Modrinth listing is ARR (all rights reserved), so it is probably closed source. The only related public repo is the wiki (punchy-guys/punchy-wiki). There are known compatibility issues with tr7zw's FirstPersonModel and NotEnoughAnimations, which are not loader-level breaks."
+ },
+ {
+  "path": "mods/serversleep-3.jar",
+  "mod_id": "serversleep",
+  "mod_version": "3",
+  "repo": "https://github.com/aninusmuffin/serversleep",
+  "ref": "refs/tags/1.19 (cdc9329eafda8ec103eb624ae9b8dfb796562080); main/universal a39f6e4a71190f10ca90986b091e1c87415a653d",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "The mod's identity is uncertain; the best match is aninusmuffin/serversleep ('Server50Sleep', which sets the playersSleepingPercentage gamerule to 50). The only Fabric-mod source is tag 1.19, whose fabric.mod.json has id 'serversleep', version '1.19' and depends {fabricloader: '>=0.14.9', fabric: '*', minecraft: '~1.19', java: '>=17'}. If serversleep-3.jar carries that metadata, the minecraft ~1.19 constraint is a HARD LAUNCH FAILURE on 1.21.11. On main (tag 'universal'), commit 59109ea removed the mod parts; that tree is a datapack only (pack_format 10) with no fabric.mod.json, so Fabric would not load it as a mod at all. A different 'Server Sleep' mod (with a /serversleep command and serversleepmod.cfg) also exists. Recommend running unzip -p mods/serversleep-3.jar fabric.mod.json to confirm. I left the depends map empty because the source version cannot be verified."
+ },
+ {
+  "path": "mods/sodium-fabric-0.8.12+mc1.21.11.jar",
+  "mod_id": "sodium",
+  "mod_version": "0.8.12+mc1.21.11",
+  "repo": "https://github.com/CaffeineMC/sodium",
+  "ref": "refs/tags/mc1.21.11-0.8.12",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.16.0",
+   "fabric-block-view-api-v2": "*",
+   "fabric-rendering-fluids-v1": ">=2.0.0",
+   "fabric-resource-loader-v0": "*"
+  },
+  "breaks": {
+   "embeddium": "*",
+   "optifabric": "*",
+   "canvas": "*",
+   "vulkanmod": "*",
+   "optimalaim": "<2.0.0",
+   "sodium-blendingregistry": "*",
+   "ocrenderfix_sodium": "*",
+   "betterfpsdist": "<=1.21-4.5",
+   "bobby": "<5.2.4",
+   "chunksfadein": "<2.0.2-1.21.2",
+   "cull-less-leaves": "<=1.3.0",
+   "cullleaves": "<=3.4.0-fabric",
+   "custom_hud": "<3.4.2",
+   "farsight": "<=1.21-4.3",
+   "iceberg": "<1.2.7",
+   "iris": "<=1.10.6",
+   "movingelevators": "<=1.4.7",
+   "notenoughcrashes": "<4.4.8",
+   "noxesium": "<2.3.3",
+   "reeses-sodium-options": "<2.0.2",
+   "fabric-api": "<0.140.0",
+   "sodium-extra": "<0.8.0",
+   "audio_engine_tweaks": "<1.2.12",
+   "sspb": "<6.0.0",
+   "moreculling": "<1.6.0-beta.2",
+   "simply-no-shading": "<7.6.2",
+   "betterend": "<=21.0.11",
+   "enchanteds_sodium_options": "<1.0.1"
+  },
+  "provides": [
+   "indium"
+  ],
+  "bundled_ids": [
+   "fabric-api-base",
+   "fabric-block-view-api-v2",
+   "fabric-rendering-v1",
+   "fabric-renderer-api-v1",
+   "fabric-lifecycle-events-v1",
+   "fabric-rendering-fluids-v1",
+   "fabric-resource-loader-v0",
+   "fabric-resource-loader-v1",
+   "fabric-transitive-access-wideners-v1"
+  ],
+  "status": "resolved",
+  "notes": "There is no minecraft or java entry in depends at this tag. BuildConfig.kt gives MC 1.21.11, MOD_VERSION 0.8.12, built against loader 0.19.2 and FAPI 0.140.0+1.21.11. Key breaks: fabric-api below 0.140.0, iris 1.10.6 or older, sodium-extra below 0.8.0, reeses-sodium-options below 2.0.2. The required Fabric API modules are bundled through include()."
+ },
+ {
+  "path": "mods/takeitout-1.1.26-1.21.11.jar",
+  "mod_id": "takeitout",
+  "mod_version": "1.1.26-1.21.11",
+  "repo": "https://github.com/Rofumer/TakeItOut",
+  "ref": "refs/heads/master-1.21.11 (70900ae1ff3627314e6d9007643ea3e200016864)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "fabric": "*",
+   "minecraft": [
+    "1.21.11"
+   ]
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "The public master-1.21.11 branch (last commit Mar 30 2026) has mod_version=1.1.10-1.21.11, while the pack has 1.1.26, so newer source is not pushed. Values shown are from the 1.1.10 tree, with loader_version=0.18.2 expanded. Litematica, malilib, Tweakeroo and litematica-printer are compiled against as local jars but not declared in depends."
+ },
+ {
+  "path": "mods/vmp-fabric-mc1.21.11-0.2.0+beta.7.227-all.jar",
+  "mod_id": "vmp",
+  "mod_version": "0.2.0+beta.7.227+1.21.11",
+  "repo": "https://github.com/RelativityMC/VMP-fabric",
+  "ref": "refs/heads/ver/1.21.11 (2ad7c567d77d7414437f6b3e834d61db8a2d5582)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.14.13",
+   "minecraft": ">=1.20.2-beta.2",
+   "java": ">=17"
+  },
+  "breaks": {
+   "optifabric": "*"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "com_ibm_async_asyncutil"
+  ],
+  "status": "resolved",
+  "notes": "Tag 0.2.0+beta.7 is a 2022 MC 1.19.2 commit and does not match. I read the ver/1.21.11 branch instead (minecraft_version=1.21.11, mod_version=0.2.0+beta.7; the .227 is a CI build-number suffix I could not tie to a specific commit). The depends values are hard-coded. It bundles com.ibm.async:asyncutil through Loom include (a plain library, auto-wrapped with a generated mod id). The custom lithium:options block is empty on this branch."
+ },
+ {
+  "path": "mods/Almanac-1.21.11-x-fabric-1.6.2.jar",
+  "mod_id": "almanac",
+  "mod_version": "1.6.2",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "Almanac (Modrinth Gi02250Z) is by frikinjay. I found no public source repo: frikinjay/almanac, Almanac, AlmanacLib, Almanac-Lib and almanac-mod all do not exist. The mod id 'almanac' comes from frikinjay/let-me-despawn, whose fabric.mod.json depends on \"almanac\": \">=1.0.2\". The depends block for 1.6.2 is not known."
+ },
+ {
+  "path": "mods/betterbeaconplacement-1.21.11-3.5.jar",
+  "mod_id": "betterbeaconplacement",
+  "mod_version": "3.5",
+  "repo": "https://github.com/Serilum/Better-Beacon-Placement",
+  "ref": "refs/heads/1.21.11 (624eb8208df7e67e2475d8e043a34a3c4d8dcb1e)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.15.0",
+   "fabric-api": "*",
+   "minecraft": ">=1.21",
+   "java": ">=21",
+   "collective": ">=8.13"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There is no tag. The branch head's Fabric/src/main/resources/fabric.mod.json has the version hard-coded as \"3.5\" and hard-coded depends. It needs Serilum's Collective >=8.13 (gradle collective_version=8.13) and Fabric API."
+ },
+ {
+  "path": "mods/c2me-fabric-mc1.21.11-0.4.0-alpha.0.26.jar",
+  "mod_id": "c2me",
+  "mod_version": "0.4.0-alpha.0.26",
+  "repo": "https://github.com/RelativityMC/C2ME-fabric",
+  "ref": "refs/heads/backports/1.21.11 (b5ee978d52fcb1bde736ebf374b903387657564f) patches/main/0002-Port-26.1.2-1.21.11.patch applied over upstream 0126574cdbedfc9abefe5904b23ce8e54797eaa9",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.3",
+   "java": ">=21",
+   "minecraft": "=1.21.11",
+   "c2me-base": "*"
+  },
+  "breaks": {
+   "tic_tacs": "*",
+   "optifabric": "*"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "c2me-base",
+   "c2me-threading-scheduling",
+   "c2me-threading-lighting",
+   "c2me-fixes-chunkio-threading-issues",
+   "c2me-fixes-general-threading-issues",
+   "c2me-fixes-worldgen-threading-issues",
+   "c2me-fixes-worldgen-deadlocks",
+   "c2me-fixes-worldgen-graal",
+   "c2me-fixes-worldgen-vanilla-bugs",
+   "c2me-opts-worldgen-vanilla",
+   "c2me-opts-natives-math",
+   "c2me-opts-dfc",
+   "c2me-opts-src",
+   "c2me-opts-worldgen-biome-cache",
+   "c2me-opts-worldgen-general",
+   "c2me-opts-allocs",
+   "c2me-opts-math",
+   "c2me-opts-scheduling",
+   "c2me-opts-chunkio",
+   "c2me-opts-accel-opencl",
+   "c2me-rewrites-chunk-serializer",
+   "c2me-rewrites-chunkio",
+   "c2me-rewrites-chunk-system",
+   "c2me-server-utils",
+   "c2me-client-uncapvd",
+   "c2me-notickvd"
+  ],
+  "status": "partial",
+  "notes": "The 0.4.0 line targets 26.1.2 (tag 0.4.0-alpha.0 is MC 26.1.2). The 1.21.11 jar is built from a patch-based backport branch, and the '.26' suffix looks like a build counter on 0.4.0-alpha.0, so the exact build commit could not be pinned. Values come from the current backport patch. Upstream's root depends are java >=25 and minecraft >1.21.11; the patch changes them to java >=21 and minecraft =1.21.11. Build: loader_version 0.19.3, fabric_version 0.141.3+1.21.11. Root also has conflicts: dynview *, betterchunkloading *. In the patch, the bundled submodules c2me-opts-natives-math and c2me-opts-accel-opencl declare \"java\": \">=25\". On Java 21 those nested modules should simply not load rather than crash. Patch 0004 sets c2me-opts-accel-opencl's own depends to c2me-base/c2me-opts-dfc/c2me-rewrites-chunk-system >=0.4-."
+ },
+ {
+  "path": "mods/cobweb-fabric-1.21.11-1.4.0.jar",
+  "mod_id": "cobweb",
+  "mod_version": "1.4.0",
+  "repo": "https://github.com/crystal-nest/cobweb",
+  "ref": "refs/tags/v1.21.11-1.4.0",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.3",
+   "fabric-api": "*",
+   "minecraft": "~1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Crystal Nest API by Crystal Spider. Also suggests forgeconfigapiport ~21.11.0. Placeholders resolved from gradle.properties: fabric_loader_version=0.18.3, minecraft_version=1.21.11, java_version=21."
+ },
+ {
+  "path": "mods/debugify-1.21.11+1.1.jar",
+  "mod_id": "debugify",
+  "mod_version": "1.21.11+1.1",
+  "repo": "https://github.com/isXander/Debugify",
+  "ref": "refs/tags/1.21.11+1.1",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.0",
+   "minecraft": "~1.21.11",
+   "java": ">=21",
+   "fabric-resource-loader-v0": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Template src/main/templates/fabric.mod.json; the depends are hard-coded. Also recommends yet_another_config_lib_v3 * and modmenu *. Built with fabricApiVersion 0.139.4+1.21.11 and loader 0.18.4."
+ },
+ {
+  "path": "mods/EasyShulkerBoxes-v21.11.0-mc1.21.11-Fabric.jar",
+  "mod_id": "easyshulkerboxes",
+  "mod_version": "21.11.0",
+  "repo": "https://github.com/Fuzss/easyshulkerboxes",
+  "ref": "refs/tags/v21.11.0-mc1.21.11/fabric (dbe9184890c7b620b2d2e54ef83fdd4aaa1181e9, dir 1.21.11/)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11- <1.21.12-",
+   "fabricloader": ">=0.18.0",
+   "iteminteractions": "*",
+   "fabric-api": ">=0.139.0",
+   "forgeconfigapiport": "*",
+   "puzzleslib": ">=21.11.2"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "iteminteractions"
+  ],
+  "status": "resolved",
+  "notes": "There is no fabric.mod.json in the repo. Fuzss's convention plugin (multiloader-convention-plugins 1.0-SNAPSHOT, ModJsonConfigurator.kt, read from Fuzss/modresources) generates it from gradle.properties dependencies.* and the shared catalog fuzs.sharedcatalogs:1.21.11-SNAPSHOT. The release commit is 2025-12-15 18:33 UTC, so I resolved against catalog snapshot 20251215.162039-3: fabricapi-min 0.139.0, puzzleslib-min 21.11.2, fabricloader-min 0.18.0. If Gradle used a cached older snapshot, puzzleslib could be >=21.11.0. iteminteractions is embedded (jar-in-jar) and also listed as a required depend."
+ },
+ {
+  "path": "mods/EuphoriaPatcher-1.9.3-r5.8.1-fabric.jar",
+  "mod_id": "euphoria_patcher",
+  "mod_version": "1.9.3-r5.8.1",
+  "repo": "https://github.com/EuphoriaPatches/EuphoriaPatcher",
+  "ref": "refs/heads/multiloader @ f946dd4af5a0ddf44be44cea634fe3c8f5a8dca2 (version.properties mod_version=1.9.3-r5.8.1; unchanged through e6834a4)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.15.0",
+   "minecraft": ">=1.14.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The commit was found from version.properties history. It is a client-only, version-agnostic jar (environment client) with no fabric-api dependency."
+ },
+ {
+  "path": "mods/ferritecore-8.2.0-fabric.jar",
+  "mod_id": "ferritecore",
+  "mod_version": "8.2.0",
+  "repo": "https://github.com/malte0811/FerriteCore",
+  "ref": "refs/tags/build-8.2.0",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.14.21",
+   "minecraft": ">=1.21.11 <1.22"
+  },
+  "breaks": {
+   "hydrogen": "<=0.3"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The tag is the same commit as branch 1.21.11. ${mc_version} resolves to minecraft_version=1.21.11 and ${next_major_mc} to 1.22 (gradle.properties, via buildSrc loader-conventions)."
+ },
+ {
+  "path": "mods/Highlighter-1.21.11-fabric-1.2.0.jar",
+  "mod_id": "highlighter",
+  "mod_version": "1.2.0",
+  "repo": "https://github.com/AHilyard/Highlighter",
+  "ref": "refs/heads/1.21.11-multi (1c10f10ad02644fd01feb3549fc3381825d35e76)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.16.0",
+   "fabric-api": "*",
+   "minecraft": "=1.21.11",
+   "java": ">=21",
+   "iceberg": ">=1.4.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Item Highlighter by Grend (anthonyhilyard). There are no tags. The branch head has modVersion=1.2.0 and is dated 2026-05-21, the same day as the 1.2.0 release. It requires the Iceberg library >=1.4.0. Built against loader 0.19.2 and fabric-api 0.141.3+1.21.11."
+ },
+ {
+  "path": "mods/iris-fabric-1.10.7+mc1.21.11.jar",
+  "mod_id": "iris",
+  "mod_version": "1.10.7+mc1.21.11",
+  "repo": "https://github.com/IrisShaders/Iris",
+  "ref": "refs/heads/1.21.11 (0a1fcaae55099356bf53410b4f5302753edb0ffc, MOD_VERSION 1.10.8; fabric.mod.json identical at 11f566b7fbc8da1f62437eda86ee68fda9cf2ee0, MOD_VERSION 1.10.6)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.12.3",
+   "sodium": [
+    "0.8.x"
+   ]
+  },
+  "breaks": {
+   "embeddium": "*",
+   "iris-explorer": "*",
+   "originsenhanced": "<=1.3.2",
+   "colormatic": "<=3.0.0",
+   "bedrockwaters": "<=1.6.0",
+   "batchedentityrendering": "*",
+   "canvas": "*",
+   "optifabric": "*",
+   "worldeditcui": "<1.18.1",
+   "physicsmod": "<=3.0.13",
+   "distanthorizons": "<=2.1.99",
+   "immersive_portals": "<=1.4.2"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "fabric-api-base",
+   "fabric-key-binding-api-v1"
+  ],
+  "status": "resolved",
+  "notes": "Iris has no tags for 1.10.x. No commit on branch 1.21.11 ever has MOD_VERSION 1.10.7: it goes from 1.10.6 straight to 1.10.8. common/src/main/resources/fabric.mod.json is byte-identical across those commits, so 1.10.7 should share these depends and breaks. There is no minecraft depend. Sodium must be 0.8.x; 1.10.6 was built against sodium 0.8.7 and 1.10.8 against 0.8.14 (commit message 'Fix support for 0.8.13'), so an older Iris may misbehave with newer 0.8.x Sodium."
+ },
+ {
+  "path": "mods/lithostitched-1.7.2-fabric-21.11.jar",
+  "mod_id": "lithostitched",
+  "mod_version": "1.7.2",
+  "repo": "https://github.com/Apollounknowndev/lithostitched",
+  "ref": "refs/heads/cloche @ 92598f77262926fc9e0fcb88e2a9cab538169b54 (version 1.5.8+beta1, last public commit with a fabric:1.21.11 target)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "No public commit has version 1.7.2 with a 21.11 target. On the cloche branch, 1.7.1 (b89602b) and 1.7.3 (4763f3b) build only 1.21.1 and 26.1; 1.21.11 was dropped after 1.5.8+beta1. The 21.1, 26.1 and 26.2 branches (stonecutter) also have no 21.11. The cloche plugin (terrarium-earth/cloche GenerateFabricModJson.kt) generates fabric.mod.json with only fabricloader '>=<loaderVersion minus last segment>'. At 92598f7 loaderVersion was 0.18.2, giving >=0.18; it adds no minecraft or fabric-api depend even though fabricApi(0.139.4) is used. The real 1.7.2 jar may differ, so check the jar itself if this matters."
+ },
+ {
+  "path": "mods/mru-1.0.26+edge+1.21.11-fabric.jar",
+  "mod_id": "mru",
+  "mod_version": "1.0.26+edge",
+  "repo": "https://github.com/mineblock11/mru",
+  "ref": "refs/tags/1.0.26+edge",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.3",
+   "minecraft": "1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Stonecutter build. target_loader is deps.fabric_loader=0.18.3 (root gradle.properties). target_minecraft is mod.target=1.21.11 (versions/1.21.11-fabric/gradle.properties). No fabric-api depend."
+ },
+ {
+  "path": "mods/particle_core-0.3.2+1.21.11.jar",
+  "mod_id": "particle_core",
+  "mod_version": "0.3.2+1.21.11",
+  "repo": "https://github.com/fzzyhmstrs/pc",
+  "ref": "refs/heads/1.21.11 @ 703c5b7d76e4c5dc06d533aee2e50d1d0e2f202d (commit '0.3.2')",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "fabric-language-kotlin": ">=1.13.2+kotlin.2.1.20",
+   "minecraft": "=1.21.11",
+   "java": ">=21",
+   "fzzy_config": ">=0.7.5"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The repo is fzzyhmstrs/pc, not particle_core. There are no tags; 703c5b7 is the version-bump commit, and the metadata is unchanged through the branch head. Placeholders come from gradle.properties: loaderVersion=0.18.4, fabricKotlinVersion=1.13.2+kotlin.2.1.20, fzzyConfigVersion=0.7.5. It needs Fabric Language Kotlin and Fzzy Config."
+ },
+ {
+  "path": "mods/PuzzlesLib-v21.11.13-mc1.21.11-Fabric.jar",
+  "mod_id": "puzzleslib",
+  "mod_version": "21.11.13",
+  "repo": "https://github.com/Fuzss/puzzleslib",
+  "ref": "refs/heads/1.21.11 (146218fee27e0388e95c216c325d6a2e716217b6; gradle.properties mod.version=21.11.13)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11- <1.21.12-",
+   "fabricloader": ">=0.18.0",
+   "fabric-api": ">=0.141.2",
+   "forgeconfigapiport": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Tag v21.11.13-mc1.21.11/fabric points to a README-only commit on main, so I used branch 1.21.11, which has mod.version=21.11.13 and the changelog entry dated 2026-05-30. fabric.mod.json is generated by Fuzss's convention plugin from catalog fuzs.sharedcatalogs:1.21.11-SNAPSHOT. Snapshots -8 (2026-01-26) and -9 both give fabricapi-min 0.141.2 and fabricloader-min 0.18.0. Requires Forge Config API Port (any version) and Fabric API."
+ },
+ {
+  "path": "mods/ShatterLib-FABRIC-0.6.0.8+1.21.11.jar",
+  "mod_id": "shatterlib",
+  "mod_version": "0.6.0.8+1.21.11",
+  "repo": "https://github.com/SSKirillSS/octo-lib",
+  "ref": "refs/heads/1.21.11 (febee5f3c0905a609e71c722f4594c82d1943b4d; gradle.properties mod_version=0.6.0.8)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11",
+   "java": ">=21",
+   "architectury": ">=19.0.1",
+   "fabric-api": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "ShatterLib / OctoLib by SSKirillSS (Shatterbyte). There are no tags; the branch head declares mod_version 0.6.0.8. The depends are hard-coded and require Architectury API >=19.0.1. There is no fabricloader depend. It bundles snakeyaml 2.2, a plain library, not a mod."
+ },
+ {
+  "path": "mods/sound-physics-remastered-fabric-1.21.11-1.5.1.jar",
+  "mod_id": "sound_physics_remastered",
+  "mod_version": "1.21.11-1.5.1",
+  "repo": "https://github.com/henkelmax/sound-physics-remastered",
+  "ref": "refs/heads/1.21.11 (f423ca74ed1f57a00ad8c72460a41862d195702c)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.1",
+   "minecraft": "1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {
+   "soundphysics": "*",
+   "voicechat_api": "<2.6.0"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. mod_version has been 1.21.11-1.5.1 since commit 11f7a33 (2025-12-10) through the head. minecraft_dependency was '1.21.x' until commit 33aa57b (2025-12-12) and '1.21.11' after, so the jar has one or the other; both accept 1.21.11. Also suggests modmenu *, cloth-config2 >=21.11.151 and voicechat_api >=2.6.0."
+ },
+ {
+  "path": "mods/tcdcommons-5.1.0+fabric-1.21.11.jar",
+  "mod_id": "tcdcommons",
+  "mod_version": "5.1.0+fabric-1.21.11",
+  "repo": "https://github.com/TheCSDev/tcdcommons",
+  "ref": "refs/tags/5.1.0",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "java": ">=21",
+   "minecraft": "1.21.11",
+   "fabricloader": ">=0.18.2",
+   "fabric-api": ">=0.139.5"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Tag 5.1.0 is the same commit as branch arch/1.21.11. The depends come from fabric.json.depends.* in root gradle.properties. fabric.json.depends.architectury (>=19.0.1) is defined but not referenced in fabric.mod.json, so Architectury is not a declared Fabric depend."
+ },
+ {
+  "path": "mods/voicechat-fabric-1.21.11-2.6.22.jar",
+  "mod_id": "voicechat",
+  "mod_version": "1.21.11-2.6.22",
+  "repo": "https://github.com/henkelmax/simple-voice-chat",
+  "ref": "refs/heads/1.21.11 @ bd5956c4d4b1beed6de18bfbc79fc05695fc88ae (last commit with mod_version=1.21.11-2.6.22)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.1",
+   "minecraft": "1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {
+   "fabric-api": "<0.139.4+1.21.11"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "fabric-api-base",
+   "fabric-command-api-v2",
+   "fabric-lifecycle-events-v1",
+   "fabric-networking-api-v1",
+   "fabric-resource-loader-v0",
+   "fabric-resource-loader-v1",
+   "fabric-key-binding-api-v1",
+   "fabric-rendering-v1"
+  ],
+  "status": "resolved",
+  "notes": "There are no tags. 2.6.22 ran from 0a9aba1 to bd5956c (2026-08-08); 2.6.23 later added the break flashback <=0.39.9, which is not in 2.6.22. Also suggests modmenu >=17.0.0-alpha.1, cloth-config2 >=21.11.151, fabric-permissions-api-v0 * and viaversion >=5.0.0. The listed Fabric API modules are bundled jar-in-jar."
+ },
+ {
+  "path": "mods/alternate-current-mc1.21.11-1.9.0.jar",
+  "mod_id": "alternate-current",
+  "mod_version": "1.9.0",
+  "repo": "https://github.com/SpaceWalkerRS/alternate-current",
+  "ref": "refs/heads/1.21.11 (7a4c4071745a680e36d8afedc9eaec92dcebfab7)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "minecraft": "1.21.x"
+  },
+  "breaks": {
+   "alternate-current-plus": "*"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "No 1.21.11-specific tag exists (v1.9 is on main). The 1.21.11 branch tip ('update to 1.21.11', 2025-12-09) has mod_version=1.9.0 and minecraft_version=1.21.11, so the version matches. The depends values are literal (only ${version} is expanded). There is no fabricloader or fabric-api dependency."
+ },
+ {
+  "path": "mods/BetterF3-17.0.0-Fabric-1.21.11.jar",
+  "mod_id": "betterf3",
+  "mod_version": "17.0.0",
+  "repo": "https://github.com/TreyRuffy/BetterF3",
+  "ref": "refs/tags/v17.0.0",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.0",
+   "minecraft": ">=1.21.11",
+   "fabric": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "cloth-config"
+  ],
+  "status": "resolved",
+  "notes": "Manifest is at fabric/src/main/resources/fabric.mod.json. The tag equals the architectury/1.21.11 branch tip. 'fabric' is satisfied by Fabric API, which provides 'fabric'. recommends modmenu >=17.0.0. The fabric build jar-in-jars cloth-config-fabric 21.11.153. Built against fabric-api 0.141.1+1.21.11 and loader 0.18.4."
+ },
+ {
+  "path": "mods/carryon-fabric-1.21.11-2.9.2.jar",
+  "mod_id": "carryon",
+  "mod_version": "2.9.2",
+  "repo": "https://github.com/Tschipp/CarryOn",
+  "ref": "refs/heads/1.21.11 (c65c63fbe1f6a089fc5afb1fc38d469f9f36262c)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "fabric-api": "*",
+   "minecraft": ">=1.21.11 <26",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags for 2.x on 1.21.11. Read from the branch tip (2026-07-26), where gradle.properties still has version=2.9.2. Placeholders were resolved from gradle.properties: fabric_loader_version=0.18.4, minecraft_version_range_fabric='>=1.21.11 <26', java_version=21. cloth-config and modmenu are modApi only, not declared or bundled. Manifest is at Fabric/src/main/resources/fabric.mod.json."
+ },
+ {
+  "path": "mods/collective-1.21.11-8.32.jar",
+  "mod_id": "collective",
+  "mod_version": "8.32",
+  "repo": "https://github.com/Serilum/Collective",
+  "ref": "refs/heads/1.21.11 (fedf2cec400a03979adf5057d01901be37b8d82c)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.15.0",
+   "fabric-api": "*",
+   "minecraft": ">=1.21",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The 1.21.11 branch tip commit is titled '(v8.32) ...' and gradle.properties version=8.32, so the ref matches. Manifest is literal, at Fabric/src/main/resources/fabric.mod.json."
+ },
+ {
+  "path": "mods/DistantHorizons-3.2.0-b-1.21.11-fabric-neoforge.jar",
+  "mod_id": "distanthorizons",
+  "mod_version": "3.2.0-b",
+  "repo": "https://gitlab.com/distant-horizons-team/distant-horizons",
+  "ref": "refs/tags/3.2.0b (eb6bf9ae7836bca986b429a28e2a9f94cb45ca77)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": "*",
+   "fabric-api-base": "*",
+   "fabric-lifecycle-events-v1": "*",
+   "fabric-resource-loader-v0": "*",
+   "minecraft": [
+    "1.21.11"
+   ],
+   "java": ">=21"
+  },
+  "breaks": {
+   "vertigo": "*"
+  },
+  "provides": [
+   "lod"
+  ],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Source is on GitLab, not GitHub (anonymous git read worked). gradle.properties has mod_version=3.2.0-b. Placeholders were resolved from versionProperties/1.21.11.properties: compatible_minecraft_versions=[\"1.21.11\"], java_version=21, fabric_incompatibility_list={\"vertigo\":\"*\"}, fabric_recommend_list={}. fabric-resource-loader-v0 is still shipped as a deprecated module in Fabric API 0.141.6. Built against sodium mc1.21.11-0.8.0 and iris 1.10.0+1.21.11, which are optional compat only, with no constraints declared. This is a merged fabric+neoforge jar."
+ },
+ {
+  "path": "mods/eg_particle_interactions-v0.9.1-fabric-mc1.21.11.jar",
+  "mod_id": "eg_particle_interactions",
+  "mod_version": "0.9.1",
+  "repo": "https://github.com/Enchanted-Games/block-place-particles",
+  "ref": "refs/tags/v0.9.1",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11",
+   "fabric": ">=0.18.1",
+   "fabric-api": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The depends block is generated by build.gradle.kts (fabricDependencyList) from versions/1.21.11-fabric/gradle.properties: deps.core.mc.compatible_range=1.21.11 gives '>=1.21.11'. A build-script quirk emits the fabric LOADER range (deps.core.fabric.loader.version_range=0.18.1) under the id 'fabric', which Fabric API provides, so Fabric API 0.141.6 satisfies '>=0.18.1'. No 'fabricloader' key is emitted. fabric-api is '*' (wildcard dependencyVersion). modmenu and YACL are optional and not emitted."
+ },
+ {
+  "path": "mods/fabric-api-0.141.6+1.21.11.jar",
+  "mod_id": "fabric-api",
+  "mod_version": "0.141.6+1.21.11",
+  "repo": "https://github.com/FabricMC/fabric",
+  "ref": "refs/tags/0.141.6+1.21.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.17.3",
+   "java": ">=21",
+   "minecraft": ">=1.21.11- <1.21.12-"
+  },
+  "breaks": {},
+  "provides": [
+   "fabric"
+  ],
+  "bundled_ids": [
+   "fabric-api-base",
+   "fabric-api-lookup-api-v1",
+   "fabric-biome-api-v1",
+   "fabric-block-api-v1",
+   "fabric-block-view-api-v2",
+   "fabric-client-gametest-api-v1",
+   "fabric-command-api-v2",
+   "fabric-content-registries-v0",
+   "fabric-convention-tags-v1",
+   "fabric-convention-tags-v2",
+   "fabric-crash-report-info-v1",
+   "fabric-data-attachment-api-v1",
+   "fabric-data-generation-api-v1",
+   "fabric-dimensions-v1",
+   "fabric-entity-events-v1",
+   "fabric-events-interaction-v0",
+   "fabric-game-rule-api-v1",
+   "fabric-gametest-api-v1",
+   "fabric-item-api-v1",
+   "fabric-item-group-api-v1",
+   "fabric-key-binding-api-v1",
+   "fabric-lifecycle-events-v1",
+   "fabric-loot-api-v2",
+   "fabric-loot-api-v3",
+   "fabric-message-api-v1",
+   "fabric-model-loading-api-v1",
+   "fabric-networking-api-v1",
+   "fabric-object-builder-api-v1",
+   "fabric-particles-v1",
+   "fabric-recipe-api-v1",
+   "fabric-registry-sync-v0",
+   "fabric-renderer-api-v1",
+   "fabric-renderer-indigo",
+   "fabric-rendering-fluids-v1",
+   "fabric-rendering-v1",
+   "fabric-resource-conditions-api-v1",
+   "fabric-resource-loader-v0",
+   "fabric-resource-loader-v1",
+   "fabric-screen-api-v1",
+   "fabric-screen-handler-api-v1",
+   "fabric-serialization-api-v1",
+   "fabric-sound-api-v1",
+   "fabric-tag-api-v1",
+   "fabric-transfer-api-v1",
+   "fabric-transitive-access-wideners-v1"
+  ],
+  "status": "resolved",
+  "notes": "The root manifest is literal. Every bundled module also depends on fabricloader >=0.17.3. A few modules carry loose minecraft lower bounds (all satisfied by 1.21.11). No module has a breaks block. Deprecated modules shipped: fabric-convention-tags-v1, fabric-loot-api-v2, fabric-resource-loader-v0. Module versions come from gradle.properties, for example fabric-api-base 1.0.5. The networking-api-v1 and resource-loader-v1 versions were not checked."
+ },
+ {
+  "path": "mods/ForgeConfigAPIPort-v21.11.1-mc1.21.11-Fabric.jar",
+  "mod_id": "forgeconfigapiport",
+  "mod_version": "21.11.1",
+  "repo": "https://github.com/Fuzss/forgeconfigapiport",
+  "ref": "refs/tags/v21.11.1-mc1.21.11/fabric",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11- <1.21.12-",
+   "fabricloader": ">=0.18.0",
+   "fabric-api": ">=0.139.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "night-config core 3.8.3 (Loom-wrapped library)",
+   "night-config toml 3.8.3 (Loom-wrapped library)"
+  ],
+  "status": "resolved",
+  "notes": "There is no fabric.mod.json in the repo. It is generated by Fuzs' multiloader-convention-plugins 1.0.16 (sources jar from Fuzss/modresources, ModJsonConfigurator.addDependencies): minecraft '>=X- <X+1-', fabricloader '>=fabricloader-min', fabric-api '>=fabricapi-min'. Values come from the shared catalog 1.21.11-SNAPSHOT; the 2025-12-11 and 2025-12-15 snapshots (release date 2025-12-15) both give fabricloader-min=0.18.0, fabricapi-min=0.139.0, minecraft=1.21.11. recommends modmenu '*'. The build is under the 1.21.11/ subdirectory."
+ },
+ {
+  "path": "mods/HoverItems-1.21.11.jar",
+  "mod_id": "",
+  "mod_version": "",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "No public source repository found. Web search turned up only hosting-site listings (a client-side Fabric hover/pop-out animation mod for 1.21.11 that needs Mod Menu for settings), with no author or GitHub link. Depends could not be verified."
+ },
+ {
+  "path": "mods/Jade-1.21.11-Fabric-21.1.6.jar",
+  "mod_id": "jade",
+  "mod_version": "21.1.6",
+  "repo": "https://github.com/Snownee/Jade",
+  "ref": "refs/tags/fabric-21.1.6",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabric-api": ">=0.139",
+   "minecraft": ">=1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The tag commit is 'Publish version 21.1.6'; gradle.properties has minecraft_version=1.21.11 and mod_version=21.1.6. There is no fabricloader or java constraint. The depends values are literal (only version is expanded)."
+ },
+ {
+  "path": "mods/malilib-fabric-1.21.11-0.27.18.jar",
+  "mod_id": "malilib",
+  "mod_version": "0.27.18",
+  "repo": "https://github.com/sakura-ryoko/malilib",
+  "ref": "1881bdab286df957076cc22e626ff27c033d0a39 (last commit with mod_version=0.27.18, ancestor of tag 1.21.11-0.27.19)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "minecraft": "1.21.11",
+   "fabric-networking-api-v1": ">=5.1.4",
+   "fabric-resource-loader-v1": "*"
+  },
+  "breaks": {
+   "sodium": "<0.8.7-",
+   "iris": "<1.10.7-",
+   "itemscroller": "<0.30.5-",
+   "litematica": "<0.26.13-",
+   "minihud": "<0.38.14-",
+   "tweakeroo": "<0.27.12-"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "fabric-api-base",
+   "fabric-networking-api-v1",
+   "fabric-resource-loader-v1",
+   "conditional-mixin"
+  ],
+  "status": "resolved",
+  "notes": "There is no 1.21.11-0.27.18 tag (0.27.17 and 0.27.19 exist). Commits acf429a through 1881bda all have mod_version=0.27.18, and fabric.mod.json, gradle.properties and build.gradle are identical across them. There is no fabricloader constraint (built with loader 0.19.3, fabric_api 0.141.4+1.21.11). It jar-in-jars the FAPI modules fabric-api-base, networking-v1 and resource-loader-v1 from 0.141.4+1.21.11, plus conditional-mixin-fabric 0.6.4. The breaks block matters: it requires sodium >=0.8.7 and iris >=1.10.7, and minimum versions of litematica, minihud, tweakeroo and itemscroller if present."
+ },
+ {
+  "path": "mods/MyTotemDoll-2.3.3+1.21.11.jar",
+  "mod_id": "my-totem-doll",
+  "mod_version": "2.3.3",
+  "repo": "https://github.com/LopyMine/My-Totem-Doll",
+  "ref": "refs/heads/master (d9e1997f6a238607e4f9afe82f1ec07cf5a48549)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.17.2",
+   "minecraft": ">=1.21.11",
+   "java": ">=21",
+   "fabric-api": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "mixinsquared"
+  ],
+  "status": "resolved",
+  "notes": "There are no tags. data.mod_version=2.3.3 from commit cb9d6bf ('1.21.11 and YACL fixes') to the master tip; the only later change is the MossyPlugin version bump. Placeholders are resolved by MossyPlugin (LopyMine/MossyPlugin ProcessResourcesManager): fabric_loader=build.fabric_loader=0.17.2, minecraft=1.21.11, java=21 (MC <26.1), fabric_api_id='fabric-api' (MC >1.19.1). YACL, modmenu, sodium and cit-resewn are optional with no constraints declared. Bundles mixinsquared-fabric 0.2.0."
+ },
+ {
+  "path": "mods/particlerain-4.0.0-beta.11+1.21.11-fabric.jar",
+  "mod_id": "particlerain",
+  "mod_version": "4.0.0-beta.11",
+  "repo": "https://github.com/PigCart/particle-rain",
+  "ref": "refs/tags/v4-beta.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.12.8",
+   "fabric-api": "*",
+   "minecraft": "1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Stonecutter build. stonecutter.properties.toml has mod.version=4.0.0-beta.11, and the [1.21.11-fabric] version_range is '1.21.11' (exact). Built with fabric-api 0.140.2+1.21.11 and iris 1.9.7 as compile-only compat, with no iris or sodium constraint."
+ },
+ {
+  "path": "mods/ResourcefulLib-fabric-1.21.11-3.11.1.jar",
+  "mod_id": "resourcefullib",
+  "mod_version": "3.11.1",
+  "repo": "https://github.com/Team-Resourceful/ResourcefulLib",
+  "ref": "refs/heads/1.21.11 (43fad2a03ac51210bef48ea09b4e23d95588643a, 'Released v3.11.1')",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabric-api": "*",
+   "minecraft": ">=1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "yabn 1.0.3 (library)",
+   "bytecodecs 1.1.3 (library)"
+  ],
+  "status": "resolved",
+  "notes": "Do not use tag v3.11.1: it points to a 26.2 commit ('Released v5.0.3', minecraft >=26.2). The 1.21.11 branch tip is the actual 'Released v3.11.1' commit. There is no fabricloader or java constraint. yabn and bytecodecs are jar-in-jar libraries."
+ },
+ {
+  "path": "mods/ShoulderSurfing-Fabric-1.21.11-5.0.10.jar",
+  "mod_id": "shouldersurfing",
+  "mod_version": "5.0.10",
+  "repo": "https://github.com/Exopandora/ShoulderSurfing",
+  "ref": "refs/tags/1.21.11-5.0.10",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "fabric": ">=0.139.4",
+   "minecraft": ">=1.21.11",
+   "forgeconfigapiport": ">=21.11.0",
+   "java": ">=21"
+  },
+  "breaks": {
+   "betterthirdperson": "*",
+   "camerautils": "*",
+   "nimble": "*",
+   "valkyrienskies": "<=2.4.11"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The depends and breaks values are literal in fabric/src/main/resources/fabric.mod.json. Also has conflicts {\"theoneprobe\":\"*\"} (warning only). 'fabric' >=0.139.4 is satisfied by Fabric API 0.141.6. Requires Forge Config API Port >=21.11.0; the pack has 21.11.1."
+ },
+ {
+  "path": "mods/sounds-2.4.23+edge+1.21.11-fabric.jar",
+  "mod_id": "sounds",
+  "mod_version": "2.4.23+edge",
+  "repo": "https://github.com/IMB11/Sounds",
+  "ref": "refs/tags/2.4.23+edge",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.17.2",
+   "yet_another_config_lib_v3": "*",
+   "fabric-api": "*",
+   "mru": "~1.0.26+edge+1.21.11",
+   "minecraft": ">1.21.10 <1.22"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Placeholders were resolved from build.fabric.gradle.kts and versions/1.21.11-fabric/gradle.properties: target_fabricloader is hard-coded to 0.17.2, target_yacl='*', target_mru=deps.mru=1.0.26+edge+1.21.11 (with a '~' prefix, so >=1.0.26 <1.1.0), mod.target='>1.21.10 <1.22'. Requires YACL (yet_another_config_lib_v3) and MRU (mod id 'mru', by IMB11) to be installed. recommends rsls '*'."
+ },
+ {
+  "path": "mods/tectonic-3.0.19-fabric-1.21.11.jar",
+  "mod_id": "tectonic",
+  "mod_version": "3.0.19",
+  "repo": "https://github.com/Apollounknowndev/tectonic",
+  "ref": "cebbe095209a46051190deff7b247a0dd7e80b9e (commit '3.0.19' on branch rewrite-squared)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18",
+   "lithostitched": ">=1.4.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "There are no 3.x tags; build.gradle.kts at this commit has version=3.0.19. There is no fabric.mod.json in the repo; it is generated by the cloche gradle plugin v0.17.1 (terrarium-earth/cloche GenerateFabricModJson). That generator writes fabricloader '>=' + loaderVersion with the last segment dropped (0.18.2 becomes '>=0.18'), plus the metadata dependencies. lithostitched version('1.4.11') becomes '>=1.4.11'; it is declared in the common target metadata and should propagate to the fabric:1.21.11 target via dependsOn. cloche 0.17.1 adds no minecraft or fabric-api dependency, and it drops breaks, conflicts and recommends from the JSON. Status is partial because this is derived from generator code, not read from a shipped manifest. Lithostitched is likely required at runtime."
+ },
+ {
+  "path": "mods/xaerominimap-fabric-1.21.11-26.4.2.jar",
+  "mod_id": "xaerominimap",
+  "mod_version": "26.4.2",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "closed_source",
+  "notes": "Xaero's Minimap is closed source; there is no public repo to read fabric.mod.json from. Not guessed."
+ },
+ {
+  "path": "mods/AmbientSounds_FABRIC_v6.3.5_mc1.21.11.jar",
+  "mod_id": "ambientsounds",
+  "mod_version": "6.3.5",
+  "repo": "https://github.com/CreativeMD/AmbientSounds",
+  "ref": "refs/heads/1.21.x (b837b787bb27a59da9adc12dadae9e6ab594530d, 'Bumped version to 6.3.5')",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "fabric-api": "*",
+   "minecraft": ">=1.21.11",
+   "creativecore": ">=2.14.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no release tags. The head of the 1.21.x branch is the commit that bumps the version to 6.3.5, and its fabric.mod.json is static with the version hardcoded as 6.3.5. Requires CreativeCore >=2.14.0, which must be installed separately. Client-only."
+ },
+ {
+  "path": "mods/bettermounthud-1.2.6.jar",
+  "mod_id": "bettermounthud",
+  "mod_version": "1.2.6",
+  "repo": "https://github.com/Lortseam/better-mount-hud",
+  "ref": "commit 7dda5428c178d2f7a2f86ca8a9b8ffb1e2f49d33 (master, 'Bump version' to 1.2.6, 2025-06-21)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "java": ">=21",
+   "fabricloader": ">=0.11.3"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. Version 1.2.6 is the master commit 7dda542, built against MC 1.21.6. Upstream has no separate 1.21.11 build: master goes straight from 1.2.6 to 1.3.0 for 26.1. The mod declares no minecraft or fabric-api dependency, so the loader will not block it on 1.21.11. Whether it works at runtime on 1.21.11 is unverified (mixins were written against 1.21.6)."
+ },
+ {
+  "path": "mods/chat_heads-1.2.8-fabric-1.21.11.jar",
+  "mod_id": "chat_heads",
+  "mod_version": "1.2.8",
+  "repo": "https://github.com/dzwdz/chat_heads",
+  "ref": "refs/tags/1.2.8-1.21.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.17.3",
+   "minecraft": "1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Architectury repo; file is fabric/src/main/resources/fabric.mod.json. Placeholders resolved from gradle.properties: fabric_loader_version_range=>=0.17.3, fabric_game_version_range=1.21.11. Suggests cloth-config (*). No fabric-api dependency."
+ },
+ {
+  "path": "mods/continuity-3.0.1-beta.1+1.21.11.jar",
+  "mod_id": "continuity",
+  "mod_version": "3.0.1-beta.1+1.21.11",
+  "repo": "https://github.com/PepperCode1/Continuity",
+  "ref": "refs/heads/1.21.11/dev (d4f7a9c0763389f335a9e55d675bd53fb4e075b7)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "minecraft": "1.21.11",
+   "fabric-api": ">=0.140.0"
+  },
+  "breaks": {
+   "sodium": "<0.8.2"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There is no tag for 3.0.1 (tags stop at v3.0.0+1.21.4), so this was read from the 1.21.11/dev branch. Its gradle.properties has mod_version=3.0.1 and is built against sodium 0.8.2+mc1.21.11 and fabric-api 0.140.0+1.21.11. The beta.1 build may have been made from an earlier commit. fabric.mod.json only substitutes ${version}; the depends and breaks are literal. Requires Fabric API >=0.140.0 and breaks Sodium older than 0.8.2. No fabricloader constraint."
+ },
+ {
+  "path": "mods/do_a_barrel_roll-fabric-3.8.3+1.21.11.jar",
+  "mod_id": "do_a_barrel_roll",
+  "mod_version": "3.8.3+1.21.11",
+  "repo": "https://github.com/enjarai/do-a-barrel-roll",
+  "ref": "refs/heads/stonecutter/1.21.11 (8f1f58974ed458f4e91937577857271df5ef39bb)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.15",
+   "fabric": "*",
+   "minecraft": ">=1.21.11 <=1.21.11",
+   "java": ">=17",
+   "cicada": ">=0.6.0 <1.0.0",
+   "yet_another_config_lib_v3": "*"
+  },
+  "breaks": {
+   "optifabric": "*",
+   "controlify": "<2.0.0-beta.9"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "mixinsquared",
+   "fabric-permissions-api-v0"
+  ],
+  "status": "resolved",
+  "notes": "There is no 3.8.3+1.21.11 tag; tags exist only for 1.21.6 and 1.21.9. Read from the stonecutter/1.21.11 branch, where gradle.properties has mod.version=3.8.3 and versions/1.21.11-fabric has mod.mc_dep=>=1.21.11 <=1.21.11. 'fabric' is the legacy id that Fabric API provides. REQUIRES cicada-lib (id cicada, built against 0.14.3) and YACL v3 (yet_another_config_lib_v3; build uses 3.8.1+1.21.11). Neither is jar-in-jar: cicada is modApi only, so both must be installed separately. Bundles mixinsquared-fabric 0.1.2-beta.4 and fabric-permissions-api 0.6.1."
+ },
+ {
+  "path": "mods/elytratrails-1.4.8.7-1.21.11.jar",
+  "mod_id": "elytratrails",
+  "mod_version": "1.4.8.7-1.21.11",
+  "repo": "https://github.com/dbrighthd/elytratrails",
+  "ref": "refs/heads/1.21.11 (54e27d9189b32b974909a06fb6d1cee18fabdd38)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "minecraft": "~1.21.11",
+   "java": ">=21",
+   "fabric-api": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Elytra Contrails by dbrighthd. There are no tags. The 1.21.11 branch head is at mod_version=1.4.9-1.21.11, one release newer than the pack's 1.4.8.7. Its fabric.mod.json only substitutes ${version}. The build has cloth-config-fabric as modApi, but it is not jar-in-jar and is not listed in depends, so it is presumably optional. Compile-only integrations: iris, EMF, ETF, flashback, CPM, modmenu."
+ },
+ {
+  "path": "mods/fabric-carpet-1.21.11-1.4.194+v251223.jar",
+  "mod_id": "carpet",
+  "mod_version": "1.4.194+v251223",
+  "repo": "https://github.com/gnembon/fabric-carpet",
+  "ref": "refs/tags/1.4.194",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": "1.21.11",
+   "fabricloader": ">=0.18.2",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The tag commit is 'Only for 1.21.11' (2025-12-23), which matches the v251223 date suffix. The version is expanded as mod_version + '+v' + build date. No fabric-api dependency."
+ },
+ {
+  "path": "mods/fovu-1.0.0-[1.21.6-1.21.11].jar",
+  "mod_id": "fovu",
+  "mod_version": "1.0.0",
+  "repo": "https://github.com/7orivorian/FOVU",
+  "ref": "refs/tags/1.0.0-1.21.6-11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "minecraft": ">=1.21.6 <=1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "FoV Unbound. Placeholders resolved from gradle.properties at the tag: loader_version=0.18.2, min_minecraft_version=1.21.6, max_minecraft_version=1.21.11. No fabric-api dependency."
+ },
+ {
+  "path": "mods/Iceberg-1.21.11-fabric-1.4.0.1.jar",
+  "mod_id": "iceberg",
+  "mod_version": "1.4.0.1",
+  "repo": "https://github.com/AHilyard/Iceberg",
+  "ref": "refs/heads/1.21.11-multi (95a36fca72a8846989b786a79b3ce18bd3483640)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.16.0",
+   "fabric-api": "*",
+   "minecraft": "=1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The branch head has modVersion=1.4.0.2, one patch newer than the pack's 1.4.0.1. The depends are literal (only ${version} is substituted), so 1.4.0.1 is very likely the same. Suggests sodium >=0.6.0 and prism >=1.0.8. The branch's own build uses fabric loader 0.19.2 and fabric-api 0.141.3+1.21.11, but the declared minimums are lower."
+ },
+ {
+  "path": "mods/jei-1.21.11-fabric-27.30.0.80.jar",
+  "mod_id": "jei",
+  "mod_version": "27.30.0.80",
+  "repo": "https://github.com/mezz/JustEnoughItems",
+  "ref": "refs/tags/v27.30.0",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.17.0",
+   "fabric-api": ">=0.139.0+1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The tag v27.30.0 has specificationVersion=27.30.0; the trailing .80 is the CI build number. Placeholders resolved from gradle.properties: fabricLoaderVersionRange=>=0.17.0, fabricApiVersionRange=>=0.139.0+1.21.11, modJavaVersion=21. The Fabric fabric.mod.json declares no minecraft dependency. Suggests amecs_key_modifiers. Later JEI versions (e.g. 27.48.0) add a required mezz config library dependency, but 27.30.0 does not."
+ },
+ {
+  "path": "mods/midnightlib-fabric-1.9.3+1.21.11.jar",
+  "mod_id": "midnightlib",
+  "mod_version": "1.9.3+1.21.11",
+  "repo": "https://github.com/TeamMidnightDust/MidnightLib",
+  "ref": "refs/heads/multiversion (c971c5f3df042696ab7ea541fd5cc736c07ab49c)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabric-resource-loader-v0": "*",
+   "minecraft": "1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags for 1.9.x. Read from the Stonecutter 'multiversion' branch, where stonecutter.properties.yaml has mod.version 1.9.3.1, slightly newer than the pack's 1.9.3. The ${minecraft} placeholder resolves to mod.fabric_mc_range='1.21.11' for the 1.21.11 node. Requires only the fabric-resource-loader-v0 module of Fabric API; no fabricloader or java constraint."
+ },
+ {
+  "path": "mods/nemos-inventory-sorting-Fabric-1.21.11-1.14.9.jar",
+  "mod_id": "nemos_inventory_sorting",
+  "mod_version": "1.14.9",
+  "repo": "https://github.com/NemoNotFound/NemosInventorySorting",
+  "ref": "refs/heads/version/1.21.11 (f2bee386a8ed9ea99bafbd623a826f57798fbd61, 'Update 1.14.9')",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "fabric-api": "*",
+   "minecraft": [
+    ">=1.21.11"
+   ],
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The version/1.21.11 branch head is the 'Update 1.14.9' commit with version=1.14.9. MultiLoader template; placeholders resolved from gradle.properties (fabric_loader_version=0.18.2, minecraft_version=1.21.11, java_version=21). Suggests 'another-mod' (template leftover)."
+ },
+ {
+  "path": "mods/particular-1.21.11-Fabric-1.3.2.jar",
+  "mod_id": "particular",
+  "mod_version": "1.3.2",
+  "repo": "https://github.com/Leclowndu93150/Particular",
+  "ref": "refs/heads/1.21.11-multiloader (9dd3034947795f52287dc3c01e583efa9653ea7b)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "fabric-api": "*",
+   "minecraft": "1.21.11",
+   "forgeconfigapiport": "*",
+   "modmenu": "*",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "This is 'Particular Reforged' by Leclowndu93150, a continuation of Chailotl's Particular, which stopped at 1.1.1+1.21.4. The branch head has version=1.3.2 and minecraft_version=1.21.11; placeholders are resolved from gradle.properties. HARD dependencies that must be installed separately (not jar-in-jar): Forge Config API Port (forgeconfigapiport, built against 21.11.1) and Mod Menu (modmenu, built against 17.0.0-alpha.1)."
+ },
+ {
+  "path": "mods/Resourcify (1.21.11-fabric)-1.8.5.jar",
+  "mod_id": "resourcify",
+  "mod_version": "1.8.5",
+  "repo": "https://github.com/DeDiamondPro/Resourcify",
+  "ref": "refs/tags/1.8.4 and refs/tags/1.8.6 (no 1.8.5 tag)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabric-language-kotlin": ">=1.11.0+kotlin.2.0.0",
+   "fabricloader": ">=0.15.0",
+   "fabric-resource-loader-v0": "*",
+   "minecraft": ">=1.21.11 <=1.21.11"
+  },
+  "breaks": {
+   "vulkanmod": "*"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The repo has tags 1.8.4 and 1.8.6 but none for 1.8.5. Both give the same depends and breaks for 1.21.11: in 1.8.6, breaks is a ${breaks} placeholder that adds vulkanmod:* for MC <26.2, and 1.8.4 has it literal. ${mcVersion} resolves to VersionRange('1.21.11','1.21.11').getFabricRange(), which is '>=1.21.11 <=1.21.11'. REQUIRES Fabric Language Kotlin. UniversalCraft, Elementa and the markdown libraries are shaded and relocated, not jar-in-jar."
+ },
+ {
+  "path": "mods/shulkerboxtooltip-fabric-5.2.16+1.21.11.jar",
+  "mod_id": "shulkerboxtooltip",
+  "mod_version": "5.2.16+1.21.11",
+  "repo": "https://github.com/MisterPeModder/ShulkerBoxTooltip",
+  "ref": "refs/tags/v5.2.16+1.21.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabric-resource-loader-v1": "*",
+   "fabricloader": ">=0.16.0",
+   "minecraft": ">=1.21.10"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The tag commit is 'Release 5.2.16+1.21.11'. fabric.mod.json only substitutes ${version}. It needs the fabric-resource-loader-v1 module, which is part of Fabric API for 1.21.11 (built against 0.139.4+1.21.11). Suggests modmenu. Jankson is shaded and relocated."
+ },
+ {
+  "path": "mods/spark-1.10.170-fabric.jar",
+  "mod_id": "spark",
+  "mod_version": "1.10.170",
+  "repo": "https://github.com/lucko/spark",
+  "ref": "commit de2c60b27708c553dd7e44577684634a38cd07c2 (master; git describe v1.10-170, 'Update Gradle to v9.4', 2026-03-25)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.4.0",
+   "fabric-api-base": "*",
+   "fabric-command-api-v2": "*",
+   "fabric-lifecycle-events-v1": "*",
+   "fabric-permissions-api-v0": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "fabric-permissions-api-v0"
+  ],
+  "status": "resolved",
+  "notes": "spark's patch number comes from 'git describe --tags': it counts commits since tag v1.10. Commit 170 is de2c60b, the last commit before 'Update to Minecraft 26.1', and its spark-fabric build targets minecraft 1.21.11, loader 0.18.4 and fabric-api modules 0.141.3+1.21.11. The fabric.mod.json declares no minecraft constraint (current master adds minecraft >=26.1). Bundles fabric-permissions-api 0.6.1 jar-in-jar. Uses placeholder-api 2.8.2 but does not list it in depends. spark-common is shaded."
+ },
+ {
+  "path": "mods/trashslot-fabric-1.21.11-21.11.4.jar",
+  "mod_id": "trashslot",
+  "mod_version": "21.11.4",
+  "repo": "https://github.com/TwelveIterationMods/TrashSlot",
+  "ref": "refs/tags/v21.11.4",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.1",
+   "fabric-api": "*",
+   "balm-fabric": ">=21.11.2",
+   "minecraft": ">=1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Placeholders resolved via build-logic/multiloader-common.gradle from gradle/libs.versions.toml at the tag: fabricLoader=0.18.1, balm=21.11.2, minecraft=1.21.11, java_version=21. REQUIRES Balm (balm-fabric) >=21.11.2, installed separately."
+ },
+ {
+  "path": "mods/xaeroworldmap-fabric-1.21.11-1.45.0.jar",
+  "mod_id": "xaeroworldmap",
+  "mod_version": "1.45.0",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "closed_source",
+  "notes": "Xaero's World Map is closed source, so there is no public fabric.mod.json to read. The depends and breaks blocks were not determined. Check the jar's own fabric.mod.json directly."
+ },
+ {
+  "path": "mods/animatica-0.6.1+1.21.8.jar",
+  "mod_id": "animatica",
+  "mod_version": "0.6.1+1.21.8",
+  "repo": "https://github.com/FoundationGames/Animatica",
+  "ref": "refs/heads/1.21.5 (4292aa25)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.11.3",
+   "fabric": "*",
+   "minecraft": ">=1.21.5",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "partial",
+  "notes": "The repo has no tags and no 1.21.8 branch; the newest branch is 1.21.5, where mod_version is 0.6.1+1.21.5. Unmerged PR #80 ('Compile for 1.21.11') has exactly the same depends block, so the 1.21.8 build very likely uses the same values. Note that it depends on the legacy 'fabric' id (an alias Fabric API provides), not 'fabric-api'. minecraft >=1.21.5 accepts 1.21.11. No breaks."
+ },
+ {
+  "path": "mods/betterstats-5.1.0+fabric-1.21.11.jar",
+  "mod_id": "betterstats",
+  "mod_version": "5.1.0+fabric-1.21.11",
+  "repo": "https://github.com/TheCSDev/betterstats",
+  "ref": "refs/tags/5.1.0",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "java": ">=21",
+   "minecraft": "1.21.11",
+   "fabricloader": ">=0.18.2",
+   "fabric-api": ">=0.139.5",
+   "tcdcommons": ">=5.1.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "v5+ lives in the new repo TheCSDev/betterstats; the old TheCSDev/mc-better-stats is archived (v4.x and older). Placeholders were resolved from root gradle.properties at the tag. TCDCommons (tcdcommons-5.1.0+fabric-1.21.11.jar) sits in META-INF/jarjar but processResources excludes it from the jar, so it is NOT bundled and must be installed separately. The architectury property is defined but not in the fabric.mod.json template, so there is no architectury dependency."
+ },
+ {
+  "path": "mods/chatanimation-fabric-1.3.0+mc1.21.11.jar",
+  "mod_id": "chatanimation",
+  "mod_version": "1.3.0",
+  "repo": "https://github.com/Ezzenix/ChatAnimation",
+  "ref": "commit eab88cf ('1.3.0', main branch, 2026-07-05)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": "*",
+   "minecraft": ">=1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. I used the main-branch commit that bumped mod.version to 1.3.0. ${minecraftVersion} is expanded by the stonecraft/stonecutter plugin to the 1.21.11 node's version. No fabric-api dependency. The library mod (emlib) dependency only arrived in 1.3.2, so 1.3.0 does not need it."
+ },
+ {
+  "path": "mods/Controlling-fabric-1.21.11-29.0.1.jar",
+  "mod_id": "controlling",
+  "mod_version": "29.0.1",
+  "repo": "https://github.com/jaredlll08/Controlling",
+  "ref": "refs/heads/1.21.11 (1b4b3139, 'Port to 1.21.11', 2025-12-18)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "java": ">=21",
+   "minecraft": "1.21.11",
+   "searchables": ">=1.0.1",
+   "fabric-api": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags; I used the 1.21.11 branch. Values come from buildSrc Versions.kt (MOD=29.0, and the patch number comes from GMUtils.updatingVersion). It requires the separate Searchables library mod (id 'searchables') >=1.0.1."
+ },
+ {
+  "path": "mods/Drip Sounds-0.5.2+1.21.10-Fabric.jar",
+  "mod_id": "waterdripsound",
+  "mod_version": "0.5.2+1.21.10",
+  "repo": "https://github.com/PieKing1215/DripSounds",
+  "ref": "refs/tags/v0.5.2",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": "*",
+   "minecraft": ">=1.21.9",
+   "cloth-config": ">=20"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "Values resolved from versions/1.21.10/gradle.properties (minecraft_min=1.21.9, cloth_min=20). cloth_id resolves to 'cloth-config' because MC >=1.18. There is no fabric-api or java constraint. The mod id is 'waterdripsound'. Cloth Config is required; Mod Menu is optional (only for opening the config screen)."
+ },
+ {
+  "path": "mods/enchdesc-fabric-1.21.11-21.11.2.jar",
+  "mod_id": "enchdesc",
+  "mod_version": "21.11.2",
+  "repo": "https://github.com/Darkhax-Minecraft/Enchantment-Descriptions",
+  "ref": "refs/heads/1.21.11 (a490050; gradle.properties unchanged since 8c5591e, 2026-02-01)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "fabric-api": "*",
+   "minecraft": "1.21.11",
+   "java": ">=21",
+   "prickle": ">=21.11.1"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The version is 21.11 plus the CI BUILD_NUMBER. gradle.properties and fabric.mod.json are unchanged on the branch since the 1.21.11 port, so these values hold for 21.11.2. It requires the Prickle library mod (id 'prickle') >=21.11.1."
+ },
+ {
+  "path": "mods/fabric-language-kotlin-1.13.13+kotlin.2.4.10.jar",
+  "mod_id": "fabric-language-kotlin",
+  "mod_version": "1.13.13+kotlin.2.4.10",
+  "repo": "https://github.com/FabricMC/fabric-language-kotlin",
+  "ref": "refs/tags/1.13.13+kotlin.2.4.10",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.16.9"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There is no minecraft, java or fabric-api constraint. It bundles the Kotlin stdlib, reflect, coroutines and serialization libraries as non-mod nested jars (includeAndExpose)."
+ },
+ {
+  "path": "mods/freecam-fabric-1.4.1-rc.1+mc1.21.11.jar",
+  "mod_id": "freecam",
+  "mod_version": "1.4.1-rc.1+mc1.21.11",
+  "repo": "https://github.com/MinecraftFreecam/Freecam",
+  "ref": "refs/tags/v1.4.1-rc.1",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": "1.21.11",
+   "fabricloader": ">=0.14.0",
+   "fabric-api-base": "*",
+   "fabric-key-binding-api-v1": "*",
+   "fabric-lifecycle-events-v1": "*",
+   "fabric-resource-loader-v1": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "fabric-api-base",
+   "fabric-key-binding-api-v1",
+   "fabric-lifecycle-events-v1",
+   "fabric-resource-loader-v1",
+   "cloth-config"
+  ],
+  "status": "resolved",
+  "notes": "fabric.mod.json is generated in fabric/build.gradle.kts, with values from the stonecutter.properties.toml [\"1.21.11\"] section (reqs.mc=\"1.21.11\", reqs.fabric_loader=\">=0.14.0\"). The Fabric API modules come from 0.139.4+1.21.11 and are included jar-in-jar. Cloth Config 21.11.153 is bundled (relationship type 'bundled'); a build comment says cloth-config needs the full fabric-api at runtime. recommends: modmenu *. No java constraint."
+ },
+ {
+  "path": "mods/ImmediatelyFast-Fabric-1.14.3+1.21.11.jar",
+  "mod_id": "immediatelyfast",
+  "mod_version": "1.14.3+1.21.11",
+  "repo": "https://github.com/RaphiMC/ImmediatelyFast",
+  "ref": "refs/tags/v1.14.3",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "java": ">=21",
+   "minecraft": "1.21.11",
+   "fabricloader": ">=0.18.0"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The depends values are hard-coded in fabric/src/main/resources/fabric.mod.json (no placeholders). No breaks, conflicts or fabric-api requirement. It bundles net.lenni0451:Reflect, which is a library, not a mod."
+ },
+ {
+  "path": "mods/krypton-0.2.10.jar",
+  "mod_id": "krypton",
+  "mod_version": "0.2.10",
+  "repo": "https://github.com/astei/krypton",
+  "ref": "refs/tags/v0.2.10",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.11.3",
+   "minecraft": ">=1.21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The tag was built against MC 1.21.9, but depends only says minecraft >=1.21, so the loader accepts 1.21.11; it does not guarantee runtime compatibility. It bundles velocity-native, which is not a mod. No fabric-api dependency."
+ },
+ {
+  "path": "mods/minihud-fabric-1.21.11-0.38.14.jar",
+  "mod_id": "minihud",
+  "mod_version": "0.38.14",
+  "repo": "https://github.com/sakura-ryoko/minihud",
+  "ref": "refs/tags/1.21.11-0.38.14",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": "1.21.11",
+   "malilib": ">=0.27.17- <0.28.0-"
+  },
+  "breaks": {
+   "malilib": "<0.27.17-"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "conditional-mixin"
+  ],
+  "status": "resolved",
+  "notes": "The 1.21.x builds come from sakura-ryoko's fork, not maruohon/minihud. There is no fabricloader or fabric-api entry in depends. It needs malilib 0.27.x, at least 0.27.17 (built against 0.27.17). It bundles me.fallenbreath conditional-mixin-fabric 0.6.4 via include()."
+ },
+ {
+  "path": "mods/netherite-instamine-1.6.0.jar",
+  "mod_id": "netherite_instamine",
+  "mod_version": "1.6.0",
+  "repo": "https://github.com/TheLokin/netherite-instamine",
+  "ref": "refs/heads/main (scripts/package.ts)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabric-resource-loader-v0": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "This is a datapack wrapped as a mod (the repo is TheLokin/mc-packs, also reachable as netherite-instamine). scripts/package.ts generates fabric.mod.json at release time: id = Modrinth slug with the first '-' replaced by '_' ('netherite_instamine'), and depends only on fabric-resource-loader-v0 '*'. There is no minecraft, fabricloader or java constraint. The script is the same for every version, so the depends are reliable even though 1.6.0 has no tag. Fabric API must supply the deprecated fabric-resource-loader-v0 module."
+ },
+ {
+  "path": "mods/PickUpNotifier-v21.11.0-mc1.21.11-Fabric.jar",
+  "mod_id": "pickupnotifier",
+  "mod_version": "21.11.0",
+  "repo": "https://github.com/Fuzss/pickupnotifier",
+  "ref": "refs/tags/v21.11.0-mc1.21.11/fabric",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": ">=1.21.11- <1.21.12-",
+   "fabricloader": ">=0.18.0",
+   "fabric-api": ">=0.139.0",
+   "forgeconfigapiport": "*",
+   "puzzleslib": ">=21.11.2"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "fabric.mod.json is generated by Fuzss's multiloader convention plugin (ModJsonConfigurator.kt). I read the sources jar from Fuzss/modresources: snapshot 1.0-20251215.173446-14, the newest before the tag commit on 2025-12-15. Minimums come from the fuzs sharedcatalogs 1.21.11-SNAPSHOT build -3 (20251215): fabricloader-min 0.18.0, fabricapi-min 0.139.0, puzzleslib-min 21.11.2. forgeconfigapiport gets '*' (not version-constrained). No java constraint. Requires Puzzles Lib and Forge Config API Port."
+ },
+ {
+  "path": "mods/rrlsFabric-5.1.15+mc.1.21.11.jar",
+  "mod_id": "rrls",
+  "mod_version": "5.1.15",
+  "repo": "https://github.com/dima-dencep/rrls",
+  "ref": "refs/tags/1.21.11-5.1.15",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "minecraft": ">=1.21.11",
+   "forgeconfigapiport": ">=21.11.1"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "${fabric_version} expands to loader_version (0.18.4), and fcapip_version = 21.11.1. It has 'conflicts': {'dynamicfps': '*'}; this is a loader warning, not a hard break. No fabric-api dependency is declared."
+ },
+ {
+  "path": "mods/skinlayers3d-fabric-1.11.2-mc1.21.11.jar",
+  "mod_id": "skinlayers3d",
+  "mod_version": "1.11.2",
+  "repo": "https://github.com/tr7zw/3d-Skin-Layers",
+  "ref": "refs/tags/1.11.2 (template tr7zw/ProcessedModTemplate@f0e7b365)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "minecraft": "1.21.x",
+   "fabric-api": "*"
+  },
+  "breaks": {
+   "tlskincape": "*"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "fabric.mod.json comes from ProcessedModTemplate (gradle-compose, master). I used the template commit just before the tag (2026-06-18 19:21). minecraft_version_range_fabric = minecraft_dependency = '1.21.x' and fabric_api_name = 'fabric-api' (versions/1.21.11-fabric/gradle.properties). $breaks$ defaults to empty, which leaves only tlskincape. No fabricloader or java constraint. With the addTRenderLib and addTRansitionLib flags it bundles the TRender 1.0.15 and TRansition 1.0.21 libraries jar-in-jar; I did not confirm their mod ids."
+ },
+ {
+  "path": "mods/stackable-fabric-1.21.11-2.0.5.jar",
+  "mod_id": "stackable",
+  "mod_version": "2.0.5",
+  "repo": "https://github.com/LinkachuGaming/Stackable",
+  "ref": "refs/heads/1.21.11 (1ce0aec, version=2.0.5, 2026-03-08)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.4",
+   "fabric-api": "*",
+   "minecraft": "~1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The repo's 2.0.5 tag points at an unrelated 1.21.9 merge commit (version=2.0.3), so I used the 1.21.11 branch commit that set version=2.0.5 instead (its date matches the 2026-03-08 release). This is the Stackable mod by Lonkachu (Modrinth stackable127). The suggests block is just the template's 'another-mod'."
+ },
+ {
+  "path": "mods/travelersbackpack-fabric-1.21.11-10.11.10.jar",
+  "mod_id": "travelersbackpack",
+  "mod_version": "10.11.10",
+  "repo": "https://github.com/Tiviacz1337/Travelers-Backpack",
+  "ref": "refs/heads/1.21.11-fabric @ fb82eab (mod_version=10.11.10, 2026-08-03)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.15.11",
+   "fabric-api": ">=0.120.0",
+   "minecraft": "~1.21.11",
+   "java": ">=21",
+   "forgeconfigapiport": "*"
+  },
+  "breaks": {
+   "accessories": "<1.4.3-beta+1.21.10",
+   "yigd": "<2.4.13"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. The branch head is 10.11.11; I used the last 10.11.10 commit. Its depends and breaks match the earlier 10.11.10 commit d4751e8. minecraft_version_range=~1.21.11. Requires Forge Config API Port. kuma-api is only modApi and is not declared in depends."
+ },
+ {
+  "path": "mods/yet_another_config_lib_v3-3.8.2+1.21.11-fabric.jar",
+  "mod_id": "yet_another_config_lib_v3",
+  "mod_version": "3.8.2+1.21.11-fabric",
+  "repo": "https://github.com/isXander/YetAnotherConfigLib",
+  "ref": "main @ 78563b1 (modVersion=3.8.2, 2026-01-09)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.17.0",
+   "minecraft": "~1.21.11",
+   "java": ">=17",
+   "fabric-api": ">=0.140.0+1.21.11"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There is no 3.8.2 tag; I used the main commit that set modVersion=3.8.2. Values come from src/main/templates/fabric.mod.json plus versions/1.21.11-fabric/gradle.properties (meta.mcDep=~1.21.11, deps.fabricApi=0.140.0+1.21.11). A later commit (0b0b8e6, 2026-02-02, still 3.8.2) raised fabricloader to >=0.18.0, so a later rebuild could say >=0.18.0. Either way it is satisfied by loader 0.19.3. The lts/elts branches now carry 3.8.2+lts/elts."
+ },
+ {
+  "path": "mods/architectury-19.0.1-fabric.jar",
+  "mod_id": "architectury",
+  "mod_version": "19.0.1",
+  "repo": "https://github.com/architectury/architectury-api",
+  "ref": "refs/heads/1.21.11 (369c884 'Port to 1.21.11 (#685)')",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "minecraft": "~1.21.11",
+   "fabricloader": ">=0.15.4",
+   "fabric-api": ">=0.127.0"
+  },
+  "breaks": {
+   "optifabric": "<1.13.0"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The repo has no release tags. I read the tip of the 1.21.11 branch (base_version=19.0, built against fabric_api 0.139.4+1.21.11 and loader 0.18.2). The fabric.mod.json depends are hardcoded, with no placeholders."
+ },
+ {
+  "path": "mods/BetterThanMending-2.2.5.jar",
+  "mod_id": "betterthanmending",
+  "mod_version": "2.2.5",
+  "repo": "https://github.com/legobmw99/BetterThanMending",
+  "ref": "refs/heads/multi @ 1d5995f (last commit with version=2.2.5; the release commit was 4d12e04 'Update to 1.21.7', and fabric.mod.json is the same in both)",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.16.14",
+   "fabric-api": "*",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags. I picked the commit by gradle.properties version=2.2.5 (minecraft_version=1.21.7, minecraft_version_range=[1.21.7,)). The Fabric fabric.mod.json has no minecraft dependency at all. The placeholders resolved to fabric_loader_version=0.16.14 and java_version=21."
+ },
+ {
+  "path": "mods/Chunky-Fabric-1.4.55.jar",
+  "mod_id": "chunky",
+  "mod_version": "1.4.55",
+  "repo": "https://github.com/pop4959/Chunky",
+  "ref": "master @ d733155 (last commit before 'Update Fabric, Forge, NeoForge to 26.1'; Fabric moved to 1.21.11 in d374655)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.18.1",
+   "fabric": "*",
+   "minecraft": ">=1.21.11",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There is no 1.4.55 tag: gradle version=1.4 and the patch number is a CI build number. master is now on 26.1 (minecraft >=26.1, java >=25), so I used the last 1.21.11-era commit. It depends on the legacy id 'fabric', which Fabric API provides. It was built against fabric-api 0.139.4+1.21.11. fabric-permissions-api is compileOnly, not bundled."
+ },
+ {
+  "path": "mods/CraftPresence-2.7.1+1.21.11-fabric.jar",
+  "mod_id": "craftpresence",
+  "mod_version": "2.7.1+1.21.11",
+  "repo": "https://gitlab.com/CDAGaming/CraftPresence",
+  "ref": "refs/heads/1.21.11 @ b8b2cba '[Port] Update to 1.21.11 (v2.7.1)'",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.12.0",
+   "minecraft": ">=1.21.11 <1.22",
+   "unilib": ">=1.2.0",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The source is on GitLab. The GitHub repo CDAGaming/CraftPresence is an old 2018 stub. Anonymous git read from GitLab worked. The release/v2.7.1 tag is on the 1.12.2 base branch, so I used the 1.21.11 port branch. Placeholders resolved from gradle.properties: fabric_loader_version_range, fabric_game_version_range, unilib_minimum_version=1.2.0. UniLib is required as a separate mod, not jar-in-jar."
+ },
+ {
+  "path": "mods/dynamic-fps-3.11.6+minecraft-1.21.11-fabric.jar",
+  "mod_id": "dynamic_fps",
+  "mod_version": "3.11.6",
+  "repo": "https://github.com/juliand665/Dynamic-FPS",
+  "ref": "refs/heads/1.21.11 @ dd1d5cf (tip, mod_version=3.11.5)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.15.10",
+   "minecraft": ">=1.21.9-beta.1",
+   "mixinextras": ">=0.3.2",
+   "fabric-resource-loader-v0": "*",
+   "fabric-lifecycle-events-v1": "*"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [
+   "battery"
+  ],
+  "status": "partial",
+  "notes": "Tag 3.11.6 is the 26.1 build (minecraft >=26.1.0, fabricloader >=0.18.4). The 1.21.11 backport branch stops at 3.11.5, and the 3.11.6 commit on 26.1 is a build refactor, so the 1.21.11 metadata is very likely unchanged. It also has conflicts (not breaks): optifabric *, smoothmenu *. It recommends modmenu and cloth-config. mixinextras is provided by Fabric Loader 0.15+."
+ },
+ {
+  "path": "mods/entity_model_features-3.2.4-1.21.11-fabric.jar",
+  "mod_id": "entity_model_features",
+  "mod_version": "3.2.4",
+  "repo": "https://github.com/Traben-0/Entity_Model_Features",
+  "ref": "refs/tags/v3.2.4",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": "*",
+   "minecraft": "*",
+   "entity_texture_features": ">=7.1"
+  },
+  "breaks": {
+   "optifabric": "*",
+   "cem": "*",
+   "entity_texture_features": "<7.1",
+   "entity_sound_features": "<=0.8"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "This is a multi-version (Essential/stonecutter-style) build. The same fabric.mod.json is used for the 1.21.11-fabric subproject, and only version/accessWidener are expanded. ETF (entity_texture_features) is not bundled and must be installed separately at >=7.1."
+ },
+ {
+  "path": "mods/FallingTree-1.21.11-1.21.11.3.jar",
+  "mod_id": "fallingtree",
+  "mod_version": "1.21.11.3",
+  "repo": "https://github.com/RakSrinaNa/FallingTree",
+  "ref": "refs/tags/1.21.11.3",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.2",
+   "fabric-lifecycle-events-v1": "*",
+   "fabric-api": ">=0.91",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There is no minecraft dependency in fabric.mod.json. It suggests modmenu and cloth-config. It was built against MC 1.21.11, loader 0.18.4 and fabric-api 0.139.5+."
+ },
+ {
+  "path": "mods/freelook-1.2.8.jar",
+  "mod_id": "",
+  "mod_version": "1.2.8",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "A Fabric client-only 'Freelook' 1.2.8 for 1.21.11 exists (released around 2026-02-19), but I could not find its source repo. jmilthedude/freelook is a different mod, 'FreeLook' 1.5.x/1.6.x by net.ninjadev, so it was not used."
+ },
+ {
+  "path": "mods/immersive-hotbar-1.1.2-1.21.9-1.21.11.jar",
+  "mod_id": "",
+  "mod_version": "1.1.2",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "I could not find the source repo (Modrinth project hsPB5xMD, MIT). Listings say it requires YACL (yet_another_config_lib_v3) and targets Fabric 1.21.9 to 1.21.11. Not verified from source."
+ },
+ {
+  "path": "mods/lambdynamiclights-4.9.1+1.21.11.jar",
+  "mod_id": "lambdynlights",
+  "mod_version": "4.9.1+1.21.11",
+  "repo": "https://github.com/LambdAurora/LambDynamicLights",
+  "ref": "refs/tags/v4.9.1+1.21.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.1",
+   "minecraft": "~1.21.11-",
+   "java": ">=21",
+   "lambdynlights_api": ">=4.9.1+1.21.11",
+   "spruceui": ">=9.1.0+1.21.11",
+   "yumi_mc_core": ">=1.0.0-beta.1+1.21.11",
+   "fabric-lifecycle-events-v1": ">=<module version shipped in fabric-api 0.139.4+1.21.11>",
+   "fabric-resource-loader-v1": ">=<module version shipped in fabric-api 0.139.4+1.21.11>",
+   "fabric-resource-conditions-api-v1": ">=<module version shipped in fabric-api 0.139.4+1.21.11>"
+  },
+  "breaks": {
+   "optifabric": "*",
+   "sodiumdynamiclights": "*",
+   "ryoamiclights": "*"
+  },
+  "provides": [],
+  "bundled_ids": [
+   "lambdynlights_api",
+   "yumi_mc_core",
+   "spruceui",
+   "pridelib"
+  ],
+  "status": "resolved",
+  "notes": "fabric.mod.json is generated by the lambdamcdev Gradle plugin from build.gradle.kts and build_logic. The three fabric-api module constraints are '>=' the module versions inside fabric-api 0.139.4+1.21.11. I could not get the exact numbers because Maven is blocked, but any fabric-api >=0.139.4+1.21.11 satisfies them. It recommends modmenu >=16.0.0-rc.1. Sodium is compile-only and optional (sodium:config_api_user entrypoint, built against 0.8.0+mc1.21.11)."
+ },
+ {
+  "path": "mods/modernfix-5.26.3-build.1.jar",
+  "mod_id": "modernfix",
+  "mod_version": "5.26.3-build.1",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "This jar is the ModernFix-mVUS fork (Modrinth TjSm1wrD; '5.26.3-build.1', Fabric 1.21.11), not upstream embeddedt/ModernFix. Upstream has no 5.26.3 tag, and its 26.1 and 1.21.1 branches are NeoForge-only. I could not find the fork's source repo."
+ },
+ {
+  "path": "mods/no-crop-trample-2.jar",
+  "mod_id": "",
+  "mod_version": "2",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "Several unrelated 'No Crop Trample' mods exist, and I could not identify which one this is or find its source."
+ },
+ {
+  "path": "mods/placeholder-api-2.8.2+1.21.10.jar",
+  "mod_id": "placeholder-api",
+  "mod_version": "2.8.2+1.21.10",
+  "repo": "https://github.com/Patbox/TextPlaceholderAPI",
+  "ref": "refs/tags/2.8.2+1.21.10",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.16.10",
+   "minecraft": ">=1.21.5-beta.3"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "It was built for 1.21.10, but the minecraft constraint has no upper bound, so it loads on 1.21.11. Fabric API is compileOnly and not declared as a dependency."
+ },
+ {
+  "path": "mods/ScalableLux-fabric-0.3.0-alpha.0.3-all.jar",
+  "mod_id": "scalablelux",
+  "mod_version": "0.3.0-alpha.0.3",
+  "repo": "https://github.com/RelativityMC/ScalableLux",
+  "ref": "refs/heads/backports/1.21.11 @ 876d045 (patch repo: upstream tag 0.3.0+alpha.0 + 26.2->26.1.2 patch + 0001-Port-26.1.2-1.21.11.patch)",
+  "ref_matches_pack_version": false,
+  "depends": {
+   "fabricloader": ">=0.19.3",
+   "minecraft": "=1.21.11"
+  },
+  "breaks": {
+   "phosphor": "*"
+  },
+  "provides": [
+   "starlight"
+  ],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The tag 0.3.0+alpha.0 itself targets 26.2. The 1.21.11 build comes from a patch-based backport branch, and its patch rewrites the minecraft dependency to '=1.21.11'. fabricloader is '>=${loader_version}' with loader_version=0.19.3, so loader 0.19.3 is the minimum; the pack's 0.19.3 meets it exactly. The trailing '.3' in the version is likely a git-describe commit count. flowsched is shaded, not jar-in-jar. Java target is 21."
+ },
+ {
+  "path": "mods/smooth_f5-fabric-1.3.0.jar",
+  "mod_id": "",
+  "mod_version": "1.3.0",
+  "repo": "",
+  "ref": "",
+  "ref_matches_pack_version": false,
+  "depends": {},
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "not_found",
+  "notes": "This is most likely Countered's Smooth F5, but I could not find its source repo. The Seramicx/seramicx-smooth-f5 fork exists, but it has no 1.3.0 and no 1.21.11 target, so I did not use it."
+ },
+ {
+  "path": "mods/stackrefill-1.21.11-5.0.jar",
+  "mod_id": "stackrefill",
+  "mod_version": "5.0",
+  "repo": "https://github.com/Serilum/Stack-Refill",
+  "ref": "refs/heads/1.21.11 @ e6f1869",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.15.0",
+   "fabric-api": "*",
+   "minecraft": ">=1.21",
+   "java": ">=21",
+   "collective": ">=8.13"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "There are no tags; this is the 1.21.11 branch, where fabric.mod.json hardcodes version 5.0. It requires Serilum's Collective >=8.13, which must be installed separately."
+ },
+ {
+  "path": "mods/UniLib-1.2.1+1.21.11-fabric.jar",
+  "mod_id": "unilib",
+  "mod_version": "1.2.1+1.21.11",
+  "repo": "https://gitlab.com/CDAGaming/UniLib",
+  "ref": "refs/heads/1.21.11 @ e470a11 '[Port] Update to 1.21.11 (v1.2.1)'",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.12.0",
+   "minecraft": ">=1.21.11 <1.22",
+   "java": ">=21"
+  },
+  "breaks": {},
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "The source is on GitLab, not GitHub; anonymous git read worked. The release/v1.2.1 tag is on the 1.12.2 base branch, so I used the 1.21.11 port branch. Placeholders resolved from fabric_loader_version_range and fabric_game_version_range."
+ },
+ {
+  "path": "mods/zoomify-2.15.2+1.21.11.jar",
+  "mod_id": "zoomify",
+  "mod_version": "2.15.2+1.21.11",
+  "repo": "https://github.com/isXander/Zoomify",
+  "ref": "refs/tags/2.15.2+1.21.11",
+  "ref_matches_pack_version": true,
+  "depends": {
+   "fabricloader": ">=0.18.0",
+   "fabric-language-kotlin": ">=1.13.8+kotlin.2.3.0",
+   "minecraft": "~1.21.11",
+   "java": ">=17",
+   "yet_another_config_lib_v3": ">=3.6.6"
+  },
+  "breaks": {
+   "optifabric": "*",
+   "controlify": "<2"
+  },
+  "provides": [],
+  "bundled_ids": [],
+  "status": "resolved",
+  "notes": "minecraft_dependency resolved from versions/1.21.11/gradle.properties (fmj.mcDep=~1.21.11). Fabric API is used at build time but not declared in depends. ktoml-core-jvm (a library) is jar-in-jar. It suggests modmenu. It was built against YACL 3.8.2+1.21.11-fabric."
+ }
+]
