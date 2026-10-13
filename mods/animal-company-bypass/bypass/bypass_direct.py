@@ -74,7 +74,6 @@ def spawn_and_inject():
             [
                 "cmd", "/c", "frida",
                 "-f", exe,
-                "--no-pause",
                 "-l", bridge,
                 "-l", symbols,
                 "-l", bypass,
@@ -113,6 +112,8 @@ def main():
     if spawn_and_inject():
         print(f"{LPURPLE}   [+] {RESET}A frida console window opened — that's doing the actual")
         print(f"{GRAY}       launch. Watch that window; this one's done.{RESET}")
+        print(f"{GRAY}       It drops into an interactive frida prompt once loaded — if the{RESET}")
+        print(f"{GRAY}       game window never appears, type %resume there and hit Enter.{RESET}")
 
 
 if __name__ == "__main__":
