@@ -84,11 +84,12 @@ def p(path_name):
     return os.path.join(GAME_DIR, path_name)
 
 
-def rename_retry(src, dst, tries=6, delay=0.5):
-    """os.rename, retrying on WinError 32 (sharing violation) - a transient
-    lock from Steam still finalizing/verifying the file, or AV doing a
-    real-time scan of a freshly-touched exe, almost always clears within a
-    couple seconds."""
+def rename_retry(src, dst, tries=10, delay=0.75):
+    """os.rename, retrying on WinError 32 (sharing violation) and WinError 5
+    (access denied). On a folder, WinError 5 has turned out to be transient
+    too - Search Indexer or AV holding a handle open inside it - since it
+    still happens even running elevated, which rules out a real ACL denial
+    in most cases. Both almost always clear within a few seconds."""
     last = None
     for attempt in range(tries):
         try:
@@ -96,7 +97,7 @@ def rename_retry(src, dst, tries=6, delay=0.5):
             return
         except OSError as e:
             last = e
-            if getattr(e, "winerror", None) != 32 or attempt == tries - 1:
+            if getattr(e, "winerror", None) not in (5, 32) or attempt == tries - 1:
                 raise
             time.sleep(delay)
     if last:
@@ -169,12 +170,13 @@ def setup_no_eac():
         return True
     except Exception as e:
         print("%s   [x] %sSetup failed: %s" % (LPURPLE, RESET, e))
-        if getattr(e, "winerror", None) == 32:
-            print("%s       File is locked by another process — close Animal Company/Steam" % GRAY)
-            print("%s       (check Task Manager for AnimalCompany.exe/EACLauncher.exe) and" % GRAY)
-            print("%s       let Steam finish verifying, or let your AV finish scanning it,%s" % (GRAY, RESET))
-            print("%s       then re-run. This is a sharing lock, not a permissions issue —%s" % (GRAY, RESET))
-            print("%s       Administrator won't fix it by itself.%s" % (GRAY, RESET))
+        if getattr(e, "winerror", None) in (5, 32):
+            print("%s       File/folder is locked by another process — close Animal Company/" % GRAY)
+            print("%s       Steam (check Task Manager for AnimalCompany.exe/EACLauncher.exe)," % GRAY)
+            print("%s       let Steam finish verifying, let your AV finish scanning, and check" % GRAY)
+            print("%s       Controlled Folder Access isn't blocking this folder — even%s" % (GRAY, RESET))
+            print("%s       elevated, this kind of lock won't clear on its own.%s" % (GRAY, RESET))
+            print("%s       If files are left half-renamed after this, run repair.py.%s" % (GRAY, RESET))
         else:
             print("%s       Try running this script as Administrator%s" % (GRAY, RESET))
         restore_game_files()
