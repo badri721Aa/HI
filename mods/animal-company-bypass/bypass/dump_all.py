@@ -63,6 +63,25 @@ def p(path_name):
     return os.path.join(GAME_DIR, path_name)
 
 
+def rename_retry(src, dst, tries=6, delay=0.5):
+    """os.rename, retrying on WinError 32 (sharing violation) - a transient
+    lock from Steam still finalizing/verifying the file, or AV doing a
+    real-time scan of a freshly-touched exe, almost always clears within a
+    couple seconds."""
+    last = None
+    for attempt in range(tries):
+        try:
+            os.rename(src, dst)
+            return
+        except OSError as e:
+            last = e
+            if getattr(e, "winerror", None) != 32 or attempt == tries - 1:
+                raise
+            time.sleep(delay)
+    if last:
+        raise last
+
+
 def spin_msg(msg, duration=1.0):
     frames = ["/", "-", "\\", "|"]
     end_time = time.time() + duration
@@ -114,22 +133,29 @@ def setup_no_eac():
     try:
         spin_msg("Parking real EAC launcher...")
         if os.path.exists(p(EAC_EXE)) and not os.path.exists(p(EAC_EXE_BAK)):
-            os.rename(p(EAC_EXE), p(EAC_EXE_BAK))
+            rename_retry(p(EAC_EXE), p(EAC_EXE_BAK))
         if os.path.exists(p(EAC_DATA)) and not os.path.exists(p(EAC_DATA_BAK)):
-            os.rename(p(EAC_DATA), p(EAC_DATA_BAK))
+            rename_retry(p(EAC_DATA), p(EAC_DATA_BAK))
         print("%s   [+] %sEAC launcher parked as *.syte_bak" % (LPURPLE, RESET))
 
         spin_msg("Switching game to EACLauncher name...")
-        os.rename(p(GAME_EXE), p(EAC_EXE))
+        rename_retry(p(GAME_EXE), p(EAC_EXE))
         if os.path.exists(p(GAME_DATA)):
-            os.rename(p(GAME_DATA), p(EAC_DATA))
+            rename_retry(p(GAME_DATA), p(EAC_DATA))
         print("%s   [+] %sGame temporarily named as EACLauncher (no EAC)" % (LPURPLE, RESET))
 
         _swapped = True
         return True
     except Exception as e:
         print("%s   [x] %sSetup failed: %s" % (LPURPLE, RESET, e))
-        print("%s       Run this script as Administrator%s" % (GRAY, RESET))
+        if getattr(e, "winerror", None) == 32:
+            print("%s       File is locked by another process — close Animal Company/Steam" % GRAY)
+            print("%s       (check Task Manager for AnimalCompany.exe/EACLauncher.exe) and" % GRAY)
+            print("%s       let Steam finish verifying, or let your AV finish scanning it,%s" % (GRAY, RESET))
+            print("%s       then re-run. This is a sharing lock, not a permissions issue —%s" % (GRAY, RESET))
+            print("%s       Administrator won't fix it by itself.%s" % (GRAY, RESET))
+        else:
+            print("%s       Try running this script as Administrator%s" % (GRAY, RESET))
         restore_game_files()
         return False
 
