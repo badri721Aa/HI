@@ -13,7 +13,7 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "psutil"])
     import psutil
 
-GAME_DIR = r"C:\Program Files (x86)\Steam\steamapps\common\Animal Company"
+GAME_DIR = r"E:\SteamLibrary\steamapps\common\Animal Company"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 GAME_EXE = "AnimalCompany.exe"

@@ -40,7 +40,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 #   regenerate.py [bypass_dir] [menu_dir] [unityplayer_dll] [live_dump_txt]
 BYPASS = SCRIPT_DIR
 MENU = os.path.join(SCRIPT_DIR, "..", "vtm-menu")
-UNITYPLAYER = r"C:\Program Files (x86)\Steam\steamapps\common\Animal Company\UnityPlayer.dll"
+UNITYPLAYER = r"E:\SteamLibrary\steamapps\common\Animal Company\UnityPlayer.dll"
 LIVE_DUMP = os.path.join(SCRIPT_DIR, "..", "dump", "live_full_dump.txt")
 
 if len(sys.argv) > 1 and sys.argv[1]:
