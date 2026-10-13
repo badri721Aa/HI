@@ -277,6 +277,13 @@ def main():
 
     os.makedirs(DUMP_DIR, exist_ok=True)
     ensure_combined_min()
+    if not os.path.exists(COMBINED_MIN):
+        print()
+        print("%s   [x] %sNo combined.min.js and could not build one — likely missing" % (LPURPLE, RESET))
+        print("%s       ac_bridge.js next to this script. Frida has nothing to inject," % GRAY)
+        print("%s       so nothing will be dumped even though this script looks like it ran.%s" % (GRAY, RESET))
+        restore_game_files()
+        return
     write_wrapper()
 
     print()
