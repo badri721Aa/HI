@@ -26,7 +26,7 @@ EAC_DATA_BAK = "EACLauncher_Data.syte_bak"
 # After setup, Steam launches EACLauncher.exe which is actually the game (no EAC)
 INJECT_PROCESS = EAC_EXE
 
-DUMP_DIR = os.path.join(SCRIPT_DIR, "..", "dump")
+DUMP_DIR = os.path.join(SCRIPT_DIR, "dump")
 OUT_FILE = os.path.join(DUMP_DIR, "dump_all_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ".txt")
 
 # The dump runs as ONE minified combined script (like the frida CLI bundles
