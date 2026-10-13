@@ -4,15 +4,36 @@ import time
 import atexit
 import subprocess
 
+GAME_DIR = r"E:\SteamLibrary\steamapps\common\Animal Company"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+
+def ensure_admin():
+    """Relaunch elevated via UAC if not already admin. Renaming files inside
+    the Steam library can hit WinError 5 (access denied) on a non-elevated
+    process depending on how that drive/folder's ACLs are set up — this
+    sidesteps having to remember to open an admin terminal every time."""
+    import ctypes
+    try:
+        if ctypes.windll.shell32.IsUserAnAdmin():
+            return True
+    except Exception:
+        return True  # can't tell (not Windows?) - just proceed as-is
+    try:
+        params = " ".join('"%s"' % a for a in sys.argv)
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, params, SCRIPT_DIR, 1)
+    except Exception as e:
+        print("Could not relaunch elevated (%s) - continuing without admin." % e)
+        return True
+    return False
+
+
 try:
     import psutil
 except ImportError:
     print("Installing psutil...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "psutil"])
     import psutil
-
-GAME_DIR = r"E:\SteamLibrary\steamapps\common\Animal Company"
-SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 GAME_EXE = "AnimalCompany.exe"
 GAME_DATA = "AnimalCompany_Data"
@@ -253,6 +274,8 @@ def main():
         restore_game_files()
 
 if __name__ == "__main__":
+    if not ensure_admin():
+        sys.exit(0)  # relaunched elevated in a new window; this instance is done
     try:
         main()
     except Exception:
