@@ -55,29 +55,16 @@ re-derive the current mapping:
   (`BOOT_LO`/`BOOT_HI`/`CALL_TARGET`) are themselves per-build and need re-finding
   in IDA/Ghidra when they drift — that part isn't automatable from here.
 
-## What's in this drop vs. what's still missing
+## What's in this drop
 
-Brought in clean from your upload set: `bypass.py`, `bypass_dump.py`,
-`build_combined.py`, `dump_all.py`, `dump_all.js`, `symbols_dump.js`,
-`current_sym.json`, `quest.js`, `regenerate.py`. Personal machine paths
-(`C:\Users\elish\...`) are gone — everything defaults to paths relative to the
-script or takes a CLI override instead.
-
-Three files I could not bring over faithfully this round:
-
-- **`ac_bridge.js`** (~160KB) — the vendored frida-il2cpp-bridge library itself.
-- **`bridge_dump.js`** (~49KB) — only read its header/intro; the `__SIG` getter-
-  signature table and resolver body weren't pulled into context.
-- **`symbols.js`** (current, ~28KB) — the live generated-output file, not read.
-
-These are large enough, and encode enough obfuscated-string data, that
-reconstructing them from partial reads would risk silently corrupting entries —
-worse than leaving them out. The sandbox's own permission layer also blocked every
-bulk zip-extraction path I tried (`unzip`, Python `zipfile.extractall`, per-file
-`zipfile.read()`+write) for this archive, so I couldn't just copy them byte-for-byte
-either. Cleanest fix: upload those three as individual file attachments the way you
-did for `quest.js`/`regenerate.py`/the first batch — that path worked fine for
-everything else — and I'll drop them in verbatim.
+Everything: `ac_bridge.js`, `bridge_dump.js`, `symbols.js`, `symbols_dump.js`,
+`bypass.py`, `bypass_dump.py`, `build_combined.py`, `dump_all.py`, `dump_all.js`,
+`current_sym.json`, `quest.js`, `regenerate.py`. `ac_bridge.js`/`bridge_dump.js`/
+`symbols.js` are copied byte-for-byte from your original upload (verified: matching
+byte counts, valid JS syntax, and `build_combined.py` reproduces a `combined.min.js`
+identical in size to your original). Personal machine paths (`C:\Users\elish\...`)
+are gone — everything defaults to paths relative to the script or takes a CLI
+override instead.
 
 `stash_dump3.js` (referenced by the original `bypass_dump.py`'s hardcoded path) and
 the `vtm menu` project `regenerate.py` also wrote to were never uploaded — send
