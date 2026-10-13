@@ -133,7 +133,7 @@ def inject_frida():
         subprocess.Popen(
             [
                 "cmd",
-                "/k",
+                "/c",
                 "frida",
                 "-l",
                 bridge,
@@ -146,6 +146,8 @@ def inject_frida():
                 "-l",
                 dump,
                 INJECT_PROCESS,
+                "&",
+                "pause",
             ],
             creationflags=subprocess.CREATE_NEW_CONSOLE,
             cwd=SCRIPT_DIR,
@@ -228,4 +230,9 @@ def main():
         restore_game_files()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        import traceback
+        traceback.print_exc()
+    input("\nPress Enter to exit...")

@@ -212,11 +212,13 @@ def inject_frida():
     try:
         args = [
             "cmd",
-            "/k",
+            "/c",
             "frida",
             "-l", WRAPPER,
             "-l", COMBINED_MIN,
             INJECT_PROCESS,
+            "&",
+            "pause",
         ]
         subprocess.Popen(args, creationflags=subprocess.CREATE_NEW_CONSOLE, cwd=SCRIPT_DIR)
         return True
@@ -325,4 +327,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        import traceback
+        traceback.print_exc()
+    input("\nPress Enter to exit...")
