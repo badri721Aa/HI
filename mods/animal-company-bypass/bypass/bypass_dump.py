@@ -1,0 +1,231 @@
+import os
+import sys
+import time
+import atexit
+import subprocess
+
+try:
+    import psutil
+except ImportError:
+    print("Installing psutil...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "psutil"])
+    import psutil
+
+GAME_DIR = r"C:\Program Files (x86)\Steam\steamapps\common\Animal Company"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+GAME_EXE = "AnimalCompany.exe"
+GAME_DATA = "AnimalCompany_Data"
+EAC_EXE = "EACLauncher.exe"
+EAC_DATA = "EACLauncher_Data"
+EAC_EXE_BAK = "EACLauncher.exe.syte_bak"
+EAC_DATA_BAK = "EACLauncher_Data.syte_bak"
+
+INJECT_PROCESS = EAC_EXE
+
+PURPLE = "\033[38;5;242m"
+LPURPLE = "\033[38;5;250m"
+DPURPLE = "\033[38;5;236m"
+WHITE = "\033[97m"
+GRAY = "\033[90m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+
+_swapped = False
+
+def p(path_name):
+    return os.path.join(GAME_DIR, path_name)
+
+def spin_msg(msg, duration=1.0):
+    frames = ["/", "-", "\\", "|"]
+    end_time = time.time() + duration
+    i = 0
+    while time.time() < end_time:
+        c = frames[i % 4]
+        sys.stdout.write(f"\r\033[2K{GRAY}   [{c}]{RESET} {msg}")
+        sys.stdout.flush()
+        time.sleep(0.15)
+        i += 1
+    sys.stdout.write(f"\r\033[2K")
+    sys.stdout.flush()
+
+def is_process_running(name):
+    for proc in psutil.process_iter(["name"]):
+        try:
+            if proc.info["name"] and proc.info["name"].lower() == name.lower():
+                return True
+        except Exception:
+            pass
+    return False
+
+def is_already_swapped():
+    return (not os.path.exists(p(GAME_EXE))) and os.path.exists(p(EAC_EXE))
+
+def setup_no_eac():
+    """Temporarily swap game <-> EACLauncher so Steam boots the game without EAC.
+    Original EAC files are kept as *.syte_bak and restored on exit."""
+    global _swapped
+
+    if not os.path.isdir(GAME_DIR):
+        print(f"{LPURPLE}   [x] {RESET}Game dir not found:")
+        print(f"{GRAY}       {GAME_DIR}{RESET}")
+        return False
+
+    if is_already_swapped():
+        _swapped = True
+        print(f"{LPURPLE}   [+] {RESET}Already in no-EAC mode (will restore on exit)")
+        return True
+
+    if not os.path.exists(p(GAME_EXE)):
+        print(f"{LPURPLE}   [x] {RESET}{GAME_EXE} not found")
+        return False
+
+    try:
+        spin_msg("Parking real EAC launcher...")
+        if os.path.exists(p(EAC_EXE)) and not os.path.exists(p(EAC_EXE_BAK)):
+            os.rename(p(EAC_EXE), p(EAC_EXE_BAK))
+        if os.path.exists(p(EAC_DATA)) and not os.path.exists(p(EAC_DATA_BAK)):
+            os.rename(p(EAC_DATA), p(EAC_DATA_BAK))
+        print(f"{LPURPLE}   [+] {RESET}EAC launcher parked as *.syte_bak")
+
+        spin_msg("Switching game to EACLauncher name...")
+        os.rename(p(GAME_EXE), p(EAC_EXE))
+        if os.path.exists(p(GAME_DATA)):
+            os.rename(p(GAME_DATA), p(EAC_DATA))
+        print(f"{LPURPLE}   [+] {RESET}Game temporarily named as EACLauncher (no EAC)")
+
+        _swapped = True
+        return True
+    except Exception as e:
+        print(f"{LPURPLE}   [x] {RESET}Setup failed: {e}")
+        print(f"{GRAY}       Run this script as Administrator{RESET}")
+        restore_game_files()
+        return False
+
+def restore_game_files():
+    """Put AnimalCompany.exe / _Data back and restore real EAC files."""
+    global _swapped
+    try:
+        if os.path.exists(p(EAC_EXE)) and not os.path.exists(p(GAME_EXE)):
+            os.rename(p(EAC_EXE), p(GAME_EXE))
+        if os.path.exists(p(EAC_DATA)) and not os.path.exists(p(GAME_DATA)):
+            os.rename(p(EAC_DATA), p(GAME_DATA))
+        if os.path.exists(p(EAC_EXE_BAK)) and not os.path.exists(p(EAC_EXE)):
+            os.rename(p(EAC_EXE_BAK), p(EAC_EXE))
+        if os.path.exists(p(EAC_DATA_BAK)) and not os.path.exists(p(EAC_DATA)):
+            os.rename(p(EAC_DATA_BAK), p(EAC_DATA))
+        if _swapped:
+            print(f"{LPURPLE}   [+] {RESET}Game files restored")
+        _swapped = False
+    except Exception as e:
+        print(f"{LPURPLE}   [x] {RESET}Restore failed: {e}")
+        print(f"{GRAY}       Manually rename EACLauncher.exe -> AnimalCompany.exe{RESET}")
+
+def inject_frida():
+    bridge = os.path.join(SCRIPT_DIR, "ac_bridge.js")
+    symbols = os.path.join(SCRIPT_DIR, "symbols.js")
+    bypass = os.path.join(SCRIPT_DIR, "bypass.js")
+    quest = os.path.join(SCRIPT_DIR, "quest.js")
+    dump = os.path.join(SCRIPT_DIR, "dump", "stash_dump.js")
+    try:
+        print(f"{LPURPLE}   [!] {RESET}Game detected! Injecting bypass + stash dump...")
+        print()
+        subprocess.Popen(
+            [
+                "cmd",
+                "/k",
+                "frida",
+                "-l",
+                bridge,
+                "-l",
+                symbols,
+                "-l",
+                bypass,
+                "-l",
+                quest,
+                "-l",
+                dump,
+                INJECT_PROCESS,
+            ],
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+            cwd=SCRIPT_DIR,
+        )
+        return True
+    except Exception as e:
+        print(f"{LPURPLE}   [x] {RESET}Injection failed: {e}")
+        return False
+
+def main():
+    try:
+        kernel32 = __import__("ctypes").windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+    except Exception:
+        pass
+
+    atexit.register(restore_game_files)
+
+    os.system("cls")
+    print()
+    print(f"{DPURPLE}{BOLD}            ███████ ██    ██ ████████ ███████ {RESET}")
+    print(f"{DPURPLE}{BOLD}            ██       ██  ██     ██    ██      {RESET}")
+    print(f"{PURPLE}{BOLD}            ███████   ████      ██    █████   {RESET}")
+    print(f"{PURPLE}{BOLD}                 ██    ██       ██    ██      {RESET}")
+    print(f"{LPURPLE}{BOLD}            ███████    ██       ██    ███████ {RESET}")
+    print()
+    print(f"{GRAY}   ────────────────────────────────────────────────────{RESET}")
+    print()
+    print(f"{LPURPLE}               Complete EAC Bypass{RESET}")
+    print(f"{GRAY}                   discord.gg/syte{RESET}")
+    print(f"{WHITE}{BOLD}              + stash API dump{RESET}")
+    print()
+    print(f"{GRAY}   ────────────────────────────────────────────────────{RESET}")
+    print()
+
+    if not setup_no_eac():
+        print()
+        print(f"{LPURPLE}   [x] {RESET}Could not set up no-EAC launch")
+        return
+
+    print()
+    print(f"{GRAY}   ────────────────────────────────────────────────────{RESET}")
+    print(f"{WHITE}{BOLD}        Looking For EACLauncher (game)...{RESET}")
+    print(f"{GRAY}   ────────────────────────────────────────────────────{RESET}")
+    print()
+    print(f"{WHITE}   Launch Animal Company from Steam{RESET}")
+    print(f"{GRAY}   (Steam starts EACLauncher = game, EAC is parked){RESET}")
+    print()
+    print(f"{GRAY}   Keep this window open - files restore when you close it{RESET}")
+    print()
+    print(f"{GRAY}   Once in a lobby WITH a stash machine present,{RESET}")
+    print(f"{GRAY}   paste the === DUMP START === ... === DUMP END === block back{RESET}")
+    print()
+
+    injected = False
+    try:
+        while True:
+            if not injected and is_process_running(INJECT_PROCESS):
+                time.sleep(1.5)
+                if inject_frida():
+                    injected = True
+                    print(f"{LPURPLE}   [+] {RESET}Bypass + dump injected!")
+                    print()
+                    print(f"{GRAY}   ────────────────────────────────────────────────────{RESET}")
+                    print(f"{WHITE}{BOLD}                    BYPASSED{RESET}")
+                    print(f"{GRAY}   ────────────────────────────────────────────────────{RESET}")
+                    print()
+                    print(f"{GRAY}   Waiting for game to close...{RESET}")
+                    print()
+            if injected and not is_process_running(INJECT_PROCESS):
+                print(f"{DPURPLE}   Game closed. Restoring files...{RESET}")
+                print()
+                break
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        print()
+        print(f"{DPURPLE}   Exiting...{RESET}")
+        print()
+    finally:
+        restore_game_files()
+
+if __name__ == "__main__":
+    main()
