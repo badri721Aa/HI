@@ -266,17 +266,24 @@ def main():
     else:
         log("No export-resolution errors seen - looks clean.")
 
+    stamp = int(time.time())
     current_sym_bytes = json.dumps(sym_map, indent=1).encode("utf-8")
-    attachments = [("symbols_fresh.js", symbols_js_text.encode("utf-8")),
-                    ("current_sym.json", current_sym_bytes)]
+    attachments = [
+        ("Frida-Map_%d.js" % stamp, symbols_js_text.encode("utf-8")),
+        ("current_sym_%d.json" % stamp, current_sym_bytes),
+    ]
     if bridge_text:
-        attachments.append(("bridge_fresh.txt", bridge_text.encode("utf-8")))
+        attachments.append(("bridge-exports_%d.txt" % stamp, bridge_text.encode("utf-8")))
+    try:
+        attachments.append(("ac_bridge.js", read_script("ac_bridge.js").encode("utf-8")))
+    except Exception:
+        pass
 
     resolved_count = sum(1 for v in sym_map.values() if v and not v.startswith("/*"))
-    summary = "Animal Company bypass run - %s\nresolved %d/%d exports%s" % (
+    summary = "**Animal Company bypass run** — %s\nresolved %d/%d exports%s" % (
         time.strftime("%Y-%m-%d %H:%M:%S"),
         resolved_count, len(sym_map) or 234,
-        " - **STALE NAMES DETECTED**" if stale else "",
+        "\n:warning: **STALE NAMES DETECTED** — see log" if stale else "",
     )
     post_discord(summary, attachments)
 
