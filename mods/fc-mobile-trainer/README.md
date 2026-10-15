@@ -40,6 +40,32 @@ throwaway/alt account as the account to do this on, not your main.
 | `mitm_addon.py` | mitmproxy addon that rewrites currency/squad fields in API *responses*, so changes survive a server sync instead of reverting |
 | `fcmobile_points.py` | The original Android driver, from before this session's platform switch — kept for reference |
 
+## Running this from a Mac
+
+Simpler than Windows, actually — macOS ships usbmuxd itself (via Xcode/
+iTunes helper), so there's no separate USB-driver install for talking to the
+iPhone. Setup:
+
+```
+python3 -m pip install frida frida-tools mitmproxy
+```
+
+Find your Mac's LAN IP for the Wi-Fi proxy step (Settings → Wi-Fi →
+Configure Proxy → Manual → that IP, port 8080):
+
+```
+ipconfig getifaddr en0      # Wi-Fi, most Macs
+# or, if connected via Ethernet/adapter: ipconfig getifaddr en1 (etc.) -
+# check System Settings > Network to see which interface is actually active
+```
+
+Everything else (`mitmdump -s mitm_addon.py -p 8080`, `python3
+fcmobile_ios_points.py`, `frida-ps -Uai` to confirm the bundle id) runs the
+same from Terminal as any other command — no admin/elevation dance needed,
+none of these scripts touch anything requiring `sudo` on the host side
+(jailbreak is a device-side concession, already done if frida-server's
+installed on the phone via Sileo/Cydia).
+
 ## Two tiers of what you asked for
 
 **Tier 1 — works today, no unknowns left:** `fcmobile_ios_points.py` +
