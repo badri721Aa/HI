@@ -24,6 +24,14 @@ function shutdown(signal) {
 }
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+// Windows raises SIGHUP when the console window is closed and ends the process a few seconds later:
+// save first, because console output may already be gone. (Windows only, so `nohup` on Linux keeps working.)
+if (process.platform === 'win32') {
+  process.on('SIGHUP', () => {
+    db.flush();
+    shutdown('SIGHUP');
+  });
+}
 
 async function main() {
   const registry = new Registry().loadDir(path.join(__dirname, 'modules'));

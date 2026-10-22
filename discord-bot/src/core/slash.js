@@ -97,6 +97,9 @@ async function register(client, registry, bot) {
     log.info(`[${bot.name}] Registered ${data.length} slash commands ${config.devGuildId ? `in guild ${config.devGuildId}` : 'globally'}.`);
   } catch (err) {
     log.error(`[${bot.name}] Slash registration failed:`, err.message);
+    if (config.devGuildId && err.code === 10004) {
+      log.error(`[${bot.name}] DEV_GUILD_ID (${config.devGuildId}) is not a server this bot is in. Leave DEV_GUILD_ID empty in .env to register the commands in every server.`);
+    }
   }
 }
 

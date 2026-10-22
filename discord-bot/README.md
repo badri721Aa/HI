@@ -84,11 +84,86 @@ Free plans change often, so check each provider's pricing page before you rely o
 |---|---|---|
 | **Oracle Cloud "Always Free"** ⭐ | ✅ Yes | Best free option: Arm VM with up to 4 cores / 24 GB RAM, enough for all 30 bots. Needs a card for identity checks. Oracle may stop VMs that look *idle* (CPU, network and memory below 20% over 7 days); restart them from the console if that happens. |
 | **Google Cloud free tier (e2-micro)** | ✅ Yes | 1 small VM in `us-west1`, `us-central1` or `us-east1` only (other regions are billed), 30 GB disk, 1 GB RAM. Fine for a few bots. Needs a card. |
-| **Your own PC, old laptop or Raspberry Pi** | ✅ While it's on | Completely free. Use pm2 (below) so it restarts automatically. |
+| **Your own PC, old laptop or Raspberry Pi** | ✅ While it's on | Completely free. On Windows use Task Scheduler ([below](#your-windows-pc-visible-window-task-scheduler)); on Linux/Raspberry Pi use pm2. |
 | **Render (free web service)** | ⚠️ With a pinger | Sleeps after 15 minutes without web traffic. The bot's built-in keep-alive server plus a free uptime monitor (UptimeRobot, Better Stack) pinging `https://your-app.onrender.com/health` every 5 minutes keeps it awake. Data resets on redeploys. |
 | **Koyeb (free instance)** | ⚠️ With a pinger | Scales to zero after about an hour without inbound traffic. Use the same `/health` pinger trick. Data resets on redeploys. |
 | **Free Discord-bot panels** (e.g. bot-hosting.net) | ⚠️ Mostly | Usually 256 MB RAM (one bot) and you must click "renew" every few days. |
 | Replit / Glitch / Heroku / Fly.io | ❌ | Replit's always-on is paid, Glitch ended project hosting in July 2025, Heroku has had no free tier since 2022, and Fly.io has no free tier for new accounts. |
+
+### Your Windows PC (visible window, Task Scheduler)
+Runs the bot 24/7 while your PC is on, using only what Windows already has. The bot runs in a **normal visible window**: no hidden PowerShell, no `-ExecutionPolicy Bypass`, nothing antivirus tools treat as suspicious. It starts when you sign in, restarts itself if it stops, and comes back within 5 minutes if its window gets closed.
+
+Use **Windows PowerShell** (not as administrator). Paste each block, press Enter, and wait for the prompt to come back. Every block starts in the right folder, so you can close PowerShell between steps. PowerShell blocks plain `npm` ("running scripts is disabled"); `npm.cmd` works.
+
+**1. Unpack and install** (Node.js 22.12 or newer). Unzip so the bot ends up in `C:\DiscordBot\discord-bot` (no spaces, outside OneDrive). If your browser renamed the download, e.g. `mega-discord-bot (2).zip`, use that name:
+```powershell
+New-Item -ItemType Directory -Force -Path "C:\DiscordBot" | Out-Null
+tar.exe -xf "$HOME\Downloads\mega-discord-bot.zip" -C "C:\DiscordBot"
+Set-Location "C:\DiscordBot\discord-bot"
+npm.cmd ci
+```
+
+**2. Token.** Developer Portal → your app → **Bot**: turn on **Server Members Intent** and **Message Content Intent** → **Save Changes**, then **Reset Token** → **Copy**.
+```powershell
+if (-not (Test-Path -LiteralPath "C:\DiscordBot\discord-bot\.env")) { Copy-Item -LiteralPath "C:\DiscordBot\discord-bot\.env.example" -Destination "C:\DiscordBot\discord-bot\.env" }
+notepad.exe "C:\DiscordBot\discord-bot\.env"
+```
+Paste the token right after `DISCORD_TOKEN=`, save, close. Leave `DEV_GUILD_ID=` empty.
+
+**3. Test once**, then stop it (click the window's title bar, **Ctrl+C**, answer **Y**):
+```powershell
+Set-Location "C:\DiscordBot\discord-bot"
+npm.cmd start
+```
+You should see `Logged in as YourBot#1234 — 1 servers …` and `Registered 98 slash commands globally.` (`0 servers` means the bot isn't invited yet: Developer Portal → OAuth2 → URL Generator → `bot` + `applications.commands`.)
+
+**4. Restart script.** `start-bot.cmd` (included) runs the bot and starts it again 15 seconds after it stops. Its `set "NODE_EXE=…"` line points at `E:\Program Files\nodejs\node.exe`; if your Node.js is elsewhere it uses `node` from your PATH, or you can edit that line.
+
+**5. Stop a click from freezing the bot.** In the classic console, one click inside the window starts "Select" mode, which pauses the bot until Esc. This turns that off for console windows you open from now on (your account only; undo with `/d 1`):
+```powershell
+reg.exe add "HKCU\Console" /v QuickEdit /t REG_DWORD /d 0 /f
+```
+
+**6. Create the task** (paste the whole block):
+```powershell
+$me        = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+$action    = New-ScheduledTaskAction -Execute "C:\DiscordBot\discord-bot\start-bot.cmd" -WorkingDirectory "C:\DiscordBot\discord-bot"
+$atLogon   = New-ScheduledTaskTrigger -AtLogOn -User $me
+$every5min = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
+$principal = New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive -RunLevel Limited
+$settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -Priority 5
+Register-ScheduledTask -TaskName "DiscordBot" -Description "Runs the Discord bot in a visible window: C:\DiscordBot\discord-bot\start-bot.cmd" -Action $action -Trigger $atLogon, $every5min -Principal $principal -Settings $settings -Force
+Start-ScheduledTask -TaskName "DiscordBot"
+```
+- *Interactive* = runs only while you're signed in, in a window you can see. *Limited* = no admin rights.
+- Starts at sign-in, and checks every 5 minutes: while the window is open nothing happens (*IgnoreNew*); if it was closed, the bot starts again.
+- No 3-day time limit, keeps running on battery, normal priority (the task default is below normal, which can make radio stutter).
+- You can see and inspect it in Task Scheduler (`taskschd.msc`).
+
+**7. Keep the PC awake** while plugged in (the screen may still turn off). If it says "Access denied", set sleep to *Never* in Settings → System → Power.
+```powershell
+powercfg /change standby-timeout-ac 0
+powercfg /change hibernate-timeout-ac 0
+```
+Laptop: closing the lid while plugged in should do nothing:
+```powershell
+powercfg /setacvalueindex SCHEME_CURRENT SUB_BUTTONS LIDACTION 0
+powercfg /setactive SCHEME_CURRENT
+```
+For Windows Update restarts, turn on "Use my sign-in info to automatically finish setting up …" (Settings → Accounts → Sign-in options; on Windows 11 under *Additional settings*). After a power cut the bot starts when you sign in.
+
+**Everyday use**
+| What | How |
+|---|---|
+| Restart (e.g. after editing `.env`) | In the bot window: click the title bar, **Ctrl+C**, answer **N**. It saves and restarts in 15 s. |
+| Stop until you say so | `Disable-ScheduledTask -TaskName "DiscordBot"`, then **Ctrl+C** in the bot window and answer **Y**. |
+| Start again | `Enable-ScheduledTask -TaskName "DiscordBot"; Start-ScheduledTask -TaskName "DiscordBot"` |
+| Remove the autostart | `Unregister-ScheduledTask -TaskName "DiscordBot" -Confirm:$false` |
+
+- Don't use **End** in Task Scheduler or `Stop-ScheduledTask`: they close only the window's `cmd.exe`, the bot keeps running, and a second copy starts 5 minutes later.
+- Don't run `npm.cmd start` while the task is on (two copies would answer twice and overwrite each other's data).
+- Window shows `Terminate batch job (Y/N)?` → the bot is stopped; type **N**. Title starts with `Select` → press **Esc**.
+- Updating: stop the bot (row above), delete the old `src` and `scripts` folders (files removed upstream would otherwise keep loading), unzip the new version over `C:\DiscordBot`, run `npm.cmd ci`, start again. `.env` and `data\` are kept; `start-bot.cmd` is replaced, so redo any change you made to its `NODE_EXE` line.
 
 ### From Windows only (your PC can be off afterwards)
 Windows 10/11 already include `ssh` and `scp`. The only browser step is creating the free server.
