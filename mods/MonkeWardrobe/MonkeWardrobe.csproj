@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>MonkeWardrobe</AssemblyName>
+    <RootNamespace>MonkeWardrobe</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <Version>1.0.0</Version>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>embedded</DebugType>
+    <!-- The game folder: override with dotnet build -p:GamePath="D:\Games\Gorilla Tag" -->
+    <GamePath Condition="'$(GamePath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Gorilla Tag</GamePath>
+    <ManagedPath>$(GamePath)\Gorilla Tag_Data\Managed</ManagedPath>
+    <PluginFolder>$(GamePath)\BepInEx\plugins\$(AssemblyName)</PluginFolder>
+    <CopyToGame Condition="'$(CopyToGame)' == ''">true</CopyToGame>
+  </PropertyGroup>
+
+  <!-- Everything here ships with the game or BepInEx, so none of it is copied to the output. -->
+  <ItemDefinitionGroup>
+    <Reference>
+      <Private>false</Private>
+    </Reference>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx" HintPath="$(GamePath)\BepInEx\core\BepInEx.dll" />
+    <Reference Include="UnityEngine" HintPath="$(ManagedPath)\UnityEngine.dll" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(ManagedPath)\UnityEngine.CoreModule.dll" />
+    <Reference Include="UnityEngine.AnimationModule" HintPath="$(ManagedPath)\UnityEngine.AnimationModule.dll" />
+    <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(ManagedPath)\UnityEngine.AssetBundleModule.dll" />
+    <Reference Include="UnityEngine.IMGUIModule" HintPath="$(ManagedPath)\UnityEngine.IMGUIModule.dll" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(ManagedPath)\UnityEngine.ImageConversionModule.dll" />
+    <Reference Include="UnityEngine.JSONSerializeModule" HintPath="$(ManagedPath)\UnityEngine.JSONSerializeModule.dll" />
+    <Reference Include="UnityEngine.ParticleSystemModule" HintPath="$(ManagedPath)\UnityEngine.ParticleSystemModule.dll" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(ManagedPath)\UnityEngine.PhysicsModule.dll" />
+    <Reference Include="UnityEngine.XRModule" HintPath="$(ManagedPath)\UnityEngine.XRModule.dll" />
+    <Reference Include="Photon3Unity3D" HintPath="$(ManagedPath)\Photon3Unity3D.dll" />
+    <Reference Include="PhotonRealtime" HintPath="$(ManagedPath)\PhotonRealtime.dll" />
+    <Reference Include="PhotonUnityNetworking" HintPath="$(ManagedPath)\PhotonUnityNetworking.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <SampleCosmetics Include="Cosmetics\**\*" />
+  </ItemGroup>
+
+  <Target Name="CheckGamePath" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(ManagedPath)\UnityEngine.CoreModule.dll')"
+           Text="Gorilla Tag was not found at '$(GamePath)'. Build with: dotnet build -p:GamePath=&quot;path\to\Gorilla Tag&quot;" />
+    <Error Condition="!Exists('$(GamePath)\BepInEx\core\BepInEx.dll')"
+           Text="BepInEx is not installed in '$(GamePath)'. Install BepInEx 5 first, then start the game once." />
+  </Target>
+
+  <!-- Copies the plugin and the sample cosmetics into the game. Cosmetic files already there are never
+       overwritten, so your edits to them survive a rebuild. -->
+  <Target Name="CopyToGame" AfterTargets="Build" Condition="'$(CopyToGame)' == 'true'">
+    <ItemGroup>
+      <NewSampleCosmetics Include="@(SampleCosmetics)" Condition="!Exists('$(PluginFolder)\Cosmetics\%(RecursiveDir)%(Filename)%(Extension)')" />
+    </ItemGroup>
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginFolder)" />
+    <Copy SourceFiles="@(NewSampleCosmetics)" DestinationFolder="$(PluginFolder)\Cosmetics\%(RecursiveDir)" />
+    <Message Importance="high" Text="MonkeWardrobe installed to $(PluginFolder)" />
+  </Target>
+
+</Project>

@@ -1,0 +1,9 @@
+{
+  "id": "mw.orb",
+  "name": "Glow Orb",
+  "author": "MonkeWardrobe",
+  "slot": "LeftHand",
+  "parts": [
+    { "shape": "Sphere", "color": "#55F2FF", "position": [0, 0.07, 0.02], "scale": [0.07, 0.07, 0.07] }
+  ]
+}

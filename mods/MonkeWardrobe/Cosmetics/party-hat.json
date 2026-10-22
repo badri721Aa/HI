@@ -1,0 +1,10 @@
+{
+  "id": "mw.party_hat",
+  "name": "Party Hat",
+  "author": "MonkeWardrobe",
+  "slot": "Head",
+  "parts": [
+    { "shape": "Cone", "color": "#FF4FA3", "position": [0, 0.17, 0], "rotation": [0, 0, 8], "scale": [0.14, 0.22, 0.14] },
+    { "shape": "Sphere", "color": "#FFE14F", "position": [-0.031, 0.388, 0], "scale": [0.05, 0.05, 0.05] }
+  ]
+}

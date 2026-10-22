@@ -1,0 +1,9 @@
+{
+  "id": "mw.block_head",
+  "name": "Block Head",
+  "author": "MonkeWardrobe",
+  "slot": "Head",
+  "parts": [
+    { "shape": "Cube", "texture": "textures/smiley.png", "pixelated": true, "position": [0, 0.06, 0.01], "scale": [0.3, 0.3, 0.3] }
+  ]
+}

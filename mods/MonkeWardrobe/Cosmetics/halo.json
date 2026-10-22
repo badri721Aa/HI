@@ -1,0 +1,9 @@
+{
+  "id": "mw.halo",
+  "name": "Golden Halo",
+  "author": "MonkeWardrobe",
+  "slot": "Head",
+  "parts": [
+    { "shape": "Torus", "color": "#FFD34D", "thickness": 0.08, "position": [0, 0.3, 0], "scale": [0.22, 0.22, 0.22] }
+  ]
+}

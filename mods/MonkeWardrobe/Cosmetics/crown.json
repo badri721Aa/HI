@@ -1,0 +1,15 @@
+{
+  "id": "mw.crown",
+  "name": "Royal Crown",
+  "author": "MonkeWardrobe",
+  "slot": "Head",
+  "parts": [
+    { "shape": "Cylinder", "color": "#F2C230", "position": [0, 0.2, 0], "scale": [0.17, 0.035, 0.17] },
+    { "shape": "Sphere", "color": "#F2C230", "position": [0.085, 0.25, 0], "scale": [0.035, 0.035, 0.035] },
+    { "shape": "Sphere", "color": "#F2C230", "position": [0.0263, 0.25, 0.0808], "scale": [0.035, 0.035, 0.035] },
+    { "shape": "Sphere", "color": "#F2C230", "position": [-0.0688, 0.25, 0.05], "scale": [0.035, 0.035, 0.035] },
+    { "shape": "Sphere", "color": "#F2C230", "position": [-0.0688, 0.25, -0.05], "scale": [0.035, 0.035, 0.035] },
+    { "shape": "Sphere", "color": "#F2C230", "position": [0.0263, 0.25, -0.0808], "scale": [0.035, 0.035, 0.035] },
+    { "shape": "Sphere", "color": "#D7263D", "position": [0, 0.2, 0.087], "scale": [0.03, 0.03, 0.015] }
+  ]
+}

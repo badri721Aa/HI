@@ -1,0 +1,11 @@
+{
+  "id": "mw.top_hat",
+  "name": "Top Hat",
+  "author": "MonkeWardrobe",
+  "slot": "Head",
+  "parts": [
+    { "shape": "Cylinder", "color": "#1C1C22", "position": [0, 0.18, 0], "scale": [0.26, 0.005, 0.26] },
+    { "shape": "Cylinder", "color": "#1C1C22", "position": [0, 0.26, 0], "scale": [0.16, 0.08, 0.16] },
+    { "shape": "Cylinder", "color": "#B3202A", "position": [0, 0.2, 0], "scale": [0.165, 0.015, 0.165] }
+  ]
+}
