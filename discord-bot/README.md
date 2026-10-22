@@ -97,9 +97,10 @@ These commands are for **PowerShell**, the default Windows terminal (its prompt 
 
 **1. On your PC: make a login key**
 ```powershell
+New-Item -ItemType Directory -Force "$HOME\.ssh"
 ssh-keygen -t ed25519 -f "$HOME\.ssh\botkey"
 ```
-When it asks for a passphrase, just press **Enter** twice. Then show the public key and copy the line it prints:
+The first line creates the `.ssh` folder if it doesn't exist yet; without it, saving the key fails with "No such file or directory". When it asks for a passphrase (an optional password for the key), don't type anything: just press **Enter**, then **Enter** again. Then show the public key and copy the line it prints (it starts with `ssh-ed25519`):
 ```powershell
 Get-Content "$HOME\.ssh\botkey.pub"
 ```
