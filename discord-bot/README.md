@@ -95,6 +95,8 @@ Windows 10/11 already include `ssh` and `scp`. The only browser step is creating
 
 These commands are for **PowerShell**, the default Windows terminal (its prompt looks like `PS C:\…>`). In the old CMD, write `%USERPROFILE%` instead of `$HOME`. Keep the quotes: they make paths with spaces work, e.g. a username like `ADVANTI SYSTEMS`.
 
+> **Optional: test on your PC first.** In the unzipped `discord-bot` folder, run `notepad .env` and paste your token after `DISCORD_TOKEN=`. Then run `npm.cmd install` and `npm.cmd start`. PowerShell blocks plain `npm` by default ("running scripts is disabled"); `npm.cmd` avoids that. The bot goes online while that window stays open; press Ctrl+C to stop it.
+
 **1. On your PC: make a login key**
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.ssh"
@@ -105,12 +107,14 @@ The first line creates the `.ssh` folder if it doesn't exist yet; without it, sa
 Get-Content "$HOME\.ssh\botkey.pub"
 ```
 
-**2. In the browser, once:** sign up at <https://www.oracle.com/cloud/free/>, then go to **Compute → Instances → Create instance**:
-- **Image:** Ubuntu.
-- **Shape:** `VM.Standard.A1.Flex` (Always Free).
-- **SSH keys:** choose *Paste public key* and paste the line from step 1.
-
-Once the server is created, copy its **Public IP address**, e.g. `140.238.12.34`. You'll use it instead of `YOUR_IP` below.
+**2. In the browser, once: create the server.** Nothing after this works until the server exists.
+1. Sign up at <https://www.oracle.com/cloud/free/>. Pick a home region near you; it can't be changed later.
+2. Open the menu ☰ → **Compute → Instances → Create instance**.
+3. **Image:** click *Change image* → **Canonical Ubuntu** (24.04 or 22.04).
+4. **Shape:** click *Change shape* → **Ampere → VM.Standard.A1.Flex** (1 OCPU / 6 GB is plenty). If Oracle says *out of capacity*, pick **VM.Standard.E2.1.Micro** instead; it's also Always Free and enough for one bot.
+5. **Networking:** keep the defaults, and make sure **Assign a public IPv4 address** is on.
+6. **Add SSH keys:** choose **Paste public keys** and paste the line from step 1.
+7. Click **Create** and wait until the state is **Running**. Then copy the **Public IP address** shown on that page, e.g. `140.238.12.34`. You'll type it wherever `YOUR_IP` appears below. `YOUR_IP` itself is only a placeholder.
 
 **3. On your PC: upload the bot zip and log in**
 Find the zip's exact name: `Get-ChildItem "$HOME\Downloads\*.zip"`. It might be `mega-discord-bot (1).zip`. Upload it, saving it on the server as `bot.zip`:
