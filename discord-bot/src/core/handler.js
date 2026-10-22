@@ -86,13 +86,30 @@ async function run(ctx, cmd) {
   }
 }
 
-/** Run listeners from all enabled modules for an event. Returns true if any listener returned true. */
+/** Best-effort guild for an event's arguments (message, member, reaction, voice state, channel, guild…). */
+function guildOf(args) {
+  for (const a of args) {
+    if (!a || typeof a !== 'object') continue;
+    if (a.guild?.id) return a.guild;
+    if (a.message?.guild?.id) return a.message.guild;
+    if (a.channels && a.members && a.id) return a; // a Guild itself
+  }
+  return null;
+}
+
+/**
+ * Run listeners from all enabled modules for an event. Returns true if any listener returned true.
+ * Categories a server disabled with `disable <category>` don't receive that server's events.
+ */
 async function dispatch(client, event, ...args) {
   const listeners = client.registry.events.get(event);
   if (!listeners) return false;
+  const guild = guildOf(args);
+  const disabled = guild ? db.get('guilds', guild.id, null)?.disabledCategories || [] : [];
   let handled = false;
   for (const l of listeners) {
     if (!moduleEnabled(client, l.category)) continue;
+    if (disabled.includes(l.category) && !ALWAYS_ON.has(l.category)) continue;
     try {
       if ((await l.handler(client, ...args)) === true) handled = true;
     } catch (err) {
@@ -134,6 +151,7 @@ async function onMessage(client, message) {
   const raw = body.slice(name.length).trim();
   const cmd = client.registry.get(name);
   if (!cmd || !moduleEnabled(client, cmd.category)) {
+    if (db.get('blacklist', message.author.id)) return; // custom commands are commands too
     await dispatch(client, 'unknownCommand', message, { name, raw, prefix: used });
     return;
   }

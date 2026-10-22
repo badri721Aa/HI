@@ -126,7 +126,8 @@ function makeEnv() {
     isTextBased: () => true,
     isVoiceBased: () => false,
     permissionsFor: () => allPerms,
-    messages: { fetch: async () => new Collection() },
+    // fetch(id) -> message (none exist in the mock), fetch({ limit }) -> Collection, like discord.js
+    messages: { fetch: async (arg) => (typeof arg === 'string' ? Promise.reject(Object.assign(new Error('Unknown Message'), { code: 10008 })) : new Collection()) },
     bulkDelete: async () => new Collection(),
     toString: () => '<#333333333333333333>',
   };
