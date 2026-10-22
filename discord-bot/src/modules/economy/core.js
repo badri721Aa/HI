@@ -39,6 +39,9 @@ async function move(ctx, dir) {
   const acc = lib.account(g(ctx), ctx.author.id);
   const space = Math.max(0, acc.bankCap - acc.bank);
   const available = dir === 'dep' ? Math.min(acc.wallet, space) : acc.bank;
+  if (dir === 'dep' && !acc.wallet) return ctx.fail('Your wallet is empty.');
+  if (dir === 'dep' && !space) return ctx.fail(`Your bank is full (${formatNumber(acc.bankCap)}). Grow it with \`work\`, \`daily\`, a 💳 Bank Card or \`upgradebank\`.`);
+  if (dir !== 'dep' && !acc.bank) return ctx.fail('Your bank is empty.');
   const amount = lib.parseAmount(ctx.args[0], available);
   if (amount === null || amount <= 0) return ctx.usage();
   if (dir === 'dep') {

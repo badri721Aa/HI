@@ -24,7 +24,7 @@ async function linkedMessage(ctx) {
   const perms = channel.permissionsFor?.(ctx.member);
   if (perms && !perms.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory])) return { error: 'You cannot read that channel.' };
   const msg = await channel.messages.fetch(messageId).catch(() => null);
-  if (!msg) return { error: 'Message not found (deleted, or I cannot read that channel).' };
+  if (!msg?.author) return { error: 'Message not found (deleted, or I cannot read that channel).' };
   return { msg };
 }
 

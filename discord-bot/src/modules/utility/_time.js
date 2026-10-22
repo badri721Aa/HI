@@ -200,6 +200,9 @@ function parseWhen(words, { now = Date.now(), zone = UTC, cities = false } = {})
   let i = 0;
   if (/^(in|at|on)$/i.test(words[0] || '')) i = 1;
 
+  const first = String(words[i] || '');
+  if (/^\d{10}$|^\d{13}$/.test(first)) return { date: new Date(first.length === 10 ? +first * 1000 : +first), used: i + 1, zone };
+
   // Durations: greedily join words while they still form a valid duration.
   let best = null;
   for (let j = i + 1; j <= Math.min(words.length, i + 6); j++) {
@@ -209,8 +212,6 @@ function parseWhen(words, { now = Date.now(), zone = UTC, cities = false } = {})
   }
   if (best && best.ms > 0) return { date: new Date(now + best.ms), used: best.used, zone, relative: true };
 
-  const first = String(words[i] || '');
-  if (/^\d{10}$|^\d{13}$/.test(first)) return { date: new Date(first.length === 10 ? +first * 1000 : +first), used: i + 1, zone };
   if (/^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:?\d{2})?$/i.test(first)) {
     const t = Date.parse(/Z|[+-]\d{2}:?\d{2}$/i.test(first) ? first : `${first}Z`);
     if (!Number.isNaN(t)) return { date: new Date(t), used: i + 1, zone };
