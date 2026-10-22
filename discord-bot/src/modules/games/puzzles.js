@@ -109,7 +109,7 @@ const simonRow = (disabled) => row(...SIMON.map((e, i) => button(`simon:${i}`, n
 module.exports = [
   {
     name: 'minesweeper',
-    aliases: ['mines', 'ms'],
+    aliases: ['ms'],
     description: 'A spoiler-tag minesweeper board (click the squares to reveal)',
     usage: '[size 4-9] [mines]',
     examples: ['', '6 5', '9 15'],
@@ -278,7 +278,7 @@ module.exports = [
   },
   {
     name: 'higherlower',
-    aliases: ['hilo', 'highlow'],
+    aliases: ['hilo'],
     description: 'Guess if the next number (1-100) is higher or lower — build a streak',
     examples: [''],
     cooldown: 5,

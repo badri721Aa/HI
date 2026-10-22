@@ -83,7 +83,7 @@ module.exports = [
   },
   {
     name: 'coinflip',
-    aliases: ['flip', 'coin'],
+    aliases: ['flip'],
     description: 'Flip a coin (optionally guess heads or tails)',
     usage: '[heads|tails]',
     examples: ['', 'heads'],
