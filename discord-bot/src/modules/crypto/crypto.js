@@ -11,6 +11,7 @@ const VS = new Set(
     'myr vnd uah ngn twd clp ars bdt kwd bhd lkr mmk gel btc eth ltc bch bnb xrp xlm dot link sats bits').split(' '),
 );
 const isVs = (s) => VS.has(String(s || '').toLowerCase());
+const amountText = (n) => (n !== 0 && Math.abs(n) < 1e-8 ? n.toExponential(4) : n.toLocaleString('en-US', { maximumFractionDigits: 8 }));
 
 async function priceReply(ctx, coin, vs) {
   const cur = (vs || 'usd').toLowerCase();
@@ -172,19 +173,19 @@ module.exports = [
         const p = await cg.price(coin.id, to);
         result = amount * p.price;
         rateText = `1 ${coin.symbol.toUpperCase()} = ${cg.money(p.price, to)}`;
-        return ctx.info(`💱 **${amount.toLocaleString('en-US', { maximumFractionDigits: 8 })} ${coin.symbol.toUpperCase()}** = **${cg.money(result, to)}**\n${rateText}`);
+        return ctx.info(`💱 **${amountText(amount)} ${coin.symbol.toUpperCase()}** = **${cg.money(result, to)}**\n${rateText}`);
       }
       if (fromFiat && !toFiat) {
         const coin = await cg.resolveCoin(to);
         const p = await cg.price(coin.id, from);
         result = amount / p.price;
-        return ctx.info(`💱 **${cg.money(amount, from)}** = **${result.toLocaleString('en-US', { maximumFractionDigits: 8 })} ${coin.symbol.toUpperCase()}**\n1 ${coin.symbol.toUpperCase()} = ${cg.money(p.price, from)}`);
+        return ctx.info(`💱 **${cg.money(amount, from)}** = **${amountText(result)} ${coin.symbol.toUpperCase()}**\n1 ${coin.symbol.toUpperCase()} = ${cg.money(p.price, from)}`);
       }
       if (!fromFiat && !toFiat) {
         const [a, b] = [await cg.resolveCoin(from), await cg.resolveCoin(to)];
         const [pa, pb] = [await cg.price(a.id, 'usd'), await cg.price(b.id, 'usd')];
         result = (amount * pa.price) / pb.price;
-        return ctx.info(`💱 **${amount.toLocaleString('en-US', { maximumFractionDigits: 8 })} ${a.symbol.toUpperCase()}** = **${result.toLocaleString('en-US', { maximumFractionDigits: 8 })} ${b.symbol.toUpperCase()}**\n(via USD: ${cg.money(amount * pa.price)})`);
+        return ctx.info(`💱 **${amountText(amount)} ${a.symbol.toUpperCase()}** = **${amountText(result)} ${b.symbol.toUpperCase()}**\n(via USD: ${cg.money(amount * pa.price)})`);
       }
       return ctx.fail(`Both are regular currencies — use \`${ctx.prefix}currency ${ctx.args.join(' ')}\`.`);
     },

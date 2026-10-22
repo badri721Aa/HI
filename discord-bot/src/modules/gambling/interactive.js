@@ -120,7 +120,8 @@ async function blackjack(ctx) {
     collector.stop('done');
     return finish(i, msg);
   });
-  collector.on('end', () => {
+  collector.on('end', (_collected, reason) => {
+    if (reason === 'done') return;
     if (!done) finish(null, msg); // idle -> automatic stand
   });
 }
@@ -200,7 +201,8 @@ async function highlow(ctx) {
     }
     return i.update(view(`✅ Correct! It was **${next}**.`)).catch(() => {});
   });
-  collector.on('end', () => {
+  collector.on('end', (_collected, reason) => {
+    if (reason === 'done') return;
     if (done) return;
     if (rounds) end(null, msg, b.bet * mult, '⌛ Timed out — cashed out automatically.');
     else end(null, msg, b.bet, '⌛ Timed out before you played — bet refunded.');
@@ -258,7 +260,8 @@ async function crash(ctx) {
     if (done) return i.deferUpdate().catch(() => {});
     return end(i, msg, b.bet * mult, `💰 You cashed out at **×${mult.toFixed(2)}** (it would have crashed at ×${crashAt.toFixed(2)}).`, collector);
   });
-  collector.on('end', () => {
+  collector.on('end', (_collected, reason) => {
+    if (reason === 'done') return;
     if (!done) end(null, msg, b.bet * mult, '⌛ Game ended — cashed out automatically.');
   });
   timer = setInterval(() => {
@@ -364,7 +367,8 @@ async function mines(ctx) {
     }
     return i.update(view()).catch(() => {});
   });
-  collector.on('end', () => {
+  collector.on('end', (_collected, reason) => {
+    if (reason === 'done') return;
     if (done) return;
     if (opened.size) end(null, msg, b.bet * mult(), '⌛ Timed out — cashed out automatically.');
     else end(null, msg, b.bet, '⌛ Timed out before you played — bet refunded.');
