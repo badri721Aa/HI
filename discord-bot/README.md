@@ -1,6 +1,6 @@
 # 🤖 Mega Discord Bot
 
-An all-in-one Discord bot with **<!--total-->1,371<!--/total--> commands** (plus unlimited custom commands per server), built on discord.js v14.
+An all-in-one Discord bot with **<!--total-->1,423<!--/total--> commands** (plus unlimited custom commands per server), built on discord.js v14.
 
 - 🛡️ Moderation, automod, anti-raid and anti-nuke
 - 💰 Economy, 🎰 gambling, 📈 leveling, 💞 profiles and marriage
@@ -12,7 +12,7 @@ An all-in-one Discord bot with **<!--total-->1,371<!--/total--> commands** (plus
 - ♾️ **Built to run forever**: auto-reconnect, crash protection, a watchdog, and a keep-alive web server
 - 🌟 `!bots`: a directory of **30 Discord-verified bots**, each for a different job, with invite links
 
-> Every command works both as a prefix command (`!help`) and through slash commands: the most important ones have their own `/command`, and **`/cmd <name>` runs any of the <!--total-->1,371<!--/total-->**. Discord allows only 100 slash commands per bot, which is why `/cmd` exists.
+> Every command works both as a prefix command (`!help`) and through slash commands: the most important ones have their own `/command`, and **`/cmd <name>` runs any of the <!--total-->1,423<!--/total-->**. Discord allows only 100 slash commands per bot, which is why `/cmd` exists.
 
 ---
 
@@ -115,7 +115,7 @@ docker run -d --restart unless-stopped --env-file .env -v $(pwd)/data:/app/data 
 
 ---
 
-## 📚 Commands (<!--total-->1,371<!--/total-->)
+## 📚 Commands (<!--total-->1,423<!--/total-->)
 
 <!--table-->
 | Category | Commands | Examples |
@@ -132,21 +132,23 @@ docker run -d --restart unless-stopped --env-file .env -v $(pwd)/data:/app/data 
 | 💰 Economy | 48 | `fish`, `hunt`, `mine`, `dig`, `chop`, `farm`, … |
 | 🎰 Gambling | 18 | `slots`, `coinbet`, `dicebet`, `roulette`, `wheel`, `scratch`, … |
 | 📈 Leveling | 26 | `setxp`, `addxp`, `removexp`, `setlevel`, `resetxp`, `resetlevels`, … |
+| 💞 Social | 11 | `profile`, `setbio`, `profilecolor`, `rep`, `replb`, `marry`, … |
 | 😂 Fun | 57 | `joke`, `dadjoke`, `programmingjoke`, `knockknock`, `chucknorris`, `meme`, … |
 | 🎮 Games | 22 | `connect4`, `hangman`, `minesweeper`, `2048`, `lightsout`, `simon`, … |
 | 🤗 Roleplay Actions | 41 | `baka`, `bite`, `blush`, `bored`, `cry`, `cuddle`, … |
+| 🐾 Animals | 33 | `cat`, `dog`, `dogbreeds`, `fox`, `duck`, `catfact`, … |
 | 🔤 Text Tools | 63 | `charcount`, `wordcount`, `linecount`, `wordfreq`, `letterfreq`, `vowelcount`, … |
 | 🅰️ Fancy Fonts | 24 | `bold`, `italic`, `bolditalic`, `script`, `boldscript`, `fraktur`, … |
 | 🔐 Encoding & Hashing | 76 | `base64`, `unbase64`, `base64url`, `base32`, `unbase32`, `base58`, … |
 | 🧮 Math | 90 | `bmi`, `tip`, `splitbill`, `discount`, `tax`, `compound`, … |
 | 📏 Unit Conversions | 418 | `convert`, `units`, `mm2cm`, `mm2m`, `mm2km`, `mm2in`, … |
-| 🎲 Generators | 28 | `password`, `passphrase`, `tokengen`, `pincode`, `uuid`, `randomnumber`, … |
+| 🎲 Generators | 36 | `colorinfo`, `randomcolor`, `hex2rgb`, `rgb2hex`, `hex2hsl`, `hsl2hex`, … |
 | 🧰 Utility | 41 | `afk`, `afklist`, `addemoji`, `enlarge`, `deleteemoji`, `renameemoji`, … |
 | ℹ️ Info | 33 | `serverinfo`, `servericon`, `serverbanner`, `splash`, `membercount`, `boosters`, … |
 | 🔎 Search & Lookups | 35 | `github`, `githubrepo`, `npm`, `pypi`, `crates`, `domain`, … |
 | 🪙 Crypto & Currency | 42 | `crypto`, `coininfo`, `cryptotop`, `cryptotrending`, `cryptoconvert`, `feargreed`, … |
 | 🎵 Music & 24/7 Voice | 44 | `join`, `leave`, `247`, `play`, `radio`, `radios`, … |
-| **Total** | **1,371** | plus 1005 aliases and unlimited custom commands |
+| **Total** | **1,423** | plus 1044 aliases and unlimited custom commands |
 <!--/table-->
 
 Browse them in Discord with `!help`, `!help <category>`, `!help <command>` or `!commands`.

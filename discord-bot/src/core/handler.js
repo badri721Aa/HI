@@ -76,8 +76,10 @@ async function run(ctx, cmd) {
     ctx.client.stats.commands++;
   } catch (err) {
     const code = err?.code;
-    let msg = err?.userMessage || 'Something went wrong running that command.';
-    if (code === 50013) msg = 'I am missing permissions to do that (check my role position and channel permissions).';
+    // A command's own explanation always wins over the generic ones.
+    let msg = 'Something went wrong running that command.';
+    if (err?.userMessage) msg = err.userMessage;
+    else if (code === 50013) msg ='I am missing permissions to do that (check my role position and channel permissions).';
     else if (code === 50001) msg = 'I do not have access to that channel.';
     else if (err?.name === 'TimeoutError' || err?.name === 'AbortError') msg = 'An external service took too long to answer. Try again later.';
     else if (err?.status) msg = `An external service returned an error (${err.status}). Try again later.`;

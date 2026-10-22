@@ -130,6 +130,9 @@ function makeEnv() {
     // fetch(id) -> message (none exist in the mock), fetch({ limit }) -> Collection, like discord.js
     messages: { fetch: async (arg) => (typeof arg === 'string' ? Promise.reject(Object.assign(new Error('Unknown Message'), { code: 10008 })) : new Collection()) },
     bulkDelete: async () => new Collection(),
+    // Typed games start a collector and wait; nobody answers in the mock, so they simply time out.
+    createMessageCollector: () => Object.assign(new EventEmitter(), { stop() {}, resetTimer() {} }),
+    awaitMessages: async () => new Collection(),
     toString: () => '<#333333333333333333>',
   };
   guild.channels.cache.set(channel.id, channel);
