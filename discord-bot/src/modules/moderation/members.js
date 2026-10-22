@@ -33,6 +33,7 @@ async function setNick(ctx, member, nick, why) {
 const commands = [
   {
     name: 'nick',
+    modPerm: 'ManageNicknames',
     aliases: ['setnick', 'nickname'],
     description: 'Change a member\'s nickname (leave empty to reset)',
     usage: '<user> [new nickname]',
@@ -59,6 +60,7 @@ const commands = [
   },
   {
     name: 'resetnick',
+    modPerm: 'ManageNicknames',
     aliases: ['clearnick', 'removenick'],
     description: 'Reset a member\'s nickname',
     usage: '<user>',
@@ -79,6 +81,7 @@ const commands = [
   },
   {
     name: 'dehoist',
+    modPerm: 'ManageNicknames',
     description: 'Strip symbols that push names to the top of the member list (user or "all")',
     usage: '<user|all>',
     examples: ['tester', 'all'],
@@ -109,6 +112,7 @@ const commands = [
   },
   {
     name: 'decancer',
+    modPerm: 'ManageNicknames',
     aliases: ['normalize', 'cleannick'],
     description: 'Replace a fancy/unreadable unicode name with plain text',
     usage: '<user>',
@@ -193,6 +197,7 @@ const commands = [
   },
   {
     name: 'jail',
+    modPerm: 'ModerateMembers',
     description: 'Remove a member\'s roles and lock them in the jail channel (optional duration)',
     usage: '<user> [duration] [reason]',
     examples: ['tester 1h being disruptive', '@nobody'],
@@ -219,6 +224,7 @@ const commands = [
   },
   {
     name: 'unjail',
+    modPerm: 'ModerateMembers',
     aliases: ['release'],
     description: 'Release a jailed member and give their roles back',
     usage: '<user> [reason]',

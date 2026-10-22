@@ -59,6 +59,7 @@ async function massRole(ctx, { add, filter, who }) {
 const commands = [
   {
     name: 'addrole',
+    modPerm: 'ManageRoles',
     aliases: ['giverole'],
     description: 'Give a role to a member',
     usage: '<user> <role>',
@@ -84,6 +85,7 @@ const commands = [
   },
   {
     name: 'removerole',
+    modPerm: 'ManageRoles',
     aliases: ['takerole'],
     description: 'Remove a role from a member',
     usage: '<user> <role>',
@@ -109,6 +111,7 @@ const commands = [
   },
   {
     name: 'temprole',
+    modPerm: 'ManageRoles',
     aliases: ['trole'],
     description: 'Give a role for a limited time — removed automatically',
     usage: '<user> <duration> <role>',
@@ -133,6 +136,7 @@ const commands = [
   },
   {
     name: 'roleall',
+    modPerm: 'ManageRoles',
     aliases: ['massrole', 'giveall'],
     description: 'Give a role to every member (confirmation required)',
     usage: '<role>',
@@ -145,6 +149,7 @@ const commands = [
   },
   {
     name: 'rolehumans',
+    modPerm: 'ManageRoles',
     aliases: ['rolehuman'],
     description: 'Give a role to every human (non-bot) member',
     usage: '<role>',
@@ -157,6 +162,7 @@ const commands = [
   },
   {
     name: 'rolebots',
+    modPerm: 'ManageRoles',
     aliases: ['rolebot'],
     description: 'Give a role to every bot in the server',
     usage: '<role>',
@@ -169,6 +175,7 @@ const commands = [
   },
   {
     name: 'removeroleall',
+    modPerm: 'ManageRoles',
     aliases: ['takeall', 'unroleall'],
     description: 'Remove a role from everyone who has it (confirmation required)',
     usage: '<role>',
@@ -181,6 +188,7 @@ const commands = [
   },
   {
     name: 'createrole',
+    modPerm: 'ManageRoles',
     aliases: ['newrole', 'mkrole'],
     description: 'Create a role, optionally with a hex color',
     usage: '<name> [#hexcolor]',
@@ -204,6 +212,7 @@ const commands = [
   },
   {
     name: 'deleterole',
+    modPerm: 'ManageRoles',
     aliases: ['delrole'],
     description: 'Delete a role (confirmation required)',
     usage: '<role>',
@@ -224,6 +233,7 @@ const commands = [
   },
   {
     name: 'rolecolor',
+    modPerm: 'ManageRoles',
     aliases: ['rolecolour', 'setrolecolor'],
     description: 'Change a role\'s color',
     usage: '<role> <#hexcolor>',
@@ -244,6 +254,7 @@ const commands = [
   },
   {
     name: 'renamerole',
+    modPerm: 'ManageRoles',
     aliases: ['rolename'],
     description: 'Rename a role (quote or mention the old name if it has spaces)',
     usage: '<role> <new name>',

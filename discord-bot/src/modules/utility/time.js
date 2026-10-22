@@ -230,7 +230,7 @@ module.exports = [
   },
   {
     name: 'datediff',
-    aliases: ['daysbetween', 'between'],
+    aliases: ['between'],
     description: 'Time between two dates (second defaults to today)',
     usage: '<date> [to <date>]',
     examples: ['2000-01-01', '2026-01-01 to 2026-12-25', 'dec 25 2020 to jan 1 2021'],

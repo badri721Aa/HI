@@ -21,6 +21,7 @@ function editable(ctx, channel) {
 const commands = [
   {
     name: 'slowmode',
+    modPerm: 'ManageChannels',
     aliases: ['slow', 'sm'],
     description: 'Set a channel\'s slowmode (0/off to disable, max 6h)',
     usage: '<duration|off> [#channel]',
@@ -48,6 +49,7 @@ const commands = [
   },
   {
     name: 'lock',
+    modPerm: 'ManageChannels',
     aliases: ['lockchannel'],
     description: 'Stop @everyone from sending messages in a channel',
     usage: '[#channel] [reason]',
@@ -73,6 +75,7 @@ const commands = [
   },
   {
     name: 'unlock',
+    modPerm: 'ManageChannels',
     aliases: ['unlockchannel'],
     description: 'Let @everyone send messages in a channel again',
     usage: '[#channel] [reason]',
@@ -97,6 +100,7 @@ const commands = [
   },
   {
     name: 'lockdown',
+    modPerm: 'ManageGuild',
     aliases: ['lockall', 'serverlock'],
     description: 'Lock every text channel in the server (confirmation required)',
     usage: '[reason]',
@@ -118,6 +122,7 @@ const commands = [
   },
   {
     name: 'unlockdown',
+    modPerm: 'ManageGuild',
     aliases: ['unlockall', 'serverunlock'],
     description: 'Unlock every channel locked by the last lockdown',
     guildOnly: true,
@@ -134,6 +139,7 @@ const commands = [
   },
   {
     name: 'hide',
+    modPerm: 'ManageChannels',
     aliases: ['hidechannel'],
     description: 'Hide a channel from @everyone',
     usage: '[#channel]',
@@ -151,6 +157,7 @@ const commands = [
   },
   {
     name: 'unhide',
+    modPerm: 'ManageChannels',
     aliases: ['showchannel', 'unhidechannel'],
     description: 'Make a hidden channel visible to @everyone again',
     usage: '[#channel]',
@@ -168,6 +175,7 @@ const commands = [
   },
   {
     name: 'nuke',
+    modPerm: 'ManageChannels',
     aliases: ['wipechannel'],
     description: 'Clone a channel and delete the original — wipes all messages (confirmation)',
     usage: '[#channel]',

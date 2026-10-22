@@ -200,7 +200,7 @@ module.exports = [
   },
   {
     name: 'simpleinterest',
-    aliases: ['interest'],
+    aliases: ['simpleint'],
     description: 'Simple interest: principal × rate × time',
     usage: '<principal> <annual rate %> <years>',
     examples: ['1000 5 3'],
@@ -391,7 +391,7 @@ module.exports = [
   },
   {
     name: 'daysbetween',
-    aliases: ['datediff'],
+    aliases: ['daysapart'],
     description: 'Number of days (and weeks) between two dates',
     usage: '<date> <date>  (YYYY-MM-DD, or "today")',
     examples: ['2024-01-01 2024-12-25', 'today 2030-01-01'],

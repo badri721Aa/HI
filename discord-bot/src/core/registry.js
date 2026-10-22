@@ -97,7 +97,7 @@ class Registry {
     if (!NAME_RE.test(cmd.name)) return this.problem(`${source}: invalid command name "${cmd.name}"`);
     if (!cmd.description) this.problem(`${source}: "${cmd.name}" is missing a description`);
     if (String(cmd.description || '').length > 100) this.problem(`${source}: "${cmd.name}" description is over 100 chars`);
-    for (const p of [...cmd.userPerms, ...cmd.botPerms]) {
+    for (const p of [...cmd.userPerms, ...cmd.botPerms, ...(cmd.modPerm ? [cmd.modPerm] : [])]) {
       if (!(p in PermissionFlagsBits)) this.problem(`${source}: "${cmd.name}" unknown permission "${p}"`);
     }
     for (const a of cmd.args || []) {

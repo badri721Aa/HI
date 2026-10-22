@@ -88,7 +88,10 @@ function renderCategory(client, prefix, ownerId, cat, page = 0) {
 }
 
 function renderCommand(client, prefix, cmd) {
-  const perms = [...cmd.userPerms].map((p) => p.replace(/([a-z])([A-Z])/g, '$1 $2'));
+  const spaced = (p) => p.replace(/([a-z])([A-Z])/g, '$1 $2');
+  const perms = cmd.userPerms.map(spaced);
+  // Moderation commands check inside execute so a configured mod role can stand in for the permission.
+  if (!perms.length && cmd.modPerm) perms.push(`${spaced(cmd.modPerm)} (or a mod role)`);
   return {
     embeds: [
       embeds.embed({

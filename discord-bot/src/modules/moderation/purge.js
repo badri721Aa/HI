@@ -64,6 +64,7 @@ function simple(name, aliases, description, filter, label) {
     name,
     aliases,
     description,
+    modPerm: 'ManageMessages',
     usage: '[amount=50]',
     examples: ['', '20'],
     guildOnly: true,
@@ -79,6 +80,7 @@ function simple(name, aliases, description, filter, label) {
 const commands = [
   {
     name: 'purge',
+    modPerm: 'ManageMessages',
     aliases: ['clear', 'prune', 'clean'],
     description: 'Bulk-delete 1-100 recent messages (optionally only from one user)',
     usage: '<amount> [user]',
@@ -104,6 +106,7 @@ const commands = [
   },
   {
     name: 'purgeuser',
+    modPerm: 'ManageMessages',
     aliases: ['purgemember', 'clearuser'],
     description: 'Delete recent messages from one user',
     usage: '<user> [amount=50]',
@@ -149,6 +152,7 @@ const commands = [
   simple('purgecommands', ['clearcommands'], 'Delete recent messages that start with this server\'s prefix', (m, ctx) => (m.content || '').startsWith(ctx.prefix), 'command messages'),
   {
     name: 'purgecontains',
+    modPerm: 'ManageMessages',
     aliases: ['purgematch', 'clearcontains'],
     description: 'Delete recent messages that contain some text (case-insensitive)',
     usage: '[amount=50] <text>',
@@ -170,6 +174,7 @@ const commands = [
   },
   {
     name: 'purgestartswith',
+    modPerm: 'ManageMessages',
     aliases: ['purgeprefix'],
     description: 'Delete recent messages that start with some text',
     usage: '[amount=50] <text>',
@@ -191,6 +196,7 @@ const commands = [
   },
   {
     name: 'purgeafter',
+    modPerm: 'ManageMessages',
     aliases: ['purgeuntil', 'clearafter'],
     description: 'Delete every message sent after a given message ID (max 100)',
     usage: '<message ID>',
@@ -206,6 +212,7 @@ const commands = [
   },
   {
     name: 'purgereactions',
+    modPerm: 'ManageMessages',
     aliases: ['clearreactions', 'removereactions'],
     description: 'Remove all reactions from recent messages (or one message ID)',
     usage: '[amount=25 | message ID]',

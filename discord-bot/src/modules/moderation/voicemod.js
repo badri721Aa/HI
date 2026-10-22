@@ -26,6 +26,7 @@ function voiceToggle(name, aliases, description, perm, verb, apply, done) {
     name,
     aliases,
     description,
+    modPerm: perm,
     usage: '<user> [reason]',
     examples: ['tester'],
     guildOnly: true,
@@ -36,9 +37,10 @@ function voiceToggle(name, aliases, description, perm, verb, apply, done) {
       const member = await voiceTarget(ctx, verb);
       if (!member) return;
       const reason = ctx.rest(1);
+      const channelId = member.voice.channelId;
       await apply(member, `${ctx.author.tag}: ${reason || name}`);
       await ctx.ok(`${done} **${member.user.tag}**.`);
-      await lib.postModlog(ctx.guild, lib.actionEmbed(`🎙️ ${name}`, `${ctx.author} → <@${member.id}> in <#${member.voice.channelId}>${reason ? `\n**Reason:** ${reason}` : ''}`));
+      await lib.postModlog(ctx.guild, lib.actionEmbed(`🎙️ ${name}`, `${ctx.author} → <@${member.id}> in <#${channelId}>${reason ? `\n**Reason:** ${reason}` : ''}`));
     },
   };
 }
@@ -58,6 +60,7 @@ const commands = [
   voiceToggle('vkick', ['voicekick', 'vdisconnect'], 'Disconnect a member from voice', 'MoveMembers', 'disconnect', (m, r) => m.voice.disconnect(r), '👋 Disconnected'),
   {
     name: 'vmove',
+    modPerm: 'MoveMembers',
     aliases: ['voicemove', 'move'],
     description: 'Move a member to another voice channel',
     usage: '<user> <voice channel>',
@@ -77,6 +80,7 @@ const commands = [
   },
   {
     name: 'vmoveall',
+    modPerm: 'MoveMembers',
     aliases: ['voicemoveall', 'moveall'],
     description: 'Move everyone from one voice channel to another',
     usage: '<from|here> <to>',
@@ -100,6 +104,7 @@ const commands = [
   },
   {
     name: 'vkickall',
+    modPerm: 'MoveMembers',
     aliases: ['voicekickall', 'vclear'],
     description: 'Disconnect everyone from a voice channel (confirmation required)',
     usage: '[voice channel|here]',

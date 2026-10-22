@@ -74,6 +74,7 @@ async function doBan(ctx, { tempOnly = false } = {}) {
 const commands = [
   {
     name: 'ban',
+    modPerm: 'BanMembers',
     aliases: ['hackban', 'banish'],
     description: 'Ban a member or user ID (optional duration = temp ban, --delete <days> of messages)',
     usage: '<user> [duration] [reason] [--delete 0-7]',
@@ -92,6 +93,7 @@ const commands = [
   },
   {
     name: 'tempban',
+    modPerm: 'BanMembers',
     aliases: ['tban'],
     description: 'Ban a user for a limited time — they are unbanned automatically',
     usage: '<user> <duration> [reason]',
@@ -103,6 +105,7 @@ const commands = [
   },
   {
     name: 'unban',
+    modPerm: 'BanMembers',
     aliases: ['pardon'],
     description: 'Unban a user by ID',
     usage: '<user ID> [reason]',
@@ -128,6 +131,7 @@ const commands = [
   },
   {
     name: 'softban',
+    modPerm: 'BanMembers',
     description: 'Ban + immediately unban to wipe a member\'s last 7 days of messages',
     usage: '<user> [reason]',
     examples: ['tester spam cleanup'],
@@ -155,6 +159,7 @@ const commands = [
   },
   {
     name: 'massban',
+    modPerm: 'BanMembers',
     description: 'Ban up to 50 user IDs at once (confirmation required)',
     usage: '<id> <id> … [reason]',
     examples: ['123456789012345678 223456789012345678 raid accounts'],
@@ -219,6 +224,7 @@ const commands = [
   },
   {
     name: 'banlist',
+    modPerm: 'BanMembers',
     aliases: ['bans'],
     description: 'List banned users and ban reasons',
     guildOnly: true,
@@ -238,6 +244,7 @@ const commands = [
   },
   {
     name: 'kick',
+    modPerm: 'KickMembers',
     aliases: ['boot'],
     description: 'Kick a member from the server',
     usage: '<user> [reason]',
@@ -263,6 +270,7 @@ const commands = [
   },
   {
     name: 'timeout',
+    modPerm: 'ModerateMembers',
     aliases: ['mute', 'to', 'shush'],
     description: 'Time out a member (they can\'t chat or speak). Max 28 days',
     usage: '<user> <duration> [reason]',
@@ -293,6 +301,7 @@ const commands = [
   },
   {
     name: 'untimeout',
+    modPerm: 'ModerateMembers',
     aliases: ['unmute', 'rto'],
     description: 'Remove a member\'s timeout',
     usage: '<user> [reason]',
@@ -318,6 +327,7 @@ const commands = [
   },
   {
     name: 'timeoutlist',
+    modPerm: 'ModerateMembers',
     aliases: ['mutelist', 'timeouts'],
     description: 'List members who are currently timed out',
     guildOnly: true,

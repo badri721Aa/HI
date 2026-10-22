@@ -21,6 +21,7 @@ function casesPages(ctx, cases, title) {
 const commands = [
   {
     name: 'warn',
+    modPerm: 'ModerateMembers',
     description: 'Warn a member (creates a case; may trigger automatic punishments)',
     usage: '<user> [reason]',
     examples: ['tester please stop spamming', '@nobody'],
@@ -65,6 +66,7 @@ const commands = [
   },
   {
     name: 'delwarn',
+    modPerm: 'ModerateMembers',
     aliases: ['removewarn', 'unwarn', 'rmwarn'],
     description: 'Delete a warning by its case number',
     usage: '<case #>',
@@ -85,6 +87,7 @@ const commands = [
   },
   {
     name: 'clearwarns',
+    modPerm: 'ModerateMembers',
     aliases: ['clearwarnings', 'resetwarns'],
     description: 'Remove all of a member\'s warnings',
     usage: '<user>',
@@ -141,6 +144,7 @@ const commands = [
   },
   {
     name: 'modlogs',
+    modPerm: 'ModerateMembers',
     aliases: ['history', 'cases'],
     description: 'Show every moderation case for a user',
     usage: '<user>',
@@ -160,6 +164,7 @@ const commands = [
   },
   {
     name: 'case',
+    modPerm: 'ModerateMembers',
     aliases: ['viewcase'],
     description: 'Show one moderation case',
     usage: '<case #>',
@@ -175,6 +180,7 @@ const commands = [
   },
   {
     name: 'reason',
+    modPerm: 'ModerateMembers',
     aliases: ['editcase'],
     description: 'Change the reason of a moderation case',
     usage: '<case #> <new reason>',
@@ -214,6 +220,7 @@ const commands = [
   },
   {
     name: 'modstats',
+    modPerm: 'ModerateMembers',
     aliases: ['modstat'],
     description: 'Moderation statistics for the server or one moderator',
     usage: '[moderator]',

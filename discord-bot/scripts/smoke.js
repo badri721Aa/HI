@@ -88,7 +88,8 @@ function makeEnv() {
     channels: { cache: new Collection(), create: async () => { throw new Error('mock: cannot create channels'); } },
     roles: { cache: new Collection([[everyone.id, everyone]]), everyone },
     emojis: { cache: new Collection() },
-    bans: { fetch: async () => new Collection() },
+    // fetch(user) -> ban or "Unknown Ban" (nobody is banned in the mock), fetch() -> Collection
+    bans: { fetch: async (arg) => (arg && (typeof arg === 'string' || arg.user) ? Promise.reject(Object.assign(new Error('Unknown Ban'), { code: 10026 })) : new Collection()) },
     fetchOwner: async () => guild.members.cache.get(user.id),
   };
   const allPerms = new PermissionsBitField(PermissionsBitField.All);
