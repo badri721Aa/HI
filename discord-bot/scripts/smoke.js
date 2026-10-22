@@ -84,7 +84,17 @@ function makeEnv() {
     premiumTier: 1,
     iconURL: () => null,
     bannerURL: () => null,
-    members: { cache: new Collection(), fetch: async () => new Collection(), me: null },
+    // Like discord.js: fetch(id) -> member or "Unknown Member", fetch({ query }) / fetch() -> Collection
+    members: {
+      cache: new Collection(),
+      fetch: async (arg) => {
+        if (typeof arg !== 'string') return new Collection();
+        const m = guild.members.cache.get(arg);
+        if (m) return m;
+        throw Object.assign(new Error('Unknown Member'), { code: 10007 });
+      },
+      me: null,
+    },
     channels: { cache: new Collection(), create: async () => { throw new Error('mock: cannot create channels'); } },
     roles: { cache: new Collection([[everyone.id, everyone]]), everyone },
     emojis: { cache: new Collection() },
