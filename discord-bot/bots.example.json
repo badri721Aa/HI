@@ -1,0 +1,310 @@
+{
+  "_readme": "30 different bots from ONE program. Create 30 applications in the Discord Developer Portal, put each token in .env as BOT1_TOKEN..BOT30_TOKEN (or paste tokens here - then never share this file), rename this file to bots.json and run npm start. Delete any entries you don't need: bots without a token are skipped. modules: \"all\" or a list of categories (core is always on). status: online | idle | dnd | invisible.",
+  "bots": [
+    {
+      "name": "Guardian",
+      "token": "env:BOT1_TOKEN",
+      "prefix": "g!",
+      "status": "invisible",
+      "activity": "Watching|for rule breakers",
+      "modules": [
+        "moderation",
+        "automod"
+      ]
+    },
+    {
+      "name": "Sentinel",
+      "token": "env:BOT2_TOKEN",
+      "prefix": "s!",
+      "status": "invisible",
+      "activity": "Watching|for raids and nukes",
+      "modules": [
+        "automod"
+      ]
+    },
+    {
+      "name": "Logger",
+      "token": "env:BOT3_TOKEN",
+      "prefix": "log!",
+      "status": "invisible",
+      "activity": "Watching|the audit log",
+      "modules": [
+        "config"
+      ]
+    },
+    {
+      "name": "Welcomer",
+      "token": "env:BOT4_TOKEN",
+      "prefix": "w!",
+      "status": "invisible",
+      "activity": "Playing|greeting new members",
+      "modules": [
+        "community"
+      ]
+    },
+    {
+      "name": "Ticketer",
+      "token": "env:BOT5_TOKEN",
+      "prefix": "t!",
+      "status": "invisible",
+      "activity": "Listening|to support tickets",
+      "modules": [
+        "tickets"
+      ]
+    },
+    {
+      "name": "Giveaways",
+      "token": "env:BOT6_TOKEN",
+      "prefix": "gw!",
+      "status": "invisible",
+      "activity": "Playing|with prizes",
+      "modules": [
+        "giveaways"
+      ]
+    },
+    {
+      "name": "Pollster",
+      "token": "env:BOT7_TOKEN",
+      "prefix": "poll!",
+      "status": "invisible",
+      "activity": "Watching|the votes",
+      "modules": [
+        "polls"
+      ]
+    },
+    {
+      "name": "Commander",
+      "token": "env:BOT8_TOKEN",
+      "prefix": "cc!",
+      "status": "invisible",
+      "activity": "Playing|with custom commands",
+      "modules": [
+        "customcommands"
+      ]
+    },
+    {
+      "name": "Banker",
+      "token": "env:BOT9_TOKEN",
+      "prefix": "$",
+      "status": "invisible",
+      "activity": "Watching|the economy",
+      "modules": [
+        "economy"
+      ]
+    },
+    {
+      "name": "Casino",
+      "token": "env:BOT10_TOKEN",
+      "prefix": "bet!",
+      "status": "invisible",
+      "activity": "Playing|blackjack",
+      "modules": [
+        "gambling"
+      ]
+    },
+    {
+      "name": "Leveler",
+      "token": "env:BOT11_TOKEN",
+      "prefix": "lvl!",
+      "status": "invisible",
+      "activity": "Watching|your XP grow",
+      "modules": [
+        "leveling"
+      ]
+    },
+    {
+      "name": "Socialite",
+      "token": "env:BOT12_TOKEN",
+      "prefix": "soc!",
+      "status": "invisible",
+      "activity": "Playing|matchmaker",
+      "modules": [
+        "social"
+      ]
+    },
+    {
+      "name": "Jester",
+      "token": "env:BOT13_TOKEN",
+      "prefix": "j!",
+      "status": "invisible",
+      "activity": "Playing|jokes",
+      "modules": [
+        "fun"
+      ]
+    },
+    {
+      "name": "Arcade",
+      "token": "env:BOT14_TOKEN",
+      "prefix": "arc!",
+      "status": "invisible",
+      "activity": "Playing|tic-tac-toe",
+      "modules": [
+        "games"
+      ]
+    },
+    {
+      "name": "Hugger",
+      "token": "env:BOT15_TOKEN",
+      "prefix": "rp!",
+      "status": "invisible",
+      "activity": "Playing|hugs and high-fives",
+      "modules": [
+        "actions"
+      ]
+    },
+    {
+      "name": "Zoo",
+      "token": "env:BOT16_TOKEN",
+      "prefix": "zoo!",
+      "status": "invisible",
+      "activity": "Watching|cat videos",
+      "modules": [
+        "animals"
+      ]
+    },
+    {
+      "name": "Scribe",
+      "token": "env:BOT17_TOKEN",
+      "prefix": "txt!",
+      "status": "invisible",
+      "activity": "Playing|with fonts",
+      "modules": [
+        "text",
+        "fonts"
+      ]
+    },
+    {
+      "name": "Cipher",
+      "token": "env:BOT18_TOKEN",
+      "prefix": "enc!",
+      "status": "invisible",
+      "activity": "Playing|with codes",
+      "modules": [
+        "encoding"
+      ]
+    },
+    {
+      "name": "Mathy",
+      "token": "env:BOT19_TOKEN",
+      "prefix": "m!",
+      "status": "invisible",
+      "activity": "Playing|calculator",
+      "modules": [
+        "math"
+      ]
+    },
+    {
+      "name": "Converter",
+      "token": "env:BOT20_TOKEN",
+      "prefix": "cv!",
+      "status": "invisible",
+      "activity": "Playing|km2mi",
+      "modules": [
+        "conversions"
+      ]
+    },
+    {
+      "name": "Generator",
+      "token": "env:BOT21_TOKEN",
+      "prefix": "gen!",
+      "status": "invisible",
+      "activity": "Playing|random",
+      "modules": [
+        "generators"
+      ]
+    },
+    {
+      "name": "Toolbox",
+      "token": "env:BOT22_TOKEN",
+      "prefix": "u!",
+      "status": "invisible",
+      "activity": "Playing|with reminders",
+      "modules": [
+        "utility"
+      ]
+    },
+    {
+      "name": "Inspector",
+      "token": "env:BOT23_TOKEN",
+      "prefix": "i!",
+      "status": "invisible",
+      "activity": "Watching|server stats",
+      "modules": [
+        "info"
+      ]
+    },
+    {
+      "name": "Seeker",
+      "token": "env:BOT24_TOKEN",
+      "prefix": "?",
+      "status": "invisible",
+      "activity": "Watching|the web",
+      "modules": [
+        "search"
+      ]
+    },
+    {
+      "name": "Trader",
+      "token": "env:BOT25_TOKEN",
+      "prefix": "c!",
+      "status": "invisible",
+      "activity": "Watching|crypto charts",
+      "modules": [
+        "crypto"
+      ]
+    },
+    {
+      "name": "DJ Radio",
+      "token": "env:BOT26_TOKEN",
+      "prefix": "dj!",
+      "status": "invisible",
+      "activity": "Listening|24/7 radio",
+      "modules": [
+        "music"
+      ]
+    },
+    {
+      "name": "Lofi Station",
+      "token": "env:BOT27_TOKEN",
+      "prefix": "lofi!",
+      "status": "invisible",
+      "activity": "Listening|lofi beats",
+      "modules": [
+        "music"
+      ]
+    },
+    {
+      "name": "Community Plus",
+      "token": "env:BOT28_TOKEN",
+      "prefix": "cp!",
+      "status": "invisible",
+      "activity": "Watching|the community",
+      "modules": [
+        "community",
+        "polls",
+        "giveaways",
+        "customcommands"
+      ]
+    },
+    {
+      "name": "Game Night",
+      "token": "env:BOT29_TOKEN",
+      "prefix": "gn!",
+      "status": "invisible",
+      "activity": "Playing|game night",
+      "modules": [
+        "games",
+        "fun",
+        "gambling"
+      ]
+    },
+    {
+      "name": "All-in-One",
+      "token": "env:BOT30_TOKEN",
+      "prefix": "!",
+      "status": "invisible",
+      "activity": "Listening|{prefix}help • {commands} commands",
+      "modules": "all"
+    }
+  ]
+}

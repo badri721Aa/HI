@@ -1,0 +1,139 @@
+# 🤖 Mega Discord Bot
+
+An all-in-one Discord bot with **__TOTAL__ commands** (plus unlimited custom commands per server), built on discord.js v14.
+
+- 🛡️ Moderation, automod, anti-raid and anti-nuke
+- 💰 Economy, 🎰 gambling, 📈 leveling, 💞 profiles and marriage
+- 🎮 Games, 😂 fun, 🤗 40 anime roleplay actions, 🐾 animals
+- 🎫 Tickets, 🎉 giveaways, 📊 polls, 🏘️ welcome, reaction roles, starboard, suggestions…
+- 🎵 **24/7 voice**: stays in a voice channel forever, rejoins after disconnects and restarts, plays internet radio
+- 🕶️ **Hidden mode**: runs as *invisible* so it sits in the collapsed "Offline" part of the member list
+- 🤝 **Up to 30 different bots from one program**: each with its own name, prefix and feature set
+- ♾️ **Built to run forever**: auto-reconnect, crash protection, a watchdog, and a keep-alive web server
+- 🌟 `!bots`: a directory of **30 Discord-verified bots**, each for a different job, with invite links
+
+> Every command works both as a prefix command (`!help`) and through slash commands: the most important ones have their own `/command`, and **`/cmd <name>` runs any of the __TOTAL__**. Discord allows only 100 slash commands per bot, which is why `/cmd` exists.
+
+---
+
+## ⚠️ What Discord does and doesn't allow
+
+| You asked for | What this bot does | Why |
+|---|---|---|
+| "30 **verified** bots" | Run up to 30 bots of your own from one program (`bots.json`), and `!bots` lists 30 verified public bots with links. | Only Discord can verify a bot. A bot qualifies once it's in **75+ servers** and its owner completes identity verification in the Developer Portal. It can't be bought or faked. Each of your bots would have to get there on its own. |
+| "Adds the best bots" | `!bots` / `!findbot`: 30 verified bots, each for a different job, with one-click links. | A bot **cannot add other bots** to a server. Discord only lets a person with *Manage Server* authorize a bot. |
+| "Hidden from the members list" | `BOT_STATUS=invisible` makes the bot look offline. It moves to the collapsed "Offline" section, and in servers over about 1,000 members offline members aren't listed at all. | Discord has no setting that removes a member from the list. Invisible is the closest you can get, and every command still works. |
+| "Stay in voice channels" | `!247 on` keeps the bot in voice forever, rejoins after kicks, disconnects and restarts, and resumes the radio station that was playing. | The bot joins **self-deafened**, so it never hears anyone. |
+| Music | Internet radio: 33 commercial-free presets, 24 genre shortcuts (`!lofi`, `!jazz`…) and a search of 30,000+ stations. Also plays direct audio links and uploaded audio files. | **YouTube/Spotify/SoundCloud aren't supported.** Streaming them breaks those services' Terms of Service, which is why Rythm and Groovy were shut down. |
+| "Run forever" | Auto-reconnect, login retry, crash guards, a watchdog, pm2/Docker configs and a `/health` endpoint. | The program still needs a computer or server that stays on. See [Free hosting](#-free-247-hosting). |
+
+---
+
+## 🚀 Setup (about 10 minutes)
+
+### 1. Create the bot on Discord
+1. Go to <https://discord.com/developers/applications> and click **New Application**.
+2. **Bot** tab: click **Reset Token** and copy the token. Keep it secret: anyone with it controls your bot.
+3. On the same page, turn on **Server Members Intent** and **Message Content Intent**.
+   (If you skip this, the bot still runs with slash commands and `@mention` commands.)
+4. **OAuth2 → URL Generator**: tick `bot` + `applications.commands`, pick permissions (or *Administrator*), open the URL and add the bot to your server. Once the bot is running, `!invite` gives you this link.
+
+### 2. Run it
+You need [Node.js 22.12 or newer](https://nodejs.org).
+```bash
+cd discord-bot
+npm install
+cp .env.example .env      # Windows: copy .env.example .env
+# open .env and paste your token after DISCORD_TOKEN=
+npm start
+```
+You should see `Logged in as YourBot#1234 — … commands`. In Discord, type `!help` or `/help`.
+
+`ffmpeg` is bundled through `ffmpeg-static`, and voice encryption (Discord's required DAVE/E2EE) is handled by `@snazzah/davey`. Nothing else needs installing.
+
+### 3. Useful first commands
+| Command | What it does |
+|---|---|
+| `!help` | Category menu with all commands |
+| `!setprefix ?` | Change the prefix in your server |
+| `!radio groovesalad` then `!247 on` | Play radio in your voice channel and stay there 24/7 |
+| `!setstatus invisible` | Hide the bot in the member list (owner only) |
+| `!bots` | 30 verified bots, each for a different job |
+| `!automod`, `!antinuke`, `!setlog` | Protect and log your server |
+| `!disable <command or category>` | Turn off anything you don't want |
+
+---
+
+## 🤝 Running 30 different bots at once
+1. Create one application per bot in the Developer Portal (step 1 above, repeated).
+2. Copy `bots.example.json` to `bots.json`. It already contains **30 profiles, each with a different job**: Guardian (moderation), Sentinel (anti-nuke), Banker (economy), Casino, Arcade, DJ Radio, Lofi Station, Ticketer, Giveaways, Converter, Seeker (web lookups) and more.
+3. Put each token in `.env` as `BOT1_TOKEN=…` through `BOT30_TOKEN=…`. A profile without a token is skipped, so start with 2 or 3.
+4. `npm start`. `!botteam` shows every bot in the team and what it does.
+
+Each profile sets its own `name`, `prefix`, `status` (e.g. `invisible`), `activity` and `modules` (`"all"` or a list of categories). Two music profiles can play in **two voice channels of the same server** at the same time.
+
+Each bot uses roughly 40–80 MB of RAM, so 30 bots need around 1.5–2.5 GB. That fits on Oracle's free VM (below) but not on 256 MB hosting panels.
+
+---
+
+## 🌍 Free 24/7 hosting
+
+Free plans change often, so check each provider's pricing page before you rely on it. Here's the situation as of late 2026:
+
+| Option | Really 24/7? | Notes |
+|---|---|---|
+| **Oracle Cloud "Always Free"** ⭐ | ✅ Yes | Best free option: Arm VM with up to 4 cores / 24 GB RAM, enough for all 30 bots. Needs a card for identity checks. Oracle may stop VMs that look *idle* (CPU, network and memory below 20% over 7 days); restart them from the console if that happens. |
+| **Google Cloud free tier (e2-micro)** | ✅ Yes | 1 small VM in `us-west1`, `us-central1` or `us-east1` only (other regions are billed), 30 GB disk, 1 GB RAM. Fine for a few bots. Needs a card. |
+| **Your own PC, old laptop or Raspberry Pi** | ✅ While it's on | Completely free. Use pm2 (below) so it restarts automatically. |
+| **Render (free web service)** | ⚠️ With a pinger | Sleeps after 15 minutes without web traffic. The bot's built-in keep-alive server plus a free uptime monitor (UptimeRobot, Better Stack) pinging `https://your-app.onrender.com/health` every 5 minutes keeps it awake. Data resets on redeploys. |
+| **Koyeb (free instance)** | ⚠️ With a pinger | Scales to zero after about an hour without inbound traffic. Use the same `/health` pinger trick. Data resets on redeploys. |
+| **Free Discord-bot panels** (e.g. bot-hosting.net) | ⚠️ Mostly | Usually 256 MB RAM (one bot) and you must click "renew" every few days. |
+| Replit / Glitch / Heroku / Fly.io | ❌ | Replit's always-on is paid, Glitch ended project hosting in July 2025, Heroku has had no free tier since 2022, and Fly.io has no free tier for new accounts. |
+
+### Oracle Cloud / Google Cloud / any Linux VM
+```bash
+sudo apt update && sudo apt install -y git curl
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs
+git clone <your repo> bot && cd bot/discord-bot
+npm install && cp .env.example .env && nano .env      # paste your token(s)
+sudo npm install -g pm2
+pm2 start ecosystem.config.js     # runs forever and restarts on crashes
+pm2 save && pm2 startup           # starts again after the VM reboots (run the command it prints)
+pm2 logs                          # watch the logs
+```
+
+### Render / Koyeb (Docker or Node)
+- Root directory: `discord-bot`. Build command: `npm install`. Start command: `npm start` (or use the included `Dockerfile`).
+- Environment variables: `DISCORD_TOKEN` (and anything else from `.env.example`). These hosts set `PORT` for you, which turns on the keep-alive server.
+- Point an uptime monitor at `https://<your-app>/health` every 5 minutes.
+
+### Docker
+```bash
+docker build -t mega-bot .
+docker run -d --restart unless-stopped --env-file .env -v $(pwd)/data:/app/data --name mega-bot mega-bot
+```
+
+---
+
+## 📚 Commands (__TOTAL__)
+
+__TABLE__
+
+Browse them in Discord with `!help`, `!help <category>`, `!help <command>` or `!commands`.
+
+**About the count:** about 400 of the commands are unit-conversion shortcuts (`!km2mi`, `!c2f`, `!kg2lb`, … for every pair of units in 10 groups), and about 20 are one-per-algorithm hash commands. They're real and they work, but if you want a tidier list, disable the category with `!disable conversions` and use `!convert 10 km mi`.
+
+---
+
+## 🛠️ For developers
+```
+discord-bot/
+├─ src/index.js            starts every bot profile, retries, watchdog
+├─ src/config.js           .env + bots.json
+├─ src/core/               framework: command handler, slash, JSON database, voice engine, UI helpers
+└─ src/modules/<category>/ commands (one folder per category; files starting with "_" are helpers)
+```
+- `npm run check` validates every command (duplicate names, slash definitions) and prints counts.
+- `npm run smoke -- <category>` runs commands against a fake Discord context (`-- all --verbose` for everything).
+- Adding a command: drop a file into `src/modules/<category>/` that exports an array of `{ name, description, usage, examples, execute(ctx) }` (see `src/modules/core/bot.js`).
+- Data is stored in `data/db.json` (atomic writes plus a rolling backup). Back up that folder.

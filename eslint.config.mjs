@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone Node.js Discord bot with its own package.json
+    "discord-bot/**",
   ]),
 ]);
 

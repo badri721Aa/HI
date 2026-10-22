@@ -1,0 +1,22 @@
+{
+  "name": "mega-discord-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "All-in-one Discord bot: 1000+ commands, moderation, economy, leveling, games, 24/7 voice radio, multi-bot profiles.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node scripts/check.js",
+    "smoke": "node scripts/smoke.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "@snazzah/davey": "^0.1.12",
+    "discord.js": "^14.27.0",
+    "ffmpeg-static": "^5.3.0"
+  }
+}
