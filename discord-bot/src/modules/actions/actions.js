@@ -62,7 +62,7 @@ async function gif(category) {
 function makeAction([name, category, emoji, withTarget, alone, noun]) {
   const cmd = {
     name,
-    description: `${emoji} ${alone.replace('{a}', 'You').replace(/\.$|!$|…$/, '')} — anime GIF${noun ? ' (counts per pair)' : ''}`.slice(0, 100),
+    description: `${emoji} ${name === 'kickrp' ? 'Kick' : name.charAt(0).toUpperCase() + name.slice(1)} someone (or just yourself) with an anime GIF`,
     usage: '[@user]',
     examples: ['', '<@111111111111111111>'],
     cooldown: 3,
@@ -74,7 +74,7 @@ function makeAction([name, category, emoji, withTarget, alone, noun]) {
       let text = solo ? alone.replace('{a}', a) : withTarget.replace('{a}', a).replace('{b}', `**${nameOf(target)}**`);
       if (!solo && noun) {
         const n = db.update('actions', `${name}:${ctx.author.id}:${target.id}`, (v) => (v || 0) + 1, 0);
-        text += `\n-# That's ${n} ${noun} from ${nameOf(ctx.author)} to ${nameOf(target)}!`;
+        text += `\n-# ${noun.charAt(0).toUpperCase()}${noun.slice(1)} from ${nameOf(ctx.author)} to ${nameOf(target)}: ${n}`;
       }
       let image = null;
       let footer = null;
