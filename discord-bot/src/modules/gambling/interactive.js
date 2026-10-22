@@ -422,7 +422,7 @@ module.exports = [
   },
   {
     name: 'highlow',
-    aliases: ['hl', 'higherlower'],
+    aliases: ['hl'],
     description: 'Guess if the next number is higher or lower — keep going to multiply your bet',
     usage: '<bet>',
     examples: ['100'],
