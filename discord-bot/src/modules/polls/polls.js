@@ -128,7 +128,7 @@ module.exports = {
       },
     },
     {
-      name: 'yesno',
+      name: 'yesnopoll',
       aliases: ['ynpoll'],
       description: 'Quick Yes / No button poll',
       usage: '<question> [time:1h]',

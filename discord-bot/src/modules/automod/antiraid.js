@@ -197,7 +197,7 @@ const commands = [
   },
   {
     name: 'minage',
-    aliases: ['accountage', 'agegate'],
+    aliases: ['agegate'],
     description: 'Kick new members whose Discord account is younger than N days',
     usage: '<days|off>',
     examples: ['7', 'off'],
