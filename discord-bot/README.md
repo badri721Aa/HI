@@ -7,7 +7,7 @@ An all-in-one Discord bot with **<!--total-->1,423<!--/total--> commands** (plus
 - 🎮 Games, 😂 fun, 🤗 40 anime roleplay actions, 🐾 animals
 - 🎫 Tickets, 🎉 giveaways, 📊 polls, 🏘️ welcome, reaction roles, starboard, suggestions…
 - 🎵 **24/7 voice**: stays in a voice channel forever, rejoins after disconnects and restarts, plays internet radio
-- 🕶️ **Hidden mode**: runs as *invisible* so it sits in the collapsed "Offline" part of the member list
+- 🕶️ **Hidden mode** (optional): `BOT_STATUS=invisible` in `.env` or `!setstatus invisible` puts it in the collapsed "Offline" part of the member list
 - 🤝 **Up to 30 different bots from one program**: each with its own name, prefix and feature set
 - ♾️ **Built to run forever**: auto-reconnect, crash protection, a watchdog, and a keep-alive web server
 - 🌟 `!bots`: a directory of **30 Discord-verified bots**, each for a different job, with invite links
@@ -48,6 +48,8 @@ cp .env.example .env      # Windows: copy .env.example .env
 npm start
 ```
 You should see `Logged in as YourBot#1234 — … commands`. In Discord, type `!help` or `/help`.
+
+On Windows PowerShell type `npm.cmd install` and `npm.cmd start` (plain `npm` is blocked there), or follow [Your Windows PC](#your-windows-pc-visible-window-task-scheduler) to run it 24/7.
 
 `ffmpeg` is bundled through `ffmpeg-static`, and voice encryption (Discord's required DAVE/E2EE) is handled by `@snazzah/davey`. Nothing else needs installing.
 
@@ -95,12 +97,19 @@ Runs the bot 24/7 while your PC is on, using only what Windows already has. The 
 
 Use **Windows PowerShell** (not as administrator). Paste each block, press Enter, and wait for the prompt to come back. Every block starts in the right folder, so you can close PowerShell between steps. PowerShell blocks plain `npm` ("running scripts is disabled"); `npm.cmd` works.
 
-**1. Unpack and install** (Node.js 22.12 or newer). Unzip so the bot ends up in `C:\DiscordBot\discord-bot` (no spaces, outside OneDrive). If your browser renamed the download, e.g. `mega-discord-bot (2).zip`, use that name:
+**0. Only if you ran the old `windows-24-7.ps1` installer before.** It started a hidden copy of the bot at every sign-in. This removes that autostart and stops a hidden copy that may still be running; if there's nothing to remove, it does nothing. Run it only now, never while the new bot runs (the last line would stop that too):
+```powershell
+Unregister-ScheduledTask -TaskName "MegaDiscordBot" -Confirm:$false -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath "$([Environment]::GetFolderPath('Startup'))\MegaDiscordBot.lnk" -ErrorAction SilentlyContinue
+Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*run-forever.ps1*') -or ($_.Name -eq 'node.exe' -and $_.CommandLine -like '*src?index.js*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+```
+To keep the old bot's economy, levels and settings, copy its `data` folder into `C:\DiscordBot\discord-bot\` after step 1. Don't reuse its `.env`; make a new one in step 2.
+
+**1. Unpack and install** (Node.js 22.12 or newer). Download the zip first. This block takes the newest `mega-discord-bot*.zip` in Downloads, whatever your browser called it, unpacks it to `C:\DiscordBot\discord-bot` (no spaces, outside OneDrive) and installs the packages. It refuses an old zip that has no `start-bot.cmd`:
 ```powershell
 New-Item -ItemType Directory -Force -Path "C:\DiscordBot" | Out-Null
-tar.exe -xf "$HOME\Downloads\mega-discord-bot.zip" -C "C:\DiscordBot"
-Set-Location "C:\DiscordBot\discord-bot"
-npm.cmd ci
+$zip = Get-ChildItem -LiteralPath "$HOME\Downloads" -Filter "mega-discord-bot*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($zip -and ((tar.exe -tf $zip.FullName) -contains "discord-bot/start-bot.cmd")) { "Unpacking $($zip.Name)"; tar.exe -xf $zip.FullName -C "C:\DiscordBot"; Set-Location "C:\DiscordBot\discord-bot"; npm.cmd ci } else { Write-Host "No new bot zip in Downloads (newest: '$($zip.Name)'). Download it and run this block again." -ForegroundColor Red }
 ```
 
 **2. Token.** Developer Portal → your app → **Bot**: turn on **Server Members Intent** and **Message Content Intent** → **Save Changes**, then **Reset Token** → **Copy**.
@@ -117,7 +126,7 @@ npm.cmd start
 ```
 You should see `Logged in as YourBot#1234 — 1 servers …` and `Registered 98 slash commands globally.` (`0 servers` means the bot isn't invited yet: Developer Portal → OAuth2 → URL Generator → `bot` + `applications.commands`.)
 
-**4. Restart script.** `start-bot.cmd` (included) runs the bot and starts it again 15 seconds after it stops. Its `set "NODE_EXE=…"` line points at `E:\Program Files\nodejs\node.exe`; if your Node.js is elsewhere it uses `node` from your PATH, or you can edit that line.
+**4. Restart script.** `start-bot.cmd` (included) runs the bot and starts it again 15 seconds after it stops. Its `set "NODE_EXE=…"` line points at `E:\Program Files\nodejs\node.exe`; if your Node.js is elsewhere it uses `node` from your PATH, or you can edit that line. Don't double-click it: the task from step 6 starts it, and Task Scheduler can't see a copy you started yourself, so it would start a second one.
 
 **5. Stop a click from freezing the bot.** In the classic console, one click inside the window starts "Select" mode, which pauses the bot until Esc. This turns that off for console windows you open from now on (your account only; undo with `/d 1`):
 ```powershell
@@ -158,12 +167,19 @@ For Windows Update restarts, turn on "Use my sign-in info to automatically finis
 | Restart (e.g. after editing `.env`) | In the bot window: click the title bar, **Ctrl+C**, answer **N**. It saves and restarts in 15 s. |
 | Stop until you say so | `Disable-ScheduledTask -TaskName "DiscordBot"`, then **Ctrl+C** in the bot window and answer **Y**. |
 | Start again | `Enable-ScheduledTask -TaskName "DiscordBot"; Start-ScheduledTask -TaskName "DiscordBot"` |
+| Bring the window back now (it was closed) | `Start-ScheduledTask -TaskName "DiscordBot"` (otherwise it comes back by itself within 5 minutes) |
 | Remove the autostart | `Unregister-ScheduledTask -TaskName "DiscordBot" -Confirm:$false` |
 
 - Don't use **End** in Task Scheduler or `Stop-ScheduledTask`: they close only the window's `cmd.exe`, the bot keeps running, and a second copy starts 5 minutes later.
-- Don't run `npm.cmd start` while the task is on (two copies would answer twice and overwrite each other's data).
+- Don't double-click `start-bot.cmd` or run `npm.cmd start` while the task is on. Task Scheduler can't see a copy you started yourself and starts a second one within 5 minutes; two copies answer twice and overwrite each other's data.
 - Window shows `Terminate batch job (Y/N)?` → the bot is stopped; type **N**. Title starts with `Select` → press **Esc**.
-- Updating: stop the bot (row above), delete the old `src` and `scripts` folders (files removed upstream would otherwise keep loading), unzip the new version over `C:\DiscordBot`, run `npm.cmd ci`, start again. `.env` and `data\` are kept; `start-bot.cmd` is replaced, so redo any change you made to its `NODE_EXE` line.
+
+**Updating to a new zip.** Download it, run `Disable-ScheduledTask -TaskName "DiscordBot"`, then press **Ctrl+C** in the bot window and answer **Y**. This block checks the newest zip first, then replaces the program folders `src` and `scripts` (so files removed upstream don't keep loading), unpacks and reinstalls:
+```powershell
+$zip = Get-ChildItem -LiteralPath "$HOME\Downloads" -Filter "mega-discord-bot*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($zip -and ((tar.exe -tf $zip.FullName) -contains "discord-bot/start-bot.cmd")) { "Updating from $($zip.Name)"; Remove-Item -LiteralPath "C:\DiscordBot\discord-bot\src", "C:\DiscordBot\discord-bot\scripts" -Recurse -Force; tar.exe -xf $zip.FullName -C "C:\DiscordBot"; Set-Location "C:\DiscordBot\discord-bot"; npm.cmd ci } else { Write-Host "No new bot zip in Downloads (newest: '$($zip.Name)')." -ForegroundColor Red }
+```
+Then `Enable-ScheduledTask -TaskName "DiscordBot"; Start-ScheduledTask -TaskName "DiscordBot"`. `.env` and `data\` are kept; `start-bot.cmd` is replaced, so redo any change you made to its `NODE_EXE` line.
 
 ### From Windows only (your PC can be off afterwards)
 Windows 10/11 already include `ssh` and `scp`. The only browser step is creating the free server.

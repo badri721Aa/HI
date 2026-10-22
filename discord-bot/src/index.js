@@ -25,7 +25,7 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 // Windows raises SIGHUP when the console window is closed and ends the process a few seconds later:
-// save first, because console output may already be gone. (Windows only, so `nohup` on Linux keeps working.)
+// save first, because console output may already be gone. Windows only: on Linux SIGHUP keeps Node's default.
 if (process.platform === 'win32') {
   process.on('SIGHUP', () => {
     db.flush();

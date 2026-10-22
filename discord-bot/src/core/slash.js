@@ -82,6 +82,10 @@ async function register(client, registry, bot) {
   const data = buildAll(registry, bot);
   const hash = crypto.createHash('sha1').update(JSON.stringify(data)).digest('hex');
   const key = `${client.user.id}:${config.devGuildId || 'global'}`;
+  if (config.devGuildId && !/^\d{17,20}$/.test(config.devGuildId)) {
+    log.error(`[${bot.name}] DEV_GUILD_ID (${config.devGuildId}) is not a server ID (only digits). Leave DEV_GUILD_ID empty in .env to register the commands in every server.`);
+    return;
+  }
   if (db.get('meta', `slashHash:${key}`) === hash) {
     log.info(`[${bot.name}] Slash commands unchanged (${data.length}).`);
     return;
