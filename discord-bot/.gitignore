@@ -3,3 +3,5 @@ data/
 .env
 bots.json
 *.log
+run-forever.ps1
+bot-control.ps1
