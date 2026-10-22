@@ -90,50 +90,64 @@ Free plans change often, so check each provider's pricing page before you rely o
 | **Free Discord-bot panels** (e.g. bot-hosting.net) | ⚠️ Mostly | Usually 256 MB RAM (one bot) and you must click "renew" every few days. |
 | Replit / Glitch / Heroku / Fly.io | ❌ | Replit's always-on is paid, Glitch ended project hosting in July 2025, Heroku has had no free tier since 2022, and Fly.io has no free tier for new accounts. |
 
-### From Windows CMD only (your PC can be off afterwards)
+### From Windows only (your PC can be off afterwards)
 Windows 10/11 already include `ssh` and `scp`. The only browser step is creating the free server.
 
-**1. On your PC (CMD): make a login key**
-```bat
-ssh-keygen -t ed25519 -f %USERPROFILE%\.ssh\botkey -N ""
-type %USERPROFILE%\.ssh\botkey.pub
+These commands are for **PowerShell**, the default Windows terminal (its prompt looks like `PS C:\…>`). In the old CMD, write `%USERPROFILE%` instead of `$HOME`. Keep the quotes: they make paths with spaces work, e.g. a username like `ADVANTI SYSTEMS`.
+
+**1. On your PC: make a login key**
+```powershell
+ssh-keygen -t ed25519 -f "$HOME\.ssh\botkey"
 ```
-Copy the line that `type` prints.
+When it asks for a passphrase, just press **Enter** twice. Then show the public key and copy the line it prints:
+```powershell
+Get-Content "$HOME\.ssh\botkey.pub"
+```
 
 **2. In the browser, once:** sign up at <https://www.oracle.com/cloud/free/>, then go to **Compute → Instances → Create instance**:
 - **Image:** Ubuntu.
 - **Shape:** `VM.Standard.A1.Flex` (Always Free).
 - **SSH keys:** choose *Paste public key* and paste the line from step 1.
 
-Once the server is created, copy its **Public IP address**.
+Once the server is created, copy its **Public IP address**, e.g. `140.238.12.34`. You'll use it instead of `YOUR_IP` below.
 
-**3. Back in CMD: upload the bot and log in** (replace `1.2.3.4` with your IP)
-```bat
-scp -i %USERPROFILE%\.ssh\botkey "%USERPROFILE%\Downloads\mega-discord-bot.zip" ubuntu@1.2.3.4:~/
-ssh -i %USERPROFILE%\.ssh\botkey ubuntu@1.2.3.4
+**3. On your PC: upload the bot zip and log in**
+Find the zip's exact name: `Get-ChildItem "$HOME\Downloads\*.zip"`. It might be `mega-discord-bot (1).zip`. Upload it, saving it on the server as `bot.zip`:
+```powershell
+scp -i "$HOME\.ssh\botkey" "$HOME\Downloads\mega-discord-bot.zip" ubuntu@YOUR_IP:bot.zip
+ssh -i "$HOME\.ssh\botkey" ubuntu@YOUR_IP
 ```
+The first time, type `yes` when it asks whether to trust the server.
 
-**4. You're now typing on the server.** Run:
+**4. Now you're on the server.** The prompt changes from `PS C:\…>` to something like `ubuntu@instance:~$`. Only now run these, one line at a time:
 ```bash
-sudo apt update && sudo apt install -y unzip curl
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs
-unzip mega-discord-bot.zip && cd discord-bot && npm install
-cp .env.example .env && nano .env
+sudo apt update
+sudo apt install -y unzip curl
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+unzip bot.zip
+cd discord-bot
+npm install
+cp .env.example .env
+nano .env
 ```
-In `nano`, paste your token after `DISCORD_TOKEN=`, then press **Ctrl+O**, **Enter**, **Ctrl+X**.
+In `nano`, paste your token after `DISCORD_TOKEN=` (right-click pastes), then press **Ctrl+O**, **Enter**, **Ctrl+X**.
 ```bash
 sudo npm install -g pm2
-pm2 start ecosystem.config.js && pm2 save
+pm2 start ecosystem.config.js
+pm2 save
 pm2 startup
 ```
-`pm2 startup` prints one `sudo env PATH=… pm2 startup …` line: copy it, run it, then type `exit`. The bot now runs 24/7, restarts itself after crashes and server reboots, and keeps running with your PC turned off. No ports need opening, because the bot only connects outward to Discord.
+`pm2 startup` prints one line starting with `sudo env PATH=…`. Copy it, run it, then type `exit` to return to your PC.
 
-**Later, from CMD:**
+The bot now runs 24/7 with your PC turned off, restarts itself after crashes, and starts again after server reboots. No ports need opening, because the bot only connects outward to Discord.
+
+**Later, from PowerShell on your PC:**
 | What | Command |
 |---|---|
-| See the logs | `ssh -i %USERPROFILE%\.ssh\botkey ubuntu@1.2.3.4 "pm2 logs --lines 50 --nostream"` |
-| Restart the bot | `ssh -i %USERPROFILE%\.ssh\botkey ubuntu@1.2.3.4 "pm2 restart all"` |
-| Install a new zip | `scp` it up as in step 3, then `ssh … "unzip -o mega-discord-bot.zip && cd discord-bot && npm install && pm2 restart all"` (your `.env` and `data/` folder are kept) |
+| See the logs | `ssh -i "$HOME\.ssh\botkey" ubuntu@YOUR_IP "pm2 logs --lines 50 --nostream"` |
+| Restart the bot | `ssh -i "$HOME\.ssh\botkey" ubuntu@YOUR_IP "pm2 restart all"` |
+| Install a new zip | Upload it as in step 3, then `ssh -i "$HOME\.ssh\botkey" ubuntu@YOUR_IP "unzip -o bot.zip && cd discord-bot && npm install && pm2 restart all"`. Your `.env` and `data/` folder are kept. |
 
 > Oracle may stop free servers that look idle for 7 days, and a small bot can look idle. Upgrading the account to **Pay As You Go** stops that, and you still pay nothing as long as you stay within the Always Free limits.
 
