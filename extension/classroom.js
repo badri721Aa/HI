@@ -53,11 +53,12 @@
       if (box) return box.innerText.trim().slice(0, 4000)
     }
     if (IS_CLASSROOM) {
-      // assignment title + description blocks
+      // Prefer the assignment title + description; cap length so we don't grab
+      // an outer container that holds the whole page (nav + comments + chrome).
       const main = document.querySelector('[role="main"]') || document.body
-      const chunks = [...main.querySelectorAll('[role="heading"], div')]
+      const chunks = [...main.querySelectorAll('[role="heading"], p, li, div')]
         .map(e => e.innerText?.trim())
-        .filter(t => t && t.length > 25)
+        .filter(t => t && t.length > 25 && t.length < 1800)
       chunks.sort((a, b) => b.length - a.length)
       if (chunks[0]) return chunks[0].slice(0, 4000)
     }
@@ -117,73 +118,79 @@
     el.dispatchEvent(new Event('change', { bubbles: true }))
   }
 
+  // The question block the user is working on (selection/focus, else first unanswered).
+  function currentQuestionContainer() {
+    const sel = window.getSelection()
+    const node = sel?.anchorNode
+      ? (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement)
+      : document.activeElement
+    const fromSel = node?.closest?.('[role="listitem"]')
+    if (fromSel) return fromSel
+    const items = [...document.querySelectorAll('[role="listitem"]')].filter(li =>
+      li.querySelector('[role="radio"],[role="checkbox"],textarea,input[type="text"],input:not([type])'),
+    )
+    return items[0] || null
+  }
+
   /* ── Google Forms: text + multiple choice ──────────────────────────────── */
   async function fillForms(answer) {
-    // 1) try multiple-choice match
-    const options = [...document.querySelectorAll('[role="radio"], [role="checkbox"]')]
+    // Scope to a single question so option-indexing/label-matching stay aligned.
+    const container = currentQuestionContainer()
+    const scope = container || document
+    const options = [...scope.querySelectorAll('[role="radio"], [role="checkbox"]')]
     if (options.length) {
       const labels = options.map(o => ({
         el: o,
         text: (o.getAttribute('aria-label') || o.closest('[role="listitem"]')?.innerText || o.innerText || '').trim().toLowerCase(),
       }))
-      const ansLow = answer.toLowerCase()
-      // direct letter answer e.g. "Answer: B" or "The answer is C"
-      const letter = ansLow.match(/\b(?:answer\s*(?:is|:)?\s*)?\(?([a-e])\)?\b/)
+      const ans = answer.trim()
+      const ansLow = ans.toLowerCase()
       let hit = null
+
+      // Letter answer ONLY when it's explicit — the whole answer is a letter,
+      // or there's a clear "answer/option/choice is X" cue. No bare stray letters.
+      const letter =
+        ans.match(/^\(?([a-eA-E])\)?[).:]?\s*$/) ||
+        ansLow.match(/\b(?:the\s+)?(?:correct\s+)?(?:answer|option|choice)\s*(?:is|:)?\s*\(?([a-e])\)?\b/)
       if (letter) {
-        const idx = letter[1].charCodeAt(0) - 97
+        const idx = letter[1].toLowerCase().charCodeAt(0) - 97
         if (labels[idx]) hit = labels[idx]
       }
+      // Otherwise match the longest option text that appears in the answer.
       if (!hit) {
-        // match longest option text that appears in the answer
-        const cands = labels
-          .filter(l => l.text && ansLow.includes(l.text))
-          .sort((a, b) => b.text.length - a.text.length)
+        const cands = labels.filter(l => l.text && ansLow.includes(l.text)).sort((a, b) => b.text.length - a.text.length)
         hit = cands[0]
       }
-      if (hit) {
-        hit.el.click()
-        status('Multiple-choice answered ✓', 'ok')
-        return true
-      }
+      if (hit) { hit.el.click(); status('Multiple-choice answered ✓', 'ok'); return true }
     }
-    // 2) text / paragraph answer
-    const field = findTypeTarget()
+    // Text / paragraph answer — prefer a field inside the same question.
+    const field = findTypeTarget(container) || findTypeTarget()
     if (field) { await typeIntoField(field, answer); status('Typed into form ✓', 'ok'); return true }
     return false
   }
 
-  /* ── Google Docs canvas (hardest target) ───────────────────────────────── */
+  /* ── Google Docs canvas ────────────────────────────────────────────────── */
+  // Docs renders to a <canvas> and only acts on *trusted* OS events, so scripted
+  // typing/paste can't insert text. Be honest: put it on the clipboard and tell
+  // the user to paste. Returns 'manual' so the caller doesn't claim success.
   async function fillDocs(answer) {
-    const iframe = document.querySelector('.docs-texteventtarget-iframe')
-    const target = iframe?.contentDocument?.querySelector('[contenteditable="true"]') || iframe?.contentDocument?.body
-    if (target) {
-      target.focus()
-      // Attempt a paste-event injection (Docs listens for paste)
-      try {
-        const dt = new DataTransfer()
-        dt.setData('text/plain', answer)
-        const ev = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt })
-        target.dispatchEvent(ev)
-      } catch {}
-      // Also simulate per-char keystrokes for editors that read keydown
-      for (const ch of answer) {
-        if (stopFlag) return true
-        target.dispatchEvent(new InputEvent('textInput', { bubbles: true, data: ch }))
-        target.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: 'insertText' }))
-        await sleep(rand(perChar() * 0.6, perChar() * 1.4))
-      }
-      status('Sent to Docs — if nothing appeared, use "Copy" + Ctrl+V', 'ok')
-      return true
-    }
-    return false
+    let copied = false
+    try { await navigator.clipboard.writeText(answer); copied = true } catch {}
+    status(
+      copied
+        ? 'Docs is canvas-based — answer copied. Click the doc and press Ctrl+V.'
+        : 'Docs is canvas-based — hit Copy, then click the doc and press Ctrl+V.',
+      copied ? 'ok' : 'err',
+    )
+    return 'manual'
   }
 
   /* ── find a generic typeable target ────────────────────────────────────── */
-  function findTypeTarget() {
+  function findTypeTarget(root) {
+    if (!root) root = document
     const active = document.activeElement
-    if (active && isTypeable(active)) return active
-    const cands = [...document.querySelectorAll('textarea, input[type="text"], input:not([type]), [contenteditable="true"]')]
+    if (active && isTypeable(active) && (root === document || root.contains(active))) return active
+    const cands = [...root.querySelectorAll('textarea, input[type="text"], input:not([type]), [contenteditable="true"]')]
       .filter(isVisible)
     // prefer empty ones
     return cands.find(e => !(e.value || e.innerText || '').trim()) || cands[0] || null
@@ -209,7 +216,9 @@
         const t = findTypeTarget()
         if (t) { await typeIntoField(t, answer); done = true }
       }
-      if (!done) {
+      if (done === 'manual') {
+        // handler already set an honest status (e.g. Docs clipboard fallback)
+      } else if (!done) {
         await navigator.clipboard.writeText(answer).catch(() => {})
         status('No field found — copied to clipboard, click the box + Ctrl+V', 'err')
       } else if (!stopFlag) {

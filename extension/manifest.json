@@ -44,6 +44,6 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://gvxnzgogfaifmsdkingq.supabase.co wss://realtime.supabase.co https://alhekma-cheating.vercel.app http://localhost; img-src 'self' data:; font-src 'self' data:"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://gvxnzgogfaifmsdkingq.supabase.co wss://realtime.supabase.co https://alhekma-cheating.vercel.app http://localhost http://localhost:*; img-src 'self' data:; font-src 'self' data:"
   }
 }

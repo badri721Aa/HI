@@ -50,10 +50,11 @@ const tools: { id: Tool; label: string; icon: string; desc: string; placeholder:
 ]
 
 function renderMarkdown(text: string): string {
-  return text
-    // Code blocks
+  // Escape first so model output can't inject HTML (dangerouslySetInnerHTML sink).
+  return escHtml(text)
+    // Code blocks (content already escaped above)
     .replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
-      `<pre class="code-block" data-lang="${lang}"><code>${escHtml(code.trim())}</code></pre>`)
+      `<pre class="code-block" data-lang="${lang}"><code>${code.trim()}</code></pre>`)
     // Inline code
     .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
     // Bold

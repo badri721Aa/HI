@@ -18,7 +18,8 @@ export const runtime = 'edge'
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? ''
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-opus-5-5'
 const ANTHROPIC_EFFORT = process.env.ANTHROPIC_EFFORT ?? 'low'
-const ANTHROPIC_MAX_TOKENS = Number(process.env.ANTHROPIC_MAX_TOKENS ?? '4096')
+const _maxTokens = Number(process.env.ANTHROPIC_MAX_TOKENS)
+const ANTHROPIC_MAX_TOKENS = Number.isFinite(_maxTokens) && _maxTokens > 0 ? _maxTokens : 4096
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY ?? ''
 const GROQ_MODEL = 'llama3-70b-8192'

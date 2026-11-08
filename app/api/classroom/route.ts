@@ -29,7 +29,7 @@ export function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
-  const { accessToken, action, courseId, courseWorkId } = await req.json().catch(() => ({}))
+  const { accessToken, action, courseId, courseWorkId, pageToken } = await req.json().catch(() => ({}))
 
   if (!accessToken || typeof accessToken !== 'string') {
     return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: CORS })
@@ -60,6 +60,13 @@ export async function POST(req: NextRequest) {
       break
     default:
       return bad('Unknown action')
+  }
+
+  // Forward the client's page cursor so large course/assignment lists aren't
+  // silently capped at one page. The upstream nextPageToken is passed through
+  // in the returned JSON for the client to continue.
+  if (pageToken && typeof pageToken === 'string') {
+    url += (url.includes('?') ? '&' : '?') + 'pageToken=' + encodeURIComponent(pageToken)
   }
 
   try {

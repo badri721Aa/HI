@@ -25,18 +25,40 @@ interface Work {
 function escHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
+
+// Escape the whole input FIRST (no HTML injection, no mangled < / >), then apply
+// markdown line-by-line so headings / code / lists aren't illegally nested in <p>.
 function md(text: string): string {
-  return text
-    .replace(/```(\w*)\n?([\s\S]*?)```/g, (_, l, c) => `<pre class="cb"><code>${escHtml(c.trim())}</code></pre>`)
+  const blocks: string[] = []
+  let s = escHtml(text).replace(/```(\w*)\n?([\s\S]*?)```/g, (_m, _lang, code) => {
+    blocks.push(`<pre class="cb"><code>${code.replace(/\n+$/, '')}</code></pre>`)
+    return `${blocks.length - 1}`
+  })
+  s = s
     .replace(/`([^`]+)`/g, '<code class="ic">$1</code>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/^[•\-*] (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>[\s\S]+?<\/li>)+/g, m => `<ul>${m}</ul>`)
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br/>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+
+  const out: string[] = []
+  let para: string[] = []
+  let list: string[] = []
+  const flushPara = () => { if (para.length) { out.push(`<p>${para.join('<br/>')}</p>`); para = [] } }
+  const flushList = () => { if (list.length) { out.push(`<ul>${list.map(li => `<li>${li}</li>`).join('')}</ul>`); list = [] } }
+
+  for (const raw of s.split('\n')) {
+    const line = raw.replace(/\s+$/, '')
+    const ph = line.trim().match(/^(\d+)$/)
+    if (ph) { flushPara(); flushList(); out.push(blocks[+ph[1]]); continue }
+    let m: RegExpMatchArray | null
+    if ((m = line.match(/^### (.+)/))) { flushPara(); flushList(); out.push(`<h3>${m[1]}</h3>`) }
+    else if ((m = line.match(/^## (.+)/))) { flushPara(); flushList(); out.push(`<h2>${m[1]}</h2>`) }
+    else if ((m = line.match(/^# (.+)/))) { flushPara(); flushList(); out.push(`<h1>${m[1]}</h1>`) }
+    else if ((m = line.match(/^\s*[•\-*]\s+(.+)/))) { flushPara(); list.push(m[1]) }
+    else if ((m = line.match(/^\s*\d+\.\s+(.+)/))) { flushPara(); list.push(m[1]) }
+    else if (line.trim() === '') { flushPara(); flushList() }
+    else { flushList(); para.push(line) }
+  }
+  flushPara(); flushList()
+  return out.join('')
 }
 
 function dueLabel(w: Work): string {
@@ -98,7 +120,8 @@ export default function ClassroomPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ accessToken, action, ...extra }),
     })
-    const data = await res.json()
+    const data = await res.json().catch(() => ({}))
+    if (res.status === 401) { setToken(null); throw new Error('Google session expired — reconnect.') }
     if (!res.ok) throw new Error(data.error ?? 'Request failed')
     return data
   }, [])
@@ -166,8 +189,12 @@ export default function ClassroomPage() {
   }
 
   async function copyAnswer() {
-    await navigator.clipboard.writeText(answer)
-    setCopied(true); setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(answer)
+      setCopied(true); setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setError('Copy failed — clipboard unavailable')
+    }
   }
 
   return (
@@ -293,7 +320,7 @@ export default function ClassroomPage() {
             </div>
           </div>
           {answer
-            ? <div className="ans text-sm leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: `<p>${md(answer)}</p>` }} />
+            ? <div className="ans text-sm leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: md(answer) }} />
             : <div className="text-xs text-zinc-600 animate-pulse">Claude is working…</div>}
         </div>
       )}
