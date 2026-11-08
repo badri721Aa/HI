@@ -79,6 +79,7 @@ export class Game implements GameApi {
   private resizeObs: ResizeObserver | null = null
   private mapImage: string | null = null
   private enemiesDefeatedRun = 0
+  private textEntry = false
   private onVisibility = () => {
     if (document.hidden) {
       if (this.phase === 'playing') this.pause()
@@ -125,7 +126,7 @@ export class Game implements GameApi {
       }
       // Only treat it as "the player pressed Esc" if the lock was really held;
       // some browsers grant and immediately drop it.
-      if (this.phase === 'playing' && performance.now() - lockedAt > 300) this.pause()
+      if (this.phase === 'playing' && !this.textEntry && performance.now() - lockedAt > 300) this.pause()
     }
 
     const self = this
@@ -554,6 +555,14 @@ export class Game implements GameApi {
     this.bus.emit('audio:music', { mood })
   }
 
+  setTextEntry(active: boolean): void {
+    if (this.textEntry === active) return
+    this.textEntry = active
+    const p = this.phase
+    this.ctx.input.enabled = !active && (p === 'playing' || p === 'dialog')
+    this.ctx.input.reset()
+  }
+
   shake(intensity: number, duration: number): void {
     if (!this.ctx.settings.cameraShake) return
     this.ctx.cameraRig.shake(intensity, duration)
@@ -565,7 +574,7 @@ export class Game implements GameApi {
     if (this.phase === p) return
     this.phase = p
     const live = p === 'playing'
-    this.ctx.input.enabled = live || p === 'dialog'
+    this.ctx.input.enabled = !this.textEntry && (live || p === 'dialog')
     this.ctx.input.capture = p !== 'title' && p !== 'loading'
     if (p === 'playing') this.ctx.player.controlEnabled = true
     this.ctx.enemies.frozen = p !== 'playing'

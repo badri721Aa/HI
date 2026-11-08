@@ -84,6 +84,11 @@ export interface GameApi {
   setMusic(mood: MusicMood): void
   /** Short screen shake via the camera rig (respects the setting). */
   shake(intensity: number, duration: number): void
+  /**
+   * The UI is capturing text (chat): gameplay input is ignored and losing pointer lock doesn't pause.
+   * Call with false when typing ends (then call requestPointerLock from a user gesture if needed).
+   */
+  setTextEntry(active: boolean): void
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -178,7 +183,10 @@ export interface ICharacter extends System {
   readonly ragdolling: boolean
   /** True once the get-up has started (the controller may move the capsule to the anchor then). */
   readonly ragdollRecovering: boolean
-  /** Ground point under the ragdoll's pelvis (where the player stands up). */
+  /**
+   * Under the ragdoll's pelvis: the ground point while it lies on something (where the player stands up),
+   * or a point that rises with the body while it is airborne (so the camera follows a thrown body).
+   */
   getRagdollAnchor(out: THREE.Vector3): THREE.Vector3
   /** End any ragdoll immediately and snap back to the animated pose (respawns, teleports, cutscenes). */
   cancelRagdoll(): void
@@ -370,8 +378,11 @@ export interface INetwork extends System {
   setProfile(p: Partial<{ name: string; color: string }>): void
   /** Public rooms with live player counts. */
   listPublicRooms(): Promise<RoomInfo[]>
-  /** Join a room by code (creates it if empty). Rejects with a readable Error on failure (e.g. full). */
-  join(code: string): Promise<void>
+  /**
+   * Join a room by code. By default an empty room is created; with `{ create: false }` it rejects with
+   * Error('No room with that code') when nobody is in it. Rejects with a readable Error on failure (e.g. full).
+   */
+  join(code: string, opts?: { create?: boolean }): Promise<void>
   /** Join the busiest public room that still has space. */
   quickJoin(): Promise<void>
   /** Create a private room and join it; resolves with its code. */
