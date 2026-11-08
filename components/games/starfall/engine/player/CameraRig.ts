@@ -235,26 +235,39 @@ export class CameraRig implements ICameraRig {
     const reach = this.boom - this.pull
     const cam = this.ctx.camera
     cam.position.set(pv.x + dx * reach, pv.y + dy * reach, pv.z + dz * reach)
+    // Backed against a wall: rise a little (never into a ceiling) and aim a bit higher.
+    let lift = (1 - smoothstep(C.minDist, C.closeFrom, reach)) * C.closeLift
+    if (lift > 0.01) {
+      const up = this.ctx.collision.raycast(cam.position.x, cam.position.y, cam.position.z, 0, 1, 0, lift + C.margin, true)
+      if (up) lift = Math.max(0, up.t - C.margin)
+      cam.position.y += lift
+    }
     this.keepAboveGround(cam.position)
-    this.target.set(pv.x, pv.y + C.lookLift, pv.z)
+    this.target.set(pv.x, pv.y + C.lookLift + lift * 0.6, pv.z)
     cam.lookAt(this.target)
   }
 
-  /**
-   * Free boom length from the pivot along (dx, dy, dz), unit length. Thin things (trunks, posts)
-   * are looked past instead of yanking the camera in for a split second.
-   */
+  /** Boom length that fits from the pivot along the unit direction (dx, dy, dz), keeping the margin. */
   private castBoom(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, len: number): number {
+    const free = this.freeLength(ox, oy, oz, dx, dy, dz, len + C.margin)
+    return Math.max(C.minDist, Math.min(len, free - C.margin))
+  }
+
+  /**
+   * Distance along a unit ray to the first solid obstruction (terrain or collider), or `len` if clear.
+   * Thin things (trunks, posts) are looked past instead of yanking the camera in for a split second.
+   */
+  private freeLength(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, len: number): number {
     const col = this.ctx.collision
     let travelled = 0
     for (let i = 0; i < 3; i++) {
-      const remain = len + C.margin - travelled
+      const remain = len - travelled
       if (remain <= 0) break
       const hit = col.raycast(ox + dx * travelled, oy + dy * travelled, oz + dz * travelled, dx, dy, dz, remain)
       if (!hit) break
       const c = hit.collider
       const thin = c && (c.shape === 'cylinder' ? c.r < 0.6 : Math.max(c.hx, c.hz) < 0.35)
-      if (!thin) return Math.max(C.minDist, Math.min(len, travelled + hit.t - C.margin))
+      if (!thin) return travelled + hit.t
       travelled += hit.t + (c.shape === 'cylinder' ? c.r * 2 : Math.max(c.hx, c.hz) * 2) + 0.05
     }
     return len
@@ -296,15 +309,15 @@ export class CameraRig implements ICameraRig {
   }
 
   /**
-   * Finds where the title camera can circle without props (signs, lanterns, rocks) hiding the
-   * hero: rays from the hero's chest and head to each candidate position. If something blocks
+   * Finds where the title camera can circle without props (signs, huts, rocks) hiding the hero:
+   * rays from the hero's chest and head to each candidate position (thin trunks and posts may drift
+   * past in the foreground — that parallax reads as cinematic). If something blocks
    * part of the circle, the camera swings slowly back and forth across the widest clear arc,
    * preferring a three-quarter front view.
    */
   private planTitleOrbit(): void {
     const pl = this.ctx.player
     const p = pl.position
-    const col = this.ctx.collision
     const blocked = this.titleBlocked
     const prefer = pl.yaw + C.titleAngle
     const camY = p.y + C.titleHeight
@@ -316,7 +329,11 @@ export class CameraRig implements ICameraRig {
       const cz = p.z + Math.cos(a) * C.titleRadius
       for (const h of [1.0, 1.55]) {
         const oy = p.y + h
-        if (col.raycast(p.x, oy, p.z, cx - p.x, camY - oy, cz - p.z, 1)) {
+        const ex = cx - p.x
+        const ey = camY - oy
+        const ez = cz - p.z
+        const len = Math.hypot(ex, ey, ez)
+        if (this.freeLength(p.x, oy, p.z, ex / len, ey / len, ez / len, len) < len - 0.01) {
           blocked[k] = 1
           any = true
           break

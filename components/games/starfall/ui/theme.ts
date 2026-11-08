@@ -22,3 +22,9 @@ export function formatTime(seconds: number): string {
 
 /** Small tracked uppercase label. */
 export const LABEL = 'text-[11px] font-medium uppercase tracking-[0.24em]'
+
+/** Healthy connection. */
+export const GOOD = '#8FCB7E'
+
+/** True in the standalone static site (apps/starfall-web defines it), which has no arcade to link back to. */
+export const STANDALONE = process.env.NEXT_PUBLIC_STARFALL_STANDALONE === '1'

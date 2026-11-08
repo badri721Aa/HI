@@ -176,3 +176,77 @@ export function WarningIcon(p: IconProps) {
     </svg>
   )
 }
+
+/* ── online ─────────────────────────────────────────────────────── */
+
+const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' } as const
+
+export function CopyIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="8.5" y="8.5" width="11" height="11" rx="2" {...stroke} />
+      <path d="M15.5 5.5v-.5a1.5 1.5 0 0 0-1.5-1.5H6A2.5 2.5 0 0 0 3.5 6v8A1.5 1.5 0 0 0 5 15.5h.5" {...stroke} />
+    </svg>
+  )
+}
+
+export function CheckIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="m5 12.5 4.5 4.5L19 7.5" {...stroke} strokeWidth={2} />
+    </svg>
+  )
+}
+
+export function RefreshIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" {...stroke} />
+      <path d="M19.8 4.2v4.3h-4.3" {...stroke} />
+    </svg>
+  )
+}
+
+/** Two figures — player counts. */
+export function UsersIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="9" cy="8.5" r="3.3" fill="currentColor" />
+      <path d="M2.8 19.5c.5-3.4 3-5.4 6.2-5.4s5.7 2 6.2 5.4Z" fill="currentColor" />
+      <circle cx="16.6" cy="9.3" r="2.6" fill="currentColor" fillOpacity={0.55} />
+      <path d="M16.2 14.3c2.6.1 4.6 1.8 5 4.7h-4.3c-.2-1.8-.8-3.4-1.9-4.6Z" fill="currentColor" fillOpacity={0.55} />
+    </svg>
+  )
+}
+
+export function ChatIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 13.5Z" {...stroke} />
+      <path d="M8.5 9h7M8.5 12h4.5" {...stroke} />
+    </svg>
+  )
+}
+
+/** Raised open hand — emotes. */
+export function WaveIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path
+        d="M7.5 12.5V6.8a1.4 1.4 0 0 1 2.8 0v4.7M10.3 11V5a1.4 1.4 0 0 1 2.8 0v6M13.1 11V6a1.4 1.4 0 0 1 2.8 0v6.5M15.9 12.5V9.3a1.4 1.4 0 0 1 2.8 0V15a6.5 6.5 0 0 1-6.5 6.5h-.6a6 6 0 0 1-4.6-2.2l-3-3.8a1.4 1.4 0 0 1 2.1-1.8l1.4 1.5"
+        {...stroke}
+      />
+    </svg>
+  )
+}
+
+/** Three signal bars; `level` 0..3 fills that many. */
+export function SignalIcon({ level, ...p }: IconProps & { level: number }) {
+  return (
+    <svg {...base(p)}>
+      {[0, 1, 2].map(i => (
+        <rect key={i} x={4 + i * 6} y={15 - i * 4.5} width="4" height={5 + i * 4.5} rx="1" fill="currentColor" fillOpacity={i < level ? 1 : 0.22} />
+      ))}
+    </svg>
+  )
+}

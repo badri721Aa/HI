@@ -5,11 +5,14 @@ import type { Game } from '../engine/Game'
 import type { GameEventMap } from '../engine/events'
 import type { HudState } from '../engine/store'
 import type { SfxName } from '../engine/types'
+import type { NetState, NetStore } from './netStore'
 import type { UiState, UiStore } from './uiStore'
 
 export interface GameUi {
   game: Game
   store: UiStore
+  /** Multiplayer state (room, players, chat). */
+  net: NetStore
   /** Touch layout (coarse pointer, or forced with ?touch=1). */
   touch: boolean
 }
@@ -27,6 +30,13 @@ export function useUi<T>(select: (s: UiState) => T): T {
   const { store } = useGameUi()
   const get = () => select(store.get())
   return useSyncExternalStore(store.subscribe, get, get)
+}
+
+/** Select a slice of the multiplayer store. Same stability rule as useUi. */
+export function useNet<T>(select: (s: NetState) => T): T {
+  const { net } = useGameUi()
+  const get = () => select(net.get())
+  return useSyncExternalStore(net.subscribe, get, get)
 }
 
 /** Select a slice of the engine's HUD snapshot. */

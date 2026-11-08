@@ -145,6 +145,9 @@ export const CAM = {
   minDist: 1,
   /** How quickly the boom extends again after an obstruction clears (1/s). */
   boomOutRate: 3.5,
+  /** Pulled in closer than closeFrom, the camera rises up to closeLift so the hero's head drops out of the middle of the view. */
+  closeFrom: 3,
+  closeLift: 0.3,
   groundClear: 0.6,
   waterClear: 0.35,
 

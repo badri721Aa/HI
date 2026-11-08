@@ -56,6 +56,8 @@ export function useMenuNav({ scope, enabled, onBack, onKey }: NavOptions): void 
     if (!root) return
     const active = document.activeElement as HTMLElement | null
     const inside = !!active && root.contains(active)
+    // Text fields keep Enter, Space and Backspace for themselves; arrows still move between items.
+    const typing = inside && isTextField(active!)
 
     switch (e.key) {
       case 'ArrowDown':
@@ -71,6 +73,7 @@ export function useMenuNav({ scope, enabled, onBack, onKey }: NavOptions): void 
       }
       case 'Enter':
       case ' ': {
+        if (typing) return
         if (e.repeat) {
           e.preventDefault()
           return
@@ -89,7 +92,7 @@ export function useMenuNav({ scope, enabled, onBack, onKey }: NavOptions): void 
       }
       case 'Escape':
       case 'Backspace':
-        if (e.repeat || !onBack) return
+        if (e.repeat || !onBack || (typing && e.key === 'Backspace')) return
         e.preventDefault()
         onBack()
         return
@@ -106,6 +109,14 @@ export function useMenuNav({ scope, enabled, onBack, onKey }: NavOptions): void 
       stopPad()
     }
   }, [enabled])
+}
+
+/** Inputs that take typed text (not buttons, checkboxes or ranges). */
+export function isTextField(el: Element | null): boolean {
+  if (!el) return false
+  if (el instanceof HTMLTextAreaElement) return true
+  if ((el as HTMLElement).isContentEditable) return true
+  return el instanceof HTMLInputElement && !['button', 'checkbox', 'radio', 'range', 'submit', 'reset', 'color'].includes(el.type)
 }
 
 /* ── gamepad → key events ───────────────────────────────────────── */

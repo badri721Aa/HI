@@ -9,6 +9,7 @@
 import type { Game } from '../engine/Game'
 import type { GameEventMap, GamePhase, ToastKind, VictoryStats } from '../engine/events'
 import { DEFAULT_SETTINGS, type Settings } from '../engine/settings'
+import { isTextField } from './nav'
 
 export interface Toast {
   id: number
@@ -33,7 +34,7 @@ export interface Objective {
   leaving: boolean
 }
 
-export type PausePanel = 'root' | 'map' | 'settings' | 'controls' | 'quit'
+export type PausePanel = 'root' | 'map' | 'settings' | 'controls' | 'online' | 'quit'
 
 export interface UiState {
   phase: GamePhase
@@ -123,7 +124,7 @@ export class UiStore {
     const onLock = () => this.set({ pointerLocked: document.pointerLockElement === game.canvas })
     // Remember a recent M press so the pause menu can open straight onto the map.
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'KeyM' && this.state.phase === 'playing') this.mapKeyAt = performance.now()
+      if (e.code === 'KeyM' && this.state.phase === 'playing' && !isTextField(e.target as Element | null)) this.mapKeyAt = performance.now()
     }
     document.addEventListener('pointerlockchange', onLock)
     window.addEventListener('keydown', onKey)

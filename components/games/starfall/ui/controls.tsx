@@ -66,6 +66,8 @@ export function Button({
   variant = 'ghost',
   className,
   autofocus,
+  disabled,
+  size = 'md',
 }: {
   children: ReactNode
   onClick: () => void
@@ -73,12 +75,15 @@ export function Button({
   className?: string
   /** Marks the button panels focus first. */
   autofocus?: boolean
+  disabled?: boolean
+  size?: 'md' | 'sm'
 }) {
   const { game } = useGameUi()
   return (
     <button
       type="button"
       data-nav
+      disabled={disabled}
       data-autofocus={autofocus || undefined}
       onClick={() => {
         playUi(game, 'ui-click')
@@ -87,11 +92,12 @@ export function Button({
       onMouseEnter={e => e.currentTarget.focus({ preventScroll: true })}
       onFocus={() => isQuietFocus() || playUi(game, 'ui-hover')}
       className={cx(
-        'inline-flex h-11 items-center justify-center gap-2 rounded-[4px] px-6 text-[13px] font-semibold uppercase tracking-[0.16em] outline-none transition-[background-color,color,border-color,box-shadow] duration-150 ease-out',
+        'inline-flex items-center justify-center gap-2 rounded-[4px] font-semibold uppercase outline-none transition-[background-color,color,border-color,box-shadow,opacity] duration-150 ease-out disabled:cursor-default disabled:opacity-40',
+        size === 'md' ? 'h-11 px-6 text-[13px] tracking-[0.16em]' : 'h-8 px-3.5 text-[11px] tracking-[0.14em]',
         'focus-visible:ring-1 focus-visible:ring-[#F5B455]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0F14]',
-        variant === 'primary' && 'bg-[#F5B455] text-[#0B0F14] hover:bg-[#F8C677] focus:bg-[#F8C677]',
-        variant === 'ghost' && 'border border-[#F3EEE6]/20 text-[#F3EEE6]/85 hover:border-[#F3EEE6]/45 hover:text-[#F3EEE6] focus:border-[#F3EEE6]/45 focus:text-[#F3EEE6]',
-        variant === 'danger' && 'border border-[#E8664F]/50 text-[#F3B3A6] hover:bg-[#E8664F]/12 hover:text-[#FFD9D0] focus:bg-[#E8664F]/12 focus:text-[#FFD9D0]',
+        variant === 'primary' && 'bg-[#F5B455] text-[#0B0F14] enabled:hover:bg-[#F8C677] enabled:focus:bg-[#F8C677]',
+        variant === 'ghost' && 'border border-[#F3EEE6]/20 text-[#F3EEE6]/85 enabled:hover:border-[#F3EEE6]/45 enabled:hover:text-[#F3EEE6] enabled:focus:border-[#F3EEE6]/45 enabled:focus:text-[#F3EEE6]',
+        variant === 'danger' && 'border border-[#E8664F]/50 text-[#F3B3A6] enabled:hover:bg-[#E8664F]/12 enabled:hover:text-[#FFD9D0] enabled:focus:bg-[#E8664F]/12 enabled:focus:text-[#FFD9D0]',
         className,
       )}
     >
