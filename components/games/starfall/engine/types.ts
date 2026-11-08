@@ -255,7 +255,7 @@ export interface ICheckpoints extends System {
 }
 
 /** gameplay/Signs.ts — signposts + the Beacon altar: interact prompts and dialogs. */
-export interface ISigns extends System {}
+export type ISigns = System
 
 /** gameplay/Cutscenes.ts — scripted sequences with letterbox, subtitles, camera shots. */
 export interface ICutscenes extends System {
@@ -282,7 +282,7 @@ export interface IParticles extends System {
 }
 
 /** fx/Ambient.ts — fireflies, drifting leaves, pollen, sea spray, waterfall mist. */
-export interface IAmbient extends System {}
+export type IAmbient = System
 
 /** fx/PostFX.ts — final render: bloom, vignette, colour grade, FXAA/MSAA; dynamic resolution. */
 export interface IPostFX extends System {
