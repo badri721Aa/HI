@@ -133,12 +133,15 @@ export class Room {
     this.channel.send({ type: 'broadcast', event, payload }).catch(() => {})
   }
 
-  /** True if some peer has no working direct link from our side (they need the relay). */
+  /**
+   * True if some peer needs the relay: no open direct link, and either WebRTC is unavailable here
+   * or the peer has been around longer than the grace period (so the link failed, dropped or is retrying).
+   */
   needsRelay(now: number): boolean {
     for (let i = 0; i < this.list.length; i++) {
       const p = this.list[i]
       if (p.link?.open) continue
-      if (!this.rtc || !p.link || now - p.link.startedAt > DIRECT_GRACE) return true
+      if (!this.rtc || now - p.knownAt > DIRECT_GRACE) return true
     }
     return false
   }
@@ -284,9 +287,9 @@ export class Room {
     if (entries.length > MAX_SEEN) entries.length = MAX_SEEN
 
     // Over capacity: the latest joiners (by joinedAt, then id) leave.
+    const myJoin = this.host.member().joinedAt
     if (entries.length + 1 > MAX_PLAYERS) {
-      const me = this.host.member()
-      const ahead = entries.filter(([id, info]) => info.joinedAt < me.joinedAt || (info.joinedAt === me.joinedAt && id < self)).length
+      const ahead = entries.filter(([id, info]) => info.joinedAt < myJoin || (info.joinedAt === myJoin && id < self)).length
       if (ahead >= MAX_PLAYERS) return false
     }
 
@@ -303,6 +306,7 @@ export class Room {
         continue
       }
       const peer = new RemotePeer(id, info)
+      peer.knownAt = this.host.now()
       this.peers.set(id, peer)
       this.list.push(peer)
       this.relayNow = true

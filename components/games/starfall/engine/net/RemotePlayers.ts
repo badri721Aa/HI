@@ -34,6 +34,8 @@ const CULL_DIST = 240
 /** A ragdolling remote lies back this far (rad) about its pelvis, which rests this high (m). */
 const LIE_ANGLE = Math.PI / 2 - 0.1
 const LIE_PELVIS = 0.16
+/** How far back (m) the labels move to sit over the torso of a lying body. */
+const LIE_TAG_BACK = 0.45
 
 /** Same CSP-safe embedded image decoding as the local hero (see player/Character.ts). */
 function embeddedImagesViaImg(parser: GLTFParser) {
@@ -235,8 +237,11 @@ class Avatar {
     const s = Math.max(TAG_SIZE, TAG_SCREEN * viewK * dist)
     const fade = 1 - THREE.MathUtils.smoothstep(dist, TAG_FADE_START, TAG_HIDE)
     const tag = this.tag.sprite
-    const tagY = TAG_Y - this.limp * this.limp * (3 - 2 * this.limp) * 1.3
-    tag.position.y = tagY
+    // Lying down, the labels drop and move back over the torso.
+    const lie = this.limp * this.limp * (3 - 2 * this.limp)
+    const tagY = TAG_Y - lie * 1.3
+    tag.position.set(0, tagY, -LIE_TAG_BACK * lie)
+    this.bubble.sprite.position.z = tag.position.z
     tag.visible = fade > 0.01
     tag.scale.set(s * this.tag.aspect, s, 1)
     this.tag.material.opacity = fade
@@ -289,6 +294,8 @@ class Avatar {
 
   dispose(): void {
     this.animator?.stopGesture()
+    // Geometry and textures belong to the shared template; each clone owns its skeleton (bone texture).
+    this.model.traverse(o => (o as THREE.SkinnedMesh).skeleton?.dispose())
     this.root.removeFromParent()
     this.blob.removeFromParent()
     this.tag.dispose()

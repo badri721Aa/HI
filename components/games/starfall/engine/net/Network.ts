@@ -12,6 +12,7 @@
  * Progress stays per player; only the world is shared. Nothing here throws
  * from update(); failures surface as `net:status` events.
  */
+import * as THREE from 'three'
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js'
 import type { Ctx, GestureName, ICharacter, INetwork, NetPeer, NetStatus, RoomInfo } from '../types'
 import {
@@ -19,7 +20,7 @@ import {
   PROFILE_KEY, PUBLIC_ROOMS, RELAY_RATE_ACTIVE, RELAY_RATE_IDLE, SUPABASE_KEY, SUPABASE_URL,
 } from './config'
 import {
-  Bucket, FLAG_ACTIVE, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, RAGDOLL, STATE_BYTES, defaultColor, defaultName,
+  Bucket, FLAG_ACTIVE, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, STATE_BYTES, defaultColor, defaultName,
   encodeState, isEmote, makeSnapshot, normalizeRoomCode, randomId, sanitizeChat, sanitizeColor, sanitizeName,
   stateCode, toRelay, type MemberInfo,
 } from './protocol'
@@ -96,9 +97,13 @@ export class Network implements INetwork {
   private lobbyUntil = 0
   private lobbyRoom: string | null = null
   private lobbyEpoch = 0
+  /** Rejects the lobby subscription still in progress (when the lobby is closed meanwhile). */
+  private lobbyAbort: ((err: Error) => void) | null = null
 
   // local state stream
   private snap = makeSnapshot()
+  private anchor = new THREE.Vector3()
+  private still = new THREE.Vector3()
   private packet = new DataView(new ArrayBuffer(STATE_BYTES))
   private lastDirect = -1
   private lastRelay = -1
@@ -141,36 +146,6 @@ export class Network implements INetwork {
       .catch(() => {})
   }
 
-  private host: RoomHost = {
-    selfId: this.selfId,
-    member: () => this.member(),
-    now: () => this.now(),
-    peerJoined: (peer, initial) => {
-      this.peers.set(peer.id, peer)
-      this.remotes.preload()
-      this.ctx.bus.emit('net:peer', { id: peer.id, name: peer.name, joined: true })
-      if (!initial) this.system(`${peer.name} joined`)
-    },
-    peerLeft: peer => {
-      this.peers.delete(peer.id)
-      this.remotes.remove(peer.id)
-      this.ctx.bus.emit('net:peer', { id: peer.id, name: peer.name, joined: false })
-      this.system(`${peer.name} left`)
-    },
-    peerChanged: peer => this.remotes.refresh(peer.id),
-    chat: (peer, text) => {
-      this.remotes.say(peer.id, text)
-      this.ctx.bus.emit('net:chat', { id: peer.id, name: peer.name, color: peer.color, text })
-    },
-    emote: (peer, name) => this.remotes.gesture(peer.id, name),
-    ragdoll: (peer, v) => this.remotes.flop(peer.id, v),
-    count: players => this.setCount(players),
-    connection: (state, message) => this.setStatus(state, message),
-    evicted: () => {
-      void this.leave().then(() => this.setStatus('error', 'Room is full'))
-    },
-  }
-
   constructor(private ctx: Ctx) {
     this.profile = loadProfile()
     this.remotes = new RemotePlayers(ctx)
@@ -201,9 +176,10 @@ export class Network implements INetwork {
 
   async listPublicRooms(): Promise<RoomInfo[]> {
     const counts = new Map<string, number>()
+    // Set before subscribing: update() closes an idle lobby once this has passed.
+    this.lobbyUntil = Math.max(this.lobbyUntil, this.now() + LOBBY_LINGER)
     try {
       await this.ensureLobby()
-      this.lobbyUntil = Math.max(this.lobbyUntil, this.now() + LOBBY_LINGER)
       const state = this.lobby?.presenceState() as Record<string, Array<{ room?: unknown }>> | undefined
       for (const metas of Object.values(state ?? {})) {
         const room = Array.isArray(metas) ? metas[metas.length - 1]?.room : undefined
@@ -232,16 +208,19 @@ export class Network implements INetwork {
   }
 
   private async connect(c: string): Promise<void> {
-    await this.leave()
+    // leave() bumps the epoch synchronously: any later join/leave makes this one stale.
+    const left = this.leave()
+    const epoch = this.epoch
+    await left
     await this.draining
+    if (epoch !== this.epoch) throw new Error('Join cancelled')
     if (this.disposed) throw new Error('Online play has shut down')
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       this.setStatus('offline', 'You appear to be offline')
       throw new Error('You appear to be offline')
     }
-    const epoch = ++this.epoch
     const client = this.getClient()
-    const room = new Room(client, c, this.host)
+    const room: Room = new Room(client, c, this.roomHost(() => this.session === room))
     this.session = room
     this.joinedAt = Date.now()
     this.setStatus('connecting', 'Joining room…')
@@ -381,6 +360,53 @@ export class Network implements INetwork {
 
   /* ── internals ───────────────────────────────────────────── */
 
+  /** Callbacks for one room; they go quiet once that room is no longer the current session. */
+  private roomHost(isCurrent: () => boolean): RoomHost {
+    return {
+      selfId: this.selfId,
+      member: () => this.member(),
+      now: () => this.now(),
+      peerJoined: (peer, initial) => {
+        if (!isCurrent()) return
+        this.peers.set(peer.id, peer)
+        this.remotes.preload()
+        this.ctx.bus.emit('net:peer', { id: peer.id, name: peer.name, joined: true })
+        // Presence is eventually consistent: someone already here may only show up after our join.
+        if (!initial) this.system(peer.joinedAt < this.joinedAt ? `${peer.name} is here` : `${peer.name} joined`)
+      },
+      peerLeft: peer => {
+        if (!isCurrent()) return
+        this.peers.delete(peer.id)
+        this.remotes.remove(peer.id)
+        this.ctx.bus.emit('net:peer', { id: peer.id, name: peer.name, joined: false })
+        this.system(`${peer.name} left`)
+      },
+      peerChanged: peer => {
+        if (isCurrent()) this.remotes.refresh(peer.id)
+      },
+      chat: (peer, text) => {
+        if (!isCurrent()) return
+        this.remotes.say(peer.id, text)
+        this.ctx.bus.emit('net:chat', { id: peer.id, name: peer.name, color: peer.color, text })
+      },
+      emote: (peer, name) => {
+        if (isCurrent()) this.remotes.gesture(peer.id, name)
+      },
+      ragdoll: (peer, v) => {
+        if (isCurrent()) this.remotes.flop(peer.id, v)
+      },
+      count: players => {
+        if (isCurrent()) this.setCount(players)
+      },
+      connection: (state, message) => {
+        if (isCurrent()) this.setStatus(state, message)
+      },
+      evicted: () => {
+        if (isCurrent()) void this.leave().then(() => this.setStatus('error', 'Room is full'))
+      },
+    }
+  }
+
   private now(): number {
     return performance.now() / 1000
   }
@@ -393,7 +419,6 @@ export class Network implements INetwork {
     if (!this.client) {
       this.client = createClient(SUPABASE_URL, SUPABASE_KEY, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'starfall-net-auth' },
-        realtime: { params: { eventsPerSecond: 20 } },
       })
     }
     return this.client
@@ -433,12 +458,20 @@ export class Network implements INetwork {
       this.wasRagdoll = false
       return
     }
-    const pos = p.position
-    const v = p.velocity
+    let pos: THREE.Vector3 = p.position
+    let v: THREE.Vector3 = p.velocity
+    // The character may still be gaining ragdoll support: probe its members defensively.
+    const ch = ctx.character as Partial<ICharacter> | undefined
+    const ragdoll = ch?.ragdolling === true || p.state === 'ragdoll'
+    if (ragdoll && typeof ch?.getRagdollAnchor === 'function') {
+      // While limp, the body (not the capsule) is what others should see.
+      const a = ch.getRagdollAnchor(this.anchor)
+      if (Number.isFinite(a.x + a.y + a.z)) {
+        pos = a
+        v = this.still
+      }
+    }
     if (!Number.isFinite(pos.x + pos.y + pos.z + v.x + v.y + v.z + p.yaw)) return
-
-    const ch = ctx.character as ICharacter & { ragdolling?: boolean }
-    const ragdoll = ch?.ragdolling === true || p.state === RAGDOLL
     const phase = ctx.game.phase
     const away = phase === 'title' || phase === 'paused' || phase === 'victory'
     const s = this.snap
@@ -450,7 +483,7 @@ export class Network implements INetwork {
     s.vx = v.x
     s.vy = v.y
     s.vz = v.z
-    s.state = stateCode(ragdoll ? RAGDOLL : p.state)
+    s.state = stateCode(ragdoll ? 'ragdoll' : p.state)
     s.wading = p.motion?.wading ?? 0
     s.slope = p.motion?.slope ?? 0
 
@@ -462,7 +495,7 @@ export class Network implements INetwork {
     this.lastY = pos.y
     this.lastZ = pos.z
     const moving = v.x * v.x + v.z * v.z > 0.01 || Math.abs(v.y) > 0.05 || !p.grounded || dx * dx + dy * dy + dz * dz > 1e-6
-    const baseFlags = (p.grounded ? FLAG_GROUNDED : 0) | (ragdoll ? FLAG_RAGDOLL : 0) | (away ? FLAG_AWAY : 0)
+    const baseFlags = (p.grounded || ragdoll ? FLAG_GROUNDED : 0) | (ragdoll ? FLAG_RAGDOLL : 0) | (away ? FLAG_AWAY : 0)
     const turned = Math.abs(Math.atan2(Math.sin(s.yaw - this.lastYaw), Math.cos(s.yaw - this.lastYaw))) > 0.02
     if (moving || turned || s.state !== this.lastState || baseFlags !== this.lastFlags) this.lastChange = now
     this.lastState = s.state
@@ -470,7 +503,8 @@ export class Network implements INetwork {
     this.lastYaw = s.yaw
     const active = now - this.lastChange < 0.3
     s.flags = baseFlags | (active ? FLAG_ACTIVE : 0)
-    const burst = active && !this.wasActive
+    // Starting and stopping go out at once (the idle rates are slow, and the last moving packet may be stale).
+    const burst = active !== this.wasActive
     this.wasActive = active
 
     if (burst || now - this.lastDirect >= 1 / (active ? P2P_RATE_ACTIVE : P2P_RATE_IDLE)) {
@@ -487,7 +521,9 @@ export class Network implements INetwork {
     // Ragdoll replication: one event on entering, carrying our momentum.
     if (ragdoll && !this.wasRagdoll && now - this.lastRagSent > 1) {
       this.lastRagSent = now
-      room.send('rag', { from: this.selfId, v: [Math.round(v.x * 100) / 100, Math.round(v.y * 100) / 100, Math.round(v.z * 100) / 100] })
+      const m = p.velocity
+      const r2 = (x: number) => (Number.isFinite(x) ? Math.round(x * 100) / 100 : 0)
+      room.send('rag', { from: this.selfId, v: [r2(m.x), r2(m.y), r2(m.z)] })
     }
     this.wasRagdoll = ragdoll
   }
@@ -521,6 +557,7 @@ export class Network implements INetwork {
         if (settled) return
         settled = true
         clearTimeout(timeout)
+        if (this.lobbyAbort === finish) this.lobbyAbort = null
         if (err) reject(err)
         else resolve()
       }
@@ -528,6 +565,7 @@ export class Network implements INetwork {
         () => finish(new Error('Could not reach the game server. Check your connection and try again.')),
         LOBBY_TIMEOUT,
       )
+      this.lobbyAbort = finish
       ch.on('presence', { event: 'sync' }, () => {
         synced = true
         if (subscribed) finish()
@@ -563,6 +601,9 @@ export class Network implements INetwork {
 
   private closeLobby(): void {
     this.lobbyEpoch++
+    const abort = this.lobbyAbort
+    this.lobbyAbort = null
+    abort?.(new Error('Lobby closed'))
     const ch = this.lobby
     this.lobby = null
     this.lobbyReady = null

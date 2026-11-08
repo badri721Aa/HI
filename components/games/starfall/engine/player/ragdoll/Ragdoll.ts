@@ -30,9 +30,9 @@ const GRAVITY = 25
 /** Air drag (1/s) and a hard cap on particle speed (m/s). */
 const AIR_DRAG = 0.3
 const MAX_SPEED = 38
-/** Coulomb friction against the ground and solids. */
-const MU_STATIC = 0.8
-const MU_KINETIC = 0.6
+/** Coulomb friction against the ground and solids (a limp body grips: it stops on slopes up to ~40°). */
+const MU_STATIC = 1.1
+const MU_KINETIC = 0.9
 /** Fraction of a joint-limit violation corrected per pass, and how much lighter a touching particle acts. */
 const LIMIT_STIFF = 0.85
 const CONTACT_WEIGHT = 0.25
@@ -57,8 +57,8 @@ const IMPACT_MIN = 2.5
 const CALM_RMS = 0.3
 const CALM_PEAK = 0.9
 const MAX_COLLIDERS = 32
-/** Re-sample the terrain under a particle once it has moved this far (m, L1). */
-const GROUND_RESAMPLE = 0.05
+/** Re-sample the terrain under a particle once it has moved this far (m, L1); between samples it collides with the tangent plane. */
+const GROUND_RESAMPLE = 0.15
 
 const _a = new THREE.Vector3()
 const _b = new THREE.Vector3()
@@ -273,10 +273,11 @@ export class Ragdoll {
       this.solveSelf()
       this.collide(it === 0)
     }
-    // Friction, then a couple of link passes: a light hand or toe can't pin the whole body,
-    // while the heavy parts (and a body at rest) keep their grip.
+    // Friction, then a couple of limit + link passes: a light hand or toe can't pin the whole body
+    // (or wrench its joint), while the heavy parts (and a body at rest) keep their grip.
     this.friction(h)
     for (let it = 0; it < SETTLE_PASSES; it++) {
+      this.solveLimits()
       this.solveLinks()
       this.collide(false)
     }
@@ -402,23 +403,42 @@ export class Ragdoll {
     const V = _c.copy(j.v).applyQuaternion(q)
     let tu = dx * U.x + dy * U.y + dz * U.z
     let tv = dx * V.x + dy * V.y + dz * V.z
-    let tl = Math.sqrt(tu * tu + tv * tv)
-    if (tl < 1e-6) {
-      tu = 1
-      tv = 0
-      tl = 1
+    let tx: number
+    let ty: number
+    let tz: number
+    if (j.hinge) {
+      // Hinge: clamp the bend (in the axis–u plane) and the sideways angle separately — the
+      // nearest allowed direction, where an ellipse this flat would yank the bend toward its axis.
+      const bend = Math.atan2(tu, cosT)
+      const side = Math.asin(tv < -1 ? -1 : tv > 1 ? 1 : tv)
+      if (bend >= -j.hu && bend <= j.hu && side >= -j.hv && side <= j.hv) return
+      const b = bend < -j.hu ? -j.hu : bend > j.hu ? j.hu : bend
+      const sd = side < -j.hv ? -j.hv : side > j.hv ? j.hv : side
+      const cb = Math.cos(b) * Math.cos(sd)
+      const sb = Math.sin(b) * Math.cos(sd)
+      const ss = Math.sin(sd)
+      tx = A.x * cb + U.x * sb + V.x * ss
+      ty = A.y * cb + U.y * sb + V.y * ss
+      tz = A.z * cb + U.z * sb + V.z * ss
+    } else {
+      let tl = Math.sqrt(tu * tu + tv * tv)
+      if (tl < 1e-6) {
+        tu = 1
+        tv = 0
+        tl = 1
+      }
+      tu /= tl
+      tv /= tl
+      const theta = Math.acos(cosT < -1 ? -1 : cosT)
+      const lim = (j.hu * j.hv) / Math.sqrt((j.hv * tu) ** 2 + (j.hu * tv) ** 2)
+      if (theta <= lim) return
+      // Closest allowed direction (near enough for a roundish cone): the rim in the same azimuth.
+      const cs = Math.cos(lim)
+      const sn = Math.sin(lim)
+      tx = A.x * cs + (U.x * tu + V.x * tv) * sn
+      ty = A.y * cs + (U.y * tu + V.y * tv) * sn
+      tz = A.z * cs + (U.z * tu + V.z * tv) * sn
     }
-    tu /= tl
-    tv /= tl
-    const theta = Math.acos(cosT < -1 ? -1 : cosT)
-    const lim = (j.hu * j.hv) / Math.sqrt((j.hv * tu) ** 2 + (j.hu * tv) ** 2)
-    if (theta <= lim) return
-    // Closest allowed direction, on the cone's rim in the same azimuth.
-    const cs = Math.cos(lim)
-    const sn = Math.sin(lim)
-    const tx = A.x * cs + (U.x * tu + V.x * tv) * sn
-    const ty = A.y * cs + (U.y * tu + V.y * tv) * sn
-    const tz = A.z * cs + (U.z * tu + V.z * tv) * sn
     const w = this.skel.invMass
     const wc = w[j.child] * this.contactScale(j.child)
     const ex = pos[pk] + tx * len - pos[ck]

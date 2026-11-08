@@ -1,7 +1,8 @@
 /**
  * The hero: loads /games/starfall/hero.glb (one skinned mesh, baked albedo),
  * places it on the player every frame and drives it with the procedural
- * Animator. Also owns the soft blob shadow under the feet.
+ * Animator. Also owns the soft blob shadow under the feet and the ragdoll: while it is limp or
+ * getting up, the root sits where the ragdoll says and its pose overrides the animation.
  *
  *   root (player position, smoothed yaw) → pivot (spin attack) → model (unit scale) → glTF armature
  */
@@ -13,6 +14,7 @@ import type { GroundHit } from '../collision'
 import { Animator, type GroundSample } from './Animator'
 import { Rig } from './anim/Rig'
 import { dampAngle, wrapAngle } from './anim/math'
+import { HeroRagdoll } from './ragdoll/HeroRagdoll'
 
 const HERO_URL = '/games/starfall/hero.glb'
 const HERO_HEIGHT = 1.62
@@ -22,6 +24,8 @@ const HERO_HEIGHT = 1.62
  */
 const YAW_RATE = 30
 const MAX_YAW_LAG = 0.6
+/** Ragdoll impacts this hard (m/s) shake the camera a little. */
+const RAGDOLL_SHAKE = 9
 
 /**
  * GLTFLoader decodes embedded images by fetch()-ing a blob: URL, which the site's CSP
@@ -46,6 +50,7 @@ export class Character implements ICharacter {
   private model = new THREE.Group()
   private rig: Rig | null = null
   private animator: Animator | null = null
+  private ragdoll: HeroRagdoll | null = null
   private blob: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null
   private owned: Array<{ dispose(): void }> = []
   private yaw = 0
@@ -119,6 +124,7 @@ export class Character implements ICharacter {
     this.model.add(scene)
     this.rig = new Rig(scene, scale)
     this.animator = new Animator(this.rig, this.probe)
+    this.ragdoll = new HeroRagdoll(this.rig, this.ctx.collision, { radius: this.ctx.player.radius, height: this.ctx.player.height })
   }
 
   /** Rounded stand-in so the game stays playable if the model is missing. */
@@ -168,6 +174,20 @@ export class Character implements ICharacter {
   update(dt: number): void {
     const p = this.ctx.player
     if (!p) return
+    const rd = this.ragdoll
+    // Cutscenes never show the ragdoll (e.g. tumbling into a shard): they cut straight to him standing.
+    if (rd?.active && this.ctx.game.phase === 'cutscene') this.cancelRagdoll()
+    if (rd?.active && this.animator) {
+      const ev = rd.update(dt, p.controlEnabled && p.hp > 0)
+      if (rd.impact > 0) this.ragdollImpact(rd)
+      if (ev === 'failed') this.cancelRagdoll()
+      else if (ev === 'done') this.animator.releaseOverride()
+      else {
+        this.updateRagdoll(dt, rd, ev === 'rise')
+        return
+      }
+    }
+
     const pos = p.position
     if (!Number.isFinite(pos.x + pos.y + pos.z)) return
     const jumped = !this.placed || this.root.position.distanceToSquared(pos) > 4
@@ -186,10 +206,34 @@ export class Character implements ICharacter {
       this.animator.update(dt, this.root.position, this.yaw)
       this.pivot.rotation.y = this.animator.spin
     }
+    this.finishFrame(pos)
+    rd?.track(this.root.position, dt, jumped)
+  }
 
+  /** Limp or getting up: the root goes where the ragdoll says and its pose replaces the animation. */
+  private updateRagdoll(dt: number, rd: HeroRagdoll, rose: boolean): void {
+    const animator = this.animator!
+    this.root.position.copy(rd.rootPos)
+    this.root.rotation.y = this.yaw = rd.rootYaw
+    this.pivot.rotation.y = 0
+    if (rose) animator.resetFeet()
+    animator.setOverride(rd.pose)
+    animator.update(dt, this.root.position, this.yaw)
+    this.finishFrame(this.root.position)
+    if (rd.phase === 'getup') rd.track(this.root.position, dt, rose)
+  }
+
+  private finishFrame(pos: THREE.Vector3): void {
     this.model.visible = !(this.blink && Math.floor(this.ctx.clock.real * 24) % 2 === 1)
     this.updateBlob(pos)
     this.root.updateMatrixWorld(true)
+  }
+
+  /** The limp body hit something hard: the same event as a landing, so audio and effects react. */
+  private ragdollImpact(rd: HeroRagdoll): void {
+    const p = rd.impactPos
+    this.ctx.bus.emit('player:land', { pos: { x: p.x, y: p.y, z: p.z }, impact: rd.impact, surface: rd.impactSurface })
+    if (rd.impact > RAGDOLL_SHAKE) this.ctx.game.shake(Math.min(0.45, rd.impact / 40), 0.25)
   }
 
   private updateBlob(pos: THREE.Vector3): void {
@@ -228,8 +272,38 @@ export class Character implements ICharacter {
     return this.animator ? this.animator.playGesture(name, opts) : Promise.resolve()
   }
 
-  stopGesture(): void {
-    this.animator?.stopGesture()
+  stopGesture(opts?: { instant?: boolean }): void {
+    this.animator?.stopGesture(opts)
+  }
+
+  startRagdoll(impulse: V3): void {
+    const rd = this.ragdoll
+    const p = this.ctx.player
+    if (!rd || !this.animator || !p || !this.placed) return
+    // The bones show the pose posed for the root's heading plus the spin-attack twist.
+    rd.start(this.root.rotation.y + this.pivot.rotation.y, p.velocity, impulse)
+    this.animator.setOverride(rd.pose)
+  }
+
+  get ragdolling(): boolean {
+    return !!this.ragdoll?.active
+  }
+
+  get ragdollRecovering(): boolean {
+    return this.ragdoll?.phase === 'getup'
+  }
+
+  getRagdollAnchor(out: THREE.Vector3): THREE.Vector3 {
+    const rd = this.ragdoll
+    return out.copy(rd?.active ? rd.anchor : this.ctx.player.position)
+  }
+
+  cancelRagdoll(): void {
+    const rd = this.ragdoll
+    if (!rd?.active) return
+    rd.cancel()
+    this.animator?.releaseOverride(0)
+    this.animator?.resetFeet()
   }
 
   lookAt(target: V3 | null): void {
@@ -248,6 +322,8 @@ export class Character implements ICharacter {
   }
 
   dispose(): void {
+    this.ragdoll?.cancel()
+    this.ragdoll = null
     this.animator?.stopGesture()
     this.root.removeFromParent()
     this.blob?.removeFromParent()

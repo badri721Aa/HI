@@ -6,7 +6,8 @@
  *   air layer      jump / somersault / fall / bounce, cross-faded on change
  *   actions        dash, spin attack, death (blended) · hurt, landing (additive)
  *   gestures       keyframed overlays for gameplay & cutscenes
- *   solve          feet planted by IK on the real ground, hips height limiter,
+ *   override       a pose from outside (ragdoll, getting up) replaces all of the above
+ *   solve         feet planted by IK on the real ground, hips height limiter,
  *                  head stabilisation + look-at, then written to the bones.
  *
  * Feet are IK targets: during a stride they travel back exactly as fast as the
@@ -212,6 +213,9 @@ export class Animator {
   private snapT = 1
   private snapDur = 0.25
 
+  /** Pose that replaces the animation entirely (ragdoll, getting up), or null. */
+  private ovr: Pose | null = null
+
   private qThigh = new THREE.Quaternion()
   private qShin = new THREE.Quaternion()
 
@@ -269,9 +273,15 @@ export class Animator {
     })
   }
 
-  stopGesture(): void {
+  /** Ends the gesture through its outro; `instant` drops it on the spot (cutscene cuts). */
+  stopGesture(opts?: { instant?: boolean }): void {
     const g = this.gesture
     if (!g) return
+    if (opts?.instant) {
+      this.finishGesture()
+      this.snapT = 1
+      return
+    }
     if (g.loop && !g.stopping) {
       // Play the outro from the end of the loop section, cross-fading from the current pose.
       g.stopping = true
@@ -296,6 +306,23 @@ export class Animator {
     this.fresh = true
   }
 
+  /**
+   * Shows `pose` instead of the animation until released (the ragdoll and its get-up drive the
+   * body this way). Feet IK and head steadying still apply as far as the pose asks (ik, stab).
+   * The caller may keep refilling the same Pose object every frame.
+   */
+  setOverride(pose: Pose): void {
+    this.ovr = pose
+  }
+
+  /** Hands the body back to the animation, cross-fading over `fade` seconds (0 = at once). */
+  releaseOverride(fade = 0.25): void {
+    if (!this.ovr) return
+    this.ovr = null
+    if (fade > 0) this.beginSnap(fade)
+    else this.snapT = 1
+  }
+
   /* ── frame ───────────────────────────────────────────────── */
 
   update(dtIn: number, root: THREE.Vector3, yaw: number): void {
@@ -312,18 +339,23 @@ export class Animator {
     this.updateSignals(dt, teleported)
 
     const out = this.out
-    this.buildIdle(dt)
-    this.buildLoco()
-    out.copy(this.idle).blend(this.loco, smooth(this.moveW))
-    this.buildAir(dt)
-    out.blend(this.air, 1 - this.groundW)
-    this.applyActions(dt, out)
-    this.applyGesture(dt, out)
-    this.breathe(out)
-    if (this.snapT < 1) {
-      this.snapT = Math.min(1, this.snapT + dt / this.snapDur)
-      this.tmp.copy(this.snap).blend(out, smooth(this.snapT))
-      out.copy(this.tmp)
+    if (this.ovr) {
+      this.dropActions()
+      out.copy(this.ovr)
+    } else {
+      this.buildIdle(dt)
+      this.buildLoco()
+      out.copy(this.idle).blend(this.loco, smooth(this.moveW))
+      this.buildAir(dt)
+      out.blend(this.air, 1 - this.groundW)
+      this.applyActions(dt, out)
+      this.applyGesture(dt, out)
+      this.breathe(out)
+      if (this.snapT < 1) {
+        this.snapT = Math.min(1, this.snapT + dt / this.snapDur)
+        this.tmp.copy(this.snap).blend(out, smooth(this.snapT))
+        out.copy(this.tmp)
+      }
     }
 
     this.updateFeet(dt, out, teleported)
@@ -636,6 +668,15 @@ export class Animator {
     }
   }
 
+  /** Overridden: whatever the body was in the middle of (flips, spins, gestures, looks) is dropped. */
+  private dropActions(): void {
+    this.flipT = this.spinT = this.hurtT = this.landT = -1
+    this.spin = 0
+    this.dashW = this.deadW = this.lookW = 0
+    if (this.gesture) this.finishGesture()
+    this.snapT = 1
+  }
+
   /** out ← (identity → add, by w) applied on top of out. */
   private addPose(out: Pose, add: Pose, w: number): void {
     if (w <= 0.001) return
@@ -916,7 +957,7 @@ export class Animator {
 
   private updateLook(dt: number): void {
     let wTarget = 0
-    if (this.hasLook) {
+    if (this.hasLook && !this.ovr) {
       const c = Math.cos(this.yaw)
       const s = Math.sin(this.yaw)
       const dx = this.lookTarget.x - this.root.x

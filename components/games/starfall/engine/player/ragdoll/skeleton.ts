@@ -6,7 +6,8 @@
  *                 (finger middle) · hip · knee · ankle · toe (ball of the foot)
  *   links         rigid bones, plus braces that keep the pelvis and rib cage solid
  *   joints        elliptical cone limits measured in the parent segment's frame; knees and
- *                 elbows are flat cones (hinges), so they only bend one way
+ *                 elbows are hinges (a wide bend range, a few degrees sideways), so they only
+ *                 bend one way
  *   frames        rest → current rotation of every segment: the pelvis and the chest come from
  *                 their particles, every limb segment is swung from its parent's frame
  *
@@ -57,6 +58,8 @@ export interface JointLimit {
   hu: number
   hv: number
   cosInner: number
+  /** Much narrower across than along (elbows, knees): limited as bend + sideways angle, not as an ellipse. */
+  hinge: boolean
   /** Rest-space swing taking `dir` onto `axis` (keeps the frame swing away from its singularity). */
   p0: THREE.Quaternion
 }
@@ -258,6 +261,7 @@ export class RagdollSkeleton {
     this.joints.push({
       pivot, child, parent, frame, dir, axis, u, v, hu, hv,
       cosInner: Math.cos(Math.min(hu, hv)),
+      hinge: hv < hu * 0.3,
       p0: new THREE.Quaternion().setFromUnitVectors(dir, axis),
     })
   }
@@ -269,7 +273,8 @@ export class RagdollSkeleton {
   frames(src: Float64Array, out: THREE.Quaternion[]): void {
     this.basisFrame(src, P.pelvis, P.chest, P.hipL, P.hipR, 0, out[F.pelvis])
     this.basisFrame(src, P.chest, P.neck, P.shoulderL, P.shoulderR, 1, out[F.chest])
-    for (const j of this.joints) if (j.frame >= 0) this.swing(src, j, out)
+    const joints = this.joints
+    for (let k = 0; k < joints.length; k++) if (joints[k].frame >= 0) this.swing(src, joints[k], out)
   }
 
   /** Frame of a particle-defined segment: up = a→b, left = d→c. Keeps `out` when degenerate. */

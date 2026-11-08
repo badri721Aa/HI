@@ -114,6 +114,15 @@ export const MOVE = {
   stepWadeShorten: 0.25,
   /** Landings harder than this (m/s) play the 'land' state. */
   landStateImpact: 4,
+
+  // ── ragdoll
+  /** Landings harder than this (m/s) knock the hero flat instead (a fall of ~7.5 m). */
+  ragdollImpact: 24,
+  /** Flopping on demand: a forward shove and a little hop on top of the current velocity (m/s). */
+  ragdollPush: 1.8,
+  ragdollHop: 2.4,
+  /** Share of the knockback a hit gives a body that is already limp. */
+  ragdollHitKick: 0.6,
 } as const
 
 export const CAM = {

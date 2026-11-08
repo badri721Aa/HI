@@ -17,23 +17,20 @@ import { CHAT_MAX, NAME_MAX, SHIRT_COLORS } from './config'
 
 /* ── player state codes ──────────────────────────────────── */
 
-/** Order is the wire code. 'ragdoll' is appended so older states keep their codes. */
-const STATES = [
+/** Order is the wire code (append new states at the end). */
+const STATES: readonly PlayerState[] = [
   'idle', 'move', 'jump', 'doubleJump', 'fall', 'land', 'dash',
   'attack', 'hurt', 'dead', 'wade', 'bounce', 'cutscene', 'ragdoll',
-] as const
+]
 
-/** The ragdoll state (typed loosely: older contracts may not list it yet). */
-export const RAGDOLL = 'ragdoll' as string as PlayerState
+const STATE_CODE = new Map<PlayerState, number>(STATES.map((s, i) => [s, i]))
 
-const STATE_CODE = new Map<string, number>(STATES.map((s, i) => [s, i]))
-
-export function stateCode(s: string): number {
+export function stateCode(s: PlayerState): number {
   return STATE_CODE.get(s) ?? 0
 }
 
 export function stateFromCode(code: number): PlayerState {
-  return (STATES[code] ?? 'idle') as string as PlayerState
+  return STATES[code] ?? 'idle'
 }
 
 export const FLAG_GROUNDED = 1

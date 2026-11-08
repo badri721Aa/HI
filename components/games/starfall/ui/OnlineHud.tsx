@@ -162,13 +162,13 @@ function TouchOnlineButtons() {
         <WaveIcon className="h-4 w-4" />
       </button>
       {emotesOpen && (
-        // A narrow column: stays in the left half, clear of the toasts on the right.
-        <div className={cx(styles.prompt, 'absolute left-0 top-10 z-10 flex w-[96px] flex-col gap-1.5')}>
+        // A narrow solid column: stays in the left half, clear of the toasts, and cleanly covers the objective while open.
+        <div className={cx(styles.prompt, 'absolute left-0 top-10 z-10 flex w-[112px] flex-col gap-0.5 rounded-[6px] border border-[#F3EEE6]/12 bg-[#0B0F14]/90 p-1 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)]')}>
           {EMOTES.map(e => (
             <button
               key={e.name}
               type="button"
-              className="pointer-events-auto h-8 touch-none rounded-full border border-[#F3EEE6]/20 bg-[#0B0F14]/75 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F3EEE6]/90 active:bg-[#F5B455] active:text-[#0B0F14]"
+              className="pointer-events-auto h-9 touch-none rounded-[4px] px-3 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F3EEE6]/90 active:bg-[#F5B455] active:text-[#0B0F14]"
               onPointerDown={ev => {
                 ev.preventDefault()
                 net.emote(e.name)

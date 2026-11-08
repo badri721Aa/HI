@@ -15,7 +15,7 @@ import { heightAt } from '../world/heightfield'
 import { EXTRAPOLATE_DIRECT, EXTRAPOLATE_RELAY, INTERP_DELAY, TELEPORT_DIST } from './config'
 import type { PeerLink } from './p2p'
 import {
-  Bucket, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, RAGDOLL, copySnapshot, makeSnapshot, stateFromCode,
+  Bucket, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, copySnapshot, makeSnapshot, stateFromCode,
   type MemberInfo, type Snapshot,
 } from './protocol'
 
@@ -57,6 +57,8 @@ export class RemotePeer implements NetPeer {
   snapped = false
 
   /* link bookkeeping (managed by the room) */
+  /** Local time (s) this player appeared in presence. */
+  knownAt = 0
   link: PeerLink | null = null
   linkAttempts = 0
   nextLinkAt = 0
@@ -181,7 +183,7 @@ export class RemotePeer implements NetPeer {
       this.airMinVy = 0
     }
     this.wasGrounded = this.grounded = grounded
-    this.ragdoll = (a.flags & FLAG_RAGDOLL) !== 0 || state === RAGDOLL
+    this.ragdoll = (a.flags & FLAG_RAGDOLL) !== 0 || state === 'ragdoll'
     this.away = (a.flags & FLAG_AWAY) !== 0
     this.wading = a.wading
     this.slope = a.slope

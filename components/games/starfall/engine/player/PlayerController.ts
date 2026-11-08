@@ -7,6 +7,10 @@
  * up and makes the hero slide. On top of that: a variable-height jump with coyote time and
  * buffering, a double jump, a dash, a spin attack, moving-platform riding, bounce pads,
  * wading and drowning. Every frame `motion` is filled for the animator.
+ *
+ * Ragdoll: R (or a landing far too hard, or death) makes the Character go limp. The capsule then
+ * stops colliding and rides along with the body (so the camera follows it); when the get-up
+ * starts it moves to where the hero stands up, and control returns once he is on his feet.
  */
 import * as THREE from 'three'
 import type { Collider, GroundHit, WallPush } from '../collision'
@@ -98,6 +102,11 @@ export class PlayerController implements IPlayerController {
   /** Time the stick has been pushed (nearly) all the way — on a pad that builds into a sprint. */
   private fullTiltT = 0
 
+  /** Ragdoll: capsule already moved to the stand-up spot; seconds spent floating in deep water. */
+  private ragPlaced = false
+  private drownT = 0
+  private readonly anchor = new THREE.Vector3()
+
   private failed = false
 
   constructor(private ctx: Ctx) {}
@@ -154,11 +163,25 @@ export class PlayerController implements IPlayerController {
   /* ── public actions ──────────────────────────────────────── */
 
   teleport(x: number, y: number, z: number, yaw: number): void {
-    const p = this.position
-    p.set(x, y, z)
+    this.ctx.character?.cancelRagdoll()
+    this.position.set(x, y, z)
     this.velocity.set(0, 0, 0)
     this._yaw = wrapAngle(yaw)
     this.dead = false
+    this.ragPlaced = false
+    this.resetMotion()
+    if (this.invulnT > 0) {
+      this.invulnT = 0
+      this.ctx.character?.setBlink(false)
+    }
+    this.settle()
+    this._state = 'idle'
+    this.stateTime = 0
+    this.writeMotion()
+  }
+
+  /** Clears every move in progress (jumps, dashes, attacks, landings, slides). */
+  private resetMotion(): void {
     this.hurtT = this.dashT = this.dashCd = this.attackT = this.attackCd = 0
     this.coyoteT = this.jumpBufT = this.dashBufT = this.attackBufT = 0
     this.landT = this.landImpact = this.airTime = this.turnRate = this.slope = this.wadeT = this.vyMove = 0
@@ -168,12 +191,14 @@ export class PlayerController implements IPlayerController {
     this.stepPhase = 0.5
     this._stompSpeed = 0
     this.sliding = false
-    if (this.invulnT > 0) {
-      this.invulnT = 0
-      this.ctx.character?.setBlink(false)
-    }
-    const g = this.ctx.collision.groundAt(x, z, y + 0.05, M.radius, M.stepUp, this.hit)
-    if (y - g.y <= M.snapDown) {
+    this.drownT = 0
+  }
+
+  /** Stands on the ground just below the feet (or lets go of it), refreshing support and water depth. */
+  private settle(): void {
+    const p = this.position
+    const g = this.ctx.collision.groundAt(p.x, p.z, p.y + 0.05, M.radius, M.stepUp, this.hit)
+    if (p.y - g.y <= M.snapDown) {
       p.y = g.y
       this._grounded = true
       this.setSupport(g.collider)
@@ -182,9 +207,6 @@ export class PlayerController implements IPlayerController {
       this.setSupport(null)
     }
     this.depth = g.water - p.y
-    this._state = 'idle'
-    this.stateTime = 0
-    this.writeMotion()
   }
 
   hurt(amount: number, from: V3): void {
@@ -202,22 +224,30 @@ export class PlayerController implements IPlayerController {
     }
     dx /= l
     dz /= l
-    v.set(dx * M.knockback, M.knockbackUp, dz * M.knockback)
-    // Flinch facing the thing that hit us.
-    this._yaw = Math.atan2(-dx, -dz)
-    this.leaveGround(false)
-    this.attackT = 0
-    this.jumpCut = false
-    this.hurtT = M.hurtTime
+    const limp = this.ctx.character.ragdolling
+    if (limp) {
+      // Down (or getting up): the blow knocks the body about instead.
+      const k = M.ragdollHitKick
+      this.ctx.character.startRagdoll({ x: dx * M.knockback * k, y: M.knockbackUp * k, z: dz * M.knockback * k })
+    } else {
+      v.set(dx * M.knockback, M.knockbackUp, dz * M.knockback)
+      // Flinch facing the thing that hit us.
+      this._yaw = Math.atan2(-dx, -dz)
+      this.leaveGround(false)
+      this.attackT = 0
+      this.jumpCut = false
+      this.hurtT = M.hurtTime
+    }
     this.invulnT = M.invulnTime
-    this.ctx.character.setBlink(true)
+    // A fatal blow goes limp without the hit blink.
+    if (this._hp > 0) this.ctx.character.setBlink(true)
     this.ctx.bus.emit('player:hurt', { pos: v3(p), hp: this._hp })
     this.ctx.game.shake(0.35, 0.3)
     if (this._hp <= 0) {
       this.dead = true
-      this.setState('dead')
+      if (!limp) this.setState('dead')
       this.ctx.game.playerDied('enemy')
-    } else {
+    } else if (!limp) {
       this.setState('hurt')
     }
     this.writeMotion()
@@ -233,7 +263,7 @@ export class PlayerController implements IPlayerController {
   }
 
   launch(vy: number): void {
-    if (this.dead) return
+    if (this.dead || this.ctx.character.ragdolling) return
     this.dashT = 0
     this.bounce(vy)
     this.writeMotion()
@@ -262,7 +292,18 @@ export class PlayerController implements IPlayerController {
     }
     if (!this._grounded && !this.sliding) this.airTime += dt
 
+    if (ctx.character.ragdolling) {
+      this.ragdollTick(dt)
+      this.writeMotion()
+      return
+    }
+    if (this._state === 'ragdoll') this.endRagdoll()
+
     const live = this.controlEnabled && !this.dead && this.hurtT <= 0
+    if (live && s.ragdoll && this.flop()) {
+      this.writeMotion()
+      return
+    }
     this.readInput(live, dt)
 
     // Ride whatever we stand on before anything else moves us.
@@ -292,7 +333,12 @@ export class PlayerController implements IPlayerController {
     const travel = Math.max(Math.hypot(v.x, v.z), Math.abs(v.y)) * dt
     const n = Math.min(24, Math.max(1, Math.ceil(travel / M.maxSubstep)))
     const h = dt / n
-    for (let i = 0; i < n; i++) this.subStep(h)
+    for (let i = 0; i < n && !this.limp; i++) this.subStep(h)
+    if (this.limp) {
+      // Knocked flat by the landing: the ragdoll has taken over.
+      this.writeMotion()
+      return
+    }
 
     this.keepInBounds()
     this.water(dt)
@@ -661,6 +707,14 @@ export class PlayerController implements IPlayerController {
     if (airborne || impact > 2.5) {
       this.ctx.bus.emit('player:land', { pos: v3(this.position), impact, surface: this.surface() })
     }
+    if (airborne && impact > M.ragdollImpact && this.controlEnabled && !this.dead) {
+      // Far too hard to land on your feet: the body carries the fall into the ground and goes down.
+      this.ctx.character.startRagdoll({ x: Math.sin(this._yaw), y: 0, z: Math.cos(this._yaw) })
+      if (this.ctx.character.ragdolling) {
+        this.enterRagdoll()
+        return
+      }
+    }
     this.airTime = 0
     if (steep) {
       this.sliding = true
@@ -761,6 +815,86 @@ export class PlayerController implements IPlayerController {
       p.x = nx * PLAY_RADIUS
       p.z = nz * PLAY_RADIUS
     }
+  }
+
+  /* ── ragdoll ─────────────────────────────────────────────── */
+
+  private get limp(): boolean {
+    return this._state === 'ragdoll'
+  }
+
+  /** R: go limp on purpose, keeping the momentum, with a shove forward and a little hop. */
+  private flop(): boolean {
+    const f = M.ragdollPush
+    this.ctx.character.startRagdoll({ x: Math.sin(this._yaw) * f, y: M.ragdollHop, z: Math.cos(this._yaw) * f })
+    if (!this.ctx.character.ragdolling) return false
+    this.enterRagdoll()
+    return true
+  }
+
+  /** The Character went limp (on our request or the game's): drop every move in progress. */
+  private enterRagdoll(): void {
+    this.resetMotion()
+    this.setSupport(null)
+    this.velocity.set(0, 0, 0)
+    this.ragPlaced = false
+    this.setState('ragdoll')
+  }
+
+  /**
+   * While limp the capsule rides along with the body (the camera follows it) without colliding;
+   * once the get-up starts it moves to the stand-up spot and waits there.
+   */
+  private ragdollTick(dt: number): void {
+    const ch = this.ctx.character
+    if (!this.limp) this.enterRagdoll()
+    if (ch.ragdollRecovering) {
+      if (!this.ragPlaced) {
+        this.ragPlaced = true
+        this.standUp()
+      }
+      this.velocity.set(0, 0, 0)
+      return
+    }
+    this.ragPlaced = false
+    const p = this.position
+    const v = this.velocity
+    const a = ch.getRagdollAnchor(this.anchor)
+    if (!Number.isFinite(a.x + a.y + a.z)) return
+    v.subVectors(a, p).divideScalar(dt)
+    if (v.lengthSq() > M.terminal * M.terminal) v.setLength(M.terminal)
+    p.copy(a)
+    const g = this.ctx.collision.groundAt(p.x, p.z, p.y + 0.05, M.radius, M.airStepUp, this.hit)
+    this._grounded = p.y - g.y < 0.05
+    const prev = this.depth
+    this.depth = g.water - p.y
+    if (this.depth > M.splashDepth && prev <= M.splashDepth) {
+      this.ctx.bus.emit('player:splash', { pos: { x: p.x, y: g.water, z: p.z }, big: v.y < -6 })
+    }
+    // Floating in water too deep to stand up in: drowned, as on foot.
+    this.drownT = g.water - g.y > M.drownDepth && this.depth > 0 ? this.drownT + dt : 0
+    if (this.drownT > 0.5 && !this.dead && this.ctx.game.phase === 'playing') {
+      this.dead = true
+      this.ctx.game.playerDied('water')
+    }
+  }
+
+  /** Puts the capsule where the body stands up, facing the way it rises, clear of solids. */
+  private standUp(): void {
+    const ch = this.ctx.character
+    const p = ch.getRagdollAnchor(this.position)
+    this.velocity.set(0, 0, 0)
+    this._yaw = wrapAngle(ch.root.rotation.y)
+    for (let i = 0; i < 2; i++) this.ctx.collision.pushOut(p, M.radius, M.height, M.stepUp, this.push)
+    this.settle()
+    this.resetMotion()
+  }
+
+  /** On his feet again (or the ragdoll was dropped): back to normal control. */
+  private endRagdoll(): void {
+    if (!this.ragPlaced) this.standUp()
+    this.ragPlaced = false
+    this.setState('idle')
   }
 
   /* ── water, facing, feedback ─────────────────────────────── */
@@ -900,7 +1034,8 @@ export class PlayerController implements IPlayerController {
     const v = this.velocity
     m.state = this._state
     m.stateTime = this.stateTime
-    m.speed = Math.hypot(v.x, v.z)
+    // A limp body isn't walking (and shouldn't widen the camera's sprint FOV).
+    m.speed = this._state === 'ragdoll' ? 0 : Math.hypot(v.x, v.z)
     m.vy = v.y
     m.grounded = this._grounded
     m.turnRate = this.turnRate

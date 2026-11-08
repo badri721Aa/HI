@@ -209,7 +209,10 @@ export class NetStore {
     } else {
       const saved = input.onPointerLockChange
       const wrapper = (locked: boolean) => {
-        if (locked) saved?.(locked)
+        if (!locked) return
+        saved?.(locked)
+        // Back in the game after the chat closed: from now on a lost lock pauses again.
+        if (!this.state.chatOpen) this.restoreLock()
       }
       input.onPointerLockChange = wrapper
       this.lock = { saved, wrapper, timer: null }
@@ -226,7 +229,7 @@ export class NetStore {
     this.set({ chatOpen: false })
     const game = this.game
     if (relock && game?.phase === 'playing') game.requestPointerLock()
-    // The unlock event from openChat has long fired; wait for the re-lock before handing back.
+    // Hand the handler back once the re-lock lands (see openChat), or shortly after if it never does.
     const l = this.lock
     if (l && !l.timer) l.timer = setTimeout(() => this.restoreLock(), 600)
   }
