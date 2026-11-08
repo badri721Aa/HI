@@ -210,6 +210,7 @@ export class Room {
     }
     // CHANNEL_ERROR / TIMED_OUT / CLOSED — realtime-js keeps retrying on its own.
     this.subscribed = false
+    this.synced = false
     if (this.joining) {
       if (status === 'CHANNEL_ERROR' && err?.message) console.warn('[starfall] room channel error', err.message)
       return
@@ -248,9 +249,14 @@ export class Room {
     }
     const j = this.joining
     this.joining = null
-    this.reconcile(!!j)
-    if (j) j.resolve()
-    else this.host.connection('online')
+    if (!j) {
+      // Back after a drop: the next presence sync reconciles the player list.
+      this.host.connection('online')
+      if (this.synced && !this.reconcile(false)) this.host.evicted()
+      return
+    }
+    if (this.reconcile(true)) j.resolve()
+    else j.reject(new Error('Room is full'))
   }
 
   private onSync(): void {
@@ -260,11 +266,11 @@ export class Room {
       if (this.subscribed && !this.tracked) void this.announce()
       return
     }
-    if (this.tracked) this.reconcile(false)
+    if (this.tracked && !this.reconcile(false)) this.host.evicted()
   }
 
-  /** Diff presence against our peer list. */
-  private reconcile(initial: boolean): void {
+  /** Diffs presence against our peer list; false if we lost a race for the last slot and must leave. */
+  private reconcile(initial: boolean): boolean {
     const self = this.host.selfId
     const state = this.channel.presenceState() as Record<string, unknown[]>
     const entries: Array<[string, MemberInfo]> = []
@@ -276,6 +282,13 @@ export class Room {
     }
     entries.sort((a, b) => a[1].joinedAt - b[1].joinedAt || (a[0] < b[0] ? -1 : 1))
     if (entries.length > MAX_SEEN) entries.length = MAX_SEEN
+
+    // Over capacity: the latest joiners (by joinedAt, then id) leave.
+    if (entries.length + 1 > MAX_PLAYERS) {
+      const me = this.host.member()
+      const ahead = entries.filter(([id, info]) => info.joinedAt < me.joinedAt || (info.joinedAt === me.joinedAt && id < self)).length
+      if (ahead >= MAX_PLAYERS) return false
+    }
 
     const seen = new Set<string>()
     for (const [id, info] of entries) {
@@ -305,17 +318,8 @@ export class Room {
       this.peers.delete(p.id)
       this.host.peerLeft(p)
     }
-
-    // Lost a race for the last slot? The latest joiners leave.
-    if (entries.length + 1 > MAX_PLAYERS) {
-      const me = this.host.member()
-      const ahead = entries.filter(([id, info]) => info.joinedAt < me.joinedAt || (info.joinedAt === me.joinedAt && id < self)).length
-      if (ahead >= MAX_PLAYERS) {
-        this.host.evicted()
-        return
-      }
-    }
     this.host.count(this.players)
+    return true
   }
 
   /* ── links ───────────────────────────────────────────────── */

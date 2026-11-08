@@ -73,7 +73,7 @@ const SHARD_HIGH = k({
   stab: 0.1,
 })
 
-const KNEEL_DOWN = k({
+export const KNEEL_DOWN = k({
   pos: [0, -0.4, -0.02],
   spine: [10, 0, 0],
   chest: [6, 0, 0],
@@ -94,7 +94,7 @@ const KNEEL_DOWN = k({
   stab: 0.1,
 })
 
-const LIE = k({
+export const LIE = k({
   ik: 0,
   pos: [0, -0.637, -0.5],
   hips: [-88, 0, 0],
@@ -114,7 +114,7 @@ const LIE = k({
   stab: 0,
 })
 
-const SIT = k({
+export const SIT = k({
   ik: 0,
   pos: [0, -0.628, -0.5],
   hips: [-16, 0, 0],
@@ -132,7 +132,7 @@ const SIT = k({
   stab: 0.2,
 })
 
-const KNEES_UP = k({
+export const KNEES_UP = k({
   ik: 1,
   pos: [0, -0.62, -0.46],
   hips: [-12, 0, 0],
@@ -146,7 +146,7 @@ const KNEES_UP = k({
   stab: 0.3,
 })
 
-const CROUCH = k({
+export const CROUCH = k({
   ik: 1,
   pos: [0, -0.34, -0.12],
   hips: [26, 0, 0],

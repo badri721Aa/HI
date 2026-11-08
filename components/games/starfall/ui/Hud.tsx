@@ -118,13 +118,18 @@ function DashMeter() {
 
 function ObjectiveLine({ hidden }: { hidden: boolean }) {
   const objective = useUi(s => s.objective)
+  const online = useNet(s => !!s.room)
   if (!objective || hidden) return null
   return (
     <div
       key={objective.id}
       data-state={objective.leaving ? 'closed' : 'open'}
-      // Phones: below the compass, sharing that row with the toasts (left half / right half).
-      className={cx(styles.objective, 'mt-5 max-w-[min(340px,60vw)] max-sm:absolute max-sm:left-0 max-sm:top-[104px] max-sm:mt-0 max-sm:w-[calc(50vw-24px)]')}
+      // Phones: below the compass (and the online chip), sharing that row with the toasts (left half / right half).
+      className={cx(
+        styles.objective,
+        'mt-5 max-w-[min(340px,60vw)] max-sm:absolute max-sm:left-0 max-sm:mt-0 max-sm:w-[calc(50vw-24px)]',
+        online ? 'max-sm:top-[136px]' : 'max-sm:top-[104px]',
+      )}
     >
       <div className={cx(LABEL, styles.hudText, 'text-[10px] text-[#F5B455]')}>Objective</div>
       <div className={cx(styles.hudText, 'mt-1 text-[15px] leading-snug text-[#F3EEE6]')}>{objective.text}</div>

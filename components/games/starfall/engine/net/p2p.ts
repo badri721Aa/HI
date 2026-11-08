@@ -72,8 +72,9 @@ export class PeerLink {
     if (!polite) this.bind(pc.createDataChannel('state', { ordered: false, maxRetransmits: 0 }))
   }
 
+  /** Usable for sending. A 'disconnected' ICE state counts as down (the relay covers it until it recovers or fails). */
   get open(): boolean {
-    return !this.closed && this.dc !== null && this.dc.readyState === 'open'
+    return !this.closed && this.dc !== null && this.dc.readyState === 'open' && this.pc.connectionState !== 'disconnected'
   }
 
   /** Feed a signalling message from the peer (already validated and addressed to us). */

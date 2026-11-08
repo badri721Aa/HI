@@ -145,7 +145,8 @@ export class NetStore {
     } catch {
       /* the stored profile below still reflects the choice */
     }
-    this.set({ profile: { ...this.state.profile, ...readProfile(net), ...p } })
+    // The network's copy wins: it sanitises names.
+    this.set({ profile: { ...this.state.profile, ...p, ...readProfile(net) } })
     this.refreshPlayers()
   }
 

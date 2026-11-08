@@ -24,13 +24,16 @@ const HERO_URL = '/games/starfall/hero.glb'
 const HERO_HEIGHT = 1.62
 /** Name tag anchor above the feet (m), its world height at close range, and its minimum on-screen height (fraction of the view). */
 const TAG_Y = 1.98
-const TAG_SIZE = 0.27
+const TAG_SIZE = 0.2
 const TAG_SCREEN = 0.048
 const BUBBLE_SCALE = 1.12
 /** Beyond these distances the animator runs every 2nd / 4th frame. */
 const LOD1 = 45
 const LOD2 = 90
 const CULL_DIST = 240
+/** A ragdolling remote lies back this far (rad) about its pelvis, which rests this high (m). */
+const LIE_ANGLE = Math.PI / 2 - 0.1
+const LIE_PELVIS = 0.16
 
 /** Same CSP-safe embedded image decoding as the local hero (see player/Character.ts). */
 function embeddedImagesViaImg(parser: GLTFParser) {
@@ -65,6 +68,7 @@ class Avatar {
   readonly bubble: CanvasSprite
   readonly blob: THREE.Mesh
   animator: Animator | null = null
+  rig: Rig | null = null
   shirt: ShirtMaterial | null = null
   placeholder: THREE.Mesh<THREE.CapsuleGeometry, THREE.MeshStandardMaterial> | null = null
   bubbleT = 0
@@ -74,6 +78,8 @@ class Avatar {
   frame = 0
   prevYaw = 0
   turnRate = 0
+  /** 0..1 how far the body has gone limp onto the ground. */
+  limp = 0
   readonly hit = {} as GroundHit
   readonly blobHit = {} as GroundHit
   readonly motion: MotionState
@@ -132,7 +138,8 @@ class Avatar {
     this.model.scale.setScalar(t.scale)
     this.model.add(scene)
     try {
-      this.animator = new Animator(new Rig(scene, t.scale), this.probe)
+      this.rig = new Rig(scene, t.scale)
+      this.animator = new Animator(this.rig, this.probe)
     } catch (err) {
       console.warn('[starfall] remote hero rig failed', err)
     }
@@ -184,13 +191,14 @@ class Avatar {
     this.prevYaw = p.yaw
     this.turnRate += (THREE.MathUtils.clamp(raw, -12, 12) - this.turnRate) * (1 - Math.exp(-10 * dt))
     if (this.drawn.away !== p.away) this.redrawTag()
+    if (this.bubbleT > 0) this.bubbleT -= dt
 
     const dist = camera.position.distanceTo(p.position)
     _sphere.center.set(p.position.x, p.position.y + 0.9, p.position.z)
     _sphere.radius = 1.4
     const visible = p.ready && dist < CULL_DIST && frustum.intersectsSphere(_sphere)
     root.visible = visible
-    this.updateBlob(p.ready && dist < 60)
+    this.updateBlob(visible && dist < 60)
     if (!visible) {
       this.wasVisible = false
       return
@@ -199,7 +207,7 @@ class Avatar {
     const a = this.animator
     if (a) {
       const m = this.motion
-      // No physical ragdoll on remote copies (yet): show the limp death pose at the replicated anchor.
+      // Remote copies don't run the ragdoll physics: they go limp (death pose, lying down) at the replicated anchor.
       m.state = p.ragdoll ? 'dead' : p.state
       m.stateTime = p.stateTime
       m.speed = Math.hypot(p.velocity.x, p.velocity.z)
@@ -218,6 +226,7 @@ class Avatar {
         this.pivot.rotation.y = a.spin
         this.animAcc = 0
       }
+      this.updateLimp(dt, p.ragdoll)
     }
     this.wasVisible = true
 
@@ -226,18 +235,39 @@ class Avatar {
     const s = Math.max(TAG_SIZE, TAG_SCREEN * viewK * dist)
     const fade = 1 - THREE.MathUtils.smoothstep(dist, TAG_FADE_START, TAG_HIDE)
     const tag = this.tag.sprite
+    const tagY = TAG_Y - this.limp * this.limp * (3 - 2 * this.limp) * 1.3
+    tag.position.y = tagY
     tag.visible = fade > 0.01
     tag.scale.set(s * this.tag.aspect, s, 1)
     this.tag.material.opacity = fade
     const bubble = this.bubble.sprite
     if (this.bubbleT > 0) {
-      this.bubbleT -= dt
       const bs = s * (BUBBLE_H / TAG_H) * BUBBLE_SCALE
-      bubble.visible = fade > 0.01 && this.bubbleT > 0
-      bubble.position.y = TAG_Y + s * 0.78
+      bubble.visible = fade > 0.01
+      bubble.position.y = tagY + s * 0.78
       bubble.scale.set(bs * this.bubble.aspect, bs, 1)
       this.bubble.material.opacity = fade * Math.min(1, this.bubbleT / 0.6, (BUBBLE_TIME - this.bubbleT) / 0.15)
     } else bubble.visible = false
+  }
+
+  /** Tilts the body onto its back about the pelvis while ragdolling, and back up after. */
+  private updateLimp(dt: number, on: boolean): void {
+    const target = on ? 1 : 0
+    if (this.limp === target && !on) return
+    this.limp += (target - this.limp) * (1 - Math.exp(-(on ? 6 : 4) * dt))
+    if (Math.abs(this.limp - target) < 0.002) this.limp = target
+    const pivot = this.pivot
+    if (this.limp === 0) {
+      pivot.rotation.x = 0
+      pivot.position.set(0, 0, 0)
+      return
+    }
+    const w = this.limp * this.limp * (3 - 2 * this.limp)
+    const h = Math.max(LIE_PELVIS, this.rig ? this.rig.hipsPos.y : 0.5)
+    const th = -w * LIE_ANGLE
+    // Rotate about the pelvis (0, h, 0), then lower it towards the ground.
+    pivot.rotation.x = th
+    pivot.position.set(0, h - h * Math.cos(th) - w * (h - LIE_PELVIS), -h * Math.sin(th))
   }
 
   private updateBlob(show: boolean): void {
@@ -279,23 +309,30 @@ export class RemotePlayers {
   private settled = false
   private disposed = false
   private owned: Array<{ dispose(): void }> = []
-  private blobGeo: THREE.PlaneGeometry
-  private blobMat: THREE.MeshBasicMaterial
+  private blob: { geo: THREE.PlaneGeometry; mat: THREE.MeshBasicMaterial } | null = null
   private frustum = new THREE.Frustum()
 
-  constructor(private ctx: Ctx) {
-    this.blobGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)
-    this.blobMat = new THREE.MeshBasicMaterial({
-      map: ctx.textures.get('glow'),
-      color: 0x24170f,
-      transparent: true,
-      opacity: 0.42,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-      fog: true,
-    })
+  constructor(private ctx: Ctx) {}
+
+  /** Shared blob-shadow quad, made on first use (textures are only loaded after construction). */
+  private blobParts(): { geo: THREE.PlaneGeometry; mat: THREE.MeshBasicMaterial } {
+    if (!this.blob) {
+      this.blob = {
+        geo: new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+        mat: new THREE.MeshBasicMaterial({
+          map: this.ctx.textures.get('glow'),
+          color: 0x24170f,
+          transparent: true,
+          opacity: 0.42,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2,
+          fog: true,
+        }),
+      }
+    }
+    return this.blob
   }
 
   /** Starts loading the hero model once (idempotent). */
@@ -353,7 +390,8 @@ export class RemotePlayers {
       let av = this.avatars.get(peer.id)
       if (!av) {
         if (!peer.ready || !this.settled) continue
-        av = new Avatar(this.ctx, peer, this.template, this.blobGeo, this.blobMat)
+        const blob = this.blobParts()
+        av = new Avatar(this.ctx, peer, this.template, blob.geo, blob.mat)
         this.avatars.set(peer.id, av)
       }
       av.update(dt, camera, this.frustum)
@@ -378,7 +416,7 @@ export class RemotePlayers {
     const av = this.avatars.get(id)
     if (!av?.root.visible) return
     const p = av.peer.position
-    this.ctx.fx?.burst('dust', p, { dir: { x: v[0] * 0.15, y: 1, z: v[2] * 0.15 }, count: 12 })
+    this.ctx.fx?.burst('dust', p, { dir: { x: v[0] * 0.15, y: 1, z: v[2] * 0.15 }, count: 6, scale: 0.8 })
   }
 
   remove(id: string): void {
@@ -399,7 +437,8 @@ export class RemotePlayers {
     for (const d of this.owned) d.dispose()
     this.owned = []
     this.template = null
-    this.blobGeo.dispose()
-    this.blobMat.dispose()
+    this.blob?.geo.dispose()
+    this.blob?.mat.dispose()
+    this.blob = null
   }
 }

@@ -4,7 +4,7 @@
  * the chat log + input (bottom-left), the player list (hold Tab) and the
  * keyboard shortcuts — Enter/T chat, Tab players, 1–4 emotes.
  */
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import type { GestureName } from '../engine/types'
 import { playUi, useGameUi, useNet, useUi } from './context'
 import { KeyCap } from './controls'
@@ -43,7 +43,8 @@ export function NetChip() {
   const count = Math.max(players.length, room?.players ?? 0)
 
   return (
-    <div className="mt-3 flex items-center gap-2">
+    // Phones: the compass drops to the second row, so the chip sits just below it (the objective moves down).
+    <div className="mt-3 flex items-center gap-2 max-sm:absolute max-sm:left-0 max-sm:top-[92px] max-sm:mt-0">
       <ChipBody
         code={shown.code}
         count={room ? count : null}
@@ -81,10 +82,11 @@ function ChipBody({
   const body = (
     <>
       <StatusDot tone={tone} pulse={pulse} />
-      <span className="font-semibold tracking-[0.18em] text-[#F3EEE6]/90">{code.toUpperCase()}</span>
+      {/* On phones the touch chip drops the code (it's in the player list it opens) to leave room for its buttons. */}
+      <span className={cx('font-semibold tracking-[0.18em] text-[#F3EEE6]/90', interactive && 'max-sm:hidden')}>{code.toUpperCase()}</span>
       {count !== null && (
         <>
-          <span aria-hidden className="h-3 w-px bg-[#F3EEE6]/20" />
+          <span aria-hidden className={cx('h-3 w-px bg-[#F3EEE6]/20', interactive && 'max-sm:hidden')} />
           <span className="flex items-center gap-1.5 tabular-nums text-[#F3EEE6]/85">
             <UsersIcon className="h-3 w-3 text-[#F3EEE6]/55" />
             <span>
@@ -160,7 +162,8 @@ function TouchOnlineButtons() {
         <WaveIcon className="h-4 w-4" />
       </button>
       {emotesOpen && (
-        <div className={cx(styles.prompt, 'absolute left-0 top-10 flex gap-1.5')}>
+        // A narrow column: stays in the left half, clear of the toasts on the right.
+        <div className={cx(styles.prompt, 'absolute left-0 top-10 z-10 flex w-[96px] flex-col gap-1.5')}>
           {EMOTES.map(e => (
             <button
               key={e.name}
@@ -253,7 +256,6 @@ function ChatPanel({ open }: { open: boolean }) {
           : 'bottom-[clamp(20px,4vh,36px)] left-[clamp(16px,2.4vw,32px)]',
       )}
     >
-      {open && <div aria-hidden className="absolute -inset-x-4 -bottom-4 -top-8 -z-10 rounded-[8px] bg-gradient-to-t from-[#0B0F14]/60 via-[#0B0F14]/25 to-transparent" />}
       <ul className="flex w-full flex-col items-start gap-1" aria-live="polite" aria-label="Chat">
         {shown.map(l => (
           <ChatRow key={l.key} line={l} fading={!open && l.leaving} />
@@ -270,7 +272,8 @@ function ChatRow({ line, fading }: { line: ChatLine; fading: boolean }) {
     <li
       className={cx(
         styles.chatLine,
-        'max-w-full rounded-[3px] bg-[#0B0F14]/55 px-2.5 py-[5px] text-[13px] leading-snug transition-opacity duration-700 ease-in',
+        'max-w-full rounded-[3px] px-2.5 py-[5px] text-[13px] leading-snug transition-opacity duration-700 ease-in',
+        line.self ? 'bg-[#2A2116]/70' : 'bg-[#0B0F14]/55',
         fading ? 'opacity-0' : 'opacity-100',
       )}
     >
@@ -299,7 +302,8 @@ function ChatInput() {
   /** Set once Enter / Esc closed the chat, so the blur that follows isn't treated as "clicked away". */
   const closing = useRef(false)
 
-  useEffect(() => {
+  // Layout effect: on touch the focus must land inside the tap for the on-screen keyboard to open.
+  useLayoutEffect(() => {
     ref.current?.focus({ preventScroll: true })
   }, [])
 

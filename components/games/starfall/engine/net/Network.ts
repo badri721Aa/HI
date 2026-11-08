@@ -28,7 +28,7 @@ import { Room, type RoomHost } from './Room'
 
 /** Keep a lobby subscription opened for listing alive this long after the last request (s). */
 const LOBBY_LINGER = 30
-const LOBBY_TIMEOUT = 8000
+const LOBBY_TIMEOUT = 12000
 const LOBBY_SYNC_WAIT = 1500
 
 type Profile = { name: string; color: string }
@@ -82,6 +82,8 @@ export class Network implements INetwork {
 
   private client: SupabaseClient | null = null
   private session: Room | null = null
+  /** The join in progress (a second join() for the same code shares it). */
+  private pending: { code: string; promise: Promise<void> } | null = null
   /** Increments on every join/leave so stale async continuations can bail out. */
   private epoch = 0
   private joinedAt = 0
@@ -93,6 +95,7 @@ export class Network implements INetwork {
   private lobbyReady: Promise<void> | null = null
   private lobbyUntil = 0
   private lobbyRoom: string | null = null
+  private lobbyEpoch = 0
 
   // local state stream
   private snap = makeSnapshot()
@@ -103,6 +106,9 @@ export class Network implements INetwork {
   private lastState = -1
   private lastFlags = -1
   private lastYaw = 0
+  private lastX = 0
+  private lastY = 0
+  private lastZ = 0
   private wasActive = false
   private wasRagdoll = false
   private lastRagSent = -10
@@ -110,6 +116,13 @@ export class Network implements INetwork {
   private emoteBucket = new Bucket(3, 2)
   private retrackTimer: ReturnType<typeof setTimeout> | null = null
   private failedUpdate = false
+  private lastUpdate = 0
+  private disposed = false
+  /**
+   * Channel removals still in flight. realtime-js hands back the existing channel for a topic until
+   * its removal completes, so new channels are only created once these have settled.
+   */
+  private draining: Promise<unknown> = Promise.resolve()
 
   private onOffline = () => {
     if (this.session) this.setStatus('connecting', 'Waiting for the network…')
@@ -118,6 +131,14 @@ export class Network implements INetwork {
     // Leave right away so the others see us go (closing the socket drops presence).
     for (const p of this.session?.list ?? []) p.link?.close()
     this.client?.realtime.disconnect()
+  }
+  /** Back from the back/forward cache: the socket was closed on pagehide, so join again. */
+  private onPageShow = (e: PageTransitionEvent) => {
+    const code = this.session?.code
+    if (!e.persisted || !code) return
+    void this.leave()
+      .then(() => this.join(code))
+      .catch(() => {})
   }
 
   private host: RoomHost = {
@@ -158,6 +179,7 @@ export class Network implements INetwork {
   init(): void {
     window.addEventListener('offline', this.onOffline)
     window.addEventListener('pagehide', this.onPageHide)
+    window.addEventListener('pageshow', this.onPageShow)
   }
 
   /* ── public API ──────────────────────────────────────────── */
@@ -197,11 +219,22 @@ export class Network implements INetwork {
     return PUBLIC_ROOMS.map(r => roomInfo(r.code, Math.min(MAX_PLAYERS, counts.get(r.code) ?? 0)))
   }
 
-  async join(code: string): Promise<void> {
+  join(code: string): Promise<void> {
     const c = normalizeRoomCode(code)
-    if (!c) throw new Error('Room codes are 3 to 12 letters or digits')
-    if (this.session?.code === c && this.status !== 'error') return
+    if (!c) return Promise.reject(new Error('Room codes are 3 to 12 letters or digits'))
+    if (this.pending?.code === c) return this.pending.promise
+    if (this.session?.code === c && this.status === 'online') return Promise.resolve()
+    const promise = this.connect(c).finally(() => {
+      if (this.pending?.promise === promise) this.pending = null
+    })
+    this.pending = { code: c, promise }
+    return promise
+  }
+
+  private async connect(c: string): Promise<void> {
     await this.leave()
+    await this.draining
+    if (this.disposed) throw new Error('Online play has shut down')
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       this.setStatus('offline', 'You appear to be offline')
       throw new Error('You appear to be offline')
@@ -215,17 +248,17 @@ export class Network implements INetwork {
     try {
       await room.connect()
     } catch (err) {
+      this.retire(room.leave())
       if (epoch === this.epoch) {
         this.session = null
-        void room.leave()
         this.clearPeers()
         const msg = (err as Error).message || 'Could not join the room'
         this.setStatus('error', msg)
-      } else void room.leave()
+      }
       throw err instanceof Error ? err : new Error(String(err))
     }
     if (epoch !== this.epoch) {
-      void room.leave()
+      this.retire(room.leave())
       throw new Error('Join cancelled')
     }
     this.room = roomInfo(c, room.players)
@@ -266,6 +299,7 @@ export class Network implements INetwork {
 
   async leave(): Promise<void> {
     this.epoch++
+    this.pending = null
     const room = this.session
     if (this.retrackTimer) clearTimeout(this.retrackTimer)
     this.retrackTimer = null
@@ -280,7 +314,9 @@ export class Network implements INetwork {
     this.untrackLobby()
     this.setStatus('offline')
     if (wasIn) this.ctx.bus.emit('net:room', null)
-    await room.leave()
+    const done = room.leave()
+    this.retire(done)
+    await done
   }
 
   sendChat(text: string): void {
@@ -310,14 +346,18 @@ export class Network implements INetwork {
   update(dt: number): void {
     try {
       const now = this.now()
+      // Other players live in wall-clock time (they keep moving while we are paused or slow),
+      // so smoothing uses real elapsed time rather than the clamped game step.
+      const realDt = this.lastUpdate > 0 ? Math.min(0.25, Math.max(0, now - this.lastUpdate)) : dt
+      this.lastUpdate = now
       const room = this.session
       if (room?.online) {
         room.update(now)
         this.stream(now, room)
       }
       if (room) {
-        for (let i = 0; i < room.list.length; i++) room.list[i].update(dt, now)
-        this.remotes.update(dt, room.list)
+        for (let i = 0; i < room.list.length; i++) room.list[i].update(realDt, now)
+        this.remotes.update(realDt, room.list)
       }
       if (this.lobby && !this.lobbyRoom && now > this.lobbyUntil) this.closeLobby()
     } catch (err) {
@@ -327,8 +367,10 @@ export class Network implements INetwork {
   }
 
   dispose(): void {
+    this.disposed = true
     window.removeEventListener('offline', this.onOffline)
     window.removeEventListener('pagehide', this.onPageHide)
+    window.removeEventListener('pageshow', this.onPageShow)
     void this.leave()
     this.closeLobby()
     this.remotes.dispose()
@@ -355,6 +397,12 @@ export class Network implements INetwork {
       })
     }
     return this.client
+  }
+
+  /** Remembers a channel removal so the next channel on that topic waits for it. */
+  private retire(removal: Promise<unknown>): void {
+    const settled = removal.catch(() => {})
+    this.draining = Promise.all([this.draining, settled])
   }
 
   private setStatus(status: NetStatus, message?: string): void {
@@ -406,7 +454,14 @@ export class Network implements INetwork {
     s.wading = p.motion?.wading ?? 0
     s.slope = p.motion?.slope ?? 0
 
-    const moving = v.x * v.x + v.z * v.z > 0.01 || Math.abs(v.y) > 0.05 || !p.grounded
+    // Moving platforms carry the player with zero velocity, so position changes count too.
+    const dx = pos.x - this.lastX
+    const dy = pos.y - this.lastY
+    const dz = pos.z - this.lastZ
+    this.lastX = pos.x
+    this.lastY = pos.y
+    this.lastZ = pos.z
+    const moving = v.x * v.x + v.z * v.z > 0.01 || Math.abs(v.y) > 0.05 || !p.grounded || dx * dx + dy * dy + dz * dz > 1e-6
     const baseFlags = (p.grounded ? FLAG_GROUNDED : 0) | (ragdoll ? FLAG_RAGDOLL : 0) | (away ? FLAG_AWAY : 0)
     const turned = Math.abs(Math.atan2(Math.sin(s.yaw - this.lastYaw), Math.cos(s.yaw - this.lastYaw))) > 0.02
     if (moving || turned || s.state !== this.lastState || baseFlags !== this.lastFlags) this.lastChange = now
@@ -440,35 +495,52 @@ export class Network implements INetwork {
   /* ── lobby (public room counts) ─────────────────────────── */
 
   private ensureLobby(): Promise<void> {
-    if (this.lobby && this.lobbyReady) return this.lobbyReady
+    if (this.lobbyReady) return this.lobbyReady
+    if (this.disposed) return Promise.reject(new Error('Online play has shut down'))
+    const epoch = this.lobbyEpoch
+    const ready = this.draining.then(() => {
+      if (epoch !== this.lobbyEpoch || this.disposed) throw new Error('Lobby closed')
+      return this.openLobby(epoch)
+    })
+    this.lobbyReady = ready
+    ready.catch(() => {
+      if (this.lobbyReady === ready) this.closeLobby()
+    })
+    return ready
+  }
+
+  /** Subscribes to the lobby; resolves once its presence is known (or after a short grace). */
+  private openLobby(epoch: number): Promise<void> {
     const ch = this.getClient().channel(LOBBY_CHANNEL, { config: { presence: { key: this.selfId } } })
     this.lobby = ch
-    const ready = new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       let synced = false
       let subscribed = false
-      const timeout = setTimeout(() => {
-        if (this.lobby === ch) this.closeLobby()
-        reject(new Error('Could not reach the game server. Check your connection and try again.'))
-      }, LOBBY_TIMEOUT)
-      const done = () => {
+      let settled = false
+      const finish = (err?: Error) => {
+        if (settled) return
+        settled = true
         clearTimeout(timeout)
-        resolve()
+        if (err) reject(err)
+        else resolve()
       }
+      const timeout = setTimeout(
+        () => finish(new Error('Could not reach the game server. Check your connection and try again.')),
+        LOBBY_TIMEOUT,
+      )
       ch.on('presence', { event: 'sync' }, () => {
         synced = true
-        if (subscribed) done()
+        if (subscribed) finish()
       })
       ch.subscribe(status => {
-        if (status !== 'SUBSCRIBED') return
+        if (status !== 'SUBSCRIBED' || epoch !== this.lobbyEpoch) return
         subscribed = true
-        if (synced) done()
-        else setTimeout(done, LOBBY_SYNC_WAIT)
+        if (synced) finish()
+        else setTimeout(() => finish(), LOBBY_SYNC_WAIT)
+        // (Re)announce our public room — also after the socket reconnects.
         if (this.lobbyRoom) void ch.track({ room: this.lobbyRoom }).catch(() => {})
       })
     })
-    this.lobbyReady = ready
-    ready.catch(() => {})
-    return ready
   }
 
   /** While in a public room we keep the room's lobby count current. */
@@ -490,9 +562,10 @@ export class Network implements INetwork {
   }
 
   private closeLobby(): void {
+    this.lobbyEpoch++
     const ch = this.lobby
     this.lobby = null
     this.lobbyReady = null
-    if (ch && this.client) void this.client.removeChannel(ch).catch(() => {})
+    if (ch && this.client) this.retire(this.client.removeChannel(ch))
   }
 }
