@@ -176,21 +176,21 @@ export function buildLake(ctx: Ctx): ZonePart {
     const lz = I.z - 1.25
     const y = I.topY
     kit.box({ x: lx, y: y - 0.05, z: lz, w: 0.75, h: 0.3, d: 0.75, yaw: 0.6, mat: 'mossStone', uvScale: 1 })
-    kit.cylinder({ x: lx, y: y + 0.25, z: lz, r: 0.17, h: 0.75, segments: 10, mat: 'stone', uvScale: 1 })
-    kit.box({ x: lx, y: y + 0.98, z: lz, w: 0.62, h: 0.12, d: 0.62, yaw: 0.6, mat: 'stone', uvScale: 1 })
+    kit.cylinder({ x: lx, y: y + 0.25, z: lz, r: 0.17, h: 0.75, segments: 10, mat: 'mossStone', uvScale: 1 })
+    kit.box({ x: lx, y: y + 0.98, z: lz, w: 0.62, h: 0.12, d: 0.62, yaw: 0.6, mat: 'mossStone', uvScale: 1 })
     // Firebox: four corner posts around a glowing core.
     const c = Math.cos(0.6)
     const sn = Math.sin(0.6)
     for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
       const px = (ox * c + oz * sn) * 0.2
       const pz = (-ox * sn + oz * c) * 0.2
-      kit.box({ x: lx + px, y: y + 1.1, z: lz + pz, w: 0.08, h: 0.38, d: 0.08, yaw: 0.6, mat: 'stone', uvScale: 1 })
+      kit.box({ x: lx + px, y: y + 1.1, z: lz + pz, w: 0.08, h: 0.38, d: 0.08, yaw: 0.6, mat: 'mossStone', uvScale: 1 })
     }
     kit.box({ x: lx, y: y + 1.13, z: lz, w: 0.3, h: 0.3, d: 0.3, yaw: 0.6, mat: 'glow', castShadow: false })
     const roof = new THREE.ConeGeometry(0.52, 0.34, 4, 1)
     roof.rotateY(Math.PI / 4 + 0.6)
     kit.add(roof, 'mossStone', m4.makeTranslation(lx, y + 1.65, lz))
-    kit.add(new THREE.SphereGeometry(0.08, 8, 6), 'stone', m4.makeTranslation(lx, y + 1.86, lz))
+    kit.add(new THREE.SphereGeometry(0.08, 8, 6), 'mossStone', m4.makeTranslation(lx, y + 1.86, lz))
     kit.own(ctx.collision.addCylinder({ x: lx, y: y - 0.1, z: lz, r: 0.42, h: 2.0, surface: 'stone' }))
 
     // Low round dais under the shard, ringed with tiny glowing pebbles.
@@ -204,7 +204,7 @@ export function buildLake(ctx: Ctx): ZonePart {
     for (let k = 0; k < 4; k++) {
       const s = 0.3 - k * 0.055
       q.setFromAxisAngle(v.set(0, 1, 0), rand() * TAU)
-      kit.add(boulderGeometry(rand, s * 1.3, s * 0.55, s, { uvScale: 1 }), 'stone', m4.compose(v.set(I.x + 1.75, cy + s * 0.5, I.z - 0.9), q, one))
+      kit.add(boulderGeometry(rand, s * 1.3, s * 0.55, s, { uvScale: 1 }), 'mossStone', m4.compose(v.set(I.x + 1.75, cy + s * 0.5, I.z - 0.9), q, one))
       cy += s * 0.95
     }
     kit.own(ctx.collision.addCylinder({ x: I.x + 1.75, y: y - 0.1, z: I.z - 0.9, r: 0.38, h: cy - y + 0.1, surface: 'stone' }))

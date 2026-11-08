@@ -114,17 +114,16 @@ export function buildIntro(ctx: Ctx): Scene {
   })
   s.say(13.8, LINES[3]).hush(17.4)
 
-  // Over his shoulder, tilting up to the Beacon.
-  const horizon = hero.at(60, 0, 4)
-  const summit = vec(lantern.x, lantern.y - 4, lantern.z)
-  const c2End = hero.at(-3.2, 0.9, 2.0)
+  // Over his shoulder: the island ahead, the shard lights standing over it.
+  const ahead = hero.at(120, 0, 12)
+  const c2End = hero.at(-2.6, 0.75, 1.75)
   s.shot(
     new PathShot({
       at: 15.6,
       duration: 2.2,
-      pos: [hero.at(-2.6, 1.1, 1.55), c2End],
-      target: [horizon, summit],
-      fov: [42, 40],
+      pos: [hero.at(-2.0, 0.85, 1.35), c2End],
+      target: [hero.at(120, 0, 6), ahead],
+      fov: [44, 42],
       ease: ease.inOutSine,
       anchor: hero.at(0, 0, 1.4),
     }),
@@ -142,8 +141,8 @@ export function buildIntro(ctx: Ctx): Scene {
     new PathShot({
       at: 17.8,
       duration: 2.6,
-      pos: [c2End, hero.at(-4.8, 0.45, 2.7), followPos],
-      target: [summit, followLook],
+      pos: [c2End, hero.at(-4.4, 0.4, 2.6), followPos],
+      target: [ahead, followLook],
       fov: [40, ctx.settings.fov],
       ease: ease.inOutSine,
       anchor: hero.at(0, 0, 1.4),

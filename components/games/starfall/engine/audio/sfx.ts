@@ -172,7 +172,7 @@ export class Sfx {
   jump(double: boolean): void {
     if (!this.gate('jump', 0.05)) return
     const t = this.t
-    const v = this.voice(this.mix.sfx, double ? 1.4 : 1.6, { wet: double ? 0.5 : 0 })
+    const v = this.voice(this.mix.sfx, double ? 1.5 : 2.3, { wet: double ? 0.5 : 0 })
     if (!double) {
       this.whoosh(v, t, 500, 1900, 0.24, 0.24, 1.1)
       this.tone(v, t, 'sine', 260, 430, 0.05, 0.008, 0.07)
@@ -305,7 +305,7 @@ export class Sfx {
     if (!this.gate('spark', 0.03)) return
     const t = this.t
     const n = SPARK_LADDER[Math.min(Math.max(0, chain), SPARK_LADDER.length - 1)]
-    const v = this.voice(this.mix.sfx, 1.4, { pan: rand(-0.15, 0.15), wet: 0.45 })
+    const v = this.voice(this.mix.sfx, 1.8, { pan: rand(-0.15, 0.15), wet: 0.45 })
     this.chime(v, t, mtof(n), 0.085, 0.45, 2, 0.9)
     this.chime(v, t + 0.035, mtof(n + 12), 0.02, 0.25, 2, 0.4)
   }

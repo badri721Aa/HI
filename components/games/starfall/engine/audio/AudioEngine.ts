@@ -122,7 +122,8 @@ export class AudioEngine implements IAudio {
 
   update(dt: number): void {
     const ac = this.ac
-    if (!ac || ac.state !== 'running') return
+    const mix = this.mix
+    if (!ac || !mix || ac.state !== 'running') return
     try {
       this.syncListener(ac)
       const phase = this.ctx.game.phase
@@ -130,8 +131,8 @@ export class AudioEngine implements IAudio {
         this.phase = phase
         const [m, a] = DUCK[phase] ?? DUCK.playing
         const t = ac.currentTime
-        this.mix!.music.setDuck(m, t, phase === 'paused' ? 0.15 : 0.4)
-        this.mix!.ambience.setDuck(a, t, 0.5)
+        mix.music.setDuck(m, t, phase === 'paused' ? 0.15 : 0.4)
+        mix.ambience.setDuck(a, t, 0.5)
       }
       this.ambT -= dt
       if (this.ambT <= 0) {

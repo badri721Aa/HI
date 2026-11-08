@@ -23,7 +23,7 @@ import { glowTexture, supportHeight } from './parts/util'
 /** Per-shard tint (the core stays warm white). Indexed like SHARDS. */
 const SHARD_TINTS = ['#7fdcf5', '#a8f0cf', '#e2f08a', '#b9b6ff', '#8cc3ff', '#ffbfe0', '#ffc77a']
 const SPARK_COLOR = '#ffc44d'
-const HEART_COLOR = '#ff5d84'
+const HEART_COLOR = '#ec4f72'
 
 /** Chest height above the feet used for pickup distances. */
 const CHEST = 1.0
@@ -179,7 +179,7 @@ export class Collectibles implements ICollectibles {
     this.sparkMesh = spark
 
     // ── hearts ──
-    const heart = new THREE.InstancedMesh(heartGeometry(), gemMaterial(this.time, sun, { spin: 1.5, bob: 0.1, core: 0.9, coreRadius: 0.32, rim: 1.0, color: HEART_COLOR }), Math.max(1, this.hearts.length))
+    const heart = new THREE.InstancedMesh(heartGeometry(), gemMaterial(this.time, sun, { face: true, spin: 1.3, bob: 0.1, core: 0.75, coreRadius: 0.3, rim: 0.75, color: HEART_COLOR }), Math.max(1, this.hearts.length))
     heart.name = 'hearts'
     heart.frustumCulled = false
     heart.count = this.hearts.length
@@ -422,7 +422,7 @@ export class Collectibles implements ICollectibles {
       }
       const u = h.state === COLLECTING ? h.t / HEART_COLLECT_TIME : 0
       glows.move(slot, h.x, h.y, h.z, 1.5 * (1 + u))
-      glows.intensity(slot, (0.42 + 0.1 * Math.sin(t * 2.4 + i)) * (1 - u))
+      glows.intensity(slot, (0.32 + 0.08 * Math.sin(t * 2.4 + i)) * (1 - u))
     }
   }
 

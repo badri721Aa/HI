@@ -209,7 +209,7 @@ export class Instruments {
     const env = s.gain(0, this.d.dry)
     const lp = s.filter('lowpass', 900, 5, env)
     s.glide(lp.frequency, t, 1100, 260, 0.12)
-    const end = s.perc(env.gain, t, 0.3 * vel, 0.004, 0.16)
+    const end = s.perc(env.gain, t, 0.45 * vel, 0.004, 0.16)
     s.osc('sawtooth', mtof(midi), lp, t, end)
   }
 

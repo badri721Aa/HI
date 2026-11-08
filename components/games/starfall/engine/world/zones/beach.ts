@@ -62,15 +62,23 @@ export function beam(kit: ZoneKit, mat: Mat, ax: number, ay: number, az: number,
   tbox(kit, mat, (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, w, h, len, yaw, pitch, 0, uv, parent)
 }
 
-/** Visual-only round pole / rope from a to b. */
-export function rod(kit: ZoneKit, mat: Mat, ax: number, ay: number, az: number, bx: number, by: number, bz: number, r: number, seg = 6, uv = 2, parent?: THREE.Matrix4): void {
+/**
+ * Visual-only round pole / rope from a to b (radius r at a, rTop at b).
+ * `grain` turns the texture so planks/bark run along the pole (masts, spars).
+ */
+export function rod(kit: ZoneKit, mat: Mat, ax: number, ay: number, az: number, bx: number, by: number, bz: number, r: number, seg = 6, uv = 2, parent?: THREE.Matrix4, rTop = r, grain = false): void {
   _d.set(bx - ax, by - ay, bz - az)
   const len = _d.length()
   if (len < 1e-4) return
+  const g = worldCylinder(rTop, r, len, seg, uv)
+  if (grain) {
+    const a = g.attributes.uv as THREE.BufferAttribute
+    for (let i = 0; i < a.count; i++) a.setXY(i, a.getY(i), a.getX(i))
+  }
   _q.setFromUnitVectors(_up, _d.divideScalar(len))
   _m.compose(_p.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2), _q, _one)
   if (parent) _m.premultiply(parent)
-  kit.add(worldCylinder(r, r, len, seg, uv), mat, _m)
+  kit.add(g, mat, _m)
 }
 
 /** A rope hanging between two points with a little sag. */
@@ -237,18 +245,18 @@ export function roofSteps(kit: ZoneKit, cx: number, cz: number, yaw: number, eav
  * Flat ring (rIn > 0) or disc (rIn = 0) whose TOP is at y, `t` thick, with planar world UVs on
  * the faces (cylinder caps would stretch textures) and an outer rim. Visual only.
  */
-export function slab(kit: ZoneKit, mat: Mat, x: number, y: number, z: number, rIn: number, rOut: number, t: number, seg = 24, uv = 2, rot = 0): void {
+export function slab(kit: ZoneKit, mat: Mat, x: number, y: number, z: number, rIn: number, rOut: number, t: number, seg = 24, uv = 2, rot = 0, parent?: THREE.Matrix4): void {
   for (const up of [true, false]) {
     const g = new THREE.RingGeometry(rIn, rOut, seg, 1, rot)
     g.rotateX(up ? -Math.PI / 2 : Math.PI / 2)
-    g.translate(x, up ? y : y - t, z)
+    g.translate(0, up ? 0 : -t, 0)
     const p = g.attributes.position as THREE.BufferAttribute
     const a = g.attributes.uv as THREE.BufferAttribute
-    for (let i = 0; i < p.count; i++) a.setXY(i, p.getX(i) / uv, p.getZ(i) / uv)
-    kit.add(g, mat)
+    for (let i = 0; i < p.count; i++) a.setXY(i, (p.getX(i) + x) / uv, (p.getZ(i) + z) / uv)
+    kit.add(g, mat, place(x, y, z, 0, 0, 0, parent))
   }
-  kit.add(openCylinder(rOut, rOut, t, seg, uv, false, rot), mat, place(x, y - t / 2, z))
-  if (rIn > 0) kit.add(openCylinder(rIn, rIn, t, seg, uv, true, rot), mat, place(x, y - t / 2, z))
+  kit.add(openCylinder(rOut, rOut, t, seg, uv, false, rot), mat, place(x, y - t / 2, z, 0, 0, 0, parent))
+  if (rIn > 0) kit.add(openCylinder(rIn, rIn, t, seg, uv, true, rot), mat, place(x, y - t / 2, z, 0, 0, 0, parent))
 }
 
 /** Open-ended cylinder with world-scaled UVs; `inward` flips it so its faces look at the axis. */

@@ -26,7 +26,14 @@ void main() {
     mat4 m = modelMatrix;
     float ph = 0.0;
   #endif
-  float a = uTime * uSpin + ph;
+  #ifdef FACE_CAMERA
+    // Flat gems (hearts) turn their face toward the viewer and sway instead of spinning edge-on.
+    vec3 wc = (m * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+    vec2 toCam = cameraPosition.xz - wc.xz;
+    float a = atan(toCam.x, toCam.y) + sin(uTime * uSpin + ph) * 0.55;
+  #else
+    float a = uTime * uSpin + ph;
+  #endif
   float c = cos(a);
   float s = sin(a);
   pos.xz = vec2(c * pos.x + s * pos.z, -s * pos.x + c * pos.z);
@@ -81,8 +88,10 @@ void main() {
 `
 
 export interface GemOptions {
-  /** Spin speed in rad/s applied in the shader (0 = static / CPU driven). */
+  /** Spin speed in rad/s applied in the shader (0 = static / CPU driven); with `face`, the sway rate. */
   spin?: number
+  /** Turn each gem's +Z face toward the camera (with a gentle sway) instead of spinning. */
+  face?: boolean
   /** Bob amplitude in metres applied in the shader. */
   bob?: number
   /** Brightness of the inner core (≈ 0.6–1.6). */
@@ -117,6 +126,7 @@ export function gemMaterial(time: THREE.IUniform<number>, sunDir: THREE.Vector3,
     fog: true,
     side: o.side ?? THREE.FrontSide,
   })
+  if (o.face) m.defines.FACE_CAMERA = ''
   // UniformsUtils.merge clones values — attach the shared ones afterwards.
   m.uniforms.uTime = time
   m.uniforms.uSunDir = { value: sunDir }

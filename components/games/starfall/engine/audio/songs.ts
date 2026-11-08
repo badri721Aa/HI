@@ -99,8 +99,8 @@ const title: Song = {
     const ch = TITLE_CHORDS[b >> 1]
     const ins = p.ins
     if (s === 0 && (b & 1) === 0) {
-      ins.pad(t, ch.pad, p.t16 * 32, 1.4, { attack: 1.8, release: 2.6, bright: 1250, wave: 'triangle' })
-      ins.pad(t, ch.pad, p.t16 * 32, 0.8, { attack: 2.2, release: 2.6, bright: 900 })
+      ins.pad(t, ch.pad, p.t16 * 32, 1.1, { attack: 1.8, release: 2.6, bright: 1250, wave: 'triangle' })
+      ins.pad(t, ch.pad, p.t16 * 32, 0.6, { attack: 2.2, release: 2.6, bright: 900 })
       ins.sub(t, ch.root, p.t16 * 32, 0.7)
     }
     // Lighter on the very first bars so the theme fades in.
@@ -218,7 +218,7 @@ const danger: Song = {
     const s = i & 15
     const b = bar % 4
     const ch = DANGER[b]
-    if (s === 0) ins.pad(t, ch.pad, p.t16 * 16, 0.6, { attack: 0.35, release: 0.8, bright: 650 })
+    if (s === 0) ins.pad(t, ch.pad, p.t16 * 16, 0.9, { attack: 0.35, release: 0.8, bright: 650 })
     const o = OSTINATO[s]
     if (o !== null) ins.pulse(t, ch.root + o, s === 0 || s === 8 ? 1 : 0.7)
     if (s === 0 || s === 6 || s === 10) ins.tom(t, s === 0 ? 40 : 43, s === 0 ? 1 : 0.7)

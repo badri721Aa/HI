@@ -329,7 +329,7 @@ export function buildForest(ctx: Ctx): ZonePart {
     const p = at(deg, rho)
     const y = kit.ground(p.x, p.z)
     kit.cylinder({ x: p.x, y: y - 0.3, z: p.z, r: r * 1.25, rTop: r, h: h + 0.3, segments: 14, mat: 'bark', collide: { surface: 'wood' } })
-    kit.add(new THREE.CircleGeometry(r * 0.92, 14).rotateX(-Math.PI / 2), 'planks', m4.makeTranslation(p.x, y + h + 0.005, p.z), { castShadow: false })
+    kit.add(new THREE.CircleGeometry(r * 0.92, 14).rotateX(-Math.PI / 2), 'darkPlanks', m4.makeTranslation(p.x, y + h + 0.005, p.z), { castShadow: false })
     cluster(p.x + r * 1.3, p.z, 3, 0.4)
   }
 

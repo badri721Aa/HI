@@ -299,8 +299,8 @@ const STONES: Array<[number, number, number, number]> = [
   [-61.6, -40.0, 2.85, 0.85],
   [-62.9, -42.9, 2.95, 0.9],
   [-61.4, -45.7, 3.1, 0.85],
-  [-60.6, -48.5, 3.45, 0.8],
-  [-60.0, -51.0, 3.85, 0.75],
+  [-60.6, -48.5, 3.45, 0.85],
+  [-59.9, -51.0, 3.85, 0.85],
 ]
 
 export function buildFalls(ctx: Ctx): ZonePart {
@@ -355,7 +355,8 @@ export function buildFalls(ctx: Ctx): ZonePart {
         rock(F.x + side * (4.35 + rand() * 0.4), F.topY + s * 0.45, -57.6 + k * 2.1, s * 1.1, s, s * 1.2, rand() * TAU, true)
       }
     }
-    for (let k = 0; k < 3; k++) rock(F.x - 2.4 + k * 2.4, F.topY + 0.6, -58.9 + rand() * 0.4, 1.3, 1.0, 1.0, rand() * TAU, true)
+    // The spring wells up between two rocks (leave a gap so the shelf stays walkable).
+    for (const side of [-1, 1]) rock(F.x + side * 1.9, F.topY + 0.6, -58.8 + rand() * 0.4, 1.3, 1.0, 1.0, rand() * TAU, true)
     // Bulk rock wedged under the shelf so it reads as part of the cliff.
     rock(F.x - 4.9, shelfBottom - 0.9, -56.2, 2.2, 2.6, 2.6, 0.4, false)
     rock(F.x + 4.9, shelfBottom - 0.9, -56.0, 2.0, 2.8, 2.6, 1.3, false)

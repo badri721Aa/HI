@@ -526,5 +526,5 @@ function buildProps(kit: ZoneKit, hay: THREE.Material): void {
 
   // A lying barrel and hay by the well-side lamp.
   barrel(kit, 0.2, heightAt(0.2, 53.6) + 0.02, 53.6, { pitch: Math.PI / 2, yaw: 0.4, collide: true })
-  hayBale(kit, hay, -1.4, 44.2, 0.6)
+  hayBale(kit, hay, -1.0, 48.6, 0.6)
 }
