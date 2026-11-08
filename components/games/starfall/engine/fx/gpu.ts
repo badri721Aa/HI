@@ -165,14 +165,14 @@ void main() {
     a = exp(-r * r * 5.0) * (1.0 - smoothstep(0.85, 1.0, r));
     col *= 1.0 + 1.6 * exp(-r * r * 28.0);
   } else if (vShape < 1.5) {
-    // thin soft annulus
-    a = smoothstep(0.5, 0.8, r) * (1.0 - smoothstep(0.84, 1.0, r));
+    // soft annulus, broad enough to survive grazing views of flat ripples
+    a = smoothstep(0.38, 0.78, r) * (1.0 - smoothstep(0.8, 1.0, r));
   } else if (vShape < 2.5) {
     // four-point twinkling sparkle
     vec2 p = abs(vUv);
-    float rays = (1.0 - p.x) * exp(-p.y * 22.0) + (1.0 - p.y) * exp(-p.x * 22.0);
-    float core = exp(-r * r * 14.0);
-    a = clamp(core + rays * 0.85, 0.0, 1.0) * (1.0 - smoothstep(0.9, 1.0, r));
+    float rays = (1.0 - p.x) * exp(-p.y * 16.0) + (1.0 - p.y) * exp(-p.x * 16.0);
+    float core = exp(-r * r * 9.0);
+    a = clamp(core + rays * 0.85 + exp(-r * r * 3.5) * 0.22, 0.0, 1.0) * (1.0 - smoothstep(0.9, 1.0, r));
     a *= 0.6 + 0.4 * sin(uTime * 17.0 + vSeed * 60.0);
     col *= 1.0 + core * 1.5;
   } else if (vShape < 3.5) {

@@ -47,7 +47,6 @@ export class Atmosphere {
 
   /** this = mix(a, b, t). Safe when `this` is `a` or `b`. */
   lerpBetween(a: Atmosphere, b: Atmosphere, t: number): this {
-    const n = (x: number, y: number) => x + (y - x) * t
     // When the light hands over between sun and moon, dim it through the middle
     // and swing it while it is dim, instead of sweeping a bright light overhead.
     const handover = Math.abs(a.sunDisc - b.sunDisc) > 0.5
@@ -55,16 +54,19 @@ export class Atmosphere {
     lerpDir(this.lightDir, a.lightDir, b.lightDir, dirT)
     lerpDir(this.sunDir, a.sunDir, b.sunDir, t)
     lerpDir(this.moonDir, a.moonDir, b.moonDir, t)
-    for (const k of COLOR_KEYS) this[k].copy(a[k]).lerp(b[k], t)
-    this.lightIntensity = n(a.lightIntensity, b.lightIntensity) * (handover ? 1 - 0.8 * Math.sin(Math.PI * t) : 1)
-    this.sunDisc = n(a.sunDisc, b.sunDisc)
-    this.moon = n(a.moon, b.moon)
-    this.stars = n(a.stars, b.stars)
-    this.cloudCover = n(a.cloudCover, b.cloudCover)
-    this.hemiIntensity = n(a.hemiIntensity, b.hemiIntensity)
-    this.envIntensity = n(a.envIntensity, b.envIntensity)
-    this.exposure = n(a.exposure, b.exposure)
-    this.caustics = n(a.caustics, b.caustics)
+    for (let i = 0; i < COLOR_KEYS.length; i++) {
+      const k = COLOR_KEYS[i]
+      this[k].copy(a[k]).lerp(b[k], t)
+    }
+    this.lightIntensity = mix(a.lightIntensity, b.lightIntensity, t) * (handover ? 1 - 0.8 * Math.sin(Math.PI * t) : 1)
+    this.sunDisc = mix(a.sunDisc, b.sunDisc, t)
+    this.moon = mix(a.moon, b.moon, t)
+    this.stars = mix(a.stars, b.stars, t)
+    this.cloudCover = mix(a.cloudCover, b.cloudCover, t)
+    this.hemiIntensity = mix(a.hemiIntensity, b.hemiIntensity, t)
+    this.envIntensity = mix(a.envIntensity, b.envIntensity, t)
+    this.exposure = mix(a.exposure, b.exposure, t)
+    this.caustics = mix(a.caustics, b.caustics, t)
     return this
   }
 }
@@ -73,6 +75,10 @@ const COLOR_KEYS = [
   'lightColor', 'sunColor', 'zenith', 'horizon', 'halo', 'bounce', 'fog', 'cloudLit', 'cloudShade',
   'hemiSky', 'hemiGround', 'waterShallow', 'waterDeep',
 ] as const
+
+function mix(x: number, y: number, t: number): number {
+  return x + (y - x) * t
+}
 
 function smooth(e0: number, e1: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)))

@@ -71,8 +71,8 @@ export function buildBeacon(ctx: Ctx): Scene {
     new PathShot({
       at: 0,
       duration: 4.4,
-      pos: [hero.at(-5.0, 2.2, 1.6), hero.at(-6.6, 1.3, 2.8)],
-      target: [hero.at(1.6, 0, 1.9), hero.at(reach, 0, rise * 0.55)],
+      pos: [hero.at(-4.2, 1.8, 1.4), hero.at(-6.0, 1.2, 1.9)],
+      target: [hero.at(2.0, 0, 1.5), hero.at(4.0, 0, 3.6)],
       fov: [48, 50],
       ease: ease.inOutSine,
       anchor: chest,
@@ -102,6 +102,8 @@ export function buildBeacon(ctx: Ctx): Scene {
   const origin = hero.at(Math.min(1.8, reach * 0.45), 0, 1.15)
   const helixR = towerRadius(ctx, axis.x, axis.z) + 1.0
   const a0 = Math.atan2(origin.x - axis.x, origin.z - axis.z)
+  // Each light leaves the altar, winds ~1.1–1.3 turns around the tower (alternating direction,
+  // bulging out mid-climb) and dives into the lantern.
   for (let i = 0; i < TOTAL_SHARDS; i++) {
     const turns = (1.1 + (i % 3) * 0.12) * (i % 2 ? -1 : 1)
     const pts: THREE.Vector3[] = [origin]
@@ -119,14 +121,11 @@ export function buildBeacon(ctx: Ctx): Scene {
   s.at(9.3, () => ctx.character.stopGesture())
 
   // ── ignition ───────────────────────────────────────────────
-  const c1 = hero.at(-8.6, -3.9, 1.0)
-  const c0 = hero.at(-8.0, -3.6, 0.9)
-  const cTarget = vec(
-    THREE.MathUtils.lerp(altar.x, lantern.x, 0.62),
-    THREE.MathUtils.lerp(altar.y + 1.8, lantern.y, 0.62),
-    THREE.MathUtils.lerp(altar.z, lantern.z, 0.62),
-  )
-  s.shot(new PathShot({ at: 9.6, duration: 3.4, pos: [c0, c1], target: cTarget, fov: 60, ease: ease.linear, anchor: chest }))
+  // Wide enough to hold the hero at the altar and the lantern above him.
+  const c0 = hero.at(-11, -4.5, 0.6)
+  const c1 = hero.at(-11.8, -4.8, 0.7)
+  const cTarget = chest.clone().lerp(lantern, 0.5)
+  s.shot(new PathShot({ at: 9.6, duration: 3.4, pos: [c0, c1], target: cTarget, fov: 58, ease: ease.linear, anchor: chest }))
   s.at(IGNITE, ignite)
     .flash(IGNITE, 'rgba(255, 244, 214, 0.9)', 1.1)
     .burst(IGNITE, 'beacon', lantern, { scale: 1.4, color: FLAME })
@@ -146,7 +145,7 @@ export function buildBeacon(ctx: Ctx): Scene {
     duration: DURATION - 13.0,
     pos: [c1, hero.at(-24, -16, rise + 9), vec(BEACON.x - 62, 50, BEACON.z + 82), wideEnd],
     target: [cTarget, vec(lantern.x, lantern.y - 2, lantern.z), wideLook],
-    fov: [60, 46],
+    fov: [58, 46],
     ease: ease.inOutCubic,
   })
   s.shot(wide)

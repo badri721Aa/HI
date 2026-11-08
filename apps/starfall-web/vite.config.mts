@@ -12,6 +12,8 @@ export default defineConfig({
   root: here,
   publicDir: path.join(here, 'public'),
   plugins: [react()],
+  // Lets shared components know they're in the standalone site (no arcade to link back to).
+  define: { 'process.env.NEXT_PUBLIC_STARFALL_STANDALONE': JSON.stringify('1') },
   resolve: {
     alias: [
       { find: 'next/link', replacement: path.join(here, 'src/link-shim.tsx') },

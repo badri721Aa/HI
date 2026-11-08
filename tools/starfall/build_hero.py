@@ -216,7 +216,7 @@ for e in eyes:
     pts = [e.matrix_world @ v.co for v in e.data.vertices]
     c = sum(pts, Vector()) / len(pts)
     e.matrix_world = (Matrix.Translation(c + Vector((0, -0.012, 0.0)))
-                      @ Matrix.Scale(1.06, 4)
+                      @ Matrix.Scale(1.05, 4)
                       @ Matrix.Translation(-c) @ e.matrix_world)
     e.data.materials.clear()
     for n in ORDER:
@@ -262,7 +262,7 @@ def dominant(face):
 def is_hair(p):
     if abs(p.x) > 0.27 and p.z < 5.86 and p.y < -0.2:
         return False  # keep the ears clear
-    if p.z > 5.9:
+    if p.z > 5.95:
         return True
     if p.z > 5.8 and abs(p.x) > 0.25:
         return True
@@ -314,7 +314,7 @@ boundary = list(set(boundary))
 front = sorted({v for e in boundary for v in e.verts if (mw @ v.co).y < -0.5}, key=lambda v: (mw @ v.co).x)
 for i, v in enumerate(front):
     if i % 2 == 0:
-        v.co += mw_inv.to_3x3() @ Vector((0, -0.02, -0.075))
+        v.co += mw_inv.to_3x3() @ Vector((0, -0.02, -0.045))
 head_c = mw_inv @ Vector((0, -0.42, 5.72))
 ext = bmesh.ops.extrude_edge_only(bm, edges=boundary)
 for g in ext['geom']:
@@ -333,6 +333,163 @@ bm.free()
 body.data.update()
 for p in body.data.polygons:
     p.use_smooth = True
+
+# ── 6b. friendlier proportions + face paint ─────────────────────────
+# A slightly bigger head reads younger and friendlier. Scale every vertex by its
+# 'head' weight around the top of the neck so the neck blends smoothly.
+HEAD_SCALE = 1.16
+pivot_w = Vector((0, -0.317, 5.404))
+pivot = mw_inv @ pivot_w
+gi_head = body.vertex_groups['head'].index
+for v in body.data.vertices:
+    w = 0.0
+    for g in v.groups:
+        if g.group == gi_head:
+            w = g.weight
+    if w > 0:
+        k = 1 + (HEAD_SCALE - 1) * w
+        v.co = pivot + (v.co - pivot) * k
+body.data.update()
+
+# Eye centres and radius, measured after scaling (object-local coordinates).
+eye_pts = {1: [], -1: []}
+for poly in body.data.polygons:
+    if poly.material_index != IDX['eye']:
+        continue
+    for vi in poly.vertices:
+        co = body.data.vertices[vi].co
+        eye_pts[1 if co.x > 0 else -1].append(co.copy())
+eye_c = {k: sum(v, Vector()) / len(v) for k, v in eye_pts.items()}
+eye_r = max((co - eye_c[1]).length for co in eye_pts[1])
+ecx, ecy, ecz = abs(eye_c[1].x), (eye_c[1].y + eye_c[-1].y) / 2, (eye_c[1].z + eye_c[-1].z) / 2
+print('eye centres (local)', tuple(round(x, 3) for x in eye_c[1]), tuple(round(x, 3) for x in eye_c[-1]), 'radius', round(eye_r, 3))
+
+def vmath(nt, op, a, b=None):
+    n = nt.nodes.new('ShaderNodeVectorMath')
+    n.operation = op
+    nt.links.new(a, n.inputs[0])
+    if b is not None:
+        if isinstance(b, tuple):
+            n.inputs[1].default_value = b
+        else:
+            nt.links.new(b, n.inputs[1])
+    return n.outputs['Value'] if op in ('DOT_PRODUCT', 'DISTANCE', 'LENGTH') else n.outputs['Vector']
+
+def smath(nt, op, a, b=None, c=None):
+    n = nt.nodes.new('ShaderNodeMath')
+    n.operation = op
+    for i, x in enumerate((a, b, c)):
+        if x is None:
+            continue
+        if isinstance(x, (int, float)):
+            n.inputs[i].default_value = x
+        else:
+            nt.links.new(x, n.inputs[i])
+    return n.outputs[0]
+
+def mirrored_obj(nt):
+    """Object coords with |x| so one formula paints both sides of the face."""
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    sep = nt.nodes.new('ShaderNodeSeparateXYZ')
+    nt.links.new(tc.outputs['Object'], sep.inputs['Vector'])
+    comb = nt.nodes.new('ShaderNodeCombineXYZ')
+    nt.links.new(smath(nt, 'ABSOLUTE', sep.outputs['X']), comb.inputs['X'])
+    nt.links.new(sep.outputs['Y'], comb.inputs['Y'])
+    nt.links.new(sep.outputs['Z'], comb.inputs['Z'])
+    return comb.outputs['Vector'], sep
+
+def soft_mask(nt, dist, inner, outer):
+    mr = nt.nodes.new('ShaderNodeMapRange')
+    mr.interpolation_type = 'SMOOTHSTEP'
+    nt.links.new(dist, mr.inputs['Value'])
+    mr.inputs['From Min'].default_value = inner
+    mr.inputs['From Max'].default_value = outer
+    mr.inputs['To Min'].default_value = 1.0
+    mr.inputs['To Max'].default_value = 0.0
+    return mr.outputs['Result']
+
+# Eyes: warm white sclera, brown iris with a lighter inner ring, pupil and a catchlight.
+nt = MATS['eye'].node_tree
+b = nt.nodes['Principled BSDF']
+tc_e = nt.nodes.new('ShaderNodeTexCoord')
+sep_e = nt.nodes.new('ShaderNodeSeparateXYZ')
+nt.links.new(tc_e.outputs['Object'], sep_e.inputs['Vector'])
+sx = smath(nt, 'SIGN', sep_e.outputs['X'])
+def comb(xs, y, z):
+    n = nt.nodes.new('ShaderNodeCombineXYZ')
+    nt.links.new(xs, n.inputs['X'])
+    n.inputs['Y'].default_value = y
+    n.inputs['Z'].default_value = z
+    return n.outputs['Vector']
+# The two eye meshes aren't exact mirror images, so each eye uses its own measured centre.
+mixc = nt.nodes.new('ShaderNodeMix')
+mixc.data_type = 'VECTOR'
+nt.links.new(smath(nt, 'GREATER_THAN', sep_e.outputs['X'], 0.0), mixc.inputs['Factor'])
+mixc.inputs[4].default_value = tuple(eye_c[-1])
+mixc.inputs[5].default_value = tuple(eye_c[1])
+centre = mixc.outputs[1]
+d = vmath(nt, 'NORMALIZE', vmath(nt, 'SUBTRACT', tc_e.outputs['Object'], centre))
+# The source model's eye sockets sit slightly to one side of the eyeballs, so a uniform
+# sideways correction centres both irises in their openings; a touch downward reads relaxed.
+gaze = vmath(nt, 'NORMALIZE', comb(smath(nt, 'MULTIPLY', sx, 0.0), -1.0, -0.07))
+gx = nt.nodes.new('ShaderNodeVectorMath')
+gx.operation = 'ADD'
+nt.links.new(gaze, gx.inputs[0])
+gx.inputs[1].default_value = (-0.26, 0.0, 0.0)
+gaze = vmath(nt, 'NORMALIZE', gx.outputs['Vector'])
+t = vmath(nt, 'DOT_PRODUCT', d, gaze)
+hl_dir = Vector((-0.34, -1.0, 0.3)).normalized()
+th = vmath(nt, 'DOT_PRODUCT', d, tuple(hl_dir))
+def step_at(x, edge, soft=0.004):
+    mr = nt.nodes.new('ShaderNodeMapRange')
+    mr.interpolation_type = 'SMOOTHSTEP'
+    nt.links.new(x, mr.inputs['Value'])
+    mr.inputs['From Min'].default_value = edge - soft
+    mr.inputs['From Max'].default_value = edge + soft
+    return mr.outputs['Result']
+col = lin('#f3eee6')
+mix_iris = nt.nodes.new('ShaderNodeMix'); mix_iris.data_type = 'RGBA'
+nt.links.new(step_at(t, math.cos(math.radians(42))), mix_iris.inputs['Factor'])
+mix_iris.inputs[6].default_value = col
+mix_iris.inputs[7].default_value = lin('#3a2416')
+mix_inner = nt.nodes.new('ShaderNodeMix'); mix_inner.data_type = 'RGBA'
+nt.links.new(step_at(t, math.cos(math.radians(34)), 0.012), mix_inner.inputs['Factor'])
+nt.links.new(mix_iris.outputs[2], mix_inner.inputs[6])
+mix_inner.inputs[7].default_value = lin('#7a4c2a')
+mix_pupil = nt.nodes.new('ShaderNodeMix'); mix_pupil.data_type = 'RGBA'
+nt.links.new(step_at(t, math.cos(math.radians(18))), mix_pupil.inputs['Factor'])
+nt.links.new(mix_inner.outputs[2], mix_pupil.inputs[6])
+mix_pupil.inputs[7].default_value = lin('#0d0907')
+mix_hl = nt.nodes.new('ShaderNodeMix'); mix_hl.data_type = 'RGBA'
+nt.links.new(step_at(th, math.cos(math.radians(6)), 0.002), mix_hl.inputs['Factor'])
+nt.links.new(mix_pupil.outputs[2], mix_hl.inputs[6])
+mix_hl.inputs[7].default_value = (1, 1, 1, 1)
+nt.links.new(mix_hl.outputs[2], b.inputs['Base Color'])
+
+# Face: eyebrows (hair colour, gentle arch) and a hint of warmth on the cheeks.
+nt = MATS['head'].node_tree
+b = nt.nodes['Principled BSDF']
+base = b.inputs['Base Color'].links[0].from_socket
+pm, sep = mirrored_obj(nt)
+# brow arch just above the eye socket, gently curved: z = ecz + 1.12 r - 0.3 (dx^2 / r)
+dx = smath(nt, 'SUBTRACT', smath(nt, 'ABSOLUTE', sep.outputs['X']), ecx)
+arch = smath(nt, 'SUBTRACT', ecz + 1.12 * eye_r, smath(nt, 'MULTIPLY', smath(nt, 'POWER', dx, 2.0), 0.3 / eye_r))
+brow_d = smath(nt, 'ABSOLUTE', smath(nt, 'SUBTRACT', sep.outputs['Z'], arch))
+brow_band = soft_mask(nt, brow_d, 0.09 * eye_r, 0.16 * eye_r)
+brow_len = soft_mask(nt, smath(nt, 'ABSOLUTE', smath(nt, 'SUBTRACT', dx, 0.1 * eye_r)), 0.85 * eye_r, 1.05 * eye_r)
+brow_front = soft_mask(nt, sep.outputs['Y'], ecy + 0.6 * eye_r, ecy + 1.2 * eye_r)
+brow = smath(nt, 'MULTIPLY', smath(nt, 'MULTIPLY', brow_band, brow_len), brow_front)
+mix_b = nt.nodes.new('ShaderNodeMix'); mix_b.data_type = 'RGBA'
+nt.links.new(brow, mix_b.inputs['Factor'])
+nt.links.new(base, mix_b.inputs[6])
+mix_b.inputs[7].default_value = lin('#3a2214')
+cheek = vmath(nt, 'DISTANCE', pm, (ecx + 0.25 * eye_r, ecy - 0.15 * eye_r, ecz - 1.55 * eye_r))
+blush = smath(nt, 'MULTIPLY', soft_mask(nt, cheek, 0.25 * eye_r, 1.15 * eye_r), 0.32)
+mix_c = nt.nodes.new('ShaderNodeMix'); mix_c.data_type = 'RGBA'
+nt.links.new(blush, mix_c.inputs['Factor'])
+nt.links.new(mix_b.outputs[2], mix_c.inputs[6])
+mix_c.inputs[7].default_value = lin('#e2847a')
+nt.links.new(mix_c.outputs[2], b.inputs['Base Color'])
 
 # ── 7. UV unwrap ────────────────────────────────────────────────────
 bpy.ops.object.select_all(action='DESELECT')
@@ -385,8 +542,20 @@ import numpy as np
 a = np.array(alb.pixels[:], dtype=np.float32).reshape(TEX, TEX, 4)
 o = np.array(ao.pixels[:], dtype=np.float32).reshape(TEX, TEX, 4)
 occl = o[..., :1]
+# Mask of eye texels (rasterise the eye faces' UVs) so AO only lightly shades them.
+eye_mask = np.zeros((TEX, TEX), dtype=bool)
+uvl = body.data.uv_layers.active.data
+for poly in body.data.polygons:
+    if poly.material_index != IDX['eye']:
+        continue
+    pts = [(uvl[l].uv.x * TEX, uvl[l].uv.y * TEX) for l in poly.loop_indices]
+    xs = [q[0] for q in pts]; ys = [q[1] for q in pts]
+    x0, x1 = max(0, int(min(xs)) - 2), min(TEX - 1, int(max(xs)) + 2)
+    y0, y1 = max(0, int(min(ys)) - 2), min(TEX - 1, int(max(ys)) + 2)
+    eye_mask[y0:y1 + 1, x0:x1 + 1] = True
+ao_w = np.where(eye_mask[..., None], 0.2, 0.58).astype(np.float32)
 final = a.copy()
-final[..., :3] = a[..., :3] * (0.42 + 0.58 * occl)
+final[..., :3] = a[..., :3] * ((1 - ao_w) + ao_w * occl)
 final[..., 3] = 1.0
 out_img = bpy.data.images.new('hero_tex', TEX, TEX, alpha=False)
 out_img.pixels[:] = final.ravel()
@@ -406,8 +575,55 @@ nt.links.new(tn.outputs['Color'], b.inputs['Base Color'])
 em = bpy.data.materials.new('HeroEye')
 em.use_nodes = True
 eb = em.node_tree.nodes['Principled BSDF']
-eb.inputs['Base Color'].default_value = lin('#120d0a')
 eb.inputs['Roughness'].default_value = 0.12
+
+# Eyes get their own crisp painted texture, projected straight onto each eyeball from the
+# front, so the iris is sharp and sits exactly where we want it in the eye opening.
+ET = 256
+yy, xx = np.mgrid[0:ET, 0:ET].astype(np.float32)
+eu = (xx + 0.5) / ET - 0.5
+ev = (yy + 0.5) / ET - 0.5
+rr = np.hypot(eu, ev)
+ang = np.arctan2(ev, eu)
+srgb = lambda h: np.array([int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)], dtype=np.float32)
+img = np.empty((ET, ET, 3), dtype=np.float32)
+img[:] = srgb('#f4efe8')
+IR, PR = 0.25, 0.105
+t = np.clip((rr - PR) / (IR - PR), 0, 1)[..., None]
+streak = (0.5 + 0.5 * np.sin(ang * 23.0) * np.sin(ang * 7.0 + 1.3))[..., None]
+iris = srgb('#9a6a3c') * (1 - t) + srgb('#4a2c18') * t
+iris = iris * (0.86 + 0.14 * streak)
+ring = np.clip((rr - (IR - 0.03)) / 0.03, 0, 1)[..., None]
+iris = iris * (1 - 0.55 * ring)
+edge = np.clip((IR + 0.006 - rr) / 0.012, 0, 1)[..., None]
+img = img * (1 - edge) + iris * edge
+pup = np.clip((PR + 0.006 - rr) / 0.012, 0, 1)[..., None]
+img = img * (1 - pup) + srgb('#0c0806') * pup
+for hx, hy, hr in ((-0.075, 0.085, 0.05), (0.07, -0.06, 0.022)):
+    hd = np.hypot(eu - hx, ev - hy)
+    hm = np.clip((hr - hd) / 0.01, 0, 1)[..., None]
+    img = img * (1 - hm) + np.float32(1.0) * hm
+eye_img = bpy.data.images.new('hero_eye', ET, ET, alpha=False)
+eye_px = np.ones((ET, ET, 4), dtype=np.float32)
+eye_px[..., :3] = img
+eye_img.pixels[:] = eye_px.ravel()
+eye_img.pack()
+etn = em.node_tree.nodes.new('ShaderNodeTexImage')
+etn.image = eye_img
+em.node_tree.links.new(etn.outputs['Color'], eb.inputs['Base Color'])
+
+# Front projection per eye. The source sockets sit slightly off-centre on the eyeballs, so
+# the iris is nudged to sit in the middle of each opening (and a touch low: relaxed look).
+IRIS_SHIFT_U, IRIS_SHIFT_V = 0.025, 0.03
+uvl = body.data.uv_layers.active.data
+for poly in body.data.polygons:
+    if poly.material_index != IDX['eye']:
+        continue
+    side = 1 if poly.center.x > 0 else -1
+    c = eye_c[side]
+    for li in poly.loop_indices:
+        co = body.data.vertices[body.data.loops[li].vertex_index].co
+        uvl[li].uv = (0.5 + (co.x - c.x) / (2 * eye_r) + IRIS_SHIFT_U, 0.5 + (co.z - c.z) / (2 * eye_r) + IRIS_SHIFT_V)
 eye_flags = [p.material_index == IDX['eye'] for p in body.data.polygons]
 body.data.materials.clear()
 body.data.materials.append(fm)

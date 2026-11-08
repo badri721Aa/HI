@@ -56,7 +56,9 @@ export class Environment implements IEnvironment {
   private envTimer = 0
 
   private focus = new THREE.Vector3()
-  private shadowKey = ''
+  /** Shadow settings the light was last configured for (re-read from ctx.quality). */
+  private shadowSize = 0
+  private shadowRadius = 0
   private waterDetail = -1
   private ready = false
 
@@ -143,6 +145,8 @@ export class Environment implements IEnvironment {
   }
 
   setTimeOfDay(tod: TimeOfDay, seconds: number): void {
+    // Already there (e.g. the intro re-asserting dusk): nothing to re-bake.
+    if (this.to === PRESETS[tod] && this.blend >= 1) return
     this.to = PRESETS[tod]
     this.from.copy(this.atmo)
     if (!this.ready) {
@@ -253,9 +257,9 @@ export class Environment implements IEnvironment {
       this.fog.far = q.viewDistance
       this.fog.near = Math.round(q.viewDistance * 0.35)
     }
-    const key = `${q.shadowMapSize}:${q.shadowRadius}`
-    if (key !== this.shadowKey) {
-      this.shadowKey = key
+    if (q.shadowMapSize !== this.shadowSize || q.shadowRadius !== this.shadowRadius) {
+      this.shadowSize = q.shadowMapSize
+      this.shadowRadius = q.shadowRadius
       const s = this.sun.shadow
       s.mapSize.set(q.shadowMapSize, q.shadowMapSize)
       s.map?.dispose()

@@ -80,10 +80,9 @@ export function bakeWorldMap(): WorldMap {
       dens[k * 4 + 2] = Math.round(THREE.MathUtils.clamp(meadow, 0, 1) * 255)
       dens[k * 4 + 3] = 255
 
-      // Coast: near sea level, next to open sea, away from the inland lakes.
-      if (inLake || hh < -1.6 || hh > 1.2) continue
-      if (Math.min(at(i + 1, j), at(i - 1, j), at(i, j + 1), at(i, j - 1)) > -0.8) continue
-      if (slope < 1e-3) continue
+      // Coast: the last land cell before open sea (away from the inland lakes).
+      if (inLake || hh < 0 || hh > 1.5 || slope < 1e-3) continue
+      if (Math.min(at(i + 1, j), at(i - 1, j), at(i, j + 1), at(i, j - 1)) > -0.05) continue
       // One Newton step onto the h = 0 waterline, along the gradient.
       const step = THREE.MathUtils.clamp(-hh / slope, -CELL, CELL)
       coast.push(x + (gx / slope) * step, z + (gz / slope) * step, gx / slope, gz / slope)

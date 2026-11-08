@@ -38,6 +38,8 @@ type AirKind = 'jump' | 'flip' | 'fall' | 'bounce'
 const AIR_STATES = new Set<PlayerState>(['jump', 'doubleJump', 'fall', 'bounce'])
 const UPPER = [J.spine, J.chest, J.neck, J.head, J.shoulderL, J.upperArmL, J.forearmL, J.handL, J.shoulderR, J.upperArmR, J.forearmR, J.handR]
 const SPINE_CHAIN = [J.hips, J.spine, J.chest, J.neck, J.head]
+const NECK_HEAD = [J.neck, J.head]
+const HEAD_ONLY = [J.head]
 const LEG_JOINTS = [
   [J.thighL, J.shinL, J.footL, J.toeL],
   [J.thighR, J.shinR, J.footR, J.toeR],
@@ -943,7 +945,7 @@ export class Animator {
       // The chest takes a share of big look turns.
       _q1.setFromAxisAngle(UP, this.lookYaw * 0.22 * lw).multiply(C[J.chest])
       rig.setWorld(out, J.chest, _q1)
-      rig.accumulate(out, [J.neck, J.head])
+      rig.accumulate(out, NECK_HEAD)
     }
     // Desired head orientation: its own authored offset (neck · head) in character space…
     const desired = _q2.multiplyQuaternions(out.q[J.neck], out.q[J.head])
@@ -957,7 +959,7 @@ export class Animator {
     _q1.copy(C[J.head]).invert().premultiply(target)
     _q4.identity().slerp(_q1, 0.4).multiply(C[J.neck])
     rig.setWorld(out, J.neck, _q4)
-    rig.accumulate(out, [J.head])
+    rig.accumulate(out, HEAD_ONLY)
     rig.setWorld(out, J.head, target)
   }
 }

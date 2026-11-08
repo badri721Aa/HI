@@ -109,11 +109,6 @@ const SMALL: Array<[number, number, number, number]> = [
   [-62, 9.5, 1.9, 1.0],
 ]
 
-interface ShroomMats {
-  stem: THREE.Material
-  cap: THREE.Material
-}
-
 export function buildForest(ctx: Ctx): ZonePart {
   const kit = new ZoneKit(ctx, 'forest')
   const rand = rng(0x5eed2)
@@ -122,10 +117,8 @@ export function buildForest(ctx: Ctx): ZonePart {
   const g0 = kit.ground(gx, gz)
   const at = (deg: number, rho: number) => ({ x: gx + Math.cos(deg * DEG) * rho, z: gz + Math.sin(deg * DEG) * rho })
 
-  const mats: ShroomMats = {
-    stem: kit.mat('plaster', { color: 0xf1e3c6, roughness: 0.9, key: 'stem' }),
-    cap: kit.mat('plaster', { color: 0xc4482d, roughness: 0.62, key: 'cap' }),
-  }
+  const stemMat = kit.mat('plaster', { color: 0xeedcbc, roughness: 0.9, key: 'stem' })
+  const capMat = kit.mat('plaster', { color: 0xc4482d, roughness: 0.62, key: 'cap' })
   const glow = kit.mat('glow', { color: 0xb8f5e4, emissive: 0x3fd2b0, emissiveIntensity: 0.85, key: 'spore' })
   const m4 = new THREE.Matrix4()
   const q = new THREE.Quaternion()
@@ -134,7 +127,7 @@ export function buildForest(ctx: Ctx): ZonePart {
   const spot = new THREE.IcosahedronGeometry(1, 0)
 
   /** Cream spots sitting on the cap surface (cap rim at height yRim). */
-  const spots = (x: number, yRim: number, z: number, r: number, h: number, n: number, mat: THREE.Material) => {
+  const spots = (x: number, yRim: number, z: number, r: number, h: number, n: number) => {
     for (let i = 0; i < n; i++) {
       const s = 0.18 + rand() * 0.66
       const a = rand() * TAU
@@ -147,15 +140,15 @@ export function buildForest(ctx: Ctx): ZonePart {
       const size = r * (0.08 + rand() * 0.07)
       sc.set(size, size * 0.32, size * (0.8 + rand() * 0.4))
       m4.compose(new THREE.Vector3(x + Math.cos(a) * s * r, yRim + yy - size * 0.08, z + Math.sin(a) * s * r), q, sc)
-      kit.add(spot.clone(), mat, m4, { castShadow: false })
+      kit.add(spot.clone(), stemMat, m4, { castShadow: false })
     }
   }
 
   /**
    * A giant mushroom whose cap collider top is at `top` (absolute). Stem and cap are solid.
-   * `lean` shifts the cap sideways (towards +x of `leanDir`) for a more organic silhouette.
+   * `lean` shifts the cap sideways (towards the angle `leanDir`) for a more organic silhouette.
    */
-  const giant = (x: number, z: number, top: number, r: number, stemR: number, lean = 0, leanDir = 0, capMat = mats.cap) => {
+  const giant = (x: number, z: number, top: number, r: number, stemR: number, lean = 0, leanDir = 0) => {
     const ground = kit.ground(x, z)
     const h = Math.max(0.7, r * 0.42)
     const rim = top - h * CAP_TOP
@@ -174,10 +167,10 @@ export function buildForest(ctx: Ctx): ZonePart {
       }
       stem.computeVertexNormals()
     }
-    kit.add(stem, mats.stem, m4.makeTranslation(x, 0, z))
+    kit.add(stem, stemMat, m4.makeTranslation(x, 0, z))
     kit.add(capTopGeo(r, h, segs), capMat, m4.makeTranslation(cx, rim, cz))
-    kit.add(capUnderGeo(r, h, stemR, segs), mats.stem, m4.makeTranslation(cx, rim, cz))
-    spots(cx, rim, cz, r, h, Math.round(4 + r * 4), mats.stem)
+    kit.add(capUnderGeo(r, h, stemR, segs), stemMat, m4.makeTranslation(cx, rim, cz))
+    spots(cx, rim, cz, r, h, Math.round(4 + r * 4))
     kit.own(ctx.collision.addCylinder({ x, y: ground - 0.5, z, r: stemR * 1.2, h: rim - ground + 0.5, surface: 'wood', tag: 'mushroom' }))
     kit.own(ctx.collision.addCylinder({ x: cx, y: rim - h * 0.08, z: cz, r: r * 0.96, h: h * (CAP_TOP + 0.08), surface: 'leaves', tag: 'mushroom' }))
   }
@@ -206,13 +199,13 @@ export function buildForest(ctx: Ctx): ZonePart {
   const padH = 0.75
   const padTop = pg + 1.0
   const padRim = padTop - padH * CAP_TOP
-  kit.add(stemGeo(0.5, pg - 0.4, padRim + padH * 0.32, 14), mats.stem, m4.makeTranslation(px, 0, pz))
+  kit.add(stemGeo(0.5, pg - 0.4, padRim + padH * 0.32, 14), stemMat, m4.makeTranslation(px, 0, pz))
   const pad = new THREE.Group()
   pad.position.set(px, padRim, pz)
   const padCap = new THREE.Mesh(capTopGeo(padR, padH, 28), padMat)
   padCap.castShadow = true
   const padUnder = capUnderGeo(padR, padH, 0.5, 28)
-  const padUnderMesh = new THREE.Mesh(padUnder, mats.stem)
+  const padUnderMesh = new THREE.Mesh(padUnder, stemMat)
   const padSpots: THREE.BufferGeometry[] = []
   for (let i = 0; i < 9; i++) {
     const s = i === 0 ? 0 : 0.35 + (i % 2) * 0.3
@@ -259,7 +252,7 @@ export function buildForest(ctx: Ctx): ZonePart {
       const tilt = (rand() - 0.5) * 0.35
       q.setFromAxisAngle(v.set(Math.cos(a + 1.57), 0, Math.sin(a + 1.57)), tilt)
       m4.compose(sc.set(mx, y - 0.05, mz), q, new THREE.Vector3(1, 1, 1))
-      kit.add(new THREE.CylinderGeometry(r * 0.32, r * 0.42, h + 0.05, 6, 1, true).translate(0, (h + 0.05) / 2, 0), mats.stem, m4, { castShadow: false })
+      kit.add(new THREE.CylinderGeometry(r * 0.32, r * 0.42, h + 0.05, 6, 1, true).translate(0, (h + 0.05) / 2, 0), stemMat, m4, { castShadow: false })
       kit.add(sporeCap(r).translate(0, h + 0.03, 0), glow, m4, { castShadow: false })
     }
   }
@@ -277,8 +270,7 @@ export function buildForest(ctx: Ctx): ZonePart {
 
   /* ── hollow fallen log (walk through it, or over it) ───────── */
   {
-    const lx = -90.6
-    const lz = 39.6
+    const { x: lx, z: lz } = at(70, 10.2)
     const yaw = 30 * DEG
     const len = 7.2
     const ro = 1.35
@@ -335,8 +327,7 @@ export function buildForest(ctx: Ctx): ZonePart {
 
   /* ── mossy standing stones ─────────────────────────────────── */
   {
-    const sx0 = -94
-    const sz0 = 11
+    const { x: sx0, z: sz0 } = at(270, 19)
     const n = 6
     const stone = new THREE.BoxGeometry(1, 1, 1, 2, 4, 2)
     for (let i = 0; i < n; i++) {

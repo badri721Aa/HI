@@ -99,8 +99,8 @@ export function buildBeacon(ctx: Ctx): BeaconPart {
   const setLevel = (k: number) => {
     coreMat.emissiveIntensity = 0.2 + k * 9
     glass.emissive.copy(glassGlow).multiplyScalar(k * 0.7)
-    pillarMat.opacity = k * 0.55
-    sweepMat.opacity = k * 0.8
+    pillarMat.opacity = k * 0.45
+    sweepMat.opacity = k * 0.42
     spriteMat.opacity = k
     if (light) light.intensity = k * 420
   }
@@ -209,7 +209,7 @@ function fadeCylinder(r0: number, r1: number, h: number, seg: number, rows: numb
 function sweepGeometry(color: THREE.Color): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
   for (const s of [0, Math.PI]) {
-    const g = fadeCylinder(0.3, 5.5, 60, 16, 6, color, 1.25)
+    const g = fadeCylinder(0.25, 3.0, 55, 16, 6, color, 1.6)
     g.rotateZ(-Math.PI / 2 - 0.07)
     g.rotateY(s)
     parts.push(g)

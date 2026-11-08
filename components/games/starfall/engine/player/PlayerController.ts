@@ -55,6 +55,8 @@ export class PlayerController implements IPlayerController {
   private platVZ = 0
 
   private sliding = false
+  /** Vertical speed used to move this frame: the average of before/after gravity (frame-rate independent arcs). */
+  private vyMove = 0
   /** Time spent standing on too-steep ground without it dropping away (debounces slides at cliff bases). */
   private steepT = 0
   private airTime = 0
@@ -159,7 +161,7 @@ export class PlayerController implements IPlayerController {
     this.dead = false
     this.hurtT = this.dashT = this.dashCd = this.attackT = this.attackCd = 0
     this.coyoteT = this.jumpBufT = this.dashBufT = this.attackBufT = 0
-    this.landT = this.landImpact = this.airTime = this.turnRate = this.slope = this.wadeT = 0
+    this.landT = this.landImpact = this.airTime = this.turnRate = this.slope = this.wadeT = this.vyMove = 0
     this.jumpCut = false
     this.canDouble = this.airDash = this.airSpin = true
     this.airMax = M.runSpeed
@@ -445,7 +447,7 @@ export class PlayerController implements IPlayerController {
   private bounce(vy: number): void {
     const v = this.velocity
     this.leaveGround(false)
-    v.y = vy
+    v.y = this.vyMove = vy
     this.canDouble = this.airDash = this.airSpin = true
     this.jumpCut = false
     this.coyoteT = 0
@@ -534,8 +536,11 @@ export class PlayerController implements IPlayerController {
   }
 
   private gravity(dt: number, jumpHeld: boolean): void {
-    if (this._grounded || this.sliding) return
     const v = this.velocity
+    if (this._grounded || this.sliding) {
+      this.vyMove = v.y
+      return
+    }
     if (this.jumpCut) {
       if (v.y <= 0) this.jumpCut = false
       else if (!jumpHeld) {
@@ -543,10 +548,13 @@ export class PlayerController implements IPlayerController {
         this.jumpCut = false
       }
     }
+    const vy0 = v.y
     let g = v.y > 0 ? M.gravityUp : M.gravityDown
     if (this.dashT > 0) g *= M.dashGravity
     else if (jumpHeld && Math.abs(v.y) < M.apexBand && (this._state === 'jump' || this._state === 'doubleJump')) g *= M.apexGravity
     v.y = Math.max(v.y - g * dt, -M.terminal)
+    // Trapezoidal step: jump height and airtime come out the same at 30, 60 or 144 fps.
+    this.vyMove = (vy0 + v.y) * 0.5
   }
 
   /* ── collision ───────────────────────────────────────────── */
@@ -575,12 +583,12 @@ export class PlayerController implements IPlayerController {
 
     // Vertical move with head bumps.
     if (!onGround) {
-      p.y += v.y * h
-      if (v.y > 0) {
+      p.y += this.vyMove * h
+      if (this.vyMove > 0) {
         const ceil = col.ceilingAt(p.x, p.z, y0 + M.height, M.radius)
         if (p.y + M.height > ceil) {
           p.y = Math.max(y0, ceil - M.height)
-          v.y = 0
+          v.y = this.vyMove = 0
           this.jumpCut = false
         }
       }
@@ -684,6 +692,7 @@ export class PlayerController implements IPlayerController {
     if (this._grounded || this.sliding) this.airTime = 0
     this._grounded = false
     this.sliding = false
+    this.vyMove = v.y
     this.setSupport(null)
     this.airMax = Math.max(M.runSpeed, Math.hypot(v.x, v.z))
   }
@@ -837,9 +846,14 @@ export class PlayerController implements IPlayerController {
       return
     }
     let len: number
-    if (sp <= M.walkSpeed) len = M.stepWalk
+    if (sp <= M.walkSpeed) len = lerp(M.stepMin, M.stepWalk, sp / M.walkSpeed)
     else if (sp <= M.runSpeed) len = lerp(M.stepWalk, M.stepRun, (sp - M.walkSpeed) / (M.runSpeed - M.walkSpeed))
     else len = lerp(M.stepRun, M.stepSprint, clamp((sp - M.runSpeed) / (M.sprintSpeed - M.runSpeed), 0, 1))
+    if (this.depth > 0) {
+      // Same wade weight as the animator's high-kneed wading stride.
+      const w = Math.max(clamp((this.depth / M.wadeMax) * 1.4, 0, 1), this._state === 'wade' ? 0.8 : 0)
+      len *= 1 - M.stepWadeShorten * w
+    }
     this.stepPhase += (sp * dt) / len
     if (this.stepPhase < 1) return
     this.stepPhase -= Math.floor(this.stepPhase)

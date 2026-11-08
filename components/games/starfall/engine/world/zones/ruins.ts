@@ -69,7 +69,7 @@ export function buildRuins(ctx: Ctx): ZonePart {
   /** Yaw that points a box's local +z radially outward at `deg`. */
   const radial = (deg: number) => Math.PI / 2 - deg * DEG
 
-  const runeMat = kit.mat('glow', { color: 0xc8ecff, emissive: RUNE.getHex(), emissiveIntensity: 1.7, key: 'rune' })
+  const runeMat = kit.mat('glow', { color: 0x6cc0ff, emissive: 0x1f86ff, emissiveIntensity: 1.6, key: 'rune' })
   const m4 = new THREE.Matrix4()
   const q = new THREE.Quaternion()
   const v = new THREE.Vector3()
@@ -99,7 +99,7 @@ export function buildRuins(ctx: Ctx): ZonePart {
       const r = RT + (rand() - 0.5) * 0.06 + (i === 0 ? 0.12 : 0)
       const g = worldCylinder(r, r, h, 26, 2)
       g.rotateY(rand() * TAU)
-      kit.add(g, i % 5 === 2 ? 'mossStone' : 'stone', m4.makeTranslation(T.x, base + i * course + h / 2, T.z))
+      kit.add(g, i < 2 ? 'mossStone' : 'stone', m4.makeTranslation(T.x, base + i * course + h / 2, T.z))
     }
     kit.own(ctx.collision.addCylinder({ x: T.x, y: base - 0.5, z: T.z, r: RT, h: T.height + 0.5, surface: 'stone' }))
     // Plinth ring at the foot.
@@ -325,7 +325,7 @@ export function buildRuins(ctx: Ctx): ZonePart {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow;')
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float uRuneTime;\nuniform vec3 uRune;\nvarying float vGlow;')
-      .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.75, 0.9, 1.0), vGlow * 0.8);')
+      .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.35, 0.7, 1.0), vGlow * 0.85);')
       .replace(
         '#include <emissivemap_fragment>',
         '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uRune * vGlow * (1.5 + 0.45 * sin(uRuneTime * 2.6));',

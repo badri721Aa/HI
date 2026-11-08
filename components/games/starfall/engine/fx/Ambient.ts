@@ -141,7 +141,7 @@ export class Ambient implements IAmbient {
       this.nearCount = n
     }
     if (this.nearCount === 0) return
-    const rate = Math.min(this.nearCount * 0.3, 14) * EMIT_SCALE[this.level]
+    const rate = Math.min(this.nearCount * 0.4, 16) * EMIT_SCALE[this.level]
     this.sprayAcc = Math.min(this.sprayAcc + rate * dt, 6)
     const p = this.p
     while (this.sprayAcc >= 1) {
@@ -166,7 +166,7 @@ export class Ambient implements IAmbient {
       p.gravity = -0.1
       p.drag = 0.6
       this.puffColor(1)
-      p.a = 0.26
+      p.a = 0.34
       p.rot = rand(0, 6.28)
       p.spin = rand(-0.4, 0.4)
       p.shape = SHAPE.smoke
@@ -199,13 +199,13 @@ export class Ambient implements IAmbient {
     const dx = this.center.x - FALLS.x
     const dz = this.center.z - FALLS.curtainZ
     if (dx * dx + dz * dz > MIST_RADIUS * MIST_RADIUS) return
-    this.mistAcc = Math.min(this.mistAcc + 6 * EMIT_SCALE[this.level] * dt, 4)
+    this.mistAcc = Math.min(this.mistAcc + 9 * EMIT_SCALE[this.level] * dt, 4)
     const p = this.p
     while (this.mistAcc >= 1) {
       this.mistAcc -= 1
       p.x = FALLS.x + rand(-3.5, 3.5)
-      p.y = FALLS.poolLevel + rand(0.1, 0.8)
-      p.z = FALLS.curtainZ + rand(0.3, 2.5)
+      p.y = FALLS.poolLevel + rand(0.2, 1.2)
+      p.z = FALLS.curtainZ + rand(0.5, 3.5)
       p.vx = rand(-0.3, 0.3)
       p.vy = rand(0.35, 0.9)
       p.vz = rand(0.5, 1.4)
@@ -214,8 +214,8 @@ export class Ambient implements IAmbient {
       p.size1 = p.size0 * rand(2.8, 3.6)
       p.gravity = 0.05
       p.drag = 0.35
-      this.puffColor(1)
-      p.a = 0.2
+      this.puffColor(1.05)
+      p.a = 0.36
       p.rot = rand(0, 6.28)
       p.spin = rand(-0.25, 0.25)
       p.shape = SHAPE.smoke

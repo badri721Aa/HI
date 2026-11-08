@@ -239,7 +239,7 @@ export function buildLake(ctx: Ctx): ZonePart {
   kit.finalize()
 
   /* ── lily pads (instanced, dynamic colliders) ──────────────── */
-  const padMat = new THREE.MeshStandardMaterial({ color: 0x6b9440, roughness: 0.5, metalness: 0 })
+  const padMat = new THREE.MeshStandardMaterial({ color: 0x6b9440, roughness: 0.78, metalness: 0 })
   padMat.onBeforeCompile = shader => {
     shader.uniforms.uPadNoise = { value: ctx.textures.get('noise') }
     shader.vertexShader = shader.vertexShader

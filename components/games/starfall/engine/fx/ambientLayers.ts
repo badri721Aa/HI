@@ -19,9 +19,9 @@ interface LayerDef {
 }
 
 export const LAYERS: Record<LayerKind, LayerDef> = {
-  fireflies: { counts: [50, 110, 180, 260], box: 64, additive: true },
+  fireflies: { counts: [60, 120, 200, 280], box: 48, additive: true },
   pollen: { counts: [90, 180, 300, 420], box: 34, additive: true },
-  leaves: { counts: [24, 50, 90, 130], box: 44, additive: false },
+  leaves: { counts: [36, 70, 120, 170], box: 36, additive: false },
 }
 
 /** Single leaves cut from the leaves_albedo atlas: [x, y, w, h] in 512² pixels (top-left origin). */
@@ -80,7 +80,7 @@ void main() {
   float glow = 0.06 + 0.94 * blink;
 
   vec4 mv = viewMatrix * vec4(wp, 1.0);
-  float size = 0.26 * (0.8 + 0.4 * iSeed2.y) * step(0.001, vis);
+  float size = 0.3 * (0.8 + 0.4 * iSeed2.y) * step(0.001, vis);
   float a = fxMinPixel(size, mv.z, 1.5) * vis;
   mv.xy += position.xy * size;
   vec3 tint = mix(vec3(0.62, 1.0, 0.22), vec3(1.0, 0.82, 0.25), iSeed2.w);

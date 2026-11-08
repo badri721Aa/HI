@@ -81,6 +81,13 @@ float waterGround( vec2 xz ) {
   return texture2D( tHeight, uv ).r;
 }
 
+// The sea plane runs under the whole island; inside a lake basin (whose bed dips
+// below sea level) it must not show through the lake surface above it.
+bool seaUnderLake( vec3 p ) {
+${LAKES.map(l => `  if ( p.y < ${(l.level - 1).toFixed(2)} && distance( p.xz, vec2( ${l.x.toFixed(1)}, ${l.z.toFixed(1)} ) ) < ${(l.r + 7).toFixed(1)} ) return true;`).join('\n')}
+  return false;
+}
+
 float waterSunVis( vec2 xz ) {
   vec2 uv = xz / ${(WORLD_HALF * 2).toFixed(1)} + 0.5;
   float v = texture2D( tSunVisA, uv ).r;
@@ -93,6 +100,7 @@ float waterSunVis( vec2 xz ) {
 /** Replaces <map_fragment>. */
 const FRAG_SURFACE = /* glsl */ `
 vec3 wP = vWWorld;
+if ( seaUnderLake( wP ) ) discard;
 float wDepth = wP.y - waterGround( wP.xz );
 float wD = max( wDepth, 0.0 );
 float wSea = vWater.x;

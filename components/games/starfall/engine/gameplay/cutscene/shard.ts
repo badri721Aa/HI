@@ -45,7 +45,7 @@ export function buildShard(ctx: Ctx, index: number): Scene {
   const r0 = THREE.MathUtils.clamp(Math.hypot(offX, offZ), 2.6, 8)
   const h0 = THREE.MathUtils.clamp(cam.y - p.y, 0.4, 4.5)
   const towardFace = wrap(ctx.player.yaw - a0)
-  const sweep = (towardFace >= 0 ? 1 : -1) * THREE.MathUtils.clamp(Math.abs(towardFace), 0.55, TAU * 0.16)
+  const sweep = (towardFace >= 0 ? 1 : -1) * THREE.MathUtils.clamp(Math.abs(towardFace), 0.6, TAU * 0.24)
 
   s.shot(
     new OrbitShot({
@@ -54,8 +54,8 @@ export function buildShard(ctx: Ctx, index: number): Scene {
       focus: out => out.copy(ctx.player.position),
       azimuth: [a0, a0 + sweep],
       radius: [r0, 3.7],
-      height: [h0, 0.75],
-      lookY: [1.3, 1.75],
+      height: [h0, 1.05],
+      lookY: [1.3, 1.65],
       fov: [ctx.camera.fov, 46],
       ease: ease.inOutSine,
     }),

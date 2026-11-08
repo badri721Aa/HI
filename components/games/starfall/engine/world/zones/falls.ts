@@ -28,32 +28,34 @@ function rng(seed: number): () => number {
 }
 
 /**
- * Lumpy rock from a subdivided icosahedron: smooth low-frequency bumps, box-projected
- * world UVs (metres / uvScale) so the rock texture never stretches. Unit radius, then scaled.
+ * Chunky faceted rock: a low-subdivision icosahedron with strong per-vertex displacement
+ * (kept watertight), flat-shaded, with box-projected world UVs (metres / uvScale) so the
+ * rock texture never stretches. Unit radius before the (sx, sy, sz) scale.
  */
-export function boulderGeometry(rand: () => number, sx: number, sy: number, sz: number, opts: { flatTop?: boolean; uvScale?: number } = {}): THREE.BufferGeometry {
-  const base = new THREE.IcosahedronGeometry(1, 2)
+export function boulderGeometry(rand: () => number, sx: number, sy: number, sz: number, opts: { flatTop?: boolean; uvScale?: number; detail?: number } = {}): THREE.BufferGeometry {
+  const base = new THREE.IcosahedronGeometry(1, opts.detail ?? 1)
   base.deleteAttribute('uv')
   base.deleteAttribute('normal')
   const g = mergeVertices(base)
   base.dispose()
   const p = g.attributes.position as THREE.BufferAttribute
   const k1 = 1.3 + rand() * 1.2
-  const k2 = 2.6 + rand() * 1.8
   const o1 = rand() * TAU
   const o2 = rand() * TAU
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i)
     const y = p.getY(i)
     const z = p.getZ(i)
-    const bump = 1 + 0.16 * Math.sin(x * k1 + o1) * Math.cos(z * k1 - o2) + 0.08 * Math.sin(y * k2 + z * k2 + o2) + (rand() - 0.5) * 0.05
+    const bump = 1 + 0.18 * Math.sin(x * k1 + o1) * Math.cos(z * k1 - o2) + (rand() - 0.5) * 0.3
     let ny = y * bump
-    if (opts.flatTop && ny > 0.55) ny = 0.55 + (ny - 0.55) * 0.15
+    // Flat, slightly tilted top (a cleaved face) reads as rock rather than a pebble.
+    const cut = 0.5 + x * 0.08
+    if (opts.flatTop !== false && ny > cut) ny = cut + (ny - cut) * 0.12
     p.setXYZ(i, x * bump * sx, ny * sy, z * bump * sz)
   }
-  g.computeVertexNormals()
   const out = g.toNonIndexed()
   g.dispose()
+  out.computeVertexNormals()
   boxProjectUV(out, opts.uvScale ?? 2.5)
   return out
 }
@@ -221,47 +223,51 @@ function waterMaterial(noise: THREE.Texture, uTime: { value: number }): THREE.Me
 }
 
 /* ────────────────────────────────────────────────────────────
-   Mist: GPU-animated billboards rising from the plunge pool.
-   ──────────────────────────────────────────────────────────── */
+   Mist: GPU-animated camera-facing quads rising from the plunge pool
+   (instanced quads rather than GL points, which some drivers mishandle).
+   ──────────────────────────────────────────────────────────────────── */
 
-function mistPoints(count: number, x: number, y: number, z: number, sprite: THREE.Texture, rand: () => number) {
-  const pos = new Float32Array(count * 3)
+function mistPuffs(count: number, x: number, y: number, z: number, sprite: THREE.Texture, rand: () => number) {
+  const quad = new THREE.PlaneGeometry(1, 1)
+  const geo = new THREE.InstancedBufferGeometry()
+  geo.index = quad.index
+  geo.setAttribute('position', quad.attributes.position)
+  geo.setAttribute('uv', quad.attributes.uv)
+  const base = new Float32Array(count * 3)
   const seed = new Float32Array(count * 4)
   for (let i = 0; i < count; i++) {
-    pos[i * 3] = x + (rand() - 0.5) * 2 * CURTAIN_HALF_BOTTOM
-    pos[i * 3 + 1] = y
-    pos[i * 3 + 2] = z + (rand() - 0.5) * 1.2
+    base[i * 3] = x + (rand() - 0.5) * 2 * CURTAIN_HALF_BOTTOM
+    base[i * 3 + 1] = y
+    base[i * 3 + 2] = z + (rand() - 0.5) * 1.2
     seed[i * 4] = rand()
     seed[i * 4 + 1] = rand()
     seed[i * 4 + 2] = 3 + rand() * 2.5
     seed[i * 4 + 3] = rand()
   }
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-  geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4))
-  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(x, y + 3, z + 1.5), 9)
+  geo.setAttribute('aBase', new THREE.InstancedBufferAttribute(base, 3))
+  geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 4))
+  geo.instanceCount = count
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(x, y + 3, z + 1.5), 10)
   const mat = new THREE.ShaderMaterial({
-    uniforms: THREE.UniformsUtils.merge([
-      THREE.UniformsLib.fog,
-      { uTime: { value: 0 }, uPx: { value: 400 }, uColor: { value: new THREE.Color(1, 1, 1) }, uSprite: { value: null } },
-    ]),
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uColor: { value: new THREE.Color(1, 1, 1) }, uSprite: { value: null } }]),
     vertexShader: /* glsl */ `
       #include <common>
       #include <fog_pars_vertex>
+      attribute vec3 aBase;
       attribute vec4 aSeed;
       uniform float uTime;
-      uniform float uPx;
       varying float vAlpha;
+      varying vec2 vUv;
       void main() {
-        float life = aSeed.z;
-        float k = fract(uTime / life + aSeed.x);
-        vec3 p = position;
+        float k = fract(uTime / aSeed.z + aSeed.x);
+        vec3 p = aBase;
         p.y += k * (3.5 + aSeed.y * 3.0);
         p.z += k * (1.5 + aSeed.w * 2.5);
         p.x += sin(uTime * 0.6 + aSeed.y * 6.28) * 0.6 * k;
         vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+        mvPosition.xy += position.xy * (1.2 + k * 3.2);
         gl_Position = projectionMatrix * mvPosition;
-        gl_PointSize = (1.2 + k * 3.2) * uPx / max(0.5, -mvPosition.z);
+        vUv = uv;
         vAlpha = smoothstep(0.0, 0.15, k) * (1.0 - smoothstep(0.45, 1.0, k)) * (0.18 + aSeed.w * 0.12);
         #include <fog_vertex>
       }`,
@@ -271,8 +277,9 @@ function mistPoints(count: number, x: number, y: number, z: number, sprite: THRE
       uniform sampler2D uSprite;
       uniform vec3 uColor;
       varying float vAlpha;
+      varying vec2 vUv;
       void main() {
-        float a = texture2D(uSprite, gl_PointCoord).a * vAlpha;
+        float a = texture2D(uSprite, vUv).a * vAlpha;
         if (a < 0.004) discard;
         gl_FragColor = vec4(uColor, a);
         #include <tonemapping_fragment>
@@ -284,9 +291,9 @@ function mistPoints(count: number, x: number, y: number, z: number, sprite: THRE
     fog: true,
   })
   mat.uniforms.uSprite.value = sprite
-  const pts = new THREE.Points(geo, mat)
-  pts.frustumCulled = true
-  return pts
+  const mesh = new THREE.Mesh(geo, mat)
+  quad.dispose()
+  return mesh
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -313,10 +320,11 @@ export function buildFalls(ctx: Ctx): ZonePart {
   const v = new THREE.Vector3()
   const one = new THREE.Vector3(1, 1, 1)
   const rockMat = kit.mat('rock', { color: 0xc9bfb2, key: 'cliff' })
+  const stoneMat = kit.mat('rock', { color: 0xa7b38f, key: 'mossy' })
 
   const rock = (x: number, y: number, z: number, sx: number, sy: number, sz: number, yaw: number, collide: boolean, flatTop = false) => {
     q.setFromEuler(new THREE.Euler((rand() - 0.5) * 0.2, yaw, (rand() - 0.5) * 0.2))
-    kit.add(boulderGeometry(rand, sx, sy, sz, { flatTop }), rockMat, m4.compose(v.set(x, y, z), q, one))
+    kit.add(boulderGeometry(rand, sx, sy, sz, { flatTop: flatTop || rand() < 0.5 }), rockMat, m4.compose(v.set(x, y, z), q, one))
     if (collide) kit.own(ctx.collision.addCylinder({ x, y: y - sy, z, r: Math.min(sx, sz) * 0.85, h: sy * (flatTop ? 1.5 : 1.7), surface: 'rock' }))
   }
 
@@ -389,18 +397,22 @@ export function buildFalls(ctx: Ctx): ZonePart {
   for (const [x, z, top, r] of STONES) {
     const ground = kit.ground(x, z)
     const h = top - ground + 0.5
-    const g = new THREE.CylinderGeometry(r, r * 1.2, h, 11, 3)
+    // Bevelled top ring, rough flanks flaring into the water.
+    const g = new THREE.CylinderGeometry(r * 0.88, r * 1.25, h, 9, 4)
     const p = g.attributes.position as THREE.BufferAttribute
+    const o = rand() * TAU
     for (let i = 0; i < p.count; i++) {
       const y = p.getY(i)
-      const k = 1 + (Math.sin(Math.atan2(p.getZ(i), p.getX(i)) * 3 + x) * 0.07 + (rand() - 0.5) * 0.06) * (y < h / 2 - 0.01 ? 1 : 0.6)
-      p.setXYZ(i, p.getX(i) * k, y < h / 2 - 0.01 ? y : y + (rand() - 0.5) * 0.04, p.getZ(i) * k)
+      const a = Math.atan2(p.getZ(i), p.getX(i))
+      const topRing = y > h / 2 - 0.01
+      const k = 1 + Math.sin(a * 3 + o) * 0.1 + (rand() - 0.5) * (topRing ? 0.06 : 0.16)
+      p.setXYZ(i, p.getX(i) * k, topRing ? y + (rand() - 0.5) * 0.05 : y, p.getZ(i) * k)
     }
-    g.computeVertexNormals()
     const ng = g.toNonIndexed()
     g.dispose()
-    boxProjectUV(ng, 1.4)
-    kit.add(ng, 'mossStone', m4.makeTranslation(x, top - h / 2, z))
+    ng.computeVertexNormals()
+    boxProjectUV(ng, 1.6)
+    kit.add(ng, stoneMat, m4.makeTranslation(x, top - h / 2, z))
     kit.own(ctx.collision.addCylinder({ x, y: ground - 0.5, z, r: r * 0.95, h, surface: 'stone', tag: 'stepping-stone' }))
   }
 
@@ -419,12 +431,13 @@ export function buildFalls(ctx: Ctx): ZonePart {
         const z = cliffZ(x, y) - 0.6
         const s = 1.6 + rand() * 1.6
         const foot = band === 0 && kit.ground(x, z + s) < y + 1
-        rock(x + (rand() - 0.5) * 1.2, y, z, s * (1 + rand() * 0.4), s * (1.1 + rand() * 0.6), s, rand() * TAU, foot)
+        rock(x + (rand() - 0.5) * 1.2, y, z, s * (1.1 + rand() * 0.6), s * (0.7 + rand() * 0.6), s * (0.8 + rand() * 0.3), rand() * TAU, foot)
       }
     }
     // Pillars of rock framing the falls.
-    rock(F.x - 6.4, 7.5, cliffZ(F.x - 6.4, 7.5) - 0.2, 1.6, 6.5, 1.8, 0.3, false)
-    rock(F.x + 6.4, 7.0, cliffZ(F.x + 6.4, 7.0) - 0.2, 1.7, 6.0, 1.9, 1.1, false)
+    // (solid, so the camera boom stops at them instead of clipping inside)
+    rock(F.x - 6.4, 7.5, cliffZ(F.x - 6.4, 7.5) - 0.2, 1.6, 6.5, 1.8, 0.3, true)
+    rock(F.x + 6.4, 7.0, cliffZ(F.x + 6.4, 7.0) - 0.2, 1.7, 6.0, 1.9, 1.1, true)
     rock(F.x - 6.6, 3.0, -52.2, 1.5, 1.8, 1.4, 0.7, true)
     // Wet boulders around the pool rim.
     for (const [x, z, s] of [[-73.5, -46.5, 1.2], [-74.8, -41.0, 0.9], [-55.2, -47.6, 1.0], [-54.5, -39.2, 0.8], [-70.5, -35.8, 0.7]] as const) {
@@ -441,21 +454,18 @@ export function buildFalls(ctx: Ctx): ZonePart {
   kit.addObject(waterMesh)
 
   const mistCount = Math.round(70 * Math.min(1.4, Math.max(0.4, ctx.quality.particles / 2500)))
-  const mist = mistPoints(mistCount, F.x, poolY + 0.2, water.bottomZ - 0.2, ctx.textures.get('glow'), rand)
+  const mist = mistPuffs(mistCount, F.x, poolY + 0.2, water.bottomZ - 0.2, ctx.textures.get('glow'), rand)
   mist.renderOrder = 3
   kit.addObject(mist)
   const mistMat = mist.material as THREE.ShaderMaterial
 
   kit.finalize()
 
-  const size = new THREE.Vector2()
   const white = new THREE.Color(1, 1, 1)
   return {
     update(_dt, t) {
       uTime.value = t
       mistMat.uniforms.uTime.value = t
-      ctx.renderer.getDrawingBufferSize(size)
-      mistMat.uniforms.uPx.value = size.y * 0.5 * ctx.camera.projectionMatrix.elements[5]
       // Mist takes on the sky's colour so it never glows at night.
       ;(mistMat.uniforms.uColor.value as THREE.Color).copy(ctx.env.fogColor).lerp(white, 0.45)
     },

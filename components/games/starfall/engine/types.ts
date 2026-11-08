@@ -49,6 +49,7 @@ export interface Ctx {
   ambient: IAmbient
   post: IPostFX
   audio: IAudio
+  net: INetwork
 }
 
 /** Base lifecycle. */
@@ -306,6 +307,64 @@ export interface IAudio extends System {
   setMusic(mood: MusicMood): void
   /** Pause/resume everything (tab hidden, paused menu ducks instead). */
   setPaused(paused: boolean): void
+}
+
+/* ────────────────────────────────────────────────────────────
+   Multiplayer
+   ──────────────────────────────────────────────────────────── */
+
+export type NetStatus = 'offline' | 'connecting' | 'online' | 'error'
+
+export interface RoomInfo {
+  /** Room code: a fixed name for public rooms ('sunset', 'meadow', …), 5 letters for private ones. */
+  code: string
+  name: string
+  public: boolean
+  players: number
+  max: number
+}
+
+/** Another player in the room, as rendered locally (smoothed). */
+export interface NetPeer {
+  id: string
+  name: string
+  /** Shirt colour, hex. */
+  color: string
+  position: THREE.Vector3
+  yaw: number
+  state: PlayerState
+  ragdoll: boolean
+  /** Direct peer-to-peer link (true) or relayed through the server (false). */
+  direct: boolean
+  /** Round-trip time in ms, or -1 if unknown. */
+  ping: number
+}
+
+/**
+ * net/Network.ts — rooms, presence, chat and replicated players.
+ * Supabase Realtime carries rooms, presence, chat and WebRTC signalling;
+ * movement goes peer-to-peer over WebRTC data channels, with a low-rate relay fallback.
+ * Progress (shards, sparks) stays per player; the world is shared visually.
+ */
+export interface INetwork extends System {
+  readonly status: NetStatus
+  readonly room: RoomInfo | null
+  readonly selfId: string
+  readonly peers: ReadonlyMap<string, NetPeer>
+  /** Display name and shirt colour; persisted locally. */
+  readonly profile: { name: string; color: string }
+  setProfile(p: Partial<{ name: string; color: string }>): void
+  /** Public rooms with live player counts. */
+  listPublicRooms(): Promise<RoomInfo[]>
+  /** Join a room by code (creates it if empty). Rejects with a readable Error on failure (e.g. full). */
+  join(code: string): Promise<void>
+  /** Join the busiest public room that still has space. */
+  quickJoin(): Promise<void>
+  /** Create a private room and join it; resolves with its code. */
+  createPrivate(): Promise<string>
+  leave(): Promise<void>
+  sendChat(text: string): void
+  sendEmote(name: GestureName): void
 }
 
 export type { Collider }

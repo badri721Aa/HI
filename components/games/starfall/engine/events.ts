@@ -79,6 +79,13 @@ export interface GameEventMap {
   'cutscene:start': { name: CutsceneName }
   'cutscene:end': { name: CutsceneName; skipped: boolean }
   'audio:music': { mood: MusicMood }
+
+  // ── multiplayer ────────────────────────────────────────
+  'net:status': { status: 'offline' | 'connecting' | 'online' | 'error'; message?: string }
+  /** Room joined/left (null) or its player count changed. */
+  'net:room': { code: string; name: string; public: boolean; players: number; max: number } | null
+  'net:chat': { id: string; name: string; color: string; text: string; system?: boolean }
+  'net:peer': { id: string; name: string; joined: boolean }
 }
 
 type Handler<T> = (payload: T) => void

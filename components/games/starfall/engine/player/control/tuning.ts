@@ -38,7 +38,8 @@ export const MOVE = {
   airDrag: 5,
   jumpSpeed: 9.2,
   doubleJumpSpeed: 8.6,
-  gravityUp: 26,
+  /** With exact (trapezoidal) integration: apex = jumpSpeed² / 2·gravityUp ≈ 1.57 m (+ a little apex hang). */
+  gravityUp: 27,
   gravityDown: 38,
   /** Near the apex (|vy| below band) while jump is held, gravity is scaled for a little hang time. */
   apexBand: 1.2,
@@ -103,10 +104,14 @@ export const MOVE = {
   hurtTime: 0.35,
   invulnTime: 1.3,
 
-  // ── feedback
+  // ── feedback (stride lengths match the animator's gait)
+  /** Shuffling steps when creeping, growing to the walk stride at walkSpeed. */
+  stepMin: 0.45,
   stepWalk: 0.75,
   stepRun: 1.25,
   stepSprint: 1.6,
+  /** Wading shortens the stride by up to this fraction. */
+  stepWadeShorten: 0.25,
   /** Landings harder than this (m/s) play the 'land' state. */
   landStateImpact: 4,
 } as const
@@ -160,7 +165,7 @@ export const CAM = {
   /** Start angle relative to the hero's facing (0 = straight in front). */
   titleAngle: 0.55,
   titleSpin: 0.045,
-  titleRadius: 7,
+  titleRadius: 7.5,
   titleHeight: 1.15,
   titleLookY: 1.0,
   /** Sideways aim offset so the hero sits on the right third (menus are bottom-left). */

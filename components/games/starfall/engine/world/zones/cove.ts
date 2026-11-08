@@ -6,7 +6,7 @@
  * mast — is centred exactly on WRECK at WRECK.nestY (shard 6 floats above it).
  * Collision boxes can only yaw, so the tilted deck is approximated by flat strips.
  *
- * Climb: barrel → crates on the shore side → deck (through a gap in the bulwark) →
+ * Climb: a low crate → crate stacks on the shore side → deck (through a gap in the bulwark) →
  * plank steps spiralling up the mast (each ≤ 1.15 m) → crow's nest.
  * A balance spar crosses the hull breach, whose bare ribs open onto the beach.
  */
@@ -245,10 +245,16 @@ class Ship {
       const a = A0 + i * DA
       angles.push(a)
       const yaw = Math.atan2(Math.cos(a), Math.sin(a))
-      const rc = 1.15
-      tbox(kit, 'planks', Math.cos(a) * rc, y - 0.06, ZM + Math.sin(a) * rc, 1.0, 0.12, 1.7, yaw, 0, 0, 1, M)
-      beam(kit, 'darkPlanks', Math.cos(a) * 0.3, y - 0.95, ZM + Math.sin(a) * 0.3, Math.cos(a) * 1.75, y - 0.14, ZM + Math.sin(a) * 1.75, 0.1, 0.1, 1, M)
-      this.box(Math.cos(a) * rc, y, ZM + Math.sin(a) * rc, 1.0, 1.7, 0.3, yaw)
+      // The top steps stick out past the nest: its underside would otherwise cap the jumps.
+      const outer = i >= k - 3
+      const r0 = outer ? NEST_R + 0.1 : 0.3
+      const r1 = outer ? NEST_R + 1.25 : 2.0
+      const rc = (r0 + r1) / 2
+      const tw = outer ? 1.2 : 1.0
+      tbox(kit, 'planks', Math.cos(a) * rc, y - 0.06, ZM + Math.sin(a) * rc, tw, 0.12, r1 - r0, yaw, 0, 0, 1, M)
+      beam(kit, 'darkPlanks', Math.cos(a) * 0.3, y - (outer ? 1.6 : 0.95), ZM + Math.sin(a) * 0.3, Math.cos(a) * (r1 - 0.25), y - 0.14, ZM + Math.sin(a) * (r1 - 0.25), 0.1, 0.1, 1, M)
+      if (outer) beam(kit, 'darkPlanks', Math.cos(a) * 0.3, y - 0.1, ZM + Math.sin(a) * 0.3, Math.cos(a) * r0, y - 0.1, ZM + Math.sin(a) * r0, 0.12, 0.1, 1, M)
+      this.box(Math.cos(a) * rc, y, ZM + Math.sin(a) * rc, tw, r1 - r0, 0.3, yaw)
     }
     const last = angles[angles.length - 1]
 
@@ -380,7 +386,7 @@ function scatter(kit: ZoneKit, ship: Ship): void {
     const p = ship.world(x, 0, z)
     return [p.x, p.z]
   }
-  // The climbing route: barrel → crate stacks → deck strip on the shore side.
+  // The climbing route: low crate → crate stacks → deck strip on the shore side.
   const zc = 4.3
   const hb = hullHalfBeam(HULL, uAt(zc))
   const deckTop = ship.world((-2 * hullHalfWidthAt(HULL, uAt(zc), DECK)) / 3, DECK, zc).y
@@ -389,8 +395,10 @@ function scatter(kit: ZoneKit, ship: Ship): void {
   crateStack(kit, ax, az, aTop, 1.1, WRECK.yaw + 0.1)
   const [bx, bz] = W(-(hb + 1.95), zc - 0.9)
   if (aTop - 1.1 - heightAt(bx, bz) > 0.45) crateStack(kit, bx, bz, aTop - 1.1, 1.0, WRECK.yaw - 0.25)
-  const [qx, qz] = W(-(hb + 1.9), zc + 1.2)
-  barrel(kit, qx, heightAt(qx, qz) - 0.08, qz, { collide: true })
+  const [qx, qz] = W(-(hb + 1.9), zc + 1.25)
+  crateStack(kit, qx, qz, heightAt(qx, qz) + 0.85, 1.05, WRECK.yaw + 0.5)
+  const [px, pz] = W(-(hb + 3.0), zc + 1.6)
+  barrel(kit, px, heightAt(px, pz) - 0.08, pz, { collide: true })
 
   // Barrels and crates washed up and half sunk in the sand.
   const yaw = WRECK.yaw

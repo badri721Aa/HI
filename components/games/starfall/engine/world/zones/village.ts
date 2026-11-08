@@ -46,7 +46,7 @@ export function buildVillage(ctx: Ctx): ZonePart {
   sails.position.set(WX - HUB_OUT, g + HUB_Y, WZ)
   sails.rotation.order = 'YXZ'
   sails.rotation.y = -Math.PI / 2
-  buildSails(sailKit, kit.mat('darkPlanks'), kit.mat('planks'), kit.mat('cloth'), kit.mat('metal'))
+  buildSails(sailKit, kit.mat('darkPlanks'), kit.mat('cloth'))
   sailKit.finalize()
 
   kit.finalize()
@@ -128,7 +128,7 @@ function buildHouse(kit: ZoneKit, h: HouseDef, i: number): void {
     const bw = w / bays
     beam(kit, 'darkPlanks', -w / 2 + 0.1, F + 0.95, fz, -w / 2 + bw - 0.1, top - 0.15, fz, 0.12, 0.06, 1, m)
     beam(kit, 'darkPlanks', w / 2 - 0.1, F + 0.95, fz, w / 2 - bw + 0.1, top - 0.15, fz, 0.12, 0.06, 1, m)
-    for (let k = 1; k < bays - 1; k++) window(kit, m, -w / 2 + (k + 0.5) * bw, F + 1.5, fz, s > 0 ? 0 : Math.PI)
+    for (let k = 1; k < bays - 1; k++) houseWindow(kit, m, -w / 2 + (k + 0.5) * bw, F + 1.5, fz, s > 0 ? 0 : Math.PI)
   }
 
   // Gable ends: tie beam, sill, posts either side of an attic window, collar beam; door + lantern on +x.
@@ -143,7 +143,7 @@ function buildHouse(kit: ZoneKit, h: HouseDef, i: number): void {
     const cy = top + rise * 0.78
     const cw = d * 0.22
     tbox(kit, 'darkPlanks', gx, cy, 0, 0.08, 0.14, cw * 2, 0, 0, 0, 1, m)
-    window(kit, m, gx, top + rise * 0.3, 0, e > 0 ? Math.PI / 2 : -Math.PI / 2, 0.5, 0.58)
+    houseWindow(kit, m, gx, top + rise * 0.3, 0, e > 0 ? Math.PI / 2 : -Math.PI / 2, 0.5, 0.58)
   }
   const fx = w / 2 + 0.03
   for (const lz of [-0.75, 0.75]) tbox(kit, 'darkPlanks', fx, F + wall / 2, lz, 0.08, wall, 0.17, 0, 0, 0, 1, m)
@@ -154,7 +154,7 @@ function buildHouse(kit: ZoneKit, h: HouseDef, i: number): void {
   beam(kit, 'darkPlanks', fx, F + 2.5, 0.85, fx + 0.55, F + 2.5, 0.85, 0.06, 0.08, 1, m)
   const [lx0, lz0] = localXZ(x, z, yaw, fx + 0.48, 0.85)
   hangingLantern(kit, lx0, F + 2.46, lz0)
-  window(kit, m, -fx, F + 1.5, 0.9, -Math.PI / 2)
+  houseWindow(kit, m, -fx, F + 1.5, 0.9, -Math.PI / 2)
   const [sx, sz] = localXZ(x, z, yaw, fx + 0.45, 0)
   const gs = heightAt(sx, sz)
   kit.box({ x: sx, y: gs - 0.3, z: sz, w: 1.5, h: F - 0.16 - gs + 0.3, d: 0.8, yaw: yaw + Math.PI / 2, mat: 'stone', uvScale: 1, collide: true })
@@ -196,7 +196,7 @@ function buildHouse(kit: ZoneKit, h: HouseDef, i: number): void {
 }
 
 /** Glowing window with frame, sill and shutters, centred at local (x, y, z) facing `face` (yaw). */
-function window(kit: ZoneKit, m: THREE.Matrix4, x: number, y: number, z: number, face: number, ww = 0.7, wh = 0.8): void {
+function houseWindow(kit: ZoneKit, m: THREE.Matrix4, x: number, y: number, z: number, face: number, ww = 0.7, wh = 0.8): void {
   const c = Math.cos(face)
   const s = Math.sin(face)
   const at = (along: number, out: number): [number, number] => [x + along * c + out * s, z - along * s + out * c]
@@ -222,7 +222,7 @@ function buildWell(kit: ZoneKit): void {
   const rim = g + 0.85
   kit.add(openCylinder(1.05, 1.1, 1.15, 16, 1.5), 'stone', place(x, rim - 0.575, z))
   kit.add(openCylinder(0.8, 0.8, 0.9, 16, 1.5, true), 'stone', place(x, rim - 0.45, z))
-  slab(kit, 'mossStone', x, rim + 0.06, z, 0.76, 1.12, 0.12, 16, 1)
+  slab(kit, 'stone', x, rim + 0.06, z, 0.76, 1.12, 0.12, 16, 1)
   slab(kit, 'metal', x, g + 0.4, z, 0, 0.8, 0.02, 16, 2)
   solidCyl(kit, x, g - 0.3, z, 1.1, rim + 0.06 - (g - 0.3), 'stone')
   // Posts, windlass, little roof.
@@ -327,17 +327,25 @@ function buildWindmill(kit: ZoneKit, hay: THREE.Material): void {
   tbox(kit, 'roof', dx - 0.05, g + HUB_Y + 0.85, WZ, 1.6, 0.14, 1.7, 0, 0, 0.18, 1.5)
   rod(kit, 'darkPlanks', dx - 0.5, g + HUB_Y, WZ, WX - HUB_OUT + 0.3, g + HUB_Y, WZ, 0.17, 8, 1)
 
-  // Lean-to shed on the south side; crates and hay lead up to its roof and on to the stage.
+  // Store shed on the south side (plaster, timber frame, flat tiled roof falling gently away from
+  // the tower); crates and hay lead up onto it and on to the stage.
   const shed = { x: WX + 0.8, z: WZ + 6.2, w: 4.0, d: 2.6 }
   const roofY = g + 3.4
   const sg = Math.min(heightAt(shed.x - 2, shed.z - 1.3), heightAt(shed.x + 2, shed.z + 1.3), heightAt(shed.x, shed.z))
-  kit.box({ x: shed.x, y: sg - 0.3, z: shed.z, w: shed.w, h: roofY - 0.2 - sg + 0.3, d: shed.d, mat: 'planks', uvScale: 1.4, collide: { surface: 'wood' } })
-  kit.box({ x: shed.x, y: roofY - 0.2, z: shed.z, w: shed.w + 0.3, h: 0.2, d: shed.d + 0.3, mat: 'darkPlanks', uvScale: 1.4, collide: { surface: 'wood' } })
+  const wallTop = roofY - 0.22
+  kit.box({ x: shed.x, y: sg - 0.3, z: shed.z, w: shed.w + 0.2, h: 0.65, d: shed.d + 0.2, mat: 'stone', uvScale: 1.2 })
+  kit.box({ x: shed.x, y: sg + 0.35, z: shed.z, w: shed.w, h: wallTop - sg - 0.35, d: shed.d, mat: 'plaster', uvScale: 2 })
+  kit.solidBox(shed.x, sg - 0.3, shed.z, shed.w + 0.2, roofY - sg + 0.3, shed.d + 0.2, 0, { surface: 'wood' })
   for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    tbox(kit, 'darkPlanks', shed.x + (ox * shed.w) / 2, (roofY - 0.2 + sg) / 2, shed.z + (oz * shed.d) / 2, 0.16, roofY - 0.2 - sg, 0.16, 0, 0, 0, 1)
+    tbox(kit, 'darkPlanks', shed.x + (ox * shed.w) / 2, (wallTop + sg + 0.35) / 2, shed.z + (oz * shed.d) / 2, 0.17, wallTop - sg - 0.35, 0.17, 0, 0, 0, 1)
   }
-  tbox(kit, 'darkPlanks', shed.x + shed.w / 2 + 0.03, sg + 0.95, shed.z + 0.2, 0.06, 1.9, 1.0, 0, 0, 0, 1)
-  tbox(kit, 'glow', shed.x - 0.6, sg + 1.6, shed.z + shed.d / 2 + 0.02, 0.5, 0.4, 0.04, 0, 0, 0, 1)
+  for (const oz of [-1, 1]) tbox(kit, 'darkPlanks', shed.x, wallTop - 0.08, shed.z + (oz * shed.d) / 2 + oz * 0.03, shed.w + 0.04, 0.16, 0.08, 0, 0, 0, 1)
+  for (const ox of [-1, 1]) tbox(kit, 'darkPlanks', shed.x + (ox * shed.w) / 2 + ox * 0.03, wallTop - 0.08, shed.z, 0.08, 0.16, shed.d + 0.04, 0, 0, 0, 1)
+  beam(kit, 'darkPlanks', shed.x - shed.w / 2 + 0.1, sg + 0.45, shed.z + shed.d / 2 + 0.03, shed.x - shed.w / 2 + 1.3, wallTop - 0.15, shed.z + shed.d / 2 + 0.03, 0.12, 0.06, 1)
+  tbox(kit, 'roof', shed.x, roofY - 0.1, shed.z + 0.05, shed.w + 0.5, 0.2, shed.d + 0.6, 0, 0.07, 0, 1.6)
+  tbox(kit, 'darkPlanks', shed.x + shed.w / 2 + 0.04, sg + 1.0, shed.z + 0.2, 0.06, 1.9, 1.0, 0, 0, 0, 1)
+  tbox(kit, 'darkPlanks', shed.x + shed.w / 2 + 0.06, sg + 2.0, shed.z + 0.2, 0.08, 0.12, 1.25, 0, 0, 0, 1)
+  houseWindow(kit, new THREE.Matrix4(), shed.x + 0.6, sg + 1.7, shed.z + shed.d / 2 + 0.03, 0, 0.55, 0.5)
   hayBale(kit, hay, WX + 4.6, WZ + 8.1, 0.2, g + 1.0)
   crateStack(kit, WX + 3.9, WZ + 6.6, g + 2.2, 1.1, 0.15)
   crate(kit, WX + 2.0, roofY, WZ + 5.6, 1.05, 0.25, true, 1.1)
@@ -377,12 +385,12 @@ function ringRailing(kit: ZoneKit, x: number, z: number, r: number, base: number
 
 /**
  * Four sails in the hub's local frame (axle = local z, sails sweep the xy plane).
- * Materials come from the main village kit so nothing is duplicated.
+ * Materials come from the main village kit so nothing is duplicated (two batches: timber + cloth).
  */
-function buildSails(kit: ZoneKit, frameMat: THREE.Material, board: THREE.Material, cloth: THREE.Material, metal: THREE.Material): void {
+function buildSails(kit: ZoneKit, frameMat: THREE.Material, cloth: THREE.Material): void {
   const hub = worldCylinder(0.42, 0.42, 0.7, 10, 1)
   kit.add(hub, frameMat, place(0, 0, 0.05, 0, Math.PI / 2, 0))
-  kit.add(worldCylinder(0.25, 0.3, 0.12, 10, 1), metal, place(0, 0, 0.45, 0, Math.PI / 2, 0))
+  kit.add(worldCylinder(0.25, 0.3, 0.12, 10, 1), frameMat, place(0, 0, 0.45, 0, Math.PI / 2, 0))
   const L = 6.2
   for (let k = 0; k < 4; k++) {
     const a = (k * Math.PI) / 2
@@ -396,7 +404,7 @@ function buildSails(kit: ZoneKit, frameMat: THREE.Material, board: THREE.Materia
     beam(kit, frameMat, ...P(1.4, 1.4, 0.32), ...P(L - 0.1, 1.4, 0.32), 0.08, 0.08, 1)
     // Leading board and sail cloth lie in the sail plane: roll the box so its height runs along the whip.
     const [bx, by] = P((1.4 + L - 0.1) / 2, -0.28, 0)
-    tbox(kit, board, bx, by, 0.3, 0.4, L - 1.5, 0.04, 0, 0, a - Math.PI / 2, 1)
+    tbox(kit, frameMat, bx, by, 0.3, 0.4, L - 1.5, 0.04, 0, 0, a - Math.PI / 2, 1)
     const [cx, cy] = P((1.45 + L - 0.1) / 2, 0.74, 0)
     tbox(kit, cloth, cx, cy, 0.25, 1.28, L - 1.6, 0.02, 0, 0, a - Math.PI / 2, 1.5)
   }

@@ -36,6 +36,7 @@ import { Particles } from './fx/Particles'
 import { Ambient } from './fx/Ambient'
 import { PostFX } from './fx/PostFX'
 import { AudioEngine } from './audio/AudioEngine'
+import { Network } from './net/Network'
 
 interface Timer {
   at: number
@@ -163,6 +164,7 @@ export class Game implements GameApi {
     ctx.ambient = new Ambient(ctx)
     ctx.post = new PostFX(ctx)
     ctx.audio = new AudioEngine(ctx)
+    ctx.net = new Network(ctx)
 
     this.resize()
     this.resizeObs = new ResizeObserver(() => this.resize())
@@ -192,6 +194,7 @@ export class Game implements GameApi {
       ['Releasing fireflies', 0.5, () => ctx.ambient.init()],
       ['Tuning the lens', 1, () => ctx.post.init()],
       ['Composing music', 0.5, () => ctx.audio.init()],
+      ['Tuning the radio', 0.5, () => ctx.net.init()],
     ]
     const total = steps.reduce((s, x) => s + x[1], 0) + 1
     let done = 0
@@ -412,7 +415,7 @@ export class Game implements GameApi {
     this.resizeObs?.disconnect()
     document.removeEventListener('visibilitychange', this.onVisibility)
     const ctx = this.ctx
-    for (const s of [ctx.audio, ctx.post, ctx.ambient, ctx.fx, ctx.cutscenes, ctx.signs, ctx.checkpoints, ctx.enemies, ctx.collectibles, ctx.cameraRig, ctx.player, ctx.character, ctx.zones, ctx.vegetation, ctx.env]) {
+    for (const s of [ctx.net, ctx.audio, ctx.post, ctx.ambient, ctx.fx, ctx.cutscenes, ctx.signs, ctx.checkpoints, ctx.enemies, ctx.collectibles, ctx.cameraRig, ctx.player, ctx.character, ctx.zones, ctx.vegetation, ctx.env]) {
       try {
         s?.dispose()
       } catch (err) {
@@ -790,6 +793,7 @@ export class Game implements GameApi {
         ctx.player.update(dt)
         ctx.character.setMotion(ctx.player.motion)
         ctx.character.update(dt)
+        ctx.net.update(dt)
         ctx.enemies.update(dt)
         ctx.collectibles.update(dt)
         ctx.checkpoints.update(dt)
@@ -817,6 +821,7 @@ export class Game implements GameApi {
         ctx.zones.update(dt)
         ctx.character.setMotion(ctx.player.motion)
         ctx.character.update(dt)
+        ctx.net.update(dt)
         ctx.collectibles.update(dt)
         ctx.cameraRig.update(dt)
         ctx.env.setShadowFocus(ctx.player.position)
@@ -826,8 +831,10 @@ export class Game implements GameApi {
         ctx.ambient.update(dt)
         ctx.audio.update(dt)
       } else {
-        // paused / victory: keep the last frame, redraw occasionally for the UI backdrop
+        // paused / victory: keep the last frame, redraw occasionally for the UI backdrop.
+        // The network keeps running so other players keep moving and the link stays alive.
         ctx.audio.update(dt)
+        ctx.net.update(dt)
         if (++this.pausedFrame % 4 !== 0) return
       }
       ctx.post.render(dt)

@@ -27,9 +27,9 @@ const k = (s: PoseSpec): PoseSpec => ({ ...IDLE, ...s })
 const WAVE_UP = k({
   chest: [-2, -6, -2],
   head: [-3, 9, 4],
-  shoulderR: [0, 0, 6],
-  armR: [-24, 84, 82],
-  elbowR: 72,
+  shoulderR: [0, 0, 4],
+  armR: [-45, 70, 62],
+  elbowR: 78,
   handR: [0, 0, 0],
   curlR: 0.04,
   stab: 0.2,

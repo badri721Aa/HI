@@ -81,7 +81,13 @@ export function gaitFor(out: GaitParams, speed: number, walk: number, run: numbe
     out.bob *= k
     return out
   }
-  if (speed <= run) return blendGait(out, WALK, RUN, smooth((speed - walk) / Math.max(0.1, run - walk)))
+  if (speed <= run) {
+    const k = clamp01((speed - walk) / Math.max(0.1, run - walk))
+    blendGait(out, WALK, RUN, smooth(k))
+    // Stride length is linear in speed, exactly like the controller's footstep events.
+    out.step = lerp(WALK.step, RUN.step, k)
+    return out
+  }
   return blendGait(out, RUN, SPRINT, clamp01((speed - run) / Math.max(0.1, sprint - run)))
 }
 

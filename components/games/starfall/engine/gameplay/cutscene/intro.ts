@@ -75,9 +75,8 @@ export function buildIntro(ctx: Ctx): Scene {
   // …and seven shards fall to where the player will find them.
   shards.forEach((p, i) => {
     const t = 7.0 + i * 0.13
-    const d = 1.7 + (i % 3) * 0.25
-    s.streak(t, burstAt, p, d, SHARD_LIGHT)
-    s.burst(t + d, 'spark', p, { color: SHARD_LIGHT })
+    // fx.streak sparkles on arrival by itself.
+    s.streak(t, burstAt, p, 1.7 + (i % 3) * 0.25, SHARD_LIGHT)
   })
 
   // ── Sunset Beach: the hero wakes ───────────────────────────

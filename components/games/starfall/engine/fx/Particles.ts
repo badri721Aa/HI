@@ -51,34 +51,34 @@ const GOLD: [string, string] = ['#fff3cf', '#ffc94a']
 
 /** Every preset building block. Bursts combine one or more of these. */
 const DEFS = {
-  dust: { add: false, shape: SHAPE.smoke, mode: MODE.billboard, n: 6, life: [0.6, 1.1], size: [0.22, 0.38], grow: 2.6, speed: [0.5, 1.3], dist: 'ring', spread: 0.25, lift: 0.45, jitter: 0.2, yOff: 0.12, gravity: -0.4, drag: 3, colors: ['#cdbb94', '#e6d7b4'], alpha: 0.42, spin: 0.8 },
-  landRing: { add: false, shape: SHAPE.smoke, mode: MODE.billboard, n: 16, life: [0.7, 1.25], size: [0.26, 0.42], grow: 2.8, speed: [2.2, 3.6], dist: 'ring', spread: 0.12, lift: 0.35, jitter: 0.25, yOff: 0.12, gravity: -0.3, drag: 4, colors: ['#cdbb94', '#e6d7b4'], alpha: 0.48, spin: 0.6 },
+  dust: { add: false, shape: SHAPE.smoke, mode: MODE.billboard, n: 6, life: [0.6, 1.1], size: [0.22, 0.38], grow: 2.6, speed: [0.5, 1.3], dist: 'ring', spread: 0.25, lift: 0.45, jitter: 0.2, yOff: 0.12, gravity: -0.4, drag: 3, colors: ['#cdbb94', '#e6d7b4'], alpha: 0.4, spin: 0.8 },
+  landRing: { add: false, shape: SHAPE.smoke, mode: MODE.billboard, n: 16, life: [0.7, 1.25], size: [0.2, 0.32], grow: 2.3, speed: [2.2, 3.6], dist: 'ring', spread: 0.12, lift: 0.35, jitter: 0.25, yOff: 0.12, gravity: -0.3, drag: 4, colors: ['#cdbb94', '#e6d7b4'], alpha: 0.42, spin: 0.6 },
   jump: { add: false, shape: SHAPE.smoke, mode: MODE.billboard, n: 5, life: [0.45, 0.8], size: [0.18, 0.3], grow: 2.2, speed: [0.9, 1.6], dist: 'ring', spread: 0.1, lift: 0.2, jitter: 0.15, yOff: 0.08, gravity: -0.3, drag: 4, colors: ['#cdbb94', '#e6d7b4'], alpha: 0.38, spin: 0.6 },
-  djSparks: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 18, life: [0.45, 0.8], size: [0.12, 0.2], grow: 0.3, speed: [2.4, 3.6], dist: 'ring', spread: 0.15, jitter: 0.15, yOff: 0.1, gravity: -1.5, drag: 3, colors: ['#ffffff', '#ffd98a'], intensity: 2.6, alpha: 1 },
-  djRing: { add: true, shape: SHAPE.ring, mode: MODE.flat, n: 1, life: [0.42, 0.42], size: [0.35, 0.35], grow: 6, speed: [0, 0], dist: 'none', yOff: 0.05, gravity: 0, drag: 0, colors: ['#fff1c4', '#fff1c4'], intensity: 1.6, alpha: 0.65 },
-  dashGlow: { add: true, shape: SHAPE.glow, mode: MODE.stretch, n: 14, life: [0.25, 0.45], size: [0.06, 0.1], grow: 0.4, speed: [2, 4], dist: 'none', jitter: 0.35, gravity: 0, drag: 2.5, colors: ['#fff6dc', '#ffd27a'], intensity: 2.2, alpha: 0.85 },
+  djSparks: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 18, life: [0.45, 0.8], size: [0.18, 0.28], grow: 0.3, speed: [2.4, 3.6], dist: 'ring', spread: 0.15, jitter: 0.15, yOff: 0.1, gravity: -1.5, drag: 3, colors: ['#ffffff', '#ffd98a'], intensity: 2.6, alpha: 1 },
+  djRing: { add: true, shape: SHAPE.ring, mode: MODE.flat, n: 1, life: [0.42, 0.42], size: [0.35, 0.35], grow: 6, speed: [0, 0], dist: 'none', yOff: 0.05, gravity: 0, drag: 0, colors: ['#fff1c4', '#fff1c4'], intensity: 1.6, alpha: 0.8},
+  dashGlow: { add: true, shape: SHAPE.glow, mode: MODE.stretch, n: 14, life: [0.25, 0.45], size: [0.08, 0.13], grow: 0.4, speed: [2, 4], dist: 'none', jitter: 0.35, gravity: 0, drag: 2.5, colors: ['#fff6dc', '#ffd27a'], intensity: 2.2, alpha: 0.85 },
   dashDust: { add: false, shape: SHAPE.smoke, mode: MODE.billboard, n: 5, life: [0.5, 0.9], size: [0.2, 0.32], grow: 2.4, speed: [0.4, 1], dist: 'hemi', jitter: 0.3, yOff: 0.15, gravity: -0.2, drag: 3, colors: ['#cdbb94', '#e6d7b4'], alpha: 0.36, spin: 0.6 },
-  splashDrops: { add: false, shape: SHAPE.drop, mode: MODE.stretch, n: 22, life: [0.55, 0.95], size: [0.05, 0.09], grow: 0.6, speed: [3, 6], dist: 'cone', spread: 0.65, jitter: 0.25, yOff: 0.05, gravity: -14, drag: 0.5, colors: ['#eef7ff', '#cfe6f2'], intensity: 1.1, alpha: 0.85 },
-  splashFoam: { add: false, shape: SHAPE.smoke, mode: MODE.billboard, n: 8, life: [0.6, 1.1], size: [0.25, 0.4], grow: 2.4, speed: [0.8, 1.8], dist: 'ring', spread: 0.3, lift: 0.6, jitter: 0.3, yOff: 0.1, gravity: -1, drag: 3, colors: ['#ffffff', '#e2f0f6'], alpha: 0.5, spin: 0.5 },
-  ripple: { add: false, shape: SHAPE.ring, mode: MODE.flat, n: 1, life: [1.1, 1.5], size: [0.3, 0.4], grow: 7, speed: [0, 0], dist: 'none', gravity: 0, drag: 0, colors: ['#eef8ff', '#eef8ff'], intensity: 1.05, alpha: 0.5 },
-  sparkStars: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 12, life: [0.4, 0.75], size: [0.1, 0.18], grow: 0.25, speed: [1.2, 2.8], dist: 'sphere', jitter: 0.1, gravity: 0.6, drag: 2.5, colors: GOLD, intensity: 2.6, alpha: 1 },
-  sparkFlash: { add: true, shape: SHAPE.glow, mode: MODE.billboard, n: 1, life: [0.28, 0.28], size: [0.5, 0.5], grow: 2.4, speed: [0, 0], dist: 'none', gravity: 0, drag: 0, colors: ['#ffe9a8', '#ffe9a8'], intensity: 1.6, alpha: 0.7 },
+  splashDrops: { add: false, shape: SHAPE.drop, mode: MODE.stretch, n: 26, life: [0.55, 0.95], size: [0.07, 0.12], grow: 0.6, speed: [3, 6], dist: 'cone', spread: 0.65, jitter: 0.25, yOff: 0.05, gravity: -14, drag: 0.5, colors: ['#eef7ff', '#cfe6f2'], intensity: 1.1, alpha: 0.85 },
+  splashFoam: { add: false, shape: SHAPE.smoke, mode: MODE.billboard, n: 8, life: [0.6, 1.1], size: [0.32, 0.5], grow: 2.4, speed: [0.8, 1.8], dist: 'ring', spread: 0.3, lift: 0.6, jitter: 0.3, yOff: 0.1, gravity: -1, drag: 3, colors: ['#ffffff', '#e2f0f6'], alpha: 0.6, spin: 0.5 },
+  ripple: { add: false, shape: SHAPE.ring, mode: MODE.flat, n: 1, life: [1.1, 1.5], size: [0.3, 0.4], grow: 6, speed: [0, 0], dist: 'none', gravity: 0, drag: 0, colors: ['#eef8ff', '#eef8ff'], intensity: 1.05, alpha: 0.8},
+  sparkStars: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 12, life: [0.4, 0.75], size: [0.16, 0.28], grow: 0.25, speed: [1.2, 2.8], dist: 'sphere', jitter: 0.1, gravity: 0.6, drag: 2.5, colors: GOLD, intensity: 2.6, alpha: 1 },
+  sparkFlash: { add: true, shape: SHAPE.glow, mode: MODE.billboard, n: 1, life: [0.28, 0.28], size: [0.7, 0.7], grow: 2.4, speed: [0, 0], dist: 'none', gravity: 0, drag: 0, colors: ['#ffe9a8', '#ffe9a8'], intensity: 1.6, alpha: 0.7 },
   shardFlash: { add: true, shape: SHAPE.glow, mode: MODE.billboard, n: 1, life: [0.7, 0.7], size: [1.6, 1.6], grow: 3.2, speed: [0, 0], dist: 'none', gravity: 0, drag: 0, colors: ['#fff2c2', '#fff2c2'], intensity: 2.4, alpha: 0.9 },
-  shardRays: { add: true, shape: SHAPE.glow, mode: MODE.stretch, n: 26, life: [0.7, 1.2], size: [0.07, 0.12], grow: 0.3, speed: [9, 15], dist: 'sphere', gravity: -1, drag: 3.2, colors: ['#fffaf0', '#ffd36b'], intensity: 3, alpha: 1 },
-  shardStars: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 40, life: [1.1, 2], size: [0.14, 0.28], grow: 0.2, speed: [2, 6], dist: 'sphere', jitter: 0.3, gravity: -0.6, drag: 2, colors: GOLD, intensity: 2.8, alpha: 1 },
+  shardRays: { add: true, shape: SHAPE.glow, mode: MODE.stretch, n: 26, life: [0.7, 1.2], size: [0.09, 0.15], grow: 0.3, speed: [9, 15], dist: 'sphere', gravity: -1, drag: 3.2, colors: ['#fffaf0', '#ffd36b'], intensity: 3, alpha: 1 },
+  shardStars: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 40, life: [1.1, 2], size: [0.2, 0.38], grow: 0.2, speed: [2, 6], dist: 'sphere', jitter: 0.3, gravity: -0.6, drag: 2, colors: GOLD, intensity: 2.8, alpha: 1 },
   shardRing: { add: true, shape: SHAPE.ring, mode: MODE.billboard, n: 1, life: [0.55, 0.55], size: [0.4, 0.4], grow: 9, speed: [0, 0], dist: 'none', gravity: 0, drag: 0, colors: ['#ffe7a6', '#ffe7a6'], intensity: 1.8, alpha: 0.6 },
-  heartShapes: { add: true, shape: SHAPE.heart, mode: MODE.billboard, n: 5, life: [0.9, 1.4], size: [0.14, 0.22], grow: 0.6, speed: [0.6, 1.4], dist: 'cone', spread: 0.8, jitter: 0.25, gravity: 0.8, drag: 1.6, colors: ['#ff6f9f', '#ff9cc0'], intensity: 1.7, alpha: 1 },
-  heartSparks: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 14, life: [0.5, 0.9], size: [0.08, 0.15], grow: 0.3, speed: [1.2, 2.6], dist: 'sphere', jitter: 0.15, gravity: 0.5, drag: 2.5, colors: ['#ffd1e3', '#ff8fb8'], intensity: 2.2, alpha: 1 },
+  heartShapes: { add: true, shape: SHAPE.heart, mode: MODE.billboard, n: 5, life: [0.9, 1.4], size: [0.2, 0.3], grow: 0.6, speed: [0.6, 1.4], dist: 'cone', spread: 0.8, jitter: 0.25, gravity: 0.8, drag: 1.6, colors: ['#ff6f9f', '#ff9cc0'], intensity: 1.7, alpha: 1 },
+  heartSparks: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 14, life: [0.5, 0.9], size: [0.12, 0.22], grow: 0.3, speed: [1.2, 2.6], dist: 'sphere', jitter: 0.15, gravity: 0.5, drag: 2.5, colors: ['#ffd1e3', '#ff8fb8'], intensity: 2.2, alpha: 1 },
   poofSmoke: { add: false, shape: SHAPE.smoke, mode: MODE.billboard, n: 14, life: [0.8, 1.4], size: [0.32, 0.5], grow: 2.3, speed: [1, 2.6], dist: 'sphere', lift: 0.6, jitter: 0.3, yOff: 0.35, gravity: 0.4, drag: 3, colors: ['#4a3266', '#7d5aa6'], alpha: 0.72, spin: 1.2 },
-  poofSparks: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 10, life: [0.5, 0.9], size: [0.08, 0.14], grow: 0.3, speed: [1.6, 3.2], dist: 'sphere', jitter: 0.2, yOff: 0.35, gravity: 0.3, drag: 2.5, colors: ['#e2c8ff', '#b07cff'], intensity: 2.2, alpha: 1 },
-  stompStars: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 10, life: [0.4, 0.7], size: [0.12, 0.2], grow: 0.3, speed: [2.5, 4], dist: 'ring', spread: 0.35, lift: 1.2, yOff: 0.3, gravity: -4, drag: 2.5, colors: ['#ffffff', '#ffe08a'], intensity: 2.4, alpha: 1 },
+  poofSparks: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 10, life: [0.5, 0.9], size: [0.12, 0.2], grow: 0.3, speed: [1.6, 3.2], dist: 'sphere', jitter: 0.2, yOff: 0.35, gravity: 0.3, drag: 2.5, colors: ['#e2c8ff', '#b07cff'], intensity: 2.2, alpha: 1 },
+  stompStars: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 10, life: [0.4, 0.7], size: [0.18, 0.28], grow: 0.3, speed: [2.5, 4], dist: 'ring', spread: 0.35, lift: 1.2, yOff: 0.3, gravity: -4, drag: 2.5, colors: ['#ffffff', '#ffe08a'], intensity: 2.4, alpha: 1 },
   stompRing: { add: true, shape: SHAPE.ring, mode: MODE.flat, n: 1, life: [0.35, 0.35], size: [0.3, 0.3], grow: 6, speed: [0, 0], dist: 'none', yOff: 0.06, gravity: 0, drag: 0, colors: ['#fff4d6', '#fff4d6'], intensity: 1.4, alpha: 0.6 },
-  hitSparks: { add: true, shape: SHAPE.glow, mode: MODE.stretch, n: 14, life: [0.25, 0.45], size: [0.05, 0.08], grow: 0.4, speed: [4, 7], dist: 'sphere', jitter: 0.1, gravity: -6, drag: 4, colors: ['#ffffff', '#ff7a5c'], intensity: 2.6, alpha: 1 },
-  hitFlash: { add: true, shape: SHAPE.glow, mode: MODE.billboard, n: 1, life: [0.2, 0.2], size: [0.6, 0.6], grow: 1.8, speed: [0, 0], dist: 'none', gravity: 0, drag: 0, colors: ['#ff9a7a', '#ff9a7a'], intensity: 1.4, alpha: 0.6 },
-  cpEmbers: { add: true, shape: SHAPE.glow, mode: MODE.billboard, n: 30, life: [1.4, 2.6], size: [0.05, 0.1], grow: 0.35, speed: [0.8, 2], dist: 'cone', spread: 0.45, jitter: 0.6, yOff: 0.4, gravity: 0.7, drag: 0.8, colors: ['#ffd27a', '#ff8a3d'], intensity: 3, alpha: 1 },
+  hitSparks: { add: true, shape: SHAPE.glow, mode: MODE.stretch, n: 14, life: [0.25, 0.45], size: [0.07, 0.11], grow: 0.4, speed: [4, 7], dist: 'sphere', jitter: 0.1, gravity: -6, drag: 4, colors: ['#ffffff', '#ff7a5c'], intensity: 2.6, alpha: 1 },
+  hitFlash: { add: true, shape: SHAPE.glow, mode: MODE.billboard, n: 1, life: [0.2, 0.2], size: [0.8, 0.8], grow: 1.8, speed: [0, 0], dist: 'none', gravity: 0, drag: 0, colors: ['#ff9a7a', '#ff9a7a'], intensity: 1.4, alpha: 0.6 },
+  cpEmbers: { add: true, shape: SHAPE.glow, mode: MODE.billboard, n: 30, life: [1.4, 2.6], size: [0.07, 0.13], grow: 0.35, speed: [0.8, 2], dist: 'cone', spread: 0.45, jitter: 0.6, yOff: 0.4, gravity: 0.7, drag: 0.8, colors: ['#ffd27a', '#ff8a3d'], intensity: 3, alpha: 1 },
   cpFlash: { add: true, shape: SHAPE.glow, mode: MODE.billboard, n: 1, life: [0.6, 0.6], size: [0.9, 0.9], grow: 2.2, speed: [0, 0], dist: 'none', yOff: 1, gravity: 0, drag: 0, colors: ['#ffc47a', '#ffc47a'], intensity: 1.6, alpha: 0.7 },
   bounceRing: { add: true, shape: SHAPE.ring, mode: MODE.flat, n: 1, life: [0.4, 0.4], size: [0.4, 0.4], grow: 5, speed: [0, 0], dist: 'none', yOff: 0.08, gravity: 0, drag: 0, colors: ['#e9ffc4', '#e9ffc4'], intensity: 1.5, alpha: 0.7 },
-  bounceSparks: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 12, life: [0.5, 0.85], size: [0.1, 0.16], grow: 0.3, speed: [2, 4], dist: 'cone', spread: 0.7, jitter: 0.3, yOff: 0.1, gravity: -3, drag: 2, colors: ['#f4ffd0', '#c8f07a'], intensity: 2.2, alpha: 1 },
+  bounceSparks: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 12, life: [0.5, 0.85], size: [0.15, 0.24], grow: 0.3, speed: [2, 4], dist: 'cone', spread: 0.7, jitter: 0.3, yOff: 0.1, gravity: -3, drag: 2, colors: ['#f4ffd0', '#c8f07a'], intensity: 2.2, alpha: 1 },
   beaconFlash: { add: true, shape: SHAPE.glow, mode: MODE.billboard, n: 1, life: [1.1, 1.1], size: [3, 3], grow: 3, speed: [0, 0], dist: 'none', gravity: 0, drag: 0, colors: ['#fff0c8', '#fff0c8'], intensity: 2.2, alpha: 0.9 },
   beaconTrails: { add: true, shape: SHAPE.glow, mode: MODE.stretch, n: 90, life: [1.8, 3], size: [0.12, 0.2], grow: 0.3, speed: [9, 15], dist: 'sphere', gravity: -3.2, drag: 1.4, colors: ['#fff6e0', '#ffc65a'], intensity: 3.2, alpha: 1 },
   beaconStars: { add: true, shape: SHAPE.star, mode: MODE.billboard, n: 60, life: [2, 3.4], size: [0.22, 0.4], grow: 0.15, speed: [6, 12], dist: 'sphere', gravity: -2.4, drag: 1.6, colors: ['#ffffff', '#ffd98a'], intensity: 3, alpha: 1 },
@@ -97,6 +97,8 @@ const SURFACE_DUST: Record<Surface, string | null> = {
 }
 
 const MAX_STREAKS = 12
+/** Ripple rings float this far above the still-water level so wave crests don't hide them. */
+const RIPPLE_LIFT = 0.12
 
 interface Streak {
   active: boolean
@@ -196,12 +198,12 @@ export class Particles implements IParticles {
         _v.set(pos.x, y, pos.z)
         this.emit('splashDrops', _v, s, n, color)
         this.emit('splashFoam', _v, s, undefined, color)
-        _v.y = y + 0.03
+        _v.y = y + RIPPLE_LIFT
         this.emit('ripple', _v, s * 1.2, undefined, color)
         break
       }
       case 'ripple':
-        _v.set(pos.x, this.waterY(pos) + 0.03, pos.z)
+        _v.set(pos.x, this.waterY(pos) + RIPPLE_LIFT, pos.z)
         this.emit('ripple', _v, s, n, color)
         break
       case 'spark':
@@ -489,8 +491,9 @@ export class Particles implements IParticles {
     _d.subVectors(st.head, st.last)
     const dist = _d.length()
     if (dist < 1e-4) return
-    const spacing = (st.size * 0.3) / this.qScale
-    const n = Math.min(24, Math.ceil(dist / spacing))
+    // Dense enough that neighbouring motes overlap into a continuous ribbon.
+    const spacing = (st.size * 0.14) / Math.sqrt(this.qScale)
+    const n = Math.min(32, Math.ceil(dist / spacing))
     const spec = this.specs.trail
     const p = this.p
     for (let j = 0; j < n; j++) {

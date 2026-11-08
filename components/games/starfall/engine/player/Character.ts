@@ -16,9 +16,12 @@ import { dampAngle, wrapAngle } from './anim/math'
 
 const HERO_URL = '/games/starfall/hero.glb'
 const HERO_HEIGHT = 1.62
-/** Visual yaw follows physics this fast (1/s), and never trails it by more than this. */
-const YAW_RATE = 18
-const MAX_YAW_LAG = 2.1
+/**
+ * Visual yaw follows physics this fast (1/s), and never trails it by more than this (rad).
+ * The controller already rate-limits turning, so this only rounds off the corners.
+ */
+const YAW_RATE = 30
+const MAX_YAW_LAG = 0.6
 
 /**
  * GLTFLoader decodes embedded images by fetch()-ing a blob: URL, which the site's CSP
@@ -80,7 +83,9 @@ export class Character implements ICharacter {
 
   private setupModel(scene: THREE.Object3D): void {
     let height = 0
+    const eyes = new THREE.Box3()
     const anisotropy = Math.min(8, this.ctx.renderer.capabilities.getMaxAnisotropy())
+    scene.updateMatrixWorld(true)
     scene.traverse(o => {
       const mesh = o as THREE.SkinnedMesh
       if (!mesh.isMesh) return
@@ -93,29 +98,27 @@ export class Character implements ICharacter {
       this.owned.push(mesh.geometry)
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       for (const mat of mats as THREE.MeshStandardMaterial[]) {
-        if (mat.name === 'HeroEye') {
-          mat.roughness = 0.14
-          mat.metalness = 0
-          mat.envMapIntensity = 1
-        } else {
-          mat.roughness = 0.8
-          mat.metalness = 0
-          mat.envMapIntensity = 0.6
-          if (mat.map) {
-            mat.map.anisotropy = anisotropy
-            this.owned.push(mat.map)
-          }
+        const eye = mat.name === 'HeroEye'
+        if (eye && mats.length === 1) eyes.union(bb.clone().applyMatrix4(mesh.matrixWorld))
+        mat.metalness = 0
+        mat.roughness = eye ? 0.14 : 0.8
+        mat.envMapIntensity = eye ? 1 : 0.6
+        if (mat.map) {
+          mat.map.anisotropy = anisotropy
+          this.owned.push(mat.map)
         }
         this.owned.push(mat)
       }
     })
     const scale = HERO_HEIGHT / (height || 6.24)
+    // Head focus point (between the eyes), carried by the head bone; measured in the rest pose.
+    const head = scene.getObjectByName('head')
+    if (head && !eyes.isEmpty()) head.worldToLocal(eyes.getCenter(this.headLocal))
+    else this.headLocal.set(0, 0.09 / scale, 0.02 / scale)
     this.model.scale.setScalar(scale)
     this.model.add(scene)
     this.rig = new Rig(scene, scale)
     this.animator = new Animator(this.rig, this.probe)
-    // Head focus point: ~9 cm above the head bone's origin (eye level), in bone-local units.
-    this.headLocal.set(0, 0.09 / scale, 0.02 / scale)
   }
 
   /** Rounded stand-in so the game stays playable if the model is missing. */
