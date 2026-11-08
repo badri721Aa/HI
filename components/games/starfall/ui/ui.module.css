@@ -1,0 +1,373 @@
+/*
+ * Starfall Isle — UI motion and the few styles Tailwind can't express cleanly.
+ * Palette: ink #0B0F14 · amber #F5B455 · warm off-white #F3EEE6.
+ */
+
+.root {
+  --sf-ink: #0b0f14;
+  --sf-amber: #f5b455;
+  --sf-text: #f3eee6;
+  --sf-heart: #e8664f;
+  --sf-ease: cubic-bezier(0.22, 0.7, 0.2, 1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The site's global violet focus outline doesn't belong here; every control draws its own focus state. */
+.root :focus-visible {
+  outline: none;
+}
+
+/* Legible type straight over the 3D scene. */
+.hudText {
+  text-shadow: 0 1px 2px rgba(5, 7, 10, 0.6), 0 0 14px rgba(5, 7, 10, 0.28);
+}
+.hudIcon {
+  filter: drop-shadow(0 1px 1.5px rgba(5, 7, 10, 0.55));
+}
+
+/* ── generic presence (mounted → open → closed → unmounted) ─────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+.presence[data-state='open'] {
+  animation: fadeIn 260ms ease-out both;
+}
+.presence[data-state='closed'] {
+  animation: fadeOut 220ms ease-in both;
+  pointer-events: none;
+}
+
+/* Staggered entrance; set --d on the element for the delay. */
+.rise {
+  /* backwards, not both: once done the element's own transform (e.g. :focus) applies again */
+  animation: riseIn 520ms var(--sf-ease) backwards;
+  animation-delay: var(--d, 0ms);
+}
+.slide {
+  animation: slideIn 280ms var(--sf-ease) both;
+}
+
+/* ── backdrops ──────────────────────────────────────────────────────── */
+
+.titleScrim {
+  background:
+    linear-gradient(90deg, rgba(11, 15, 20, 0.86) 0%, rgba(11, 15, 20, 0.62) 28%, rgba(11, 15, 20, 0.18) 55%, rgba(11, 15, 20, 0) 72%),
+    linear-gradient(0deg, rgba(11, 15, 20, 0.7) 0%, rgba(11, 15, 20, 0) 38%);
+}
+.panelScrim {
+  background:
+    linear-gradient(90deg, rgba(11, 15, 20, 0.9) 0%, rgba(11, 15, 20, 0.78) 34%, rgba(11, 15, 20, 0.62) 100%);
+}
+.pauseScrim {
+  background:
+    linear-gradient(90deg, rgba(11, 15, 20, 0.92) 0%, rgba(11, 15, 20, 0.74) 32%, rgba(11, 15, 20, 0.5) 70%, rgba(11, 15, 20, 0.42) 100%);
+}
+.loadingBg {
+  background:
+    radial-gradient(120% 70% at 72% 118%, rgba(245, 180, 85, 0.2) 0%, rgba(214, 120, 70, 0.08) 38%, rgba(11, 15, 20, 0) 70%),
+    radial-gradient(90% 60% at 10% -10%, rgba(80, 110, 150, 0.12) 0%, rgba(11, 15, 20, 0) 60%),
+    #0b0f14;
+}
+.topShade {
+  background: linear-gradient(180deg, rgba(8, 10, 14, 0.38) 0%, rgba(8, 10, 14, 0) 100%);
+}
+
+/* ── loading ────────────────────────────────────────────────────────── */
+
+@keyframes shootingStar {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--a)); }
+  6% { opacity: 1; }
+  22% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--a)); }
+  100% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--a)); }
+}
+.shootingStar {
+  position: absolute;
+  width: 140px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(245, 180, 85, 0) 0%, rgba(245, 180, 85, 0.55) 70%, rgba(255, 236, 200, 0.95) 100%);
+  transform-origin: 100% 50%;
+  animation: shootingStar 7s ease-out infinite;
+  animation-delay: 1.4s;
+  opacity: 0;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: var(--o, 0.5); }
+  50% { opacity: calc(var(--o, 0.5) * 0.35); }
+}
+.twinkle {
+  animation: twinkle var(--t, 5s) ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+@keyframes tipIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.tip {
+  animation: tipIn 500ms var(--sf-ease) both;
+}
+
+/* ── menus ──────────────────────────────────────────────────────────── */
+
+.menuItem {
+  position: relative;
+  transition: color 160ms ease-out, transform 200ms var(--sf-ease);
+}
+.menuItem::before {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 50%;
+  height: 1px;
+  width: 0;
+  background: var(--sf-amber);
+  transition: width 200ms var(--sf-ease);
+}
+.menuItem:focus {
+  outline: none;
+}
+.menuItem:focus,
+.menuItem[data-current='true'] {
+  transform: translateX(6px);
+}
+.menuItem:focus::before,
+.menuItem[data-current='true']::before {
+  width: 14px;
+}
+
+/* ── HUD ────────────────────────────────────────────────────────────── */
+
+@keyframes heartPop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+@keyframes heartLose {
+  0% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes rowShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(1px); }
+}
+.heartsHit {
+  animation: rowShake 360ms ease-out;
+}
+.heartLost {
+  animation: heartLose 420ms ease-out;
+}
+.heartGained,
+.pop {
+  animation: heartPop 420ms var(--sf-ease);
+}
+@keyframes lowPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+.heartLow {
+  animation: lowPulse 900ms ease-in-out infinite;
+}
+
+@keyframes starFill {
+  0% { transform: scale(0.4) rotate(-45deg); opacity: 0; }
+  60% { transform: scale(1.3) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.starFill {
+  animation: starFill 600ms var(--sf-ease) both;
+  animation-delay: var(--d, 0ms);
+}
+.starGlow {
+  filter: drop-shadow(0 0 4px rgba(245, 180, 85, 0.75)) drop-shadow(0 1px 1px rgba(5, 7, 10, 0.5));
+}
+
+@keyframes zoneCard {
+  0% { opacity: 0; letter-spacing: 0.32em; }
+  14% { opacity: 1; }
+  30% { letter-spacing: 0.18em; }
+  78% { opacity: 1; letter-spacing: 0.16em; }
+  100% { opacity: 0; letter-spacing: 0.15em; }
+}
+/* Small delay so a hitch on the first frames of play can't swallow the card. */
+.zoneCard {
+  animation: zoneCard 4200ms var(--sf-ease) 350ms both;
+}
+@keyframes ruleGrow {
+  0% { transform: scaleX(0); opacity: 0; }
+  20% { transform: scaleX(1); opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.zoneRuleL,
+.zoneRuleR {
+  animation: ruleGrow 4200ms var(--sf-ease) 350ms both;
+}
+.zoneRuleL { transform-origin: 100% 50%; }
+.zoneRuleR { transform-origin: 0% 50%; }
+
+.objective[data-state='open'] {
+  animation: slideIn 420ms var(--sf-ease) both;
+}
+.objective[data-state='closed'] {
+  animation: fadeOut 700ms ease-in both;
+}
+
+.toast[data-state='open'] {
+  animation: slideIn 260ms var(--sf-ease) both;
+}
+.toast[data-state='closed'] {
+  animation: fadeOut 360ms ease-in both;
+}
+
+@keyframes bannerTitle {
+  from { opacity: 0; letter-spacing: 0.12em; transform: translateY(6px); }
+  to { opacity: 1; letter-spacing: 0.01em; transform: none; }
+}
+.bannerTitle {
+  animation: bannerTitle 900ms var(--sf-ease) both;
+  animation-delay: 120ms;
+}
+.banner[data-state='closed'] {
+  animation: fadeOut 600ms ease-in both;
+}
+
+@keyframes promptIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.prompt {
+  animation: promptIn 200ms var(--sf-ease) both;
+}
+
+@keyframes hintBreath {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+.hintBreath {
+  animation: hintBreath 2.4s ease-in-out infinite;
+}
+
+/* Full-screen damage tint; restarted by re-keying the element. */
+@keyframes damage {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.damage {
+  background: radial-gradient(ellipse at center, rgba(160, 24, 16, 0) 42%, rgba(160, 24, 16, 0.42) 78%, rgba(120, 10, 8, 0.7) 100%);
+  animation: damage 620ms ease-out both;
+}
+@keyframes lowHp {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.6; }
+}
+.lowHp {
+  background: radial-gradient(ellipse at center, rgba(160, 24, 16, 0) 55%, rgba(150, 20, 14, 0.38) 100%);
+  animation: lowHp 1.6s ease-in-out infinite;
+}
+
+/* ── dialog / cutscene ──────────────────────────────────────────────── */
+
+@keyframes caret {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(2px); opacity: 0.45; }
+}
+.caret {
+  animation: caret 1.1s ease-in-out infinite;
+}
+.dialog[data-state='open'] {
+  animation: riseIn 260ms var(--sf-ease) both;
+}
+.dialog[data-state='closed'] {
+  animation: fadeOut 180ms ease-in both;
+}
+
+.letterbox {
+  transition: transform 650ms var(--sf-ease);
+}
+.subtitle {
+  animation: riseIn 320ms var(--sf-ease) both;
+}
+
+/* ── settings controls ──────────────────────────────────────────────── */
+
+.sliderThumb {
+  transition: box-shadow 160ms ease-out, transform 160ms ease-out;
+}
+.slider:focus-visible .sliderThumb,
+.slider:hover .sliderThumb {
+  box-shadow: 0 0 0 4px rgba(245, 180, 85, 0.22);
+}
+.slider:focus-visible {
+  outline: none;
+}
+
+/* ── map ────────────────────────────────────────────────────────────── */
+
+.mapImage {
+  filter: saturate(0.85) contrast(1.04) brightness(0.96) sepia(0.12);
+}
+.mapFrame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 60px rgba(11, 15, 20, 0.55);
+}
+@keyframes markerPulse {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.markerPulse {
+  animation: markerPulse 1.8s ease-out infinite;
+}
+
+/* ── victory ────────────────────────────────────────────────────────── */
+
+@keyframes badge {
+  0% { opacity: 0; transform: scale(0.8); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.badge {
+  animation: badge 500ms var(--sf-ease) both;
+  animation-delay: 900ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .slide,
+  .shootingStar,
+  .twinkle,
+  .heartLow,
+  .hintBreath,
+  .caret,
+  .markerPulse,
+  .lowHp {
+    animation: none !important;
+  }
+  .letterbox,
+  .menuItem {
+    transition: none !important;
+  }
+}

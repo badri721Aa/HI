@@ -1,30 +1,257 @@
-// STUB — replaced by the Character/Animator builder.
+/**
+ * The hero: loads /games/starfall/hero.glb (one skinned mesh, baked albedo),
+ * places it on the player every frame and drives it with the procedural
+ * Animator. Also owns the soft blob shadow under the feet.
+ *
+ *   root (player position, smoothed yaw) → pivot (spin attack) → model (unit scale) → glTF armature
+ */
 import * as THREE from 'three'
+import { GLTFLoader, type GLTFParser } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import type { Ctx, GestureName, ICharacter, MotionState } from '../types'
 import type { V3 } from '../events'
+import type { GroundHit } from '../collision'
+import { Animator, type GroundSample } from './Animator'
+import { Rig } from './anim/Rig'
+import { dampAngle, wrapAngle } from './anim/math'
+
+const HERO_URL = '/games/starfall/hero.glb'
+const HERO_HEIGHT = 1.62
+/** Visual yaw follows physics this fast (1/s), and never trails it by more than this. */
+const YAW_RATE = 18
+const MAX_YAW_LAG = 2.1
+
+/**
+ * GLTFLoader decodes embedded images by fetch()-ing a blob: URL, which the site's CSP
+ * (connect-src) forbids. Images may come from blob: though, so decode them through <img>.
+ */
+function embeddedImagesViaImg(parser: GLTFParser) {
+  const imgLoader = new THREE.TextureLoader(parser.options.manager)
+  return {
+    name: 'starfall_embedded_images',
+    loadTexture(index: number) {
+      const def = parser.json.textures?.[index]
+      const src = def && parser.json.images?.[def.source]
+      if (!src || src.bufferView === undefined) return null
+      return parser.loadTextureImage(index, def.source, imgLoader)
+    },
+  }
+}
 
 export class Character implements ICharacter {
   readonly root = new THREE.Group()
-  constructor(private ctx: Ctx) {}
-  init(): void {
-    const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 0.9, 4, 12), new THREE.MeshStandardMaterial({ color: 0xc9432f }))
+  private pivot = new THREE.Group()
+  private model = new THREE.Group()
+  private rig: Rig | null = null
+  private animator: Animator | null = null
+  private blob: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null
+  private owned: Array<{ dispose(): void }> = []
+  private yaw = 0
+  private placed = false
+  private blink = false
+  private visible = true
+  private hit = {} as GroundHit
+  private blobHit = {} as GroundHit
+  private up = new THREE.Vector3(0, 1, 0)
+  private normal = new THREE.Vector3()
+  private headLocal = new THREE.Vector3()
+
+  constructor(private ctx: Ctx) {
+    this.root.name = 'hero'
+    this.root.add(this.pivot)
+    this.pivot.add(this.model)
+  }
+
+  async init(): Promise<void> {
+    const ctx = this.ctx
+    ctx.scene.add(this.root)
+    this.makeBlob()
+    try {
+      const loader = new GLTFLoader().register(embeddedImagesViaImg)
+      const gltf = await loader.loadAsync(HERO_URL, e => {
+        if (e.total) ctx.progress(e.loaded / e.total)
+      })
+      this.setupModel(gltf.scene)
+    } catch (err) {
+      console.error('[starfall] hero model failed to load — using a placeholder', err)
+      this.makePlaceholder()
+    }
+    ctx.progress(1)
+  }
+
+  private setupModel(scene: THREE.Object3D): void {
+    let height = 0
+    const anisotropy = Math.min(8, this.ctx.renderer.capabilities.getMaxAnisotropy())
+    scene.traverse(o => {
+      const mesh = o as THREE.SkinnedMesh
+      if (!mesh.isMesh) return
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      mesh.frustumCulled = false
+      mesh.geometry.computeBoundingBox()
+      const bb = mesh.geometry.boundingBox!
+      height = Math.max(height, bb.max.y - bb.min.y)
+      this.owned.push(mesh.geometry)
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      for (const mat of mats as THREE.MeshStandardMaterial[]) {
+        if (mat.name === 'HeroEye') {
+          mat.roughness = 0.14
+          mat.metalness = 0
+          mat.envMapIntensity = 1
+        } else {
+          mat.roughness = 0.8
+          mat.metalness = 0
+          mat.envMapIntensity = 0.6
+          if (mat.map) {
+            mat.map.anisotropy = anisotropy
+            this.owned.push(mat.map)
+          }
+        }
+        this.owned.push(mat)
+      }
+    })
+    const scale = HERO_HEIGHT / (height || 6.24)
+    this.model.scale.setScalar(scale)
+    this.model.add(scene)
+    this.rig = new Rig(scene, scale)
+    this.animator = new Animator(this.rig, this.probe)
+    // Head focus point: ~9 cm above the head bone's origin (eye level), in bone-local units.
+    this.headLocal.set(0, 0.09 / scale, 0.02 / scale)
+  }
+
+  /** Rounded stand-in so the game stays playable if the model is missing. */
+  private makePlaceholder(): void {
+    const geo = new THREE.CapsuleGeometry(0.3, 0.95, 6, 16)
+    const mat = new THREE.MeshStandardMaterial({ color: 0xc9432f, roughness: 0.8 })
+    const m = new THREE.Mesh(geo, mat)
     m.position.y = 0.8
     m.castShadow = true
-    this.root.add(m)
-    this.ctx.scene.add(this.root)
+    this.model.add(m)
+    this.owned.push(geo, mat)
   }
-  update(): void {
+
+  private makeBlob(): void {
+    const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)
+    const mat = new THREE.MeshBasicMaterial({
+      map: this.ctx.textures.get('glow'),
+      color: 0x24170f,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+      fog: true,
+    })
+    const blob = new THREE.Mesh(geo, mat)
+    blob.name = 'hero-blob-shadow'
+    blob.renderOrder = 2
+    blob.frustumCulled = false
+    this.ctx.scene.add(blob)
+    this.blob = blob
+    this.owned.push(geo, mat)
+  }
+
+  /** Ground probe handed to the animator (feet planting). */
+  private probe = (x: number, z: number, nearY: number, out: GroundSample): boolean => {
+    const h = this.ctx.collision.groundAt(x, z, nearY + 0.2, 0.05, 0.45, this.hit)
+    if (!(h.y > nearY - 0.5)) return false
+    out.y = h.y
+    out.nx = h.nx
+    out.ny = h.ny
+    out.nz = h.nz
+    return true
+  }
+
+  update(dt: number): void {
     const p = this.ctx.player
-    this.root.position.copy(p.position)
-    this.root.rotation.y = p.yaw
+    if (!p) return
+    const pos = p.position
+    if (!Number.isFinite(pos.x + pos.y + pos.z)) return
+    const jumped = !this.placed || this.root.position.distanceToSquared(pos) > 4
+    this.root.position.copy(pos)
+    if (jumped || !Number.isFinite(this.yaw)) this.yaw = p.yaw
+    else {
+      this.yaw = dampAngle(this.yaw, p.yaw, YAW_RATE, dt)
+      const lag = wrapAngle(p.yaw - this.yaw)
+      if (Math.abs(lag) > MAX_YAW_LAG) this.yaw = p.yaw - Math.sign(lag) * MAX_YAW_LAG
+    }
+    this.root.rotation.y = this.yaw
+    this.placed = true
+
+    if (this.animator) {
+      if (jumped) this.animator.resetFeet()
+      this.animator.update(dt, this.root.position, this.yaw)
+      this.pivot.rotation.y = this.animator.spin
+    }
+
+    this.model.visible = !(this.blink && Math.floor(this.ctx.clock.real * 24) % 2 === 1)
+    this.updateBlob(pos)
+    this.root.updateMatrixWorld(true)
   }
-  getHandPosition(out: THREE.Vector3): THREE.Vector3 { return out.copy(this.root.position).add(new THREE.Vector3(0, 1.1, 0)) }
-  getHeadPosition(out: THREE.Vector3): THREE.Vector3 { return out.copy(this.root.position).add(new THREE.Vector3(0, 1.5, 0)) }
-  setMotion(_m: MotionState): void {}
-  playGesture(_n: GestureName): Promise<void> { return Promise.resolve() }
-  stopGesture(): void {}
-  lookAt(_t: V3 | null): void {}
-  setBlink(_on: boolean): void {}
-  setVisible(v: boolean): void { this.root.visible = v }
-  dispose(): void {}
+
+  private updateBlob(pos: THREE.Vector3): void {
+    const blob = this.blob
+    if (!blob) return
+    const g = this.ctx.collision.groundAt(pos.x, pos.z, pos.y + 0.1, 0.2, 0.45, this.blobHit)
+    const h = pos.y - g.y
+    const show = this.visible && h < 6 && h > -0.5
+    blob.visible = show
+    if (!show) return
+    const fade = 1 - Math.min(1, Math.max(0, h) / 6)
+    blob.position.set(pos.x, g.y + 0.02, pos.z)
+    blob.quaternion.setFromUnitVectors(this.up, this.normal.set(g.nx, g.ny, g.nz).normalize())
+    blob.scale.setScalar(0.95 * (0.55 + 0.45 * fade))
+    blob.material.opacity = (this.ctx.quality.shadows ? 0.32 : 0.55) * fade
+  }
+
+  getHandPosition(out: THREE.Vector3): THREE.Vector3 {
+    if (this.rig) return this.rig.palmR.getWorldPosition(out)
+    return out.copy(this.root.position).setY(this.root.position.y + 1.0)
+  }
+
+  getHeadPosition(out: THREE.Vector3): THREE.Vector3 {
+    if (this.rig) {
+      this.rig.headBone.updateWorldMatrix(true, false)
+      return this.rig.headBone.localToWorld(out.copy(this.headLocal))
+    }
+    return out.copy(this.root.position).setY(this.root.position.y + 1.5)
+  }
+
+  setMotion(m: MotionState): void {
+    this.animator?.setMotion(m)
+  }
+
+  playGesture(name: GestureName, opts?: { loop?: boolean; speed?: number }): Promise<void> {
+    return this.animator ? this.animator.playGesture(name, opts) : Promise.resolve()
+  }
+
+  stopGesture(): void {
+    this.animator?.stopGesture()
+  }
+
+  lookAt(target: V3 | null): void {
+    this.animator?.lookAt(target)
+  }
+
+  setBlink(on: boolean): void {
+    this.blink = on
+    if (!on) this.model.visible = true
+  }
+
+  setVisible(v: boolean): void {
+    this.visible = v
+    this.root.visible = v
+    if (this.blob) this.blob.visible = v
+  }
+
+  dispose(): void {
+    this.animator?.stopGesture()
+    this.root.removeFromParent()
+    this.blob?.removeFromParent()
+    for (const d of this.owned) d.dispose()
+    this.owned = []
+    this.animator = null
+    this.rig = null
+    this.blob = null
+  }
 }
