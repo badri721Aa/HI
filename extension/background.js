@@ -42,7 +42,55 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     broadcastNews(msg.payload?.message ?? '', msg.auth).then(r => sendResponse(r))
     return true
   }
+  // ── Homework Helper ──────────────────────────────────────────────────────
+  if (msg.type === 'GET_SETTINGS') {
+    chrome.storage.local.get('hwSettings', r =>
+      sendResponse({ settings: r.hwSettings ?? { apiBase: 'https://alhekma-cheating.vercel.app', speed: 55 } })
+    )
+    return true
+  }
+  if (msg.type === 'SET_SETTINGS') {
+    chrome.storage.local.set({ hwSettings: msg.payload }, () => sendResponse({ ok: true }))
+    return true
+  }
+  if (msg.type === 'AI_COMPLETE') {
+    aiComplete(msg.payload?.question ?? '', msg.payload?.apiBase).then(r => sendResponse(r))
+    return true
+  }
 })
+
+// Call the site's Claude endpoint and collect the streamed answer into text.
+async function aiComplete(question, apiBaseIn) {
+  const stored = await chrome.storage.local.get('hwSettings')
+  const apiBase = (apiBaseIn || stored.hwSettings?.apiBase || 'https://alhekma-cheating.vercel.app').replace(/\/$/, '')
+  try {
+    const res = await fetch(`${apiBase}/api/ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'homework', messages: [{ role: 'user', content: question }] }),
+    })
+    if (!res.ok || !res.body) return { ok: false, error: `AI error ${res.status}` }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = '', text = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop() ?? ''
+      for (const line of lines) {
+        const t = line.trim()
+        if (!t.startsWith('data: ') || t === 'data: [DONE]') continue
+        try { const { delta } = JSON.parse(t.slice(6)); if (delta) text += delta } catch {}
+      }
+    }
+    return { ok: true, text }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
 
 async function getHeaders(auth) {
   return {

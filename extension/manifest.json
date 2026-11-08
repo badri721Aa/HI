@@ -1,17 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Alhekma Live",
-  "version": "1.1.0",
-  "description": "Platform companion — live chat, news, and online users at a glance. Quick-action dock for admins.",
+  "name": "Alhekma Homework Helper",
+  "version": "1.2.0",
+  "description": "Grabs assignments on Google Classroom, Docs, and Forms, solves them with Claude, and auto-types the answer. Plus live chat, news, and online users.",
   "permissions": [
     "storage",
     "alarms",
     "notifications",
-    "tabs"
+    "tabs",
+    "scripting",
+    "activeTab"
   ],
   "host_permissions": [
     "https://gvxnzgogfaifmsdkingq.supabase.co/*",
-    "https://alhekma-cheating.vercel.app/*"
+    "https://alhekma-cheating.vercel.app/*",
+    "http://localhost/*",
+    "https://classroom.google.com/*",
+    "https://docs.google.com/*",
+    "https://forms.gle/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -19,16 +25,25 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Alhekma Live"
+    "default_title": "Alhekma Homework Helper"
   },
   "content_scripts": [
     {
       "matches": ["https://alhekma-cheating.vercel.app/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://classroom.google.com/*",
+        "https://docs.google.com/*",
+        "https://forms.gle/*"
+      ],
+      "js": ["classroom.js"],
+      "run_at": "document_idle"
     }
   ],
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://gvxnzgogfaifmsdkingq.supabase.co wss://realtime.supabase.co; img-src 'self' data:; font-src 'self' data:"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://gvxnzgogfaifmsdkingq.supabase.co wss://realtime.supabase.co https://alhekma-cheating.vercel.app http://localhost; img-src 'self' data:; font-src 'self' data:"
   }
 }
