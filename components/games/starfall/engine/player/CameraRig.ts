@@ -22,6 +22,9 @@ type Mode = 'follow' | 'scripted' | 'title'
 const TAU = Math.PI * 2
 /** Angles sampled around the hero when planning the title orbit. */
 const TITLE_SAMPLES = 72
+/** Title swing shape: asin(K·sin θ)/asin(K) is a triangle wave with eased turnarounds (near-constant drift speed). */
+const SWING_K = 0.95
+const SWING_NORM = Math.asin(SWING_K)
 
 interface FovKick {
   amp: number
@@ -54,10 +57,11 @@ export class CameraRig implements ICameraRig {
 
   private titleT = 0
   private titlePlanned = false
-  /** Title orbit angle a(t) = mid + amp·sin(phase + ω·t); amp < 0 means a slow full circle from mid. */
+  /** Title orbit angle a(t) = mid + amp·swing(phase + ω·t); amp < 0 means a slow full circle from mid. */
   private titleMid = 0
   private titleAmp = -1
   private titlePhase = 0
+  private titleOmega = 0
   private readonly titleBlocked = new Uint8Array(TITLE_SAMPLES)
 
   /** Hand-over glide from the previous camera transform (0 → 1). */
@@ -294,7 +298,7 @@ export class CameraRig implements ICameraRig {
     const a =
       this.titleAmp < 0
         ? this.titleMid + t * C.titleSpin
-        : this.titleMid + this.titleAmp * Math.sin(this.titlePhase + (t * C.titleSpin) / Math.max(0.35, this.titleAmp))
+        : this.titleMid + (this.titleAmp * Math.asin(SWING_K * Math.sin(this.titlePhase + t * this.titleOmega))) / SWING_NORM
     const r = C.titleRadius + Math.sin(t * 0.21) * 0.5
     const cam = this.ctx.camera
     cam.position.set(p.x + Math.sin(a) * r, p.y + C.titleHeight + Math.sin(t * 0.17) * 0.18, p.z + Math.cos(a) * r)
@@ -381,7 +385,16 @@ export class CameraRig implements ICameraRig {
     this.titleAmp = span / 2
     const rel = (((prefer - lo) % TAU) + TAU) % TAU
     const at = rel <= span ? lo + rel : rel - span < TAU - rel ? lo + span : lo
-    this.titlePhase = this.titleAmp > 1e-3 ? Math.asin(clamp((at - this.titleMid) / this.titleAmp, -1, 1)) : 0
+    if (this.titleAmp < 1e-3) {
+      this.titleOmega = this.titlePhase = 0
+      return
+    }
+    // Peak drift speed = titleSpin. Start at the preferred angle (nudged off the very end of the arc,
+    // where the swing rests) and head away from the nearer end so the drift is visible at once.
+    this.titleOmega = (C.titleSpin * SWING_NORM) / (this.titleAmp * SWING_K)
+    const r = clamp((at - this.titleMid) / this.titleAmp, -0.92, 0.92)
+    const base = Math.asin(Math.sin(r * SWING_NORM) / SWING_K)
+    this.titlePhase = r > 0 ? Math.PI - base : base
   }
 
   /* ── effects ─────────────────────────────────────────────── */

@@ -127,7 +127,7 @@ export interface IZones extends System {
 
 export type PlayerState =
   | 'idle' | 'move' | 'jump' | 'doubleJump' | 'fall' | 'land' | 'dash'
-  | 'attack' | 'hurt' | 'dead' | 'wade' | 'bounce' | 'cutscene'
+  | 'attack' | 'hurt' | 'dead' | 'wade' | 'bounce' | 'cutscene' | 'ragdoll'
 
 /** What the animator needs to pose the character each frame. */
 export interface MotionState {
@@ -167,7 +167,21 @@ export interface ICharacter extends System {
   setMotion(m: MotionState): void
   /** Play a gesture; resolves when it ends (looping gestures resolve on stopGesture). */
   playGesture(name: GestureName, opts?: { loop?: boolean; speed?: number }): Promise<void>
-  stopGesture(): void
+  /** Stop the current gesture; `instant` snaps straight back to the base pose (cutscene cuts). */
+  stopGesture(opts?: { instant?: boolean }): void
+  /**
+   * Go limp: a physical ragdoll that starts from the current animated pose, carries the player's
+   * velocity plus `impulse` (m/s), collides with the world, settles and then gets back up by itself.
+   */
+  startRagdoll(impulse: V3): void
+  /** True from startRagdoll until the get-up has finished. */
+  readonly ragdolling: boolean
+  /** True once the get-up has started (the controller may move the capsule to the anchor then). */
+  readonly ragdollRecovering: boolean
+  /** Ground point under the ragdoll's pelvis (where the player stands up). */
+  getRagdollAnchor(out: THREE.Vector3): THREE.Vector3
+  /** End any ragdoll immediately and snap back to the animated pose (respawns, teleports, cutscenes). */
+  cancelRagdoll(): void
   /** Head/eyes look toward a world point (null = natural). */
   lookAt(target: V3 | null): void
   /** Invincibility blink and similar. */

@@ -5,7 +5,7 @@
  */
 
 export type Device = 'kbm' | 'pad' | 'touch'
-export type Action = 'jump' | 'dash' | 'attack' | 'interact' | 'pause' | 'map' | 'sprint' | 'skip'
+export type Action = 'jump' | 'dash' | 'attack' | 'interact' | 'pause' | 'map' | 'sprint' | 'skip' | 'ragdoll'
 
 export interface InputState {
   /** Movement intent, x = right, y = forward. Length ≤ 1. */
@@ -27,6 +27,8 @@ export interface InputState {
   interact: boolean
   pause: boolean
   map: boolean
+  /** Flop into a ragdoll (R / right stick click). */
+  ragdoll: boolean
 }
 
 const KEYMAP: Record<string, Action> = {
@@ -38,6 +40,7 @@ const KEYMAP: Record<string, Action> = {
   KeyP: 'pause',
   Escape: 'pause',
   KeyM: 'map',
+  KeyR: 'ragdoll',
   ShiftLeft: 'sprint',
   ShiftRight: 'sprint',
 }
@@ -54,7 +57,7 @@ function emptyState(): InputState {
   return {
     moveX: 0, moveY: 0, lookX: 0, lookY: 0, zoom: 0,
     jumpHeld: false, sprint: false, skipHeld: false,
-    jump: false, dash: false, attack: false, interact: false, pause: false, map: false,
+    jump: false, dash: false, attack: false, interact: false, pause: false, map: false, ragdoll: false,
   }
 }
 
@@ -276,6 +279,7 @@ export class Input {
       if (edge(3)) this.edges.add('interact')
       if (edge(9)) this.edges.add('pause')
       if (edge(8)) this.edges.add('map')
+      if (edge(11)) this.edges.add('ragdoll')
       if (btn(0)) { jumpHeld = true; skipHeld = true }
       if (btn(5) || btn(10) || btn(7)) sprint = true
       if (btn(12)) zoom -= 4 * dt
@@ -305,6 +309,7 @@ export class Input {
     s.interact = on && e.has('interact')
     s.pause = e.has('pause')
     s.map = e.has('map')
+    s.ragdoll = on && e.has('ragdoll')
     e.clear()
   }
 

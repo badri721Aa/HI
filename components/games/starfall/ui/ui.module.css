@@ -253,6 +253,11 @@
   animation: fadeOut 600ms ease-in both;
 }
 
+/* Chat lines rise in; `backwards` so the fade-out (an opacity transition) isn't pinned by the fill. */
+.chatLine {
+  animation: riseIn 240ms var(--sf-ease) backwards;
+}
+
 @keyframes promptIn {
   from { opacity: 0; transform: translateY(6px) scale(0.98); }
   to { opacity: 1; transform: none; }

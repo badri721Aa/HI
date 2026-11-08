@@ -12,6 +12,8 @@
  *    alpha-to-mip compensation so leaf cards don't thin out with distance, and a
  *    cheap translucency term so backlit leaves glow in the low sun.
  *  - Rocks: procedural moss on upward faces above the beach, darker when wet.
+ *  - Near dissolve: foliage and wood right in front of the camera fade out with a
+ *    screen-door dither, so low boughs never hide the player (shadows unaffected).
  */
 import * as THREE from 'three'
 import type { TextureLib } from '../../textures'
@@ -162,6 +164,14 @@ const ROCK_SURFACE = /* glsl */ `
 }
 `
 
+/** Screen-door dissolve of anything within ~2.6 m of the rendering camera (interleaved gradient noise). */
+const NEAR_DISSOLVE = /* glsl */ `
+{
+  float vegNear = smoothstep( 0.8, 2.6, distance( vVegWorld, cameraPosition ) );
+  if ( vegNear < 1.0 && vegNear <= fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) ) ) discard;
+}
+`
+
 const RE_DIRECT = 'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );'
 
 /** Shared fragment set-up: uniforms, the translucency helper, and (for thin foliage) no back-face flip + backlight. */
@@ -231,9 +241,10 @@ export function createVegMaterial(textures: TextureLib, shared: VegUniforms, o: 
       fs = fs.replace('#include <map_fragment>', '#ifdef USE_MAP\n\tdiffuseColor.rgb *= 0.72 + 0.56 * texture2D( map, vMapUv ).r;\n#endif')
     }
     if (kind === 'rock') fs = fs.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>\n${ROCK_SURFACE}`)
+    else fs = fs.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>\n${NEAR_DISSOLVE}`)
     shader.fragmentShader = fs
   }
-  mat.customProgramCacheKey = () => `starfall.veg.${kind}.v1`
+  mat.customProgramCacheKey = () => `starfall.veg.${kind}.v2`
 
   let depth: THREE.MeshDepthMaterial | null = null
   if (!isStatic) {

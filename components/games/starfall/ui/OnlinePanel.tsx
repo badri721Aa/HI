@@ -1,9 +1,10 @@
 'use client'
 /**
- * Title screen → Play Online. Before joining: your name and shirt colour,
- * Quick Join, a private room, the public room list and join-by-code. After
- * joining: the room (its code large for private rooms), who is in it, and
- * Start, which continues or begins the journey as usual.
+ * Play Online (title screen and pause menu). Before joining: your name and
+ * shirt colour, Quick Join, a private room, the public room list and
+ * join-by-code. After joining: the room (its code large for private rooms),
+ * who is in it, and the primary action — Start on the title (continues or
+ * begins the journey as usual), Resume in the pause menu.
  */
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
 import type { RoomInfo } from '../engine/types'
@@ -26,12 +27,19 @@ interface InlineError {
   message: string
 }
 
-export function OnlinePanel({ onBack, onStart, startHint }: { onBack: () => void; onStart: () => void; startHint: string }) {
+export interface PrimaryAction {
+  label: string
+  onClick: () => void
+  /** Quiet line beside the buttons (e.g. "Continues your journey"). */
+  hint?: string
+}
+
+export function OnlinePanel({ onBack, primary }: { onBack: () => void; primary: PrimaryAction }) {
   const room = useNet(s => s.room)
   return (
     <div>
       <PanelHeader eyebrow={room ? roomKind(room) : 'Online'} title={room ? room.name : 'Play online'} aside={<BackHint onBack={onBack} />} />
-      {room ? <RoomLobby key={room.code} room={room} onStart={onStart} startHint={startHint} /> : <RoomBrowser />}
+      {room ? <RoomLobby key={room.code} room={room} primary={primary} /> : <RoomBrowser />}
     </div>
   )
 }
@@ -138,14 +146,14 @@ function PublicRooms({ busy, onJoin, error }: { busy: Busy; onJoin: (r: RoomInfo
   const [listError, setListError] = useState<string | null>(null)
   const seq = useRef(0)
 
-  const load = useEffectEvent(() => {
+  const load = () => {
     const id = ++seq.current
     setLoading(true)
     net
       .listPublicRooms()
       .then(list => {
         if (id !== seq.current) return
-        setRooms([...list].sort((a, b) => b.players - a.players || a.name.localeCompare(b.name)))
+        setRooms(list)
         setListError(null)
       })
       .catch((err: unknown) => {
@@ -154,16 +162,16 @@ function PublicRooms({ busy, onJoin, error }: { busy: Busy; onJoin: (r: RoomInfo
       .finally(() => {
         if (id === seq.current) setLoading(false)
       })
-  })
+  }
+  const tick = useEffectEvent(load)
 
   // Load on open, then keep the counts fresh while the panel is up.
   useEffect(() => {
-    const first = setTimeout(() => load(), 0)
-    const t = setInterval(() => load(), ROOMS_REFRESH_MS)
+    const first = setTimeout(() => tick(), 0)
+    const t = setInterval(() => tick(), ROOMS_REFRESH_MS)
     return () => {
       clearTimeout(first)
       clearInterval(t)
-      seq.current++
     }
   }, [])
 
@@ -227,25 +235,31 @@ function PublicRooms({ busy, onJoin, error }: { busy: Busy; onJoin: (r: RoomInfo
 
 /* ── profile ────────────────────────────────────────────────────── */
 
-const cleanName = (s: string) => s.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, NAME_MAX)
+/** Drops control characters and caps the length (the network sanitises again). */
+const cleanName = (s: string) =>
+  Array.from(s)
+    .filter(ch => ch >= ' ' && ch !== '\u007f')
+    .join('')
+    .slice(0, NAME_MAX)
 
 function ProfileEditor() {
   const { net, game } = useGameUi()
   const stored = useNet(s => s.profile)
   const [draft, setDraft] = useState(stored.name)
 
-  const commit = useEffectEvent(() => {
+  const commit = () => {
     const name = draft.trim()
     if (!name) {
       setDraft(stored.name)
       return
     }
     if (name !== stored.name) net.setProfile({ name })
-  })
+  }
+  const commitLater = useEffectEvent(commit)
 
   // Debounced so typing doesn't send a presence update per keystroke.
   useEffect(() => {
-    const t = setTimeout(() => commit(), 650)
+    const t = setTimeout(() => commitLater(), 650)
     return () => clearTimeout(t)
   }, [draft])
 
@@ -320,7 +334,7 @@ function ProfileEditor() {
 
 /* ── after joining ──────────────────────────────────────────────── */
 
-function RoomLobby({ room, onStart, startHint }: { room: RoomInfo; onStart: () => void; startHint: string }) {
+function RoomLobby({ room, primary }: { room: RoomInfo; primary: PrimaryAction }) {
   const { net, game } = useGameUi()
   const players = useNet(s => s.players)
   const status = useNet(s => s.status)
@@ -388,13 +402,13 @@ function RoomLobby({ room, onStart, startHint }: { room: RoomInfo; onStart: () =
       )}
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
-        <Button variant="primary" autofocus onClick={onStart}>
-          Start
+        <Button variant="primary" autofocus onClick={primary.onClick}>
+          {primary.label}
         </Button>
         <Button variant="danger" disabled={leaving} onClick={leave}>
           {leaving ? 'Leaving…' : 'Leave room'}
         </Button>
-        <span className="text-[12px] text-[#F3EEE6]/45">{startHint}</span>
+        {primary.hint && <span className="text-[12px] text-[#F3EEE6]/45">{primary.hint}</span>}
       </div>
       {error && <ErrorLine message={error} />}
     </div>

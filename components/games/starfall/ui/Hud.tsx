@@ -1,10 +1,11 @@
 'use client'
-/** In-play HUD: hearts, dash, objective, compass, shards & sparks, zone card, prompt, pointer-lock hint. */
+/** In-play HUD: hearts, dash, online chip, objective, compass, shards & sparks, zone card, prompt, pointer-lock hint. */
 import { useEffect, useState, type CSSProperties } from 'react'
 import { Compass } from './Compass'
-import { playUi, useGameUi, useHud, useUi } from './context'
+import { playUi, useGameUi, useHud, useNet, useUi } from './context'
 import { KeyCap } from './controls'
 import { DashIcon, HeartIcon, InteractIcon, MouseIcon, PauseIcon, SparkIcon, StarIcon } from './icons'
+import { NetChip } from './OnlineHud'
 import { cx, LABEL } from './theme'
 import styles from './ui.module.css'
 
@@ -31,6 +32,7 @@ export function Hud() {
         </div>
         {/* On touch the Dash button carries its own charge ring. */}
         {!touch && <DashMeter />}
+        <NetChip />
         <ObjectiveLine hidden={!playing} />
       </div>
 
@@ -246,7 +248,8 @@ function Prompt() {
 
 function LookHint() {
   const locked = useUi(s => s.pointerLocked)
-  if (locked) return null
+  const typing = useNet(s => s.chatOpen)
+  if (locked || typing) return null
   return (
     <div className="absolute inset-x-0 bottom-[clamp(28px,6vh,56px)] flex justify-center">
       <div className={cx(styles.presence, 'flex items-center gap-2 text-[12px] uppercase tracking-[0.18em] text-[#F3EEE6]/75')} data-state="open" style={{ animationDelay: '700ms' }}>

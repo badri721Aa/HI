@@ -11,7 +11,8 @@
  */
 import type { Game } from '../engine/Game'
 import type { GameEventMap } from '../engine/events'
-import type { INetwork, NetStatus, RoomInfo } from '../engine/types'
+import type { Input } from '../engine/input'
+import type { GestureName, INetwork, NetStatus, RoomInfo } from '../engine/types'
 
 export interface PlayerView {
   id: string
@@ -48,6 +49,8 @@ export interface NetState {
   chat: ChatLine[]
   profile: { name: string; color: string }
   chatOpen: boolean
+  /** Player list overlay (held Tab, or toggled from the chip on touch). */
+  listOpen: boolean
 }
 
 export const CHAT_MAX = 140
@@ -56,7 +59,7 @@ const CHAT_FADE_MS = 700
 const CHAT_KEEP = 40
 
 /** Shirt colours offered on the Online screen — warm, saturated enough to read at distance, never neon. */
-export const SHIRT_COLORS = ['#C9432F', '#E07B2F', '#E2B33A', '#5C9B47', '#2E8C86', '#3D6DB3', '#7B5CB0', '#C95A86']
+export const SHIRT_COLORS = ['#c9432f', '#d9822b', '#d8b43c', '#5c9a45', '#2f8c86', '#3c6fb8', '#7a5ab8', '#cc5a82']
 
 function initialNet(): NetState {
   return {
@@ -68,11 +71,21 @@ function initialNet(): NetState {
     chat: [],
     profile: { name: 'Player', color: SHIRT_COLORS[0] },
     chatOpen: false,
+    listOpen: false,
   }
 }
 
 const sameRoom = (a: RoomInfo | null, b: RoomInfo | null) =>
   a === b || (!!a && !!b && a.code === b.code && a.name === b.name && a.public === b.public && a.players === b.players && a.max === b.max)
+
+/** Temporarily replaces Input.onPointerLockChange (see NetStore.openChat). */
+interface LockSwap {
+  saved: Input['onPointerLockChange']
+  wrapper: (locked: boolean) => void
+  timer: ReturnType<typeof setTimeout> | null
+}
+
+const EMOTE_COOLDOWN_MS = 700
 
 export class NetStore {
   private state: NetState = initialNet()
@@ -82,6 +95,8 @@ export class NetStore {
   private game: Game | null = null
   private seq = 0
   private playersSig = ''
+  private lock: LockSwap | null = null
+  private emoteAt = -1e9
 
   get = (): NetState => this.state
 
@@ -100,10 +115,17 @@ export class NetStore {
       bus.on('net:room', e => this.onRoom(e ? { ...e } : null)),
       bus.on('net:peer', () => this.refreshPlayers()),
       bus.on('net:chat', e => this.pushChat(e)),
+      // Menus, cutscenes and dialogs take over: drop the chat input and the player list.
+      bus.on('ui:phase', e => {
+        if (e.phase === 'playing') return
+        this.closeChat(false)
+        if (this.state.listOpen) this.set({ listOpen: false })
+      }),
     ]
     this.syncFromNet()
     return () => {
       for (const off of offs) off()
+      this.restoreLock()
       this.stopPolling()
       for (const t of this.timers) clearTimeout(t)
       this.timers.clear()
@@ -168,8 +190,67 @@ export class NetStore {
     }
   }
 
-  setChatOpen(open: boolean): void {
-    if (this.state.chatOpen !== open) this.set({ chatOpen: open })
+  /**
+   * Opens the chat input (online, in play). Typing needs the mouse back, but
+   * the game pauses whenever pointer lock is lost — so for the time the input
+   * is open, lock losses are swallowed (lock gains still pass through) and the
+   * original handler is put back shortly after the chat closes.
+   */
+  openChat(): void {
+    const game = this.game
+    if (!game || this.state.chatOpen || !this.state.room || game.phase !== 'playing') return
+    const input = game.ctx.input
+    if (this.lock) {
+      if (this.lock.timer) clearTimeout(this.lock.timer)
+      this.lock.timer = null
+    } else {
+      const saved = input.onPointerLockChange
+      const wrapper = (locked: boolean) => {
+        if (locked) saved?.(locked)
+      }
+      input.onPointerLockChange = wrapper
+      this.lock = { saved, wrapper, timer: null }
+    }
+    // Let go of anything held (W, Shift…) so the hero stops while you type.
+    input.reset()
+    input.exitPointerLock()
+    this.set({ chatOpen: true, listOpen: false })
+  }
+
+  /** Closes the chat input; `relock` takes the mouse back (call it from the key/click that closed it). */
+  closeChat(relock: boolean): void {
+    if (!this.state.chatOpen) return
+    this.set({ chatOpen: false })
+    const game = this.game
+    if (relock && game?.phase === 'playing') game.requestPointerLock()
+    // The unlock event from openChat has long fired; wait for the re-lock before handing back.
+    const l = this.lock
+    if (l && !l.timer) l.timer = setTimeout(() => this.restoreLock(), 600)
+  }
+
+  setPlayerList(open: boolean): void {
+    const v = open && !!this.state.room && this.game?.phase === 'playing'
+    if (this.state.listOpen !== v) this.set({ listOpen: v })
+  }
+
+  /** Plays an emote on your hero and, when in a room, on everyone else's screen. */
+  emote(name: GestureName): void {
+    const game = this.game
+    if (!game || game.phase !== 'playing') return
+    const now = performance.now()
+    if (now - this.emoteAt < EMOTE_COOLDOWN_MS) return
+    this.emoteAt = now
+    try {
+      void game.ctx.character.playGesture(name).catch(() => {})
+    } catch {
+      /* the character may still be loading */
+    }
+    if (!this.state.room) return
+    try {
+      game.ctx.net.sendEmote(name)
+    } catch {
+      /* best effort */
+    }
   }
 
   /* ── internals ──────────────────────────────────────────────── */
@@ -239,10 +320,23 @@ export class NetStore {
       // A different room starts with a clean log.
       if (!prev || prev.code !== room.code) patch.chat = []
     }
+    if (!room) patch.listOpen = false
     this.set(patch)
     if (room) this.startPolling()
-    else this.stopPolling()
+    else {
+      this.stopPolling()
+      this.closeChat(false)
+    }
     this.refreshPlayers()
+  }
+
+  private restoreLock(): void {
+    const l = this.lock
+    if (!l) return
+    if (l.timer) clearTimeout(l.timer)
+    this.lock = null
+    const input = this.game?.ctx.input
+    if (input && input.onPointerLockChange === l.wrapper) input.onPointerLockChange = l.saved
   }
 
   private startPolling(): void {

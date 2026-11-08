@@ -1,12 +1,13 @@
 'use client'
-/** Pause menu: resume / map / settings / controls / restart / quit, with run stats. */
+/** Pause menu: resume / map / online / settings / controls / restart / quit, with run stats. */
 import { useEffect, useRef, type CSSProperties } from 'react'
-import { playUi, useGameUi, useHud, usePresence, useUi } from './context'
+import { playUi, useGameUi, useHud, useNet, usePresence, useUi } from './context'
 import { Button, KeyCap, MenuList, PanelHeader, type MenuEntry } from './controls'
 import { ControlsPanel } from './ControlsPanel'
 import { StarIcon } from './icons'
 import { MapPanel } from './MapPanel'
-import { focusEl, focusFirst, useMenuNav } from './nav'
+import { focusEl, focusFirst, isTextField, useMenuNav } from './nav'
+import { OnlinePanel } from './OnlinePanel'
 import { BackHint, Panel } from './Panel'
 import { SettingsPanel } from './SettingsPanel'
 import { cx, formatTime, LABEL } from './theme'
@@ -31,6 +32,8 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
   const menuRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const lastOpener = useRef<PausePanel>('root')
+  const room = useNet(s => s.room)
+  const roomPlayers = useNet(s => s.players.length)
 
   useEffect(() => {
     if (state !== 'open') return
@@ -51,6 +54,8 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
     enabled: state === 'open',
     onBack: panel !== 'root' ? () => go('root') : undefined,
     onKey: e => {
+      // Letters typed into the Online panel's fields are text, not shortcuts.
+      if (isTextField(e.target as Element | null) && e.key !== 'Escape') return false
       const isEsc = e.key === 'Escape'
       if (isEsc || e.code === 'KeyP') {
         if (e.repeat || performance.now() - store.get().pausedAt < REOPEN_GUARD_MS) return true
@@ -69,6 +74,12 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
   const items: MenuEntry[] = [
     { id: 'resume', label: 'Resume', onSelect: resume },
     { id: 'map', label: 'Map', onSelect: () => go('map') },
+    {
+      id: 'online',
+      label: 'Online',
+      meta: room ? `${room.code.toUpperCase()} · ${Math.max(room.players, roomPlayers)} / ${room.max}` : 'Play with friends',
+      onSelect: () => go('online'),
+    },
     { id: 'settings', label: 'Settings', onSelect: () => go('settings') },
     { id: 'controls', label: 'Controls', onSelect: () => go('controls') },
     { id: 'restart', label: 'Restart from checkpoint', onSelect: () => game.restartFromCheckpoint(), separated: true },
@@ -111,6 +122,7 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
           <div className="flex min-w-0 flex-1 items-start px-[clamp(16px,3vw,48px)] py-[clamp(16px,9vh,88px)] md:pl-0">
             <Panel panelRef={panelRef} label={panel} wide={panel === 'map'}>
               {panel === 'map' && <MapPanel onBack={() => go('root')} />}
+              {panel === 'online' && <OnlinePanel onBack={() => go('root')} primary={{ label: 'Resume', onClick: resume }} />}
               {panel === 'settings' && <SettingsPanel onBack={() => go('root')} />}
               {panel === 'controls' && <ControlsPanel onBack={() => go('root')} />}
               {panel === 'quit' && (

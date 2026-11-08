@@ -2,19 +2,20 @@
 /** Title screen over the live 3D scene: wordmark, menu (bottom-left), sub-panels on the right. */
 import Link from 'next/link'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { playUi, useGameUi, usePresence, useUi } from './context'
+import { playUi, useGameUi, useNet, usePresence, useUi } from './context'
 import { Button, KeyCap, MenuList, PanelHeader, type MenuEntry } from './controls'
 import { ControlsPanel } from './ControlsPanel'
 import { CreditsPanel } from './CreditsPanel'
 import { BackIcon } from './icons'
 import { focusFirst, useMenuNav } from './nav'
+import { OnlinePanel } from './OnlinePanel'
 import { BackHint, Panel } from './Panel'
 import { SettingsPanel } from './SettingsPanel'
-import { cx, formatTime, LABEL } from './theme'
+import { cx, formatTime, LABEL, STANDALONE } from './theme'
 import styles from './ui.module.css'
 import { Wordmark } from './Wordmark'
 
-type TitlePanel = 'settings' | 'controls' | 'credits' | 'confirmNew'
+type TitlePanel = 'online' | 'settings' | 'controls' | 'credits' | 'confirmNew'
 
 interface SaveSummary {
   shards: number
@@ -40,6 +41,8 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
   const menuRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const [opener, setOpener] = useState('')
+  const room = useNet(s => s.room)
+  const roomPlayers = useNet(s => s.players.length)
 
   useEffect(() => {
     if (!hasSave) return
@@ -85,6 +88,11 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
   })
 
   const start = () => game.newGame()
+  const startHint = summary
+    ? `Continues your journey · ${summary.shards} of ${summary.total} shards`
+    : hasSave
+      ? 'Continues your journey'
+      : 'Begins a new journey'
   const items: MenuEntry[] = [
     ...(hasSave
       ? [{
@@ -95,6 +103,12 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
         }]
       : []),
     { id: 'new', label: 'New Game', onSelect: () => (hasSave ? open('confirmNew', 'new') : start()) },
+    {
+      id: 'online',
+      label: 'Play Online',
+      meta: room ? `${room.name} · ${Math.max(room.players, roomPlayers)} / ${room.max}` : undefined,
+      onSelect: () => open('online', 'online'),
+    },
     { id: 'settings', label: 'Settings', onSelect: () => open('settings', 'settings') },
     { id: 'controls', label: 'Controls', onSelect: () => open('controls', 'controls') },
     { id: 'credits', label: 'Credits', onSelect: () => open('credits', 'credits') },
@@ -113,12 +127,14 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
             panel && 'max-md:hidden',
           )}
         >
-          <Link
-            href="/games"
-            className="absolute left-[clamp(20px,6vw,88px)] top-[clamp(18px,4vh,36px)] inline-flex items-center gap-2 text-[12px] uppercase tracking-[0.18em] text-[#F3EEE6]/50 transition-colors duration-150 hover:text-[#F3EEE6]"
-          >
-            <BackIcon className="h-4 w-4" /> Arcade
-          </Link>
+          {!STANDALONE && (
+            <Link
+              href="/games"
+              className="absolute left-[clamp(20px,6vw,88px)] top-[clamp(18px,4vh,36px)] inline-flex items-center gap-2 text-[12px] uppercase tracking-[0.18em] text-[#F3EEE6]/50 transition-colors duration-150 hover:text-[#F3EEE6]"
+            >
+              <BackIcon className="h-4 w-4" /> Arcade
+            </Link>
+          )}
 
           <div className={cx('mt-[18vh] transition-opacity duration-300 [@media(max-height:640px)]:mt-[9vh]', panel && 'opacity-30')}>
             <Wordmark />
@@ -146,6 +162,9 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
         {panel && (
           <div className="flex min-w-0 flex-1 items-start px-[clamp(16px,3vw,48px)] py-[clamp(16px,9vh,88px)] md:pl-0">
             <Panel panelRef={panelRef} label={panel}>
+              {panel === 'online' && (
+                <OnlinePanel onBack={back} primary={{ label: 'Start', hint: startHint, onClick: () => (hasSave ? game.continueGame() : start()) }} />
+              )}
               {panel === 'settings' && <SettingsPanel onBack={back} />}
               {panel === 'controls' && <ControlsPanel onBack={back} />}
               {panel === 'credits' && <CreditsPanel onBack={back} />}

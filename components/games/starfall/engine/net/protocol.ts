@@ -221,8 +221,7 @@ export function randomId(len = 12): string {
 }
 
 // Control characters, zero-width / bidi overrides and line separators.
-// eslint-disable-next-line no-control-regex
-const UNSAFE = /[\u0000-\u001f\u007f-\u009f­​-‏ -‮⁠-⁯﻿￹-￻]/g
+const UNSAFE = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff9-\ufffb]/g
 
 /** Strips unsafe characters, collapses whitespace, trims and caps the length (by code point). */
 export function sanitizeText(v: unknown, max: number): string {

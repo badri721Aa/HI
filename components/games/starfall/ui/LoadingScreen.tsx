@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { BackIcon } from './icons'
-import { cx, LABEL } from './theme'
+import { cx, LABEL, STANDALONE } from './theme'
 import styles from './ui.module.css'
 import { Wordmark } from './Wordmark'
 
@@ -76,9 +76,11 @@ export function LoadingScreen({ progress, label, error, state }: { progress: num
                 >
                   Try again
                 </button>
-                <Link href="/games" className="inline-flex items-center gap-2 text-[13px] text-[#F3EEE6]/60 transition-colors hover:text-[#F3EEE6]">
-                  <BackIcon className="h-4 w-4" /> Back to the Arcade
-                </Link>
+                {!STANDALONE && (
+                  <Link href="/games" className="inline-flex items-center gap-2 text-[13px] text-[#F3EEE6]/60 transition-colors hover:text-[#F3EEE6]">
+                    <BackIcon className="h-4 w-4" /> Back to the Arcade
+                  </Link>
+                )}
               </div>
             </div>
           ) : (

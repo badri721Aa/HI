@@ -15,6 +15,8 @@ import { CutsceneOverlay } from './ui/CutsceneOverlay'
 import { DialogBox } from './ui/DialogBox'
 import { Hud } from './ui/Hud'
 import { LoadingScreen } from './ui/LoadingScreen'
+import { NetStore } from './ui/netStore'
+import { OnlineLayer } from './ui/OnlineHud'
 import { PauseMenu } from './ui/PauseMenu'
 import { ScreenFx } from './ui/ScreenFx'
 import { TitleScreen } from './ui/TitleScreen'
@@ -32,6 +34,7 @@ declare global {
 export default function StarfallGame() {
   const hostRef = useRef<HTMLDivElement>(null)
   const [store] = useState(() => new UiStore())
+  const [net] = useState(() => new NetStore())
   const [game, setGame] = useState<Game | null>(null)
   const [forceTouch, setForceTouch] = useState(false)
   const [bootError, setBootError] = useState<string | null>(null)
@@ -55,6 +58,7 @@ export default function StarfallGame() {
     let cancelled = false
     let instance: Game | null = null
     let detach: (() => void) | null = null
+    let detachNet: (() => void) | null = null
 
     import('./engine/Game')
       .then(({ Game }) => {
@@ -66,6 +70,7 @@ export default function StarfallGame() {
           return
         }
         detach = store.attach(instance)
+        detachNet = net.attach(instance)
         window.__starfall = instance
         setForceTouch(new URLSearchParams(window.location.search).get('touch') === '1')
         setGame(instance)
@@ -80,12 +85,13 @@ export default function StarfallGame() {
     return () => {
       cancelled = true
       detach?.()
+      detachNet?.()
       if (instance) {
         if (window.__starfall === instance) delete window.__starfall
         instance.dispose()
       }
     }
-  }, [store])
+  }, [store, net])
 
   // Audio may only start after a user gesture.
   useEffect(() => {
@@ -123,7 +129,7 @@ export default function StarfallGame() {
     return () => clearTimeout(t)
   }, [game, phase, mapReady])
 
-  const value = useMemo<GameUi | null>(() => (game ? { game, store, touch: game.isTouch || forceTouch } : null), [game, store, forceTouch])
+  const value = useMemo<GameUi | null>(() => (game ? { game, store, net, touch: game.isTouch || forceTouch } : null), [game, store, net, forceTouch])
 
   const error = bootError ?? (phase === 'loading' ? engineError : null)
   const loading = phase === 'loading' || (phase === 'title' && !mapReady) || !!error
@@ -148,6 +154,7 @@ export default function StarfallGame() {
           <CutsceneOverlay />
           <Hud />
           <TouchControls />
+          <OnlineLayer />
           <Announcements />
           <DialogBox />
           <TitleScreen />

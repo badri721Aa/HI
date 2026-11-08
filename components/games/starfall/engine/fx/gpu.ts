@@ -122,7 +122,8 @@ void main() {
   vec2 q = vec2(c * position.x - s * position.y, s * position.x + c * position.y);
 
   if (mode > 1.5) {
-    wp.xz += q * size;
+    // Lying flat, wound so the face points up (+Y) and survives back-face culling.
+    wp.xz += vec2(q.x, -q.y) * size;
     mv = viewMatrix * vec4(wp, 1.0);
   } else if (mode > 0.5) {
     vec3 v = iVel.xyz * exp(-k * age) + vec3(0.0, iSize.z * age, 0.0);

@@ -135,6 +135,13 @@ export class SpeciesBatch {
     return { meshes, matrix, colors, count: 0 }
   }
 
+  /** Makes every mesh visible (with nothing to draw) so a renderer.compile() pass sees the materials. */
+  warm(): void {
+    for (const t of [this.near, this.mid, this.far]) {
+      if (t) for (const m of t.meshes) m.visible = true
+    }
+  }
+
   /** Enables/disables colliders to match the density thinning. */
   setDensity(density: number): void {
     if (density === this.density) return
@@ -143,6 +150,24 @@ export class SpeciesBatch {
       const c = this.colliders[i]
       if (c) c.enabled = this.rank[i] < density
     }
+  }
+
+  /**
+   * Drops, for good, every instance `blocked` rejects (it receives the instance's
+   * matrix elements at `m[o … o + 15]`). Their colliders are appended to `dropped`
+   * for the caller to remove. Returns how many were dropped.
+   */
+  retire(blocked: (m: Float32Array, o: number) => boolean, dropped: Collider[]): number {
+    let n = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.rank[i] > 1 || !blocked(this.mats, i * 16)) continue
+      this.rank[i] = Infinity
+      const c = this.colliders[i]
+      if (c) dropped.push(c)
+      this.colliders[i] = null
+      n++
+    }
+    return n
   }
 
   /**
@@ -227,15 +252,7 @@ export class SpeciesBatch {
 
   /** Triangles currently submitted to the main pass. */
   get triangles(): number {
-    let t = 0
-    for (const target of [this.near, this.mid, this.far]) {
-      if (!target) continue
-      for (const m of target.meshes) {
-        const g = m.geometry
-        t += ((g.index ? g.index.count : g.attributes.position.count) / 3) * target.count
-      }
-    }
-    return t
+    return triangles(this.near) + triangles(this.mid) + triangles(this.far)
   }
 
   dispose(): void {
@@ -247,4 +264,14 @@ export class SpeciesBatch {
       }
     }
   }
+}
+
+function triangles(t: Target | null): number {
+  let n = 0
+  if (!t) return n
+  for (const m of t.meshes) {
+    const g = m.geometry
+    n += ((g.index ? g.index.count : g.attributes.position.count) / 3) * t.count
+  }
+  return n
 }

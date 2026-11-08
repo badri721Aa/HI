@@ -33,6 +33,10 @@ const ROWS: Record<Scheme, Array<{ action: string; keys: ReactNode }>> = {
     { action: 'Map', keys: <KeyCap>M</KeyCap> },
     { action: 'Pause', keys: <><KeyCap>Esc</KeyCap><Or /><KeyCap>P</KeyCap></> },
     { action: 'Skip cutscene', keys: <><KeyCap>Space</KeyCap><Note>hold</Note></> },
+    { action: 'Ragdoll · flop', keys: <KeyCap>R</KeyCap> },
+    { action: 'Emotes · wave, cheer, point, shrug', keys: <><KeyCap>1</KeyCap><KeyCap>2</KeyCap><KeyCap>3</KeyCap><KeyCap>4</KeyCap></> },
+    { action: 'Chat', keys: <><KeyCap>Enter</KeyCap><Or /><KeyCap>T</KeyCap><Note>online</Note></> },
+    { action: 'Players in the room', keys: <><KeyCap>Tab</KeyCap><Note>hold · online</Note></> },
   ],
   pad: [
     { action: 'Move', keys: <Pad wide>L stick</Pad> },
@@ -46,6 +50,7 @@ const ROWS: Record<Scheme, Array<{ action: string; keys: ReactNode }>> = {
     { action: 'Map', keys: <Pad wide>View</Pad> },
     { action: 'Pause', keys: <Pad wide>Menu</Pad> },
     { action: 'Skip cutscene', keys: <><Pad>A</Pad><Note>hold</Note></> },
+    { action: 'Ragdoll · flop', keys: <Pad wide>L3</Pad> },
   ],
   touch: [
     { action: 'Move', keys: <Note>Drag on the left side</Note> },
@@ -55,6 +60,7 @@ const ROWS: Record<Scheme, Array<{ action: string; keys: ReactNode }>> = {
     { action: 'Dash · spin · interact', keys: <Note>Buttons beside Jump</Note> },
     { action: 'Pause', keys: <Note>Pause button, top left</Note> },
     { action: 'Skip cutscene', keys: <Note>Skip button</Note> },
+    { action: 'Chat · emotes · players', keys: <Note>Buttons by the room chip, online</Note> },
   ],
 }
 

@@ -507,7 +507,15 @@ export class Game implements GameApi {
     this.saveDirty = true
     this.bus.emit('player:died', { pos: v3(this.ctx.player.position), cause })
     this.hud.set({ deaths: this.save.deaths })
-    this.respawn()
+    if (cause === 'water') {
+      this.respawn()
+      return
+    }
+    // Go limp first, then fade out and respawn.
+    const v = this.ctx.player.velocity
+    this.ctx.character.startRagdoll({ x: v.x * 0.15, y: 2.5, z: v.z * 0.15 })
+    this.ctx.player.controlEnabled = false
+    this.after(1.4, () => this.respawn())
   }
 
   tryActivateBeacon(): void {

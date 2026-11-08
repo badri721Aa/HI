@@ -16,6 +16,7 @@ import type { QualityProfile } from '../../settings'
 import type { TextureLib } from '../../textures'
 import { fbm, smoothstep, WORLD_HALF, ZONES } from '../heightfield'
 import { CLEARINGS } from '../level'
+import type { Blockers } from './blockers'
 import { patchFoliageFragment, VEG_VERT_PARS, type VegUniforms } from './materials'
 import type { GroundCache } from './ground'
 import { hash2, Rng } from './rng'
@@ -182,6 +183,7 @@ export class GrassField {
   private dirty = true
   private site = newSite()
   private sphere = new THREE.Sphere()
+  private blockers: Blockers | null = null
 
   constructor(private ground: GroundCache, textures: TextureLib, shared: VegUniforms, parent: THREE.Object3D) {
     const rng = new Rng(77)
@@ -271,7 +273,17 @@ export class GrassField {
     this.dirty = true
   }
 
-  /** Generates every tile within `r` of (x, z) right away (used during loading). */
+  /** Keep tufts out of landmark solids from now on; regenerates every resident tile. */
+  setBlockers(b: Blockers): void {
+    this.blockers = b
+    this.slotTile.fill(-1)
+    this.tileSlot.fill(-1)
+    this.slotCount.fill(0)
+    this.slotVisible.fill(0)
+    this.dirty = true
+  }
+
+  /** Generates every tile within `r` of (x, z) right away. */
   prewarm(q: QualityProfile, x: number, z: number, r: number): void {
     if (q.grassRadius !== this.radius || this.perTile !== Math.max(8, Math.round(SUB * SUB * BASE_FILL * q.grassDensity))) this.configure(q)
     this.collectNeeded(x, z)
@@ -401,6 +413,8 @@ export class GrassField {
       const dz = Math.max(Math.abs(cz - c[1]) - TILE / 2, 0)
       if (dx * dx + dz * dz < c[2] * c[2]) bare = true
     }
+    // Landmark solids overlapping this tile (null when there are none).
+    const blockers = this.blockers && this.blockers.gather(cx, cz, TILE * 0.75) > 0 ? this.blockers : null
 
     const s = this.site
     const pool = this.pool
@@ -425,6 +439,7 @@ export class GrassField {
       const grass = coverAt(this.ground, x, z, s)
       if (grass < 0.25 || grass < hash2(id, k, 17) * 0.5 + 0.25) continue
       if (bare && this.inBare(x, z)) continue
+      if (blockers && blockers.hits(x, z, 0.12, s.h + 0.02, s.h + 0.45)) continue
       const highland = smoothstep(9, 18, s.h)
       const lush = Math.max(-1, Math.min(1, lushBase + forestT * 0.55 - highland * 0.35 - (1 - smoothstep(2, 4, s.hw)) * 0.3 + (nBig - 0.5) * 0.9))
       const k1 = nBig * 0.36 + 0.82
@@ -501,11 +516,8 @@ export class GrassField {
     }
     this.geo.instanceCount = n
     if (n > 0) {
-      for (const attr of [this.aTuft, this.aTint]) {
-        attr.clearUpdateRanges()
-        attr.addUpdateRange(0, n * 4)
-        attr.needsUpdate = true
-      }
+      upload(this.aTuft, n * 4)
+      upload(this.aTint, n * 4)
     }
   }
 
@@ -522,4 +534,10 @@ export class GrassField {
     this.geo.dispose()
     this.material.dispose()
   }
+}
+
+function upload(attr: THREE.InstancedBufferAttribute, count: number): void {
+  attr.clearUpdateRanges()
+  attr.addUpdateRange(0, count)
+  attr.needsUpdate = true
 }
