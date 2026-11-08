@@ -117,6 +117,8 @@ export class NetStore {
       bus.on('net:chat', e => this.pushChat(e)),
       // Menus, cutscenes and dialogs take over: drop the chat input and the player list.
       bus.on('ui:phase', e => {
+        // The network finishes init() during loading; pick up its stored profile then.
+        this.syncFromNet()
         if (e.phase === 'playing') return
         this.closeChat(false)
         if (this.state.listOpen) this.set({ listOpen: false })

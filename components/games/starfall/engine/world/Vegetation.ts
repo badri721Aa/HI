@@ -370,6 +370,9 @@ export class Vegetation implements IVegetation {
 
   dispose(): void {
     this.ready = false
+    this.settled = false
+    this.retired = 0
+    this.instanceCount = 0
     for (const c of this.colliders) this.ctx.collision.remove(c)
     this.colliders = []
     for (const b of this.batches) b.dispose()

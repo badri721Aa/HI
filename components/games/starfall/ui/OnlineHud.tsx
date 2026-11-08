@@ -85,10 +85,12 @@ function ChipBody({
       {count !== null && (
         <>
           <span aria-hidden className="h-3 w-px bg-[#F3EEE6]/20" />
-          <span className="flex items-center gap-1.5 tabular-nums text-[#F3EEE6]/80">
+          <span className="flex items-center gap-1.5 tabular-nums text-[#F3EEE6]/85">
             <UsersIcon className="h-3 w-3 text-[#F3EEE6]/55" />
-            {count}
-            <span className="-ml-0.5 text-[#F3EEE6]/40">/{max}</span>
+            <span>
+              {count}
+              <span className="text-[#F3EEE6]/40"> / {max}</span>
+            </span>
           </span>
         </>
       )}
@@ -99,7 +101,7 @@ function ChipBody({
       )}
     </>
   )
-  const cls = 'flex h-7 items-center gap-2 rounded-full border border-[#F3EEE6]/12 bg-[#0B0F14]/55 pl-2.5 pr-3 text-[11px] uppercase shadow-[0_4px_16px_-6px_rgba(0,0,0,0.5)]'
+  const cls = 'flex h-7 items-center gap-2 rounded-full border border-[#F3EEE6]/12 bg-[#0B0F14]/70 pl-2.5 pr-3 text-[11px] uppercase shadow-[0_4px_16px_-6px_rgba(0,0,0,0.5)]'
   if (!interactive) {
     return (
       <div role="status" aria-label={label} className={cls}>
@@ -251,7 +253,7 @@ function ChatPanel({ open }: { open: boolean }) {
           : 'bottom-[clamp(20px,4vh,36px)] left-[clamp(16px,2.4vw,32px)]',
       )}
     >
-      {open && <div aria-hidden className="absolute -inset-x-3 -bottom-3 -top-6 -z-10 rounded-[6px] bg-gradient-to-t from-[#0B0F14]/70 via-[#0B0F14]/45 to-transparent" />}
+      {open && <div aria-hidden className="absolute -inset-x-4 -bottom-4 -top-8 -z-10 rounded-[8px] bg-gradient-to-t from-[#0B0F14]/60 via-[#0B0F14]/25 to-transparent" />}
       <ul className="flex w-full flex-col items-start gap-1" aria-live="polite" aria-label="Chat">
         {shown.map(l => (
           <ChatRow key={l.key} line={l} fading={!open && l.leaving} />
@@ -338,7 +340,7 @@ function ChatInput() {
           aria-label="Chat message"
           autoComplete="off"
           enterKeyHint="send"
-          className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-[#F3EEE6] outline-none placeholder:text-[#F3EEE6]/30"
+          className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-[14px] text-[#F3EEE6] shadow-none outline-none placeholder:text-[#F3EEE6]/30 focus:outline-none focus:ring-0"
         />
         {left <= 30 && <span className={cx('shrink-0 text-[11px] tabular-nums', left <= 10 ? 'text-[#F3B3A6]' : 'text-[#F3EEE6]/45')}>{left}</span>}
         {touch && (

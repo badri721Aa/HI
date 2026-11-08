@@ -94,8 +94,6 @@ function RoomBrowser() {
       </div>
       {error?.source === 'top' && <ErrorLine message={error.message} />}
 
-      <PublicRooms busy={busy} onJoin={r => run(`room:${r.code}`, 'rooms', () => net.join(r.code))} error={error?.source === 'rooms' ? error.message : null} />
-
       <Section label="Join with a code">
         <form
           className="flex flex-wrap items-center gap-3"
@@ -125,8 +123,8 @@ function RoomBrowser() {
             spellCheck={false}
             enterKeyHint="go"
             className={cx(
-              'h-11 w-[170px] rounded-[4px] border bg-[#F3EEE6]/[0.04] px-4 font-nacelle text-[20px] uppercase tracking-[0.32em] text-[#F3EEE6] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[#F3EEE6]/20',
-              error?.source === 'code' ? 'border-[#E8664F]/70' : 'border-[#F3EEE6]/20 focus:border-[#F5B455]/80 focus:shadow-[0_0_0_3px_rgba(245,180,85,0.15)]',
+              'h-11 w-[170px] rounded-[4px] border bg-[#F3EEE6]/[0.04] px-4 py-0 font-nacelle text-[20px] uppercase tracking-[0.32em] text-[#F3EEE6] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[#F3EEE6]/20',
+              error?.source === 'code' ? 'border-[#E8664F]/70 focus:border-[#E8664F]/70 focus:ring-0' : 'border-[#F3EEE6]/20 focus:border-[#F5B455]/80 focus:shadow-[0_0_0_3px_rgba(245,180,85,0.15)] focus:ring-0',
             )}
           />
           <Button disabled={!!busy} onClick={submitCode}>
@@ -135,6 +133,8 @@ function RoomBrowser() {
         </form>
         {error?.source === 'code' && <ErrorLine message={error.message} />}
       </Section>
+
+      <PublicRooms busy={busy} onJoin={r => run(`room:${r.code}`, 'rooms', () => net.join(r.code))} error={error?.source === 'rooms' ? error.message : null} />
     </div>
   )
 }
@@ -291,7 +291,7 @@ function ProfileEditor() {
           autoComplete="nickname"
           spellCheck={false}
           enterKeyHint="done"
-          className="h-11 w-[220px] rounded-[4px] border border-[#F3EEE6]/20 bg-[#F3EEE6]/[0.04] pl-4 pr-12 text-[15px] text-[#F3EEE6] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[#F3EEE6]/25 focus:border-[#F5B455]/80 focus:shadow-[0_0_0_3px_rgba(245,180,85,0.15)]"
+          className="h-11 w-[220px] rounded-[4px] border border-[#F3EEE6]/20 bg-[#F3EEE6]/[0.04] py-0 pl-4 pr-12 text-[15px] text-[#F3EEE6] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[#F3EEE6]/25 focus:border-[#F5B455]/80 focus:shadow-[0_0_0_3px_rgba(245,180,85,0.15)] focus:ring-0"
         />
         <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] tabular-nums text-[#F3EEE6]/30">
           {NAME_MAX - draft.length}
@@ -419,7 +419,7 @@ function RoomLobby({ room, primary }: { room: RoomInfo; primary: PrimaryAction }
 
 function Section({ label, aside, children }: { label: string; aside?: ReactNode; children: ReactNode }) {
   return (
-    <section className="mt-8">
+    <section className="mt-7">
       <div className="mb-3 flex min-h-[20px] items-center justify-between gap-4 border-b border-[#F3EEE6]/10 pb-2.5">
         <h3 className={cx(LABEL, 'text-[10px] text-[#F3EEE6]/50')}>{label}</h3>
         {aside}
