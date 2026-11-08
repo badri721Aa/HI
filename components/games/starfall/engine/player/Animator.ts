@@ -301,6 +301,18 @@ export class Animator {
     g.resolve = null
   }
 
+  /** A gesture (or its outro) is playing. */
+  get gesturing(): boolean {
+    return this.gesture !== null
+  }
+
+  /** Ends the gesture at once with a short cross-fade (the hero set off running mid-gesture). */
+  interruptGesture(fade = 0.2): void {
+    if (!this.gesture) return
+    this.beginSnap(fade)
+    this.finishGesture()
+  }
+
   /** Re-plant the feet under the body (after a teleport). */
   resetFeet(): void {
     this.fresh = true

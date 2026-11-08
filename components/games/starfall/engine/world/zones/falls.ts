@@ -265,10 +265,13 @@ function mistPuffs(count: number, x: number, y: number, z: number, sprite: THREE
         p.z += k * (1.5 + aSeed.w * 2.5);
         p.x += sin(uTime * 0.6 + aSeed.y * 6.28) * 0.6 * k;
         vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
-        mvPosition.xy += position.xy * (1.2 + k * 3.2);
+        // Puffs the camera moves into thin out and shrink away (no screen-filling overdraw).
+        float size = 1.2 + k * 3.2;
+        float nearK = smoothstep(size * 0.25, size * 0.8, -mvPosition.z);
+        mvPosition.xy += position.xy * size * nearK;
         gl_Position = projectionMatrix * mvPosition;
         vUv = uv;
-        vAlpha = smoothstep(0.0, 0.15, k) * (1.0 - smoothstep(0.45, 1.0, k)) * (0.18 + aSeed.w * 0.12);
+        vAlpha = smoothstep(0.0, 0.15, k) * (1.0 - smoothstep(0.45, 1.0, k)) * (0.18 + aSeed.w * 0.12) * nearK;
         #include <fog_vertex>
       }`,
     fragmentShader: /* glsl */ `
@@ -302,12 +305,12 @@ function mistPuffs(count: number, x: number, y: number, z: number, sprite: THREE
 
 /** Stepping stones across the deep pool to the ledge's east end: x, z, top (abs), radius. */
 const STONES: Array<[number, number, number, number]> = [
-  [-63.3, -37.3, 2.75, 0.9],
-  [-61.6, -40.0, 2.85, 0.85],
-  [-62.9, -42.9, 2.95, 0.9],
-  [-61.4, -45.7, 3.1, 0.85],
-  [-60.6, -48.5, 3.45, 0.85],
-  [-59.9, -51.0, 3.85, 0.85],
+  [-63.3, -37.3, 2.75, 1.05],
+  [-61.7, -40.0, 2.85, 1.0],
+  [-62.8, -42.8, 2.95, 1.05],
+  [-61.8, -45.4, 3.1, 1.05],
+  [-60.8, -48.3, 3.45, 1.0],
+  [-59.9, -51.0, 3.85, 1.0],
 ]
 
 export function buildFalls(ctx: Ctx): ZonePart {

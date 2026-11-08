@@ -195,7 +195,9 @@ export class CameraRig implements ICameraRig {
     const sp = Math.hypot(v.x, v.z)
     this.moveT = sp > 1.5 ? this.moveT + dt : 0
     const idle = Math.min(this.lookIdle, this.moveT)
-    if (idle < C.assistDelay || pl.state === 'dash' || pl.state === 'hurt') return
+    // Not for moves that aren't running (a dash, a knock-back, a tumbling or dead body).
+    const st = pl.state
+    if (idle < C.assistDelay || st === 'dash' || st === 'hurt' || st === 'ragdoll' || st === 'dead') return
     const d = wrapAngle(Math.atan2(v.x, v.z) - this.yaw)
     // Only when running roughly away from the camera: strafing or running at it keeps the view still.
     const w =
@@ -401,9 +403,14 @@ export class CameraRig implements ICameraRig {
 
   private applyBlend(dt: number): void {
     if (this.blend >= 1) return
+    const cam = this.ctx.camera
+    // E.g. back from the victory screen's island-wide shot: a cut reads better than a swoop.
+    if (this.blend === 0 && this.fromPos.distanceToSquared(cam.position) > C.maxGlide * C.maxGlide) {
+      this.blend = this.blendK = 1
+      return
+    }
     this.blend = Math.min(1, this.blend + dt / this.blendDur)
     const k = (this.blendK = smoothstep(0, 1, this.blend))
-    const cam = this.ctx.camera
     cam.position.lerpVectors(this.fromPos, cam.position, k)
     this.tmpQuat.copy(cam.quaternion)
     cam.quaternion.copy(this.fromQuat).slerp(this.tmpQuat, k)

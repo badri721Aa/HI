@@ -172,6 +172,8 @@ export const CAM = {
   shakeMove: 0.12,
   /** Seconds to glide from a cutscene / menu camera into the gameplay camera. */
   handover: 0.6,
+  /** Hand-overs from farther away than this (m) cut instead of swooping across the island. */
+  maxGlide: 30,
 
   // ── title
   /** Start angle relative to the hero's facing (0 = straight in front). */

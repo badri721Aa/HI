@@ -51,6 +51,8 @@ function RoomBrowser() {
   const [busy, setBusy] = useState<Busy>(null)
   const [error, setError] = useState<InlineError | null>(null)
   const [code, setCode] = useState('')
+  // Why we are back here without a room (e.g. lost the race for a full room's last place).
+  const netError = useNet(s => (s.status === 'error' ? s.message : ''))
 
   const run = (kind: Exclude<Busy, null>, source: InlineError['source'], fn: () => Promise<unknown>) => {
     if (busy) return
@@ -71,7 +73,8 @@ function RoomBrowser() {
       setError({ source: 'code', message: c ? `Room codes have ${CODE_LEN} characters — this one has ${c.length}.` : 'Type the code your friend shared.' })
       return
     }
-    run('code', 'code', () => net.join(c.toLowerCase()))
+    // Joining by code never opens a new room: a mistyped code reports "No room with that code".
+    run('code', 'code', () => net.join(c.toLowerCase(), { create: false }))
   }
 
   return (
@@ -92,7 +95,7 @@ function RoomBrowser() {
           {busy === 'create' ? 'Creating…' : 'Create private room'}
         </Button>
       </div>
-      {error?.source === 'top' && <ErrorLine message={error.message} />}
+      {error?.source === 'top' ? <ErrorLine message={error.message} /> : !error && !busy && netError && <ErrorLine message={netError} />}
 
       <Section label="Join with a code">
         <form
@@ -262,6 +265,8 @@ function ProfileEditor() {
     const t = setTimeout(() => commitLater(), 650)
     return () => clearTimeout(t)
   }, [draft])
+  // Closing the panel right after typing (Esc, Start) unmounts the field without a blur: keep the name.
+  useEffect(() => () => commitLater(), [])
 
   const colorIdx = SHIRT_COLORS.findIndex(c => c.toLowerCase() === stored.color.toLowerCase())
   const pick = (i: number) => {

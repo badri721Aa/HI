@@ -158,6 +158,8 @@ export class ZoneKit {
     if (matrix) g.applyMatrix4(matrix)
     // Keep attribute sets uniform so batches can merge.
     for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k)
+    // One geometry without normals would make the whole material batch fail to merge (and vanish).
+    if (!g.attributes.normal) g.computeVertexNormals()
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((g.attributes.position.count) * 2), 2))
     const m = this.resolve(mat)
     let b = this.batches.get(m)

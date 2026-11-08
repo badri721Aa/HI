@@ -4,8 +4,8 @@
  *
  * Shard feedback: each placed shard sets a glowing gem in an altar socket AND lights the
  * flame on one of the seven pillars (one InstancedMesh, gems/flames interleaved so `count`
- * reveals them in pairs). ignite() ramps up the lantern crystal and glass, adds a strong
- * PointLight, a tall light pillar, two sweeping lighthouse beams and a glow sprite.
+ * reveals them in pairs). ignite() ramps up the lantern crystal and glass, a strong PointLight
+ * (pre-created at intensity 0), a tall light pillar, two sweeping lighthouse beams and a glow sprite.
  */
 import * as THREE from 'three'
 import type { Ctx } from '../../types'
@@ -60,6 +60,7 @@ export function buildBeacon(ctx: Ctx): BeaconPart {
   const gemMat = new THREE.MeshStandardMaterial({ color: 0xfff0c8, emissive: 0xffc35a, emissiveIntensity: 2.4, roughness: 0.25, flatShading: true })
   const gems = kit.addObject(new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.1, 0), gemMat, TOTAL_SHARDS * 2))
   gems.count = 0
+  gems.visible = false
   gems.frustumCulled = false
   const slots: THREE.Vector3[] = []
   for (let i = 0; i < TOTAL_SHARDS; i++) slots.push(sockets[i], pillars[i])
@@ -83,8 +84,11 @@ export function buildBeacon(ctx: Ctx): BeaconPart {
     o.renderOrder = 10
     o.frustumCulled = false
   }
+  // The lantern light exists (and stays visible) from the start at intensity 0: adding a light,
+  // or toggling its visibility, changes the light count and recompiles every lit shader mid-cutscene.
+  const light = kit.addObject(new THREE.PointLight(0xffc27a, 0, 90, 2))
+  light.position.set(X, lanternY, Z)
 
-  let light: THREE.PointLight | null = null
   let lit = false
   let litTime = 0
   let shown = 0
@@ -102,17 +106,12 @@ export function buildBeacon(ctx: Ctx): BeaconPart {
     pillarMat.opacity = k * 0.45
     sweepMat.opacity = k * 0.42
     spriteMat.opacity = k
-    if (light) light.intensity = k * 420
+    light.intensity = k * 420
   }
 
   const extinguish = () => {
     lit = false
     for (const o of effects) o.visible = false
-    if (light) {
-      light.removeFromParent()
-      light.dispose()
-      light = null
-    }
     setLevel(0)
   }
 
@@ -124,9 +123,6 @@ export function buildBeacon(ctx: Ctx): BeaconPart {
       lit = true
       litTime = elapsed
       for (const o of effects) o.visible = true
-      light = new THREE.PointLight(0xffc27a, 0, 90, 2)
-      light.position.set(X, lanternY, Z)
-      kit.addObject(light)
       setLevel(0)
     },
     setSockets(n: number) {
@@ -135,6 +131,8 @@ export function buildBeacon(ctx: Ctx): BeaconPart {
       for (let i = c; i < shown; i++) appear[i] = -1
       shown = c
       gems.count = c * 2
+      // An empty instanced mesh would still cost a draw call every frame.
+      gems.visible = c > 0
       if (lit && c < TOTAL_SHARDS) extinguish()
     },
     update(dt, t) {
@@ -169,6 +167,8 @@ export function buildBeacon(ctx: Ctx): BeaconPart {
     },
     dispose() {
       extinguish()
+      light.removeFromParent()
+      light.dispose()
       sprite.removeFromParent()
       gems.dispose()
       for (const m of [coreMat, gemMat, pillarMat, sweepMat, spriteMat]) m.dispose()
@@ -279,7 +279,8 @@ function buildTower(kit: ZoneKit, g: number, P: number, top: number): void {
   }
   // Lantern room: iron drum, glazing with mullions, cornice ring, dome, finial; crystal pedestal inside.
   kit.cylinder({ x: X, y: top, z: Z, r: 1.8, rTop: 1.7, h: 0.45, segments: 16, mat: 'metal', uvScale: 1 })
-  kit.add(openCylinder(1.55, 1.55, 1.6, 16, 1), 'glass', place(X, top + 0.45 + 0.8, Z))
+  // Glazing is see-through: it must not cast a solid shadow over the gallery and the crystal.
+  kit.add(openCylinder(1.55, 1.55, 1.6, 16, 1), 'glass', place(X, top + 0.45 + 0.8, Z), { castShadow: false })
   for (let k = 0; k < 8; k++) {
     const a = (k / 8) * Math.PI * 2
     tbox(kit, 'metal', X + Math.cos(a) * 1.58, top + 1.25, Z + Math.sin(a) * 1.58, 0.1, 1.6, 0.1, Math.atan2(Math.cos(a), Math.sin(a)), 0, 0, 1)

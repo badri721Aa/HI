@@ -11,7 +11,7 @@
  * attribute), one batch of eye glows and one of soft blob shadows.
  */
 import * as THREE from 'three'
-import type { V3 } from '../events'
+import type { MusicMood, V3 } from '../events'
 import type { Ctx, IEnemies } from '../types'
 import { ENEMIES } from '../world/level'
 import { heightAt, waterLevelAt } from '../world/heightfield'
@@ -110,7 +110,8 @@ export class Enemies implements IEnemies {
   private glowTex: { texture: THREE.Texture; owned: boolean } | null = null
   private unsubs: Array<() => void> = []
   private random = rng(0x6100b)
-  private danger = false
+  /** The mood actually playing (tracked from the bus, whoever set it). */
+  private mood: MusicMood = 'title'
   private calmT = 0
   private prevFeet = 0
 
@@ -175,7 +176,14 @@ export class Enemies implements IEnemies {
         g.ignoreT = 2.5
       }
     }
-    this.unsubs.push(ctx.bus.on('player:died', calm), ctx.bus.on('player:respawn', calm))
+    this.unsubs.push(
+      ctx.bus.on('player:died', calm),
+      ctx.bus.on('player:respawn', calm),
+      ctx.bus.on('audio:music', e => {
+        this.mood = e.mood
+        this.calmT = 0
+      }),
+    )
     this.prevFeet = ctx.player.position.y
     this.render()
   }
@@ -195,7 +203,6 @@ export class Enemies implements IEnemies {
       g.eye = 1
       this.setState(g, defeated.has(g.index) ? DEAD : IDLE)
     }
-    this.danger = false
     this.calmT = 0
     this.prevFeet = this.ctx.player.position.y
     this.render()
@@ -223,7 +230,8 @@ export class Enemies implements IEnemies {
     const pp = player.position
     const playing = ctx.game.phase === 'playing'
     const active = playing && !this.frozen
-    const playerAlive = player.state !== 'dead'
+    // Dead, drowning or respawning (the body may still be tumbling as a ragdoll): nothing to chase.
+    const playerAlive = player.hp > 0 && player.controlEnabled && player.state !== 'dead'
     let feetPrev = this.prevFeet
     if (Math.abs(pp.y - feetPrev) > 3) feetPrev = pp.y
     let chasing = 0
@@ -538,25 +546,19 @@ export class Enemies implements IEnemies {
     g.stateT = 0
   }
 
+  /**
+   * Danger music while anything chases the player, back to explore a few seconds after the last
+   * chase ends. Works from the mood actually playing, so a dialog or cutscene in the middle of a
+   * chase (which may or may not change the music) never leaves the danger theme stuck on.
+   */
   private updateMusic(dt: number, chasing: number, playing: boolean): void {
-    if (!playing) {
-      // Cutscenes / dialogs pick their own music; re-evaluate once play resumes.
-      this.danger = false
-      this.calmT = 0
-      return
-    }
+    if (!playing) return
     if (chasing > 0) {
       this.calmT = 0
-      if (!this.danger) {
-        this.danger = true
-        this.ctx.game.setMusic('danger')
-      }
-    } else if (this.danger) {
+      if (this.mood === 'explore') this.ctx.game.setMusic('danger')
+    } else if (this.mood === 'danger') {
       this.calmT += dt
-      if (this.calmT >= CALM_DELAY) {
-        this.danger = false
-        this.ctx.game.setMusic('explore')
-      }
+      if (this.calmT >= CALM_DELAY) this.ctx.game.setMusic('explore')
     }
   }
 

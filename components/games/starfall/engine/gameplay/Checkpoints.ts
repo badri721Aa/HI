@@ -8,6 +8,7 @@
  * no shader is ever recompiled.
  */
 import * as THREE from 'three'
+import type { GroundHit, WallPush } from '../collision'
 import type { Ctx, ICheckpoints } from '../types'
 import { CHECKPOINTS, type CheckpointDef } from '../world/level'
 import { heightAt, waterLevelAt } from '../world/heightfield'
@@ -18,6 +19,9 @@ import { glowTexture, rng, supportHeight } from './parts/util'
 
 const REACH = 2.6
 const SPAWN_AHEAD = 1.6
+const PLAYER_RADIUS = 0.35
+/** Respawn spots tried in order, as [side, ahead] metres from the post (side −1 = away from the arm). */
+const SPAWN_SPOTS: ReadonlyArray<readonly [number, number]> = [[-1, SPAWN_AHEAD], [-1, 1.0], [0, SPAWN_AHEAD], [0, 1.0], [0, -SPAWN_AHEAD]]
 const ARM_REACH = 0.64
 const ARM_Y = 2.38
 const LIGHT_SLOTS = 2
@@ -59,6 +63,9 @@ export class Checkpoints implements ICheckpoints {
   private slots: LightSlot[] = []
   private unsub: (() => void) | null = null
   private readonly want = [-1, -1]
+  private readonly spawnHit: GroundHit = { y: 0, nx: 0, ny: 1, nz: 0, surface: 'grass', collider: null, water: 0 }
+  private readonly spawnPush: WallPush = { x: 0, z: 0, hit: false, nx: 0, nz: 0 }
+  private readonly spawnPos = { x: 0, y: 0, z: 0 }
 
   private readonly m = new THREE.Matrix4()
   private readonly q = new THREE.Quaternion()
@@ -180,15 +187,27 @@ export class Checkpoints implements ICheckpoints {
     this.render(0)
   }
 
+  /**
+   * Where the hero reappears: a little ahead of the post and off to the side away from the lantern
+   * arm, so the post never stands between him and the gameplay camera straight behind him. Spots
+   * that are wet, too steep or inside something fall back to ones straight ahead / behind the post.
+   */
   spawnPoint(id: string): { x: number; y: number; z: number; yaw: number } {
     const c = CHECKPOINTS.find(x => x.id === id) ?? CHECKPOINTS[0]
     const fx = Math.sin(c.yaw)
     const fz = Math.cos(c.yaw)
-    for (const ahead of [SPAWN_AHEAD, 1.0, -SPAWN_AHEAD]) {
-      const x = c.x + fx * ahead
-      const z = c.z + fz * ahead
-      const y = this.ctx.collision.groundAt(x, z, heightAt(x, z) + 1.2, 0.35).y
-      if (waterLevelAt(x, z) - y < 0.2) return { x, y, z, yaw: c.yaw }
+    const col = this.ctx.collision
+    for (const [side, ahead] of SPAWN_SPOTS) {
+      // local +x (the arm's side) is (cos yaw, −sin yaw) in world space
+      const x = c.x + side * fz + ahead * fx
+      const z = c.z - side * fx + ahead * fz
+      const g = col.groundAt(x, z, heightAt(x, z) + 1.2, PLAYER_RADIUS, 0.45, this.spawnHit)
+      if (waterLevelAt(x, z) - g.y >= 0.2 || (!g.collider && g.ny < 0.72)) continue
+      this.spawnPos.x = x
+      this.spawnPos.y = g.y
+      this.spawnPos.z = z
+      if (col.pushOut(this.spawnPos, PLAYER_RADIUS, 1.6, 0.45, this.spawnPush).hit) continue
+      return { x, y: g.y, z, yaw: c.yaw }
     }
     return { x: c.x + fx * SPAWN_AHEAD, y: heightAt(c.x, c.z), z: c.z + fz * SPAWN_AHEAD, yaw: c.yaw }
   }
@@ -198,7 +217,8 @@ export class Checkpoints implements ICheckpoints {
   update(dt: number): void {
     if (!this.glows) return
     const ctx = this.ctx
-    if (ctx.game.phase === 'playing' && ctx.player.state !== 'dead') {
+    // Not while dying or fading out to respawn: a tumbling body must not move the respawn point.
+    if (ctx.game.phase === 'playing' && ctx.player.controlEnabled && ctx.player.hp > 0) {
       const p = ctx.player.position
       const current = ctx.game.save.checkpoint
       for (const l of this.lanterns) {

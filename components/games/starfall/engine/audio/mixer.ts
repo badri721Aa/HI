@@ -10,6 +10,9 @@ import { makeImpulse, type Synth } from './synth'
 
 /** Time constant (s) for volume / duck changes. */
 const SMOOTH = 0.08
+const OUT_LEVEL = 0.9
+/** Fade-out before the context is suspended (s). */
+export const OUTPUT_FADE = 0.06
 
 export class Bus {
   /** Dry input; voices connect here. */
@@ -54,6 +57,8 @@ export class Mixer {
   /** Development-only tap on the final output (null in production). */
   readonly analyser: AnalyserNode | null
   private delay: DelayNode
+  /** Final output gain; faded around context suspend / resume so neither edge clicks. */
+  private out: GainNode
 
   constructor(syn: Synth, debug: boolean) {
     const ac = syn.ac
@@ -72,7 +77,7 @@ export class Mixer {
     limiter.ratio.value = 20
     limiter.attack.value = 0.002
     limiter.release.value = 0.12
-    const out = syn.gain(0.9)
+    const out = (this.out = syn.gain(OUT_LEVEL))
     glue.connect(limiter)
     limiter.connect(out)
     if (debug) {
@@ -109,6 +114,14 @@ export class Mixer {
     echoTone.connect(fb)
     echoTone.connect(syn.gain(0.55, this.music.input))
     this.master.gain.setValueAtTime(0, t)
+  }
+
+  /** Fades the whole mix out (before the context is suspended) or back in (once it runs again). */
+  fadeOutput(on: boolean, t: number): void {
+    const g = this.out.gain
+    g.cancelScheduledValues(t)
+    g.setValueAtTime(g.value, t)
+    g.linearRampToValueAtTime(on ? OUT_LEVEL : 0, t + (on ? 0.3 : OUTPUT_FADE))
   }
 
   /** Re-time the echo to the current tempo (a dotted eighth). */

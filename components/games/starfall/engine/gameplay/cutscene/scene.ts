@@ -43,13 +43,12 @@ export function heroFrame(origin: V3, yaw: number) {
 }
 
 /**
- * Ends whatever gesture is playing within ~0.25 s: starts a gesture that is almost back at the
- * idle pose and stops it at once, so the animator cross-fades out of lying/raised-arm poses
- * instead of playing their full outros. Used when a cutscene is skipped.
+ * Drops whatever gesture is playing on the spot (lying on the sand, arms raised…), back to the
+ * plain standing pose. Used when a cutscene is skipped: the camera cuts, so the hero must already
+ * be standing in the very next frame rather than visibly scrambling up.
  */
 export function settlePose(character: ICharacter): void {
-  void character.playGesture('wakeUp', { speed: 12 })
-  character.stopGesture()
+  character.stopGesture({ instant: true })
 }
 
 /** Runs every step even if one throws (stub or half-built modules must never block an end state). */

@@ -59,7 +59,7 @@ export class Ambient implements IAmbient {
     this.pollen = new AmbientLayer('pollen', this.shared, null)
     this.leaves = new AmbientLayer('leaves', this.shared, ctx.textures.get('leaves_albedo'))
     this.birds = new Birds()
-    this.pool = new ParticlePool({ name: 'ambient', capacity: POOL_LIMIT[3], additive: false, noise: ctx.textures.get('noise'), renderOrder: 19 })
+    this.pool = new ParticlePool({ name: 'ambient', capacity: POOL_LIMIT[3], additive: false, noise: ctx.textures.get('noise'), renderOrder: 19, nearFade: true })
     ctx.scene.add(this.fireflies.mesh, this.pollen.mesh, this.leaves.mesh, this.birds.mesh, this.pool.mesh)
     this.applyQuality()
     this.updateCenter()

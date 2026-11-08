@@ -261,21 +261,23 @@ export class Collectibles implements ICollectibles {
     const t = ctx.clock.t
     this.time.value = t
     const playing = ctx.game.phase === 'playing'
+    // A dying body (or one fading out to respawn) must not start a shard cutscene or waste a heart.
+    const alive = playing && ctx.player.controlEnabled && ctx.player.hp > 0
     const pp = ctx.player.position
     const cx = pp.x
     const cy = pp.y + CHEST
     const cz = pp.z
 
-    this.updateShards(dt, t, playing, cx, cy, cz)
+    this.updateShards(dt, t, alive, cx, cy, cz)
     this.updateSparks(dt, t, playing, cx, cy, cz)
-    this.updateHearts(dt, t, playing, cx, cy, cz)
+    this.updateHearts(dt, t, alive, cx, cy, cz)
 
     if (this.sparkDirty) this.writeSparkMatrices()
     if (this.heartDirty) this.writeHeartMatrices()
     this.glows.commit()
   }
 
-  private updateShards(dt: number, t: number, playing: boolean, cx: number, cy: number, cz: number): void {
+  private updateShards(dt: number, t: number, alive: boolean, cx: number, cy: number, cz: number): void {
     const star = this.starMesh!
     const pillar = this.pillarMesh!
     const glows = this.glows!
@@ -307,7 +309,7 @@ export class Collectibles implements ICollectibles {
       sh.y = b.y + Math.sin(t * 1.6 + i * 1.3) * 0.14 + lift
       sh.z = b.z
 
-      if (playing && sh.state === IDLE) {
+      if (alive && sh.state === IDLE) {
         const dx = sh.x - cx
         const dy = sh.y - cy
         const dz = sh.z - cz
@@ -390,7 +392,7 @@ export class Collectibles implements ICollectibles {
     }
   }
 
-  private updateHearts(dt: number, t: number, playing: boolean, cx: number, cy: number, cz: number): void {
+  private updateHearts(dt: number, t: number, alive: boolean, cx: number, cy: number, cz: number): void {
     const glows = this.glows!
     const player = this.ctx.player
     const hurt = player.hp < player.maxHp
@@ -409,7 +411,7 @@ export class Collectibles implements ICollectibles {
           glows.hide(slot)
           continue
         }
-      } else if (playing && hurt) {
+      } else if (alive && hurt) {
         const dx = h.x - cx
         const dy = h.y - cy
         const dz = h.z - cz

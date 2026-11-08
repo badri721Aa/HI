@@ -58,7 +58,10 @@ export class Zones implements IZones {
   update(dt: number): void {
     const t = this.ctx.clock.t
     for (const p of this.parts) p.update?.(dt, t)
-    const n = this.ctx.game.shardCount()
+    // Counted in place: game.shardCount() builds a filtered array, too wasteful for every frame.
+    const shards = this.ctx.game.save.shards
+    let n = 0
+    for (let i = 0; i < shards.length; i++) if (shards[i]) n++
     if (n !== this.sockets && this.beacon) {
       this.sockets = n
       this.beacon.setSockets(n)

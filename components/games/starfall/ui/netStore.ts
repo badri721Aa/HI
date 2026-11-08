@@ -11,7 +11,6 @@
  */
 import type { Game } from '../engine/Game'
 import type { GameEventMap } from '../engine/events'
-import type { Input } from '../engine/input'
 import type { GestureName, INetwork, NetStatus, RoomInfo } from '../engine/types'
 
 export interface PlayerView {
@@ -78,13 +77,6 @@ function initialNet(): NetState {
 const sameRoom = (a: RoomInfo | null, b: RoomInfo | null) =>
   a === b || (!!a && !!b && a.code === b.code && a.name === b.name && a.public === b.public && a.players === b.players && a.max === b.max)
 
-/** Temporarily replaces Input.onPointerLockChange (see NetStore.openChat). */
-interface LockSwap {
-  saved: Input['onPointerLockChange']
-  wrapper: (locked: boolean) => void
-  timer: ReturnType<typeof setTimeout> | null
-}
-
 const EMOTE_COOLDOWN_MS = 700
 
 export class NetStore {
@@ -95,7 +87,6 @@ export class NetStore {
   private game: Game | null = null
   private seq = 0
   private playersSig = ''
-  private lock: LockSwap | null = null
   private emoteAt = -1e9
 
   get = (): NetState => this.state
@@ -127,7 +118,7 @@ export class NetStore {
     this.syncFromNet()
     return () => {
       for (const off of offs) off()
-      this.restoreLock()
+      this.closeChat(false)
       this.stopPolling()
       for (const t of this.timers) clearTimeout(t)
       this.timers.clear()
@@ -156,8 +147,9 @@ export class NetStore {
     return this.call(() => net.listPublicRooms())
   }
 
-  join(code: string): Promise<void> {
-    return this.enter(net => net.join(code))
+  /** `create: false` refuses an empty room (a mistyped code) instead of opening it. */
+  join(code: string, opts?: { create?: boolean }): Promise<void> {
+    return this.enter(net => net.join(code, opts))
   }
 
   quickJoin(): Promise<void> {
@@ -194,32 +186,15 @@ export class NetStore {
   }
 
   /**
-   * Opens the chat input (online, in play). Typing needs the mouse back, but
-   * the game pauses whenever pointer lock is lost — so for the time the input
-   * is open, lock losses are swallowed (lock gains still pass through) and the
-   * original handler is put back shortly after the chat closes.
+   * Opens the chat input (online, in play). Typing needs the mouse back: the game is told
+   * text entry is active (gameplay keys are ignored, held keys released, and the lost pointer
+   * lock doesn't pause), then the lock is let go.
    */
   openChat(): void {
     const game = this.game
     if (!game || this.state.chatOpen || !this.state.room || game.phase !== 'playing') return
-    const input = game.ctx.input
-    if (this.lock) {
-      if (this.lock.timer) clearTimeout(this.lock.timer)
-      this.lock.timer = null
-    } else {
-      const saved = input.onPointerLockChange
-      const wrapper = (locked: boolean) => {
-        if (!locked) return
-        saved?.(locked)
-        // Back in the game after the chat closed: from now on a lost lock pauses again.
-        if (!this.state.chatOpen) this.restoreLock()
-      }
-      input.onPointerLockChange = wrapper
-      this.lock = { saved, wrapper, timer: null }
-    }
-    // Let go of anything held (W, Shift…) so the hero stops while you type.
-    input.reset()
-    input.exitPointerLock()
+    game.setTextEntry(true)
+    game.ctx.input.exitPointerLock()
     this.set({ chatOpen: true, listOpen: false })
   }
 
@@ -228,10 +203,9 @@ export class NetStore {
     if (!this.state.chatOpen) return
     this.set({ chatOpen: false })
     const game = this.game
-    if (relock && game?.phase === 'playing') game.requestPointerLock()
-    // Hand the handler back once the re-lock lands (see openChat), or shortly after if it never does.
-    const l = this.lock
-    if (l && !l.timer) l.timer = setTimeout(() => this.restoreLock(), 600)
+    if (!game) return
+    game.setTextEntry(false)
+    if (relock && game.phase === 'playing') game.requestPointerLock()
   }
 
   setPlayerList(open: boolean): void {
@@ -334,15 +308,6 @@ export class NetStore {
       this.closeChat(false)
     }
     this.refreshPlayers()
-  }
-
-  private restoreLock(): void {
-    const l = this.lock
-    if (!l) return
-    if (l.timer) clearTimeout(l.timer)
-    this.lock = null
-    const input = this.game?.ctx.input
-    if (input && input.onPointerLockChange === l.wrapper) input.onPointerLockChange = l.saved
   }
 
   private startPolling(): void {

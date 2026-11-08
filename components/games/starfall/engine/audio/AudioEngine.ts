@@ -10,7 +10,7 @@
 import type { GamePhase, MusicMood } from '../events'
 import type { Ctx, IAudio, SfxName } from '../types'
 import { Ambience, type AmbienceInput } from './ambience'
-import { Mixer } from './mixer'
+import { Mixer, OUTPUT_FADE } from './mixer'
 import { Music } from './music'
 import { Sfx } from './sfx'
 import { Synth } from './synth'
@@ -111,11 +111,19 @@ export class AudioEngine implements IAudio {
     this.hidden = paused
     const ac = this.ac
     if (!ac || ac.state === 'closed') return
+    // Suspending or resuming mid-waveform clicks: fade the output out first, and back in after.
     if (paused) {
       this.music?.stop()
-      ac.suspend().catch(() => {})
+      this.mix?.fadeOutput(false, ac.currentTime)
+      setTimeout(() => {
+        if (this.hidden && this.ac === ac) ac.suspend().catch(() => {})
+      }, OUTPUT_FADE * 1000 + 30)
     } else {
-      ac.resume().catch(() => {})
+      ac.resume()
+        .then(() => {
+          if (!this.hidden && this.ac === ac) this.mix?.fadeOutput(true, ac.currentTime)
+        })
+        .catch(() => {})
       this.music?.start()
     }
   }

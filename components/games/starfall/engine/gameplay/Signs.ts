@@ -116,7 +116,8 @@ export class Signs implements ISigns {
     let sign: SignDef | null = null
     let beacon = false
 
-    if (game.phase === 'playing' && player.state !== 'dead' && !ctx.cutscenes.active) {
+    // Only on his feet and in control: not while limp, dying or fading out to respawn.
+    if (game.phase === 'playing' && player.controlEnabled && player.hp > 0 && !ctx.character.ragdolling && !ctx.cutscenes.active) {
       const p = player.position
       let best = SIGN_RANGE * SIGN_RANGE
       for (const s of this.signs) {

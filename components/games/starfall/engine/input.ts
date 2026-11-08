@@ -92,7 +92,8 @@ export class Input {
 
     on<KeyboardEvent>(window, 'keydown', e => {
       if (isTyping(e.target)) return
-      if (this.capture && PREVENT.has(e.code)) e.preventDefault()
+      // Swallow page-scrolling keys during play; in menus (input disabled) Tab must still move focus.
+      if (this.capture && PREVENT.has(e.code) && (this.enabled || e.code !== 'Tab')) e.preventDefault()
       this.device = 'kbm'
       if (!e.repeat) {
         const a = KEYMAP[e.code]

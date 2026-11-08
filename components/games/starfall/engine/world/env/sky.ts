@@ -2,8 +2,10 @@
  * Sky dome: zenith/horizon gradient, sun disc + halo, drifting clouds lit by the
  * sun, stars, a faint milky way and the moon at night.
  *
- * The dome is drawn first with no depth (rotation-only view transform, z = w),
- * so it sits at infinity, follows any camera and costs one draw call. The same
+ * The dome sits at infinity (rotation-only view transform, z = w on the far plane), so it
+ * follows any camera and costs one draw call. It is drawn after the other opaque geometry
+ * with the depth test on, so early-z skips its fairly heavy shader wherever the island
+ * already covers the screen (transparent water and effects still blend over it). The same
  * material renders the PMREM environment map (`uEnvPass` = 1 swaps the lower
  * hemisphere for a ground-bounce colour and tones down the disc).
  */
@@ -179,14 +181,14 @@ export class Sky {
       fragmentShader: FRAG,
       side: THREE.BackSide,
       depthWrite: false,
-      depthTest: false,
       fog: true,
       dithering: true,
     })
     this.mesh = new THREE.Mesh(this.geometry, this.material)
     this.mesh.name = 'sky'
     this.mesh.frustumCulled = false
-    this.mesh.renderOrder = -1000
+    // Last among the opaques (they sort by renderOrder first); transparents still draw after it.
+    this.mesh.renderOrder = 1000
     this.mesh.matrixAutoUpdate = false
     this.envMesh = new THREE.Mesh(this.geometry, this.material)
     this.envMesh.frustumCulled = false

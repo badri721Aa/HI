@@ -8,7 +8,7 @@
  */
 import * as THREE from 'three'
 import { GLTFLoader, type GLTFParser } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import type { Ctx, GestureName, ICharacter, MotionState } from '../types'
+import type { Ctx, GestureName, ICharacter, MotionState, PlayerState } from '../types'
 import type { V3 } from '../events'
 import type { GroundHit } from '../collision'
 import { Animator, type GroundSample } from './Animator'
@@ -26,6 +26,12 @@ const YAW_RATE = 30
 const MAX_YAW_LAG = 0.6
 /** Ragdoll impacts this hard (m/s) shake the camera a little. */
 const RAGDOLL_SHAKE = 9
+const ACTIVE_STATES: ReadonlySet<PlayerState> = new Set<PlayerState>(['jump', 'doubleJump', 'fall', 'bounce', 'dash', 'attack', 'hurt'])
+
+/** Is the hero doing something a gesture can't be layered over (moving, airborne, attacking…)? */
+function busy(m: MotionState): boolean {
+  return m.speed > 0.8 || !m.grounded || ACTIVE_STATES.has(m.state)
+}
 
 /**
  * GLTFLoader decodes embedded images by fetch()-ing a blob: URL, which the site's CSP
@@ -203,6 +209,10 @@ export class Character implements ICharacter {
 
     if (this.animator) {
       if (jumped) this.animator.resetFeet()
+      // Gestures pose the whole body: one still playing when the player sets off (an emote, the tail
+      // of a skipped cutscene) gives way at once instead of sliding along in a frozen pose.
+      const setOff = this.ctx.game.phase === 'playing' && p.controlEnabled && busy(p.motion)
+      if (setOff && this.animator.gesturing) this.animator.interruptGesture()
       this.animator.update(dt, this.root.position, this.yaw)
       this.pivot.rotation.y = this.animator.spin
     }
@@ -280,6 +290,13 @@ export class Character implements ICharacter {
     const rd = this.ragdoll
     const p = this.ctx.player
     if (!rd || !this.animator || !p || !this.placed) return
+    if (this.root.position.distanceToSquared(p.position) > 4) {
+      // Teleported since the last pose (same frame): carry the posed body along, or it would go
+      // limp back where it was.
+      this.root.position.copy(p.position)
+      this.root.rotation.y = this.yaw = p.yaw
+      this.root.updateMatrixWorld(true)
+    }
     // The bones show the pose posed for the root's heading plus the spin-attack twist.
     rd.start(this.root.rotation.y + this.pivot.rotation.y, p.velocity, impulse)
     this.animator.setOverride(rd.pose)

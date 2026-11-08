@@ -1,6 +1,6 @@
 'use client'
 /** Menu items, buttons and the custom settings controls (slider, toggle, segmented, tabs). */
-import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { playUi, useGameUi } from './context'
 import { isQuietFocus } from './nav'
 import styles from './ui.module.css'
@@ -352,6 +352,18 @@ export function Segmented<T extends string>({
 export function Tabs<T extends string>({ value, options, onChange, label }: { value: T; options: Option<T>[]; onChange: (v: NoInfer<T>) => void; label: string }) {
   const { game } = useGameUi()
   const idx = Math.max(0, options.findIndex(o => o.value === value))
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // On narrow screens the strip scrolls sideways: keep the selected tab in view.
+  useEffect(() => {
+    const list = listRef.current
+    const tab = list?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (!list || !tab) return
+    const l = list.getBoundingClientRect()
+    const t = tab.getBoundingClientRect()
+    if (t.left < l.left) list.scrollLeft -= l.left - t.left
+    else if (t.right > l.right) list.scrollLeft += t.right - l.right
+  }, [value])
   const pick = (i: number) => {
     const o = options[(i + options.length) % options.length]
     if (o.value === value) return
@@ -360,6 +372,7 @@ export function Tabs<T extends string>({ value, options, onChange, label }: { va
   }
   return (
     <div
+      ref={listRef}
       role="tablist"
       aria-label={label}
       tabIndex={0}

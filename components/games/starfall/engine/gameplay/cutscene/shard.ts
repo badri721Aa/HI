@@ -78,8 +78,9 @@ export function buildShard(ctx: Ctx, index: number): Scene {
   })
   s.hush(2.9).letterbox(3.0, false)
 
-  return s.build('shard', DURATION, () => {
-    // Nothing lasting is left to apply: the shard is hidden at the start and the
-    // gameplay camera glides back from wherever the orbit stopped.
+  return s.build('shard', DURATION, skipped => {
+    // The shard is hidden at the start and the gameplay camera glides back from wherever the
+    // orbit stopped; on a skip he just lowers the raised arm.
+    if (skipped) ctx.character.stopGesture()
   })
 }

@@ -34,10 +34,12 @@ export function NetChip() {
   const lastRoom = useNet(s => s.lastRoom)
   const status = useNet(s => s.status)
   const players = useNet(s => s.players)
-  const shown = room ?? (status === 'connecting' || status === 'error' ? lastRoom : null)
+  // Between rooms (switching, rejoining) the last one stays up as "Connecting"; a join that failed
+  // for good (evicted, refused) has nothing left to show.
+  const shown = room ?? (status === 'connecting' ? lastRoom : null)
   if (!shown) return null
 
-  const tone = room ? linkTone(status, players) : status === 'error' ? 'bad' : 'warn'
+  const tone = room ? linkTone(status, players) : 'warn'
   const note =
     status === 'error' ? 'Offline' : status === 'connecting' ? 'Connecting' : tone === 'warn' ? 'Relay' : null
   const count = Math.max(players.length, room?.players ?? 0)
@@ -229,9 +231,9 @@ export function OnlineLayer() {
     }
   }, [net])
 
-  const visible = playing || phase === 'dialog'
+  // Only in play: dialogs sit where the chat log does (bottom of the screen), so the log steps aside for them.
   return (
-    <div className={cx('pointer-events-none absolute inset-0 z-[45] transition-opacity duration-300', visible ? 'opacity-100' : 'opacity-0')}>
+    <div className={cx('pointer-events-none absolute inset-0 z-[45] transition-opacity duration-300', playing ? 'opacity-100' : 'opacity-0')}>
       {room && <ChatPanel open={chatOpen && playing} />}
       {room && listOpen && playing && <PlayerListOverlay />}
     </div>

@@ -129,7 +129,6 @@ export class Game implements GameApi {
       if (this.phase === 'playing' && !this.textEntry && performance.now() - lockedAt > 300) this.pause()
     }
 
-    const self = this
     const ctx = {
       renderer: this.renderer,
       scene,
@@ -143,10 +142,8 @@ export class Game implements GameApi {
       quality: QUALITY[settings.quality],
       clock: { t: 0, real: 0 },
       progress: () => {},
-      get game() {
-        return self as GameApi
-      },
     } as unknown as Ctx
+    ctx.game = this
     this.ctx = ctx
 
     // Build every system up front so they can reference each other in init().
@@ -249,6 +246,7 @@ export class Game implements GameApi {
 
   /** Must be called from a click/tap so audio and pointer lock can start. */
   newGame(): void {
+    this.resetTransient()
     this.ctx.audio.unlock()
     clearSave()
     this.save = newSave()
@@ -268,6 +266,7 @@ export class Game implements GameApi {
   }
 
   continueGame(): void {
+    this.resetTransient()
     this.ctx.audio.unlock()
     const s = loadSave()
     if (!s) return this.newGame()
@@ -298,6 +297,7 @@ export class Game implements GameApi {
   /** Call from a click so pointer lock can be re-acquired. */
   resume(): void {
     if (this.phase !== 'paused' && this.phase !== 'victory') return
+    if (this.phase === 'victory') this.setMusic('explore')
     this.ctx.input.reset()
     this.ctx.input.requestPointerLock()
     this.ctx.audio.ui('resume')
@@ -311,6 +311,7 @@ export class Game implements GameApi {
   }
 
   quitToTitle(): void {
+    this.resetTransient()
     this.flushSave()
     this.ctx.input.exitPointerLock()
     if (this.ctx.cutscenes.active) this.ctx.cutscenes.skip()
@@ -533,7 +534,10 @@ export class Game implements GameApi {
       return
     }
     this.bus.emit('beacon:activate', { pos: v3(this.ctx.zones.beaconAltar) })
-    this.runCutscene('beacon').then(() => this.victory())
+    this.runCutscene('beacon').then(() => {
+      // Quitting to the title mid-cutscene must not count as a win.
+      if (this.phase === 'cutscene') this.victory()
+    })
   }
 
   showDialog(title: string, lines: string[]): Promise<void> {
@@ -569,6 +573,14 @@ export class Game implements GameApi {
   }
 
   /* ── internals ───────────────────────────────────────────── */
+
+  /** Drop anything queued for the previous run (respawn fades, death state, ragdolls). */
+  private resetTransient(): void {
+    this.timers = []
+    this.dying = false
+    this.ctx.character.cancelRagdoll()
+    this.bus.emit('ui:fade', { to: 0, duration: 0.2 })
+  }
 
   private setPhase(p: GamePhase): void {
     if (this.phase === p) return

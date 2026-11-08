@@ -115,6 +115,13 @@ void main() {
   // Envelope: smoke fades in softly; everything fades out.
   alpha *= shape > 2.5 && shape < 3.5 ? smoothstep(0.0, 0.18, t) : 1.0;
   alpha *= pow(1.0 - t, 1.3);
+  #ifdef NEAR_FADE
+    // Big soft puffs thin out and shrink as the camera moves into them, instead of
+    // stacking screen-filling layers of overdraw (spray and falls mist around the camera).
+    float nearK = smoothstep(size * 0.5, size * 1.6, -mv.z);
+    alpha *= nearK;
+    size *= nearK;
+  #endif
 
   float ang = iMisc.x + iMisc.y * age;
   float c = cos(ang);
@@ -224,6 +231,8 @@ export interface PoolOptions {
   reserved?: number
   noise: THREE.Texture
   renderOrder?: number
+  /** Fade and shrink particles the camera gets inside of (large ambient puffs). */
+  nearFade?: boolean
   name: string
 }
 
@@ -282,7 +291,7 @@ export class ParticlePool {
       ]),
       vertexShader: VERT,
       fragmentShader: FRAG,
-      defines: opts.additive ? { ADDITIVE: '' } : {},
+      defines: { ...(opts.additive ? { ADDITIVE: '' } : {}), ...(opts.nearFade ? { NEAR_FADE: '' } : {}) },
       transparent: true,
       depthWrite: false,
       depthTest: true,

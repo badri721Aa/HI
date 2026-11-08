@@ -55,6 +55,12 @@ export const P2P_RATE_IDLE = 2
 /** Server relay rate (only for peers without a direct link): while moving, and the idle heartbeat. */
 export const RELAY_RATE_ACTIVE = 4
 export const RELAY_RATE_IDLE = 0.5
+/**
+ * Relay budget per sender in Supabase messages/s, counting the server's fan-out to every other
+ * player: the active rate drops in bigger rooms (2 Hz when full) so relayed movement stays well
+ * inside the free tier's message quota.
+ */
+export const RELAY_DELIVERIES = 16
 /** Seconds a fresh link may take to open before the relay covers that peer. */
 export const DIRECT_GRACE = 6
 /** A link not open after this many seconds is torn down and retried (impolite side). */

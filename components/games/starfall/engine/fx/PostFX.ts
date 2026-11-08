@@ -155,10 +155,17 @@ export class PostFX implements IPostFX {
     this.fxaa = fxaa
     this.samples = samples
     this.setSize(this.width, this.height, this.pixelRatio)
+    // Scene shaders differ between drawing to the canvas (tone mapping + sRGB in every material) and
+    // into this linear HDR target. Leave the target bound so the loader's warm-up compile (which uses
+    // the current target) builds the variants the composer really draws with, instead of a full
+    // second set compiling on the first frames. render() sets its own targets every frame.
+    renderer.setRenderTarget(composer.readBuffer)
   }
 
   private destroyComposer(): void {
     if (!this.composer) return
+    // Never leave a disposed target bound (a later bind would quietly re-allocate it).
+    this.ctx.renderer.setRenderTarget(null)
     for (const pass of this.composer.passes) pass.dispose()
     this.composer.dispose()
     this.composer = null

@@ -83,6 +83,8 @@ export class PlayerController implements IPlayerController {
 
   private hurtT = 0
   private invulnT = 0
+  /** Whether the Character is currently told to blink (only while invulnerable outside cutscenes). */
+  private blinking = false
   private dead = false
   private landT = 0
   private landImpact = 0
@@ -170,10 +172,8 @@ export class PlayerController implements IPlayerController {
     this.dead = false
     this.ragPlaced = false
     this.resetMotion()
-    if (this.invulnT > 0) {
-      this.invulnT = 0
-      this.ctx.character?.setBlink(false)
-    }
+    this.invulnT = 0
+    this.setBlink(false)
     this.settle()
     this._state = 'idle'
     this.stateTime = 0
@@ -240,7 +240,7 @@ export class PlayerController implements IPlayerController {
     }
     this.invulnT = M.invulnTime
     // A fatal blow goes limp without the hit blink.
-    if (this._hp > 0) this.ctx.character.setBlink(true)
+    this.setBlink(this._hp > 0)
     this.ctx.bus.emit('player:hurt', { pos: v3(p), hp: this._hp })
     this.ctx.game.shake(0.35, 0.3)
     if (this._hp <= 0) {
@@ -286,10 +286,9 @@ export class PlayerController implements IPlayerController {
     this.landT -= dt
     if (this.hurtT > 0) this.hurtT -= dt
     if (this.attackT > 0) this.attackT -= dt
-    if (this.invulnT > 0) {
-      this.invulnT -= dt
-      if (this.invulnT <= 0) ctx.character.setBlink(false)
-    }
+    if (this.invulnT > 0) this.invulnT -= dt
+    // No hit blink in a cinematic (a shard grabbed right after a hit), or once he is down for good.
+    this.setBlink(this.invulnT > 0 && this._hp > 0 && ctx.game.phase !== 'cutscene')
     if (!this._grounded && !this.sliding) this.airTime += dt
 
     if (ctx.character.ragdolling) {
@@ -1021,6 +1020,12 @@ export class PlayerController implements IPlayerController {
       if (next !== cur && GROUND_STATES.has(cur) && cur !== 'land' && this.stateTime < 0.12) next = cur
     }
     this.setState(next)
+  }
+
+  private setBlink(on: boolean): void {
+    if (on === this.blinking) return
+    this.blinking = on
+    this.ctx.character?.setBlink(on)
   }
 
   private setState(s: PlayerState): void {

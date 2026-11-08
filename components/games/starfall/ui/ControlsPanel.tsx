@@ -50,7 +50,7 @@ const ROWS: Record<Scheme, Array<{ action: string; keys: ReactNode }>> = {
     { action: 'Map', keys: <Pad wide>View</Pad> },
     { action: 'Pause', keys: <Pad wide>Menu</Pad> },
     { action: 'Skip cutscene', keys: <><Pad>A</Pad><Note>hold</Note></> },
-    { action: 'Ragdoll · flop', keys: <Pad wide>L3</Pad> },
+    { action: 'Ragdoll · flop', keys: <Pad wide>R3</Pad> },
   ],
   touch: [
     { action: 'Move', keys: <Note>Drag on the left side</Note> },

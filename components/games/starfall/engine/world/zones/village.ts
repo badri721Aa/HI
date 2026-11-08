@@ -123,7 +123,8 @@ function buildHouse(kit: ZoneKit, h: HouseDef, i: number): void {
     for (const y of [F + 0.08, F + 0.9, top - 0.08]) tbox(kit, 'darkPlanks', 0, y, fz, w + 0.04, 0.16, 0.08, 0, 0, 0, 1, m)
     for (let k = 0; k <= bays; k++) {
       const bx = -w / 2 + (k * w) / bays
-      tbox(kit, 'darkPlanks', bx, F + wall / 2, fz, 0.17, wall, 0.08, 0, 0, 0, 1, m)
+      // Posts stand 2 cm proud of the rails: equal depths would put coplanar faces at every crossing (z-fighting).
+      tbox(kit, 'darkPlanks', bx, F + wall / 2, s * (d / 2 + 0.04), 0.17, wall, 0.1, 0, 0, 0, 1, m)
     }
     const bw = w / bays
     beam(kit, 'darkPlanks', -w / 2 + 0.1, F + 0.95, fz, -w / 2 + bw - 0.1, top - 0.15, fz, 0.12, 0.06, 1, m)
@@ -146,7 +147,7 @@ function buildHouse(kit: ZoneKit, h: HouseDef, i: number): void {
     houseWindow(kit, m, gx, top + rise * 0.3, 0, e > 0 ? Math.PI / 2 : -Math.PI / 2, 0.5, 0.58)
   }
   const fx = w / 2 + 0.03
-  for (const lz of [-0.75, 0.75]) tbox(kit, 'darkPlanks', fx, F + wall / 2, lz, 0.08, wall, 0.17, 0, 0, 0, 1, m)
+  for (const lz of [-0.75, 0.75]) tbox(kit, 'darkPlanks', fx + 0.02, F + wall / 2, lz, 0.12, wall, 0.17, 0, 0, 0, 1, m)
   tbox(kit, 'darkPlanks', fx + 0.02, F + 1.02, 0, 0.08, 2.04, 1.1, 0, 0, 0, 1, m)
   tbox(kit, 'planks', fx + 0.05, F + 1.0, 0, 0.06, 1.95, 0.98, 0, 0, 0, 0.8, m)
   tbox(kit, 'metal', fx + 0.1, F + 1.0, 0.33, 0.05, 0.08, 0.08, 0, 0, 0, 1, m)

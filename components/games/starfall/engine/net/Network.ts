@@ -2,7 +2,7 @@
  * Online multiplayer: rooms, presence, chat, emotes and replicated players.
  *
  * - Supabase Realtime carries the low-rate traffic: room presence, the public
- *   room lobby, chat, emotes, ragdoll events, WebRTC signalling and a 4 Hz
+ *   room lobby, chat, emotes, ragdoll events, WebRTC signalling and a ≤ 4 Hz
  *   movement relay for peers without a direct link (see Room.ts).
  * - Movement goes peer-to-peer at 20 Hz (2 Hz idle) over unreliable WebRTC
  *   data channels (p2p.ts), as compact 40-byte binary packets (protocol.ts).
@@ -17,7 +17,7 @@ import { createClient, type RealtimeChannel, type SupabaseClient } from '@supaba
 import type { Ctx, GestureName, ICharacter, INetwork, NetPeer, NetStatus, RoomInfo } from '../types'
 import {
   CHAT_BURST, CHAT_REFILL, CODE_ALPHABET, CODE_LENGTH, LOBBY_CHANNEL, MAX_PLAYERS, P2P_RATE_ACTIVE, P2P_RATE_IDLE,
-  PROFILE_KEY, PUBLIC_ROOMS, RELAY_RATE_ACTIVE, RELAY_RATE_IDLE, SUPABASE_KEY, SUPABASE_URL,
+  PROFILE_KEY, PUBLIC_ROOMS, RELAY_DELIVERIES, RELAY_RATE_ACTIVE, RELAY_RATE_IDLE, SUPABASE_KEY, SUPABASE_URL,
 } from './config'
 import {
   Bucket, FLAG_ACTIVE, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, STATE_BYTES, defaultColor, defaultName,
@@ -25,12 +25,13 @@ import {
   stateCode, toRelay, type MemberInfo,
 } from './protocol'
 import { RemotePlayers } from './RemotePlayers'
-import { Room, type RoomHost } from './Room'
+import { JoinError, Room, type RoomHost } from './Room'
 
 /** Keep a lobby subscription opened for listing alive this long after the last request (s). */
 const LOBBY_LINGER = 30
 const LOBBY_TIMEOUT = 12000
-const LOBBY_SYNC_WAIT = 1500
+/** The lobby's first presence snapshot is often empty and fills in a moment later: wait this long (ms) unless people show up sooner. */
+const LOBBY_SYNC_WAIT = 3000
 
 type Profile = { name: string; color: string }
 
@@ -83,8 +84,8 @@ export class Network implements INetwork {
 
   private client: SupabaseClient | null = null
   private session: Room | null = null
-  /** The join in progress (a second join() for the same code shares it). */
-  private pending: { code: string; promise: Promise<void> } | null = null
+  /** The join in progress (a second identical join() shares it). */
+  private pending: { code: string; create: boolean; promise: Promise<void> } | null = null
   /** Increments on every join/leave so stale async continuations can bail out. */
   private epoch = 0
   private joinedAt = 0
@@ -137,6 +138,13 @@ export class Network implements INetwork {
     for (const p of this.session?.list ?? []) p.link?.close()
     this.client?.realtime.disconnect()
   }
+  /** Tab hidden: frames stop, so tell the others now that we are away (Game pauses first). */
+  private onVisibility = () => {
+    const room = this.session
+    if (!document.hidden || !room?.online) return
+    this.lastDirect = this.lastRelay = -1
+    this.stream(this.now(), room)
+  }
   /** Back from the back/forward cache: the socket was closed on pagehide, so join again. */
   private onPageShow = (e: PageTransitionEvent) => {
     const code = this.session?.code
@@ -155,6 +163,7 @@ export class Network implements INetwork {
     window.addEventListener('offline', this.onOffline)
     window.addEventListener('pagehide', this.onPageHide)
     window.addEventListener('pageshow', this.onPageShow)
+    document.addEventListener('visibilitychange', this.onVisibility)
   }
 
   /* ── public API ──────────────────────────────────────────── */
@@ -195,19 +204,20 @@ export class Network implements INetwork {
     return PUBLIC_ROOMS.map(r => roomInfo(r.code, Math.min(MAX_PLAYERS, counts.get(r.code) ?? 0)))
   }
 
-  join(code: string): Promise<void> {
+  join(code: string, opts?: { create?: boolean }): Promise<void> {
     const c = normalizeRoomCode(code)
     if (!c) return Promise.reject(new Error('Room codes are 3 to 12 letters or digits'))
-    if (this.pending?.code === c) return this.pending.promise
+    const create = opts?.create !== false
+    if (this.pending?.code === c && this.pending.create === create) return this.pending.promise
     if (this.session?.code === c && this.status === 'online') return Promise.resolve()
-    const promise = this.connect(c).finally(() => {
+    const promise = this.connect(c, create).finally(() => {
       if (this.pending?.promise === promise) this.pending = null
     })
-    this.pending = { code: c, promise }
+    this.pending = { code: c, create, promise }
     return promise
   }
 
-  private async connect(c: string): Promise<void> {
+  private async connect(c: string, create: boolean): Promise<void> {
     // leave() bumps the epoch synchronously: any later join/leave makes this one stale.
     const left = this.leave()
     const epoch = this.epoch
@@ -225,14 +235,15 @@ export class Network implements INetwork {
     this.joinedAt = Date.now()
     this.setStatus('connecting', 'Joining room…')
     try {
-      await room.connect()
+      await room.connect(!create)
     } catch (err) {
       this.retire(room.leave())
       if (epoch === this.epoch) {
         this.session = null
         this.clearPeers()
-        const msg = (err as Error).message || 'Could not join the room'
-        this.setStatus('error', msg)
+        // A mistyped code is not a connection problem.
+        if (err instanceof JoinError && err.reason === 'missing') this.setStatus('offline')
+        else this.setStatus('error', (err as Error).message || 'Could not join the room')
       }
       throw err instanceof Error ? err : new Error(String(err))
     }
@@ -350,6 +361,7 @@ export class Network implements INetwork {
     window.removeEventListener('offline', this.onOffline)
     window.removeEventListener('pagehide', this.onPageHide)
     window.removeEventListener('pageshow', this.onPageShow)
+    document.removeEventListener('visibilitychange', this.onVisibility)
     void this.leave()
     this.closeLobby()
     this.remotes.dispose()
@@ -402,7 +414,9 @@ export class Network implements INetwork {
         if (isCurrent()) this.setStatus(state, message)
       },
       evicted: () => {
-        if (isCurrent()) void this.leave().then(() => this.setStatus('error', 'Room is full'))
+        if (!isCurrent()) return
+        void this.leave().then(() => this.setStatus('error', 'Room is full'))
+        this.ctx.bus.emit('ui:toast', { kind: 'warning', title: 'Room is full', body: 'Someone took the last place — you are playing solo' })
       },
     }
   }
@@ -512,7 +526,8 @@ export class Network implements INetwork {
       encodeState(this.packet, s)
       room.sendDirect(this.packet.buffer as ArrayBuffer)
     }
-    if (room.relayNow || ((burst || now - this.lastRelay >= 1 / (active ? RELAY_RATE_ACTIVE : RELAY_RATE_IDLE)) && room.needsRelay(now))) {
+    const relayRate = active ? Math.min(RELAY_RATE_ACTIVE, RELAY_DELIVERIES / room.players) : RELAY_RATE_IDLE
+    if (room.relayNow || ((burst || now - this.lastRelay >= 1 / relayRate) && room.needsRelay(now))) {
       room.relayNow = false
       this.lastRelay = now
       room.send('pos', toRelay(this.selfId, s))
@@ -550,7 +565,6 @@ export class Network implements INetwork {
     const ch = this.getClient().channel(LOBBY_CHANNEL, { config: { presence: { key: this.selfId } } })
     this.lobby = ch
     return new Promise<void>((resolve, reject) => {
-      let synced = false
       let subscribed = false
       let settled = false
       const finish = (err?: Error) => {
@@ -566,14 +580,14 @@ export class Network implements INetwork {
         LOBBY_TIMEOUT,
       )
       this.lobbyAbort = finish
+      const occupied = () => Object.keys(ch.presenceState()).length > 0
       ch.on('presence', { event: 'sync' }, () => {
-        synced = true
-        if (subscribed) finish()
+        if (subscribed && occupied()) finish()
       })
       ch.subscribe(status => {
         if (status !== 'SUBSCRIBED' || epoch !== this.lobbyEpoch) return
         subscribed = true
-        if (synced) finish()
+        if (occupied()) finish()
         else setTimeout(() => finish(), LOBBY_SYNC_WAIT)
         // (Re)announce our public room — also after the socket reconnects.
         if (this.lobbyRoom) void ch.track({ room: this.lobbyRoom }).catch(() => {})

@@ -3,9 +3,10 @@
  * (who is here), broadcast events (chat, emotes, ragdolls, signalling and the
  * movement relay) and one WebRTC link per other player.
  *
- * Joining waits for the first presence snapshot so a full room can be refused
- * before we show up in it; if two players race for the last slot, the later
- * joiner (by joinedAt, then id) is asked to leave.
+ * Joining waits briefly for the first presence snapshot so a full room can be
+ * refused before we show up in it. Presence is eventually consistent (that
+ * snapshot is often still empty), so when two players race for the last slot,
+ * or the snapshot lagged, the later joiner (by joinedAt, then id) is asked to leave.
  */
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import type { GestureName } from '../types'
@@ -39,6 +40,11 @@ export interface RoomHost {
 const JOIN_TIMEOUT = 12000
 /** How long to wait for the first presence snapshot after subscribing (ms). */
 const SYNC_WAIT = 1800
+/**
+ * The first presence snapshot after subscribing is often empty and fills in up to ~3 s later, so a
+ * join that requires an occupied room waits this long (ms) for anyone to show up before giving up.
+ */
+const EXIST_WAIT = 4000
 /** After this long without the server, report an error (the client keeps retrying). */
 const LOST_AFTER = 20000
 /** Signals from ids not (yet) in presence are held this long (s). */
@@ -49,6 +55,19 @@ const MAX_SEEN = 24
 interface Orphan {
   msg: SignalMsg
   at: number
+}
+
+/** Why a join failed: `missing` = nobody in the room (join without create), `full`, or the server could not be reached. */
+export type JoinFailure = 'missing' | 'full' | 'network'
+
+export class JoinError extends Error {
+  constructor(
+    message: string,
+    readonly reason: JoinFailure,
+  ) {
+    super(message)
+    this.name = 'JoinError'
+  }
 }
 
 export class Room {
@@ -70,6 +89,11 @@ export class Room {
   private rtc = rtcSupported()
   private ping = new DataView(new ArrayBuffer(PING_BYTES))
   private scratch: Snapshot = makeSnapshot()
+  /** Join only if somebody is already here (see connect). */
+  private mustExist = false
+  /** performance.now() of the first SUBSCRIBED, and whether a re-check for occupants is scheduled. */
+  private subscribedAt = -1
+  private existCheck = false
 
   constructor(
     private client: SupabaseClient,
@@ -96,11 +120,17 @@ export class Room {
     return this.list.length + 1
   }
 
-  /** Subscribes, refuses full rooms, then announces us. */
-  connect(): Promise<void> {
+  /**
+   * Subscribes, refuses full rooms, then announces us. With `mustExist` an empty room is refused
+   * too (JoinError 'missing'), before we ever show up in it.
+   */
+  connect(mustExist = false): Promise<void> {
+    this.mustExist = mustExist
     return new Promise<void>((resolve, reject) => {
       this.joining = { resolve, reject }
-      this.later(JOIN_TIMEOUT, () => this.failJoin(new Error('Could not reach the game server. Check your connection and try again.')))
+      this.later(JOIN_TIMEOUT, () =>
+        this.failJoin(new JoinError('Could not reach the game server. Check your connection and try again.', 'network')),
+      )
       this.channel.subscribe((status, err) => this.onChannelStatus(status, err))
     })
   }
@@ -198,6 +228,7 @@ export class Room {
     if (this.closed) return
     if (status === 'SUBSCRIBED') {
       this.subscribed = true
+      if (this.subscribedAt < 0) this.subscribedAt = performance.now()
       if (this.lostTimer) clearTimeout(this.lostTimer)
       this.lostTimer = null
       if (this.joining) {
@@ -227,13 +258,26 @@ export class Room {
     }
   }
 
-  /** Room-full check, then track our presence. */
+  /** Room-full (and, for join-by-code, room-exists) check, then track our presence. */
   private async announce(): Promise<void> {
     if (this.closed || !this.subscribed || this.tracked) return
     if (this.joining) {
-      const others = Object.keys(this.channel.presenceState()).filter(k => k !== this.host.selfId).length
+      const others = Object.keys(this.channel.presenceState()).filter(k => k !== this.host.selfId && isPeerId(k)).length
+      if (this.mustExist && others === 0) {
+        // Presence is eventually consistent: only an empty room for EXIST_WAIT means nobody is here.
+        const left = EXIST_WAIT - (performance.now() - this.subscribedAt)
+        if (left <= 0) this.failJoin(new JoinError('No room with that code', 'missing'))
+        else if (!this.existCheck) {
+          this.existCheck = true
+          this.later(left, () => {
+            this.existCheck = false
+            void this.announce()
+          })
+        }
+        return
+      }
       if (others >= MAX_PLAYERS) {
-        this.failJoin(new Error('Room is full'))
+        this.failJoin(new JoinError('Room is full', 'full'))
         return
       }
     }
@@ -247,7 +291,7 @@ export class Room {
     if (this.closed) return
     if (res !== 'ok') {
       this.tracked = false
-      this.failJoin(new Error('The server refused the connection. Try again in a moment.'))
+      this.failJoin(new JoinError('The server refused the connection. Try again in a moment.', 'network'))
       return
     }
     const j = this.joining
@@ -259,7 +303,7 @@ export class Room {
       return
     }
     if (this.reconcile(true)) j.resolve()
-    else j.reject(new Error('Room is full'))
+    else j.reject(new JoinError('Room is full', 'full'))
   }
 
   private onSync(): void {
