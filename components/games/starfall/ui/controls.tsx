@@ -100,10 +100,13 @@ export function Button({
   )
 }
 
-/** Keyboard / pad glyph. `shape` replaces the default 22 px rounded-square sizing. */
+/**
+ * Keyboard / pad glyph. `shape` replaces the default 22 px rounded-square sizing.
+ * A span, not <kbd>: the site's global (unlayered) kbd rule would override these utilities.
+ */
 export function KeyCap({ children, shape, accent }: { children: ReactNode; shape?: string; accent?: boolean }) {
   return (
-    <kbd
+    <span
       className={cx(
         'inline-flex items-center justify-center border border-b-2 font-inter text-[11px] font-semibold leading-none tracking-normal',
         accent ? 'border-[#F5B455]/75 bg-[#F5B455]/15 text-[#F5B455]' : 'border-[#F3EEE6]/30 bg-[#F3EEE6]/[0.06] text-[#F3EEE6]/90',
@@ -111,7 +114,7 @@ export function KeyCap({ children, shape, accent }: { children: ReactNode; shape
       )}
     >
       {children}
-    </kbd>
+    </span>
   )
 }
 

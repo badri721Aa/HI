@@ -38,6 +38,8 @@ function VictoryContent({ state }: { state: 'open' | 'closed' }) {
   return (
     <div ref={rootRef} data-state={state} className={cx(styles.presence, 'absolute inset-0 z-50')}>
       <div aria-hidden className={cx(styles.titleScrim, 'absolute inset-0')} />
+      {/* On narrow screens the text spans the full width, past where the side scrim fades out. */}
+      <div aria-hidden className="absolute inset-0 bg-[#0B0F14]/45 md:hidden" />
       <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_80%_20%,rgba(245,180,85,0.12),transparent_70%)]" />
 
       <div className="absolute inset-0 flex flex-col justify-center overflow-y-auto px-[clamp(20px,6vw,88px)] py-[clamp(24px,7vh,72px)]">

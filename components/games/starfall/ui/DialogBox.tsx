@@ -114,8 +114,8 @@ function DialogPage({ title, text, page, pages, live }: { title: string; text: s
             ))}
         </div>
         <div className={cx('flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-[#F3EEE6]/55 transition-opacity duration-200', done ? 'opacity-100' : 'opacity-0')}>
-          {touch ? 'Tap' : <KeyCap>E</KeyCap>}
-          {lastPage ? 'Close' : 'Continue'}
+          {touch ? <span>Tap</span> : <KeyCap>E</KeyCap>}
+          <span>{lastPage ? 'Close' : 'Continue'}</span>
           <ChevronIcon className={cx(styles.caret, 'h-3.5 w-3.5 text-[#F5B455]', lastPage ? '' : 'rotate-90')} />
         </div>
       </div>

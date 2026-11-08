@@ -103,6 +103,7 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
   return (
     <div data-state={state} className={cx(styles.presence, 'absolute inset-0 z-50')}>
       <div aria-hidden className={cx(styles.titleScrim, 'absolute inset-0')} />
+      <div aria-hidden className="absolute inset-0 bg-[#0B0F14]/25 md:hidden" />
       <div aria-hidden className={cx(styles.panelScrim, 'absolute inset-0 transition-opacity duration-300', panel ? 'opacity-100' : 'opacity-0')} />
 
       <div className="absolute inset-0 flex">

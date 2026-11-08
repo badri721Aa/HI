@@ -78,6 +78,8 @@
 }
 .pauseScrim {
   background:
+    /* keeps the run stats (bottom-right) legible over bright scenery */
+    radial-gradient(48% 42% at 100% 100%, rgba(11, 15, 20, 0.62) 0%, rgba(11, 15, 20, 0) 100%),
     linear-gradient(90deg, rgba(11, 15, 20, 0.92) 0%, rgba(11, 15, 20, 0.74) 32%, rgba(11, 15, 20, 0.5) 70%, rgba(11, 15, 20, 0.42) 100%);
 }
 .loadingBg {

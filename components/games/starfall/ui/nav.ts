@@ -31,10 +31,11 @@ export function isQuietFocus(): boolean {
   return silent
 }
 
+/** Focuses `selector`, else the first nav target, else the scope itself (panels are tabIndex -1), so focus never lingers behind. */
 export function focusFirst(scope: HTMLElement | null, selector?: string): void {
   if (!scope) return
   const preferred = selector ? scope.querySelector<HTMLElement>(selector) : null
-  focusEl(preferred ?? navTargets(scope)[0], true)
+  focusEl(preferred ?? navTargets(scope)[0] ?? scope, true)
 }
 
 interface NavOptions {
