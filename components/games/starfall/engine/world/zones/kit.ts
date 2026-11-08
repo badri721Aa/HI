@@ -250,11 +250,15 @@ export class ZoneKit {
   dispose(): void {
     for (const c of this.colliders) this.ctx.collision.remove(c)
     this.colliders = []
+    const done = new Set<THREE.Material | THREE.BufferGeometry>(this.owned)
+    for (const o of this.owned) o.dispose()
     this.root.traverse(o => {
       const mesh = o as THREE.Mesh
-      if (mesh.geometry) mesh.geometry.dispose()
+      if (mesh.geometry && !done.has(mesh.geometry)) {
+        done.add(mesh.geometry)
+        mesh.geometry.dispose()
+      }
     })
-    for (const o of this.owned) o.dispose()
     this.owned = []
     this.root.removeFromParent()
   }

@@ -180,8 +180,8 @@ export class Game implements GameApi {
     const steps: Array<[string, number, () => Promise<void> | void]> = [
       ['Loading textures', 3, () => ctx.textures.preload(f => ctx.progress(f))],
       ['Raising the island', 3, () => ctx.env.init()],
-      ['Growing the forest', 3, () => ctx.vegetation.init()],
       ['Building the village', 3, () => ctx.zones.init()],
+      ['Growing the forest', 3, () => ctx.vegetation.init()],
       ['Waking the hero', 2, () => ctx.character.init()],
       ['Teaching him to run', 1, () => ctx.player.init()],
       ['Placing the camera', 0.5, () => ctx.cameraRig.init()],

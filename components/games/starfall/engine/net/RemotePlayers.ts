@@ -22,9 +22,11 @@ import { ShirtMaterial } from './shirt'
 
 const HERO_URL = '/games/starfall/hero.glb'
 const HERO_HEIGHT = 1.62
-/** Name tag anchor above the feet (m) and its world height at close range. */
+/** Name tag anchor above the feet (m), its world height at close range, and its minimum on-screen height (fraction of the view). */
 const TAG_Y = 1.98
 const TAG_SIZE = 0.27
+const TAG_SCREEN = 0.048
+const BUBBLE_SCALE = 1.12
 /** Beyond these distances the animator runs every 2nd / 4th frame. */
 const LOD1 = 45
 const LOD2 = 90
@@ -173,7 +175,7 @@ class Avatar {
     this.bubbleT = BUBBLE_TIME
   }
 
-  update(dt: number, camera: THREE.Camera, frustum: THREE.Frustum): void {
+  update(dt: number, camera: THREE.PerspectiveCamera, frustum: THREE.Frustum): void {
     const p = this.peer
     const root = this.root
     root.position.copy(p.position)
@@ -220,7 +222,8 @@ class Avatar {
     this.wasVisible = true
 
     // Labels keep a readable on-screen size with distance, then fade out.
-    const s = TAG_SIZE * Math.max(1, dist / 9)
+    const viewK = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)
+    const s = Math.max(TAG_SIZE, TAG_SCREEN * viewK * dist)
     const fade = 1 - THREE.MathUtils.smoothstep(dist, TAG_FADE_START, TAG_HIDE)
     const tag = this.tag.sprite
     tag.visible = fade > 0.01
@@ -229,7 +232,7 @@ class Avatar {
     const bubble = this.bubble.sprite
     if (this.bubbleT > 0) {
       this.bubbleT -= dt
-      const bs = s * (BUBBLE_H / TAG_H)
+      const bs = s * (BUBBLE_H / TAG_H) * BUBBLE_SCALE
       bubble.visible = fade > 0.01 && this.bubbleT > 0
       bubble.position.y = TAG_Y + s * 0.78
       bubble.scale.set(bs * this.bubble.aspect, bs, 1)
