@@ -18,7 +18,9 @@ varying vec3 vDir;
 void main() {
   vDir = position;
   vec4 p = projectionMatrix * vec4( mat3( viewMatrix ) * position, 1.0 );
-  gl_Position = p.xyww;
+  // A hair inside the far plane: exactly z = w gets clipped or fails the depth test on some
+  // GPUs during fast camera motion, which flashes the black clear colour through the sky.
+  gl_Position = vec4(p.xy, p.w * 0.99999, p.w);
 }
 `
 

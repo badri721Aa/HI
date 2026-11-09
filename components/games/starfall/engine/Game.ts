@@ -866,6 +866,7 @@ export class Game implements GameApi {
         ctx.net.update(dt)
         if (++this.pausedFrame % 4 !== 0) return
       }
+      this.renderer.setClearColor(ctx.env.fogColor, 1)
       ctx.post.render(dt)
     } catch (err) {
       console.error('[starfall] frame failed', err)

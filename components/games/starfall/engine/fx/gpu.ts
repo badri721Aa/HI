@@ -191,7 +191,8 @@ void main() {
   } else if (vShape < 4.5) {
     // heart (implicit curve) with a faint halo
     vec2 p = vUv * 1.32 + vec2(0.0, 0.12);
-    float f = pow(dot(p, p) - 1.0, 3.0) - p.x * p.x * p.y * p.y * p.y;
+    float d = dot(p, p) - 1.0;
+    float f = d * d * d - p.x * p.x * p.y * p.y * p.y; // pow() of a negative base is undefined in GLSL
     a = max(1.0 - smoothstep(-0.03, 0.03, f), exp(-r * r * 3.0) * 0.3);
   } else {
     // droplet
