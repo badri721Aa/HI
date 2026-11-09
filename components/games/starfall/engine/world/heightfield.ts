@@ -389,7 +389,7 @@ export function waterLevelAt(x: number, z: number): number {
   return lvl
 }
 
-export type Surface = 'grass' | 'sand' | 'dirt' | 'rock' | 'stone' | 'wood' | 'water' | 'leaves' | 'metal'
+export type Surface = 'grass' | 'sand' | 'dirt' | 'rock' | 'stone' | 'wood' | 'water' | 'leaves' | 'metal' | 'snow' | 'ice'
 
 /** What the ground is made of at (x, z) — drives splat textures and footstep sounds. */
 export function surfaceAt(x: number, z: number): Surface {

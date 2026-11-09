@@ -24,6 +24,7 @@ const TOAST_ICON: Record<ToastKind, { Icon: typeof StarIcon; color: string }> = 
   heart: { Icon: HeartIcon, color: 'text-[#E8664F]' },
   info: { Icon: InfoIcon, color: 'text-[#F3EEE6]/80' },
   warning: { Icon: WarningIcon, color: 'text-[#E8664F]' },
+  reward: { Icon: StarIcon, color: 'text-[#9FD8FF]' },
 }
 
 function Toasts() {
@@ -45,7 +46,7 @@ function Toasts() {
             <Icon className={cx('mt-px h-4 w-4 shrink-0', color)} />
             <div className="min-w-0">
               <div className="text-[13px] font-semibold leading-tight text-[#F3EEE6]">{t.title}</div>
-              {t.body && <div className="mt-0.5 truncate text-[12px] leading-snug text-[#F3EEE6]/55">{t.body}</div>}
+              {t.body && <div className="mt-0.5 line-clamp-3 text-[12px] leading-snug text-[#F3EEE6]/55">{t.body}</div>}
             </div>
           </div>
         )

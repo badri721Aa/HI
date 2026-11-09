@@ -1,10 +1,13 @@
 'use client'
-/** Pause-menu island map: shards, lanterns, the Beacon and the player, with shard hints on hover / tap / focus. */
+/**
+ * Pause-menu island map: shards, lanterns, the Beacon, the portal arches and the player, with shard
+ * hints on hover / tap / focus. Away in a portal map, it says where the player is and how to get home.
+ */
 import { useEffect, useState, type CSSProperties } from 'react'
 import type { Game } from '../engine/Game'
 import { useGameUi } from './context'
 import { PanelHeader } from './controls'
-import { ArrowIcon, BeaconIcon, LanternIcon, StarIcon } from './icons'
+import { ArrowIcon, BeaconIcon, CrownIcon, LanternIcon, PortalIcon, StarIcon } from './icons'
 import { BackHint } from './Panel'
 import { cx, LABEL } from './theme'
 import styles from './ui.module.css'
@@ -34,11 +37,12 @@ export function MapPanel({ onBack }: { onBack: () => void }) {
 
   const found = info.shards.filter(s => s.collected).length
   const sel = selected !== null ? info.shards[selected] : null
+  const away = info.map.id !== 'isle'
 
   return (
     <div>
       <PanelHeader
-        eyebrow="Island map"
+        eyebrow={away ? `You are in ${info.map.name}` : 'Island map'}
         title={`${found} of ${info.shards.length} shards found`}
         aside={<BackHint onBack={onBack} />}
       />
@@ -104,11 +108,28 @@ export function MapPanel({ onBack }: { onBack: () => void }) {
             </button>
           ))}
 
-          <div className="absolute -translate-x-1/2 -translate-y-1/2" style={at(info.player.u, info.player.v)}>
-            <div style={{ transform: `rotate(${Math.PI - info.player.yaw}rad)` }}>
-              <ArrowIcon className="h-[18px] w-[18px] text-[#F3EEE6] drop-shadow-[0_0_4px_rgba(0,0,0,0.7)]" />
+          {info.portals.map(p => (
+            <div
+              key={p.id}
+              title={p.unlocked ? `${p.name} portal` : `${p.name} portal — sealed`}
+              className={cx('absolute -translate-x-1/2 -translate-y-1/2', p.unlocked ? 'text-[#C9A6FF]' : 'text-[#F3EEE6]/35')}
+              style={at(p.u, p.v)}
+            >
+              <PortalIcon className={cx(styles.hudIcon, 'h-[18px] w-[18px]')} />
             </div>
-          </div>
+          ))}
+
+          {away ? (
+            <div className="absolute inset-x-6 bottom-6 rounded-[3px] border border-[#F3EEE6]/12 bg-[#0B0F14]/85 px-3 py-2.5 text-center text-[12px] leading-snug text-[#F3EEE6]/75">
+              Away from the island, in <span className="text-[#F3EEE6]">{info.map.name}</span>. Its golden arch leads home.
+            </div>
+          ) : (
+            <div className="absolute -translate-x-1/2 -translate-y-1/2" style={at(info.player.u, info.player.v)}>
+              <div style={{ transform: `rotate(${Math.PI - info.player.yaw}rad)` }}>
+                <ArrowIcon className="h-[18px] w-[18px] text-[#F3EEE6] drop-shadow-[0_0_4px_rgba(0,0,0,0.7)]" />
+              </div>
+            </div>
+          )}
 
           {sel && selected !== null && <MapTooltip u={sel.u} v={sel.v} name={sel.name} hint={sel.hint} collected={sel.collected} />}
         </div>
@@ -137,6 +158,7 @@ export function MapPanel({ onBack }: { onBack: () => void }) {
               </li>
             ))}
           </ul>
+          <Portals portals={info.portals} found={found} />
           <Legend />
         </div>
       </div>
@@ -162,6 +184,29 @@ function MapTooltip({ u, v, name, hint, collected }: { u: number; v: number; nam
   )
 }
 
+/** Each portal map: sealed (shards needed), awake (its boss waits) or conquered. */
+function Portals({ portals, found }: { portals: MapInfo['portals']; found: number }) {
+  return (
+    <ul className="mt-4 space-y-1.5 border-t border-[#F3EEE6]/10 pt-4">
+      {portals.map(p => (
+        <li key={p.id} className="flex items-start gap-3 px-2.5">
+          {p.defeated ? (
+            <CrownIcon className="mt-[2px] h-4 w-4 shrink-0 text-[#F5B455]" />
+          ) : (
+            <PortalIcon className={cx('mt-[2px] h-4 w-4 shrink-0', p.unlocked ? 'text-[#C9A6FF]' : 'text-[#F3EEE6]/35')} />
+          )}
+          <span className="min-w-0">
+            <span className={cx('block text-[13px]', p.unlocked ? 'text-[#F3EEE6]' : 'text-[#F3EEE6]/60')}>{p.name}</span>
+            <span className="block text-[12px] text-[#F3EEE6]/40">
+              {p.defeated ? `${p.boss} defeated` : p.unlocked ? `The ${p.boss} waits beyond the arch` : `Sealed — wakes at ${p.shards} shards (${Math.min(found, p.shards)} of ${p.shards})`}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function Legend() {
   const item = 'flex items-center gap-1.5'
   return (
@@ -170,6 +215,7 @@ function Legend() {
       <span className={item}><StarIcon className="h-3 w-3 text-[#F5B455]" />Found</span>
       <span className={item}><LanternIcon className="h-3.5 w-3.5 text-[#F5B455]/90" />Lantern</span>
       <span className={item}><BeaconIcon className="h-3.5 w-3.5 text-[#FFE2B0]" />Beacon</span>
+      <span className={item}><PortalIcon className="h-3.5 w-3.5 text-[#C9A6FF]" />Portal</span>
       <span className={item}><ArrowIcon className="h-3 w-3 rotate-45 text-[#F3EEE6]" />You</span>
     </div>
   )

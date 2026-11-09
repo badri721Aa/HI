@@ -6,7 +6,7 @@ import { BackHint } from './Panel'
 import { cx, LABEL } from './theme'
 
 const CREDITS: Array<[string, string]> = [
-  ['Hero', '“Low Poly Boy” — the rigged character you provided, re-lit and animated for the island'],
+  ['Hero', '“Low Poly Boy” rigged character, re-lit and animated for the island'],
   ['Design & code', 'Alhekma Arcade'],
   ['Rendering', 'three.js on WebGL 2'],
   ['Music & sound', 'Composed and synthesised live with the Web Audio API'],

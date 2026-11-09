@@ -9,11 +9,12 @@
  */
 import type * as THREE from 'three'
 import type { CollisionWorld, Collider } from './collision'
-import type { CutsceneName, EventBus, GamePhase, MusicMood, V3, WeaponId } from './events'
+import type { BlockMsg } from './build/blocks'
+import type { BossId, CutsceneName, EventBus, GamePhase, MapId, MusicMood, V3, WeaponId } from './events'
 import type { Input } from './input'
 import type { SaveGame } from './save'
 import type { QualityProfile, Settings } from './settings'
-import type { HudStore } from './store'
+import type { CompassMarker, HudStore } from './store'
 import type { TextureLib } from './textures'
 
 export interface Ctx {
@@ -51,6 +52,8 @@ export interface Ctx {
   audio: IAudio
   net: INetwork
   weapons: IWeapons
+  worlds: IWorlds
+  build: IBuilding
 }
 
 /** Base lifecycle. */
@@ -69,6 +72,8 @@ export interface GameApi {
   /** Live progress for the current run. Mutate only through the methods below. */
   readonly save: SaveGame
   readonly isTouch: boolean
+  /** A Creative game: everything unlocked, no damage, flying (save.mode === 'creative'). */
+  readonly creative: boolean
   /** Shards collected so far. */
   shardCount(): number
   collectShard(index: number): void
@@ -85,6 +90,12 @@ export interface GameApi {
   /** Opens a dialog box; resolves when the player closes it. Pauses gameplay meanwhile. */
   showDialog(title: string, lines: string[]): Promise<void>
   setMusic(mood: MusicMood): void
+  /** Plays a cutscene with the usual phase handling (gameplay holds still meanwhile); resolves when it ends. */
+  playCutscene(name: CutsceneName, arg?: number): Promise<void>
+  /** Record a portal map as unlocked (saved at once). */
+  unlockMap(id: MapId): void
+  /** Record a boss as defeated (saved at once). */
+  defeatBoss(id: BossId): void
   /** Short screen shake via the camera rig (respects the setting). */
   shake(intensity: number, duration: number): void
   /** Scale game time by `scale` for `seconds` of real time (hit-stop, slow motion). The strongest request wins. */
@@ -111,6 +122,11 @@ export interface IEnvironment extends System {
   setTimeOfDay(tod: TimeOfDay, seconds: number): void
   /** Centre of the follow-shadow frustum (call each frame with the player position). */
   setShadowFocus(p: V3): void
+  /**
+   * Blend sky, fog, sun and fill light to a map's look over `seconds`. 'isle' restores the
+   * island's current time of day; time-of-day changes made meanwhile apply once back there.
+   */
+  setAtmosphere(map: MapId, seconds: number): void
   /** For effects that want to match the sky (e.g. fog-coloured particles). */
   readonly fogColor: THREE.Color
 }
@@ -229,6 +245,8 @@ export interface IPlayerController extends System {
   readonly height: number
   /** When false, input is ignored (cutscenes, dialogs) but physics still runs. */
   controlEnabled: boolean
+  /** Creative flight (double-tap jump): no gravity, jump rises, descend sinks; touching down ends it. */
+  readonly flying: boolean
   teleport(x: number, y: number, z: number, yaw: number): void
   /** Damage from `from` (knockback away from it). Ignored while invulnerable. */
   hurt(amount: number, from: V3): void
@@ -279,10 +297,25 @@ export interface IEnemies extends System {
   aliveNear(p: V3, radius: number): number
   /** Freeze AI (cutscenes). */
   frozen: boolean
-  /** A weapon blow: every gloomling the sphere touches takes it. Returns how many were hit. */
+  /** A weapon blow: every gloomling (and registered target) the sphere touches takes it. Returns how many were hit. */
   hit(h: WeaponHit): number
-  /** The closest live gloomling within `radius` (written to `out`); false if none. */
+  /** The closest live gloomling or target within `radius` (written to `out`); false if none. */
   nearest(p: V3, radius: number, out: THREE.Vector3): boolean
+  /** Let weapon blows (swings, slams, arrows) strike something else too, e.g. a boss. Returns the unregister function. */
+  addTarget(t: HitTarget): () => void
+  /** Spawn a temporary gloomling that chases the player at once (boss minions; never saved). False when the pool is full. */
+  spawnMinion(x: number, y: number, z: number): boolean
+  /** Pop every minion at once (boss reset, travel). */
+  clearMinions(): void
+  readonly minionCount: number
+}
+
+/** Something besides the gloomlings that weapon blows can strike (bosses). */
+export interface HitTarget {
+  /** Take the blow if its sphere touches you; true when it landed. */
+  takeHit(h: WeaponHit): boolean
+  /** Point melee swings turn toward (written to `out`); false while not targetable. */
+  aimPoint(out: THREE.Vector3): boolean
 }
 
 /** A weapon blow against the gloomlings. */
@@ -297,6 +330,8 @@ export interface WeaponHit {
   from: V3
   /** Stop after this many gloomlings (an arrow hits one). */
   max?: number
+  /** Frost: a surviving gloomling freezes solid for this many seconds. */
+  freeze?: number
 }
 
 /** Arm moves the animator layers over the body for the held weapon. */
@@ -324,8 +359,61 @@ export interface IWeapons extends System {
   readonly aimYaw: number | null
   readonly pose: WeaponPose
   equip(id: WeaponId): void
+  /** A reward: own `id` (saved), put it in hand and announce it. */
+  grant(id: WeaponId): void
   /** Re-sync owned weapons and pickups with ctx.game.save (new game / continue). */
   syncWithSave(): void
+}
+
+/** worlds/Worlds.ts — portal arches, the maps behind them (built on first visit), their bosses and rewards. */
+export interface IWorlds extends System {
+  readonly current: MapId
+  /** A portal fade is running (the player can't act). */
+  readonly travelling: boolean
+  /** Below this height the player has fallen off the current map. */
+  readonly killY: number
+  /** Soft wall around the current map's play area. */
+  readonly bounds: { x: number; z: number; r: number }
+  /** HUD name of the current map; null on the island (its zones name themselves). */
+  readonly mapName: string | null
+  isUnlocked(id: MapId): boolean
+  /** Respawn point inside the current map; null on the island (use the checkpoint). */
+  spawnPoint(): { x: number; y: number; z: number; yaw: number } | null
+  /** Fade out, build the map on its first visit, move the player there and fade back in. */
+  travel(to: MapId): void
+  /** Compass markers: awake portals on the island; the boss and the way home elsewhere. */
+  compass(p: V3, cameraYaw: number, out: CompassMarker[]): void
+  /** What the 'boss' cutscene frames, or null when no fight is waiting. */
+  bossIntro(): BossIntro | null
+  /** Back on the island with every fight reset (new game / continue / quit to title). */
+  syncWithSave(): void
+}
+
+export interface BossIntro {
+  name: string
+  title: string
+  /** The boss's face (camera target) and the way it faces. */
+  focus: THREE.Vector3
+  yaw: number
+  /** Cue: the boss wakes and roars. */
+  roar(): void
+  /** The intro ended or was skipped: the fight begins. */
+  begin(): void
+}
+
+/** build/Building.ts — the block sandbox: build mode, our blocks and other players', lamps and saving. */
+export interface IBuilding extends System {
+  /** Build mode: the attack / dash buttons place and break blocks, the wheel and 1–9 / 0 pick one. */
+  readonly active: boolean
+  setActive(on: boolean): void
+  /** Put block type `slot` in hand (the HUD bar's taps). */
+  select(slot: number): void
+  /** Blocks this player has placed (capped at BLOCK_LIMIT). */
+  readonly count: number
+  /** Load the current save slot's blocks (new game, continue, Creative). */
+  syncWithSave(): void
+  /** Write unsaved block changes now. */
+  flush(): void
 }
 
 /** gameplay/Checkpoints.ts — lantern posts that light up and become respawn points. */
@@ -414,6 +502,8 @@ export interface NetPeer {
   yaw: number
   state: PlayerState
   ragdoll: boolean
+  /** The map the peer is in (only peers in the local player's map are drawn). */
+  map: MapId
   /** Direct peer-to-peer link (true) or relayed through the server (false). */
   direct: boolean
   /** Round-trip time in ms, or -1 if unknown. */
@@ -448,6 +538,8 @@ export interface INetwork extends System {
   leave(): Promise<void>
   sendChat(text: string): void
   sendEmote(name: GestureName): void
+  /** Broadcast block edits to the room (`to`: only that player acts on it). False when not connected. */
+  sendBlocks(msg: BlockMsg, to?: string): boolean
 }
 
-export type { Collider, WeaponId }
+export type { BossId, Collider, MapId, WeaponId }

@@ -2,8 +2,9 @@
  * Online multiplayer: rooms, presence, chat, emotes and replicated players.
  *
  * - Supabase Realtime carries the low-rate traffic: room presence, the public
- *   room lobby, chat, emotes, ragdoll events, WebRTC signalling and a ≤ 4 Hz
- *   movement relay for peers without a direct link (see Room.ts).
+ *   room lobby, chat, emotes, ragdoll events, block edits (paced by Building),
+ *   WebRTC signalling and a ≤ 4 Hz movement relay for peers without a direct
+ *   link (see Room.ts).
  * - Movement goes peer-to-peer at 20 Hz (2 Hz idle) over unreliable WebRTC
  *   data channels (p2p.ts), as compact 40-byte binary packets (protocol.ts).
  * - Other players are smoothed (RemotePeer.ts) and drawn as tinted, animated
@@ -14,6 +15,7 @@
  */
 import * as THREE from 'three'
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js'
+import type { BlockMsg } from '../build/blocks'
 import type { Ctx, GestureName, ICharacter, INetwork, NetPeer, NetStatus, RoomInfo } from '../types'
 import {
   CHAT_BURST, CHAT_REFILL, CODE_ALPHABET, CODE_LENGTH, LOBBY_CHANNEL, MAX_PLAYERS, P2P_RATE_ACTIVE, P2P_RATE_IDLE,
@@ -26,6 +28,7 @@ import {
 } from './protocol'
 import { RemotePlayers } from './RemotePlayers'
 import { JoinError, Room, type RoomHost } from './Room'
+import { mapCode } from '../worlds/defs'
 
 /** Keep a lobby subscription opened for listing alive this long after the last request (s). */
 const LOBBY_LINGER = 30
@@ -112,6 +115,7 @@ export class Network implements INetwork {
   private lastState = -1
   private lastFlags = -1
   private lastWeapon = -1
+  private lastMap = -1
   private lastYaw = 0
   private lastX = 0
   private lastY = 0
@@ -319,7 +323,7 @@ export class Network implements INetwork {
       return
     }
     if (!this.chatBucket.take(this.now())) {
-      this.system('Slow down a little — one message per second')
+      this.system('Please wait a moment between messages')
       return
     }
     room.send('chat', { from: this.selfId, text: clean })
@@ -330,6 +334,12 @@ export class Network implements INetwork {
     const room = this.session
     if (!room?.online || !isEmote(name) || !this.emoteBucket.take(this.now())) return
     room.send('emote', { from: this.selfId, name })
+  }
+
+  sendBlocks(msg: BlockMsg, to?: string): boolean {
+    const room = this.session
+    if (!room?.online) return false
+    return room.send('blk', to ? { from: this.selfId, op: msg.op, b: msg.cells, to } : { from: this.selfId, op: msg.op, b: msg.cells })
   }
 
   /* ── frame ───────────────────────────────────────────────── */
@@ -408,6 +418,9 @@ export class Network implements INetwork {
       ragdoll: (peer, v) => {
         if (isCurrent()) this.remotes.flop(peer.id, v)
       },
+      blocks: (peer, msg) => {
+        if (isCurrent()) this.ctx.bus.emit('net:blocks', { id: peer.id, ...msg })
+      },
       count: players => {
         if (isCurrent()) this.setCount(players)
       },
@@ -417,7 +430,7 @@ export class Network implements INetwork {
       evicted: () => {
         if (!isCurrent()) return
         void this.leave().then(() => this.setStatus('error', 'Room is full'))
-        this.ctx.bus.emit('ui:toast', { kind: 'warning', title: 'Room is full', body: 'Someone took the last place — you are playing solo' })
+        this.ctx.bus.emit('ui:toast', { kind: 'warning', title: 'Room is full', body: 'The last place was taken, so you are playing solo.' })
       },
     }
   }
@@ -502,6 +515,7 @@ export class Network implements INetwork {
     s.wading = p.motion?.wading ?? 0
     s.slope = p.motion?.slope ?? 0
     s.weapon = weaponCode(ctx.weapons?.equipped ?? 'fists')
+    s.map = mapCode(ctx.worlds?.current ?? 'isle')
 
     // Moving platforms carry the player with zero velocity, so position changes count too.
     const dx = pos.x - this.lastX
@@ -513,8 +527,9 @@ export class Network implements INetwork {
     const moving = v.x * v.x + v.z * v.z > 0.01 || Math.abs(v.y) > 0.05 || !p.grounded || dx * dx + dy * dy + dz * dz > 1e-6
     const baseFlags = (p.grounded || ragdoll ? FLAG_GROUNDED : 0) | (ragdoll ? FLAG_RAGDOLL : 0) | (away ? FLAG_AWAY : 0)
     const turned = Math.abs(Math.atan2(Math.sin(s.yaw - this.lastYaw), Math.cos(s.yaw - this.lastYaw))) > 0.02
-    if (moving || turned || s.state !== this.lastState || baseFlags !== this.lastFlags || s.weapon !== this.lastWeapon) this.lastChange = now
+    if (moving || turned || s.state !== this.lastState || baseFlags !== this.lastFlags || s.weapon !== this.lastWeapon || s.map !== this.lastMap) this.lastChange = now
     this.lastWeapon = s.weapon
+    this.lastMap = s.map
     this.lastState = s.state
     this.lastFlags = baseFlags
     this.lastYaw = s.yaw

@@ -6,6 +6,7 @@
  * the bus fire them automatically, and cutscenes call burst()/streak() directly.
  */
 import * as THREE from 'three'
+import { KIND } from '../gameplay/weapons/defs'
 import { surfaceAt, waterLevelAt, type Surface } from '../world/heightfield'
 import type { V3 } from '../events'
 import { QUALITY } from '../settings'
@@ -94,7 +95,7 @@ const DEFAULT_DUST = '#b7ae88'
 /** Dust tint per ground surface (null = no dust). */
 const SURFACE_DUST: Record<Surface, string | null> = {
   grass: '#b7ae88', sand: '#e6d3a4', dirt: '#a9885f', rock: '#b3ab9e', stone: '#b9b2a5',
-  wood: '#b49c78', leaves: '#8f8a5c', metal: '#a2a2a2', water: null,
+  wood: '#b49c78', leaves: '#8f8a5c', metal: '#a2a2a2', water: null, snow: '#f2f7ff', ice: '#d6ecf8',
 }
 
 const MAX_STREAKS = 12
@@ -323,7 +324,7 @@ export class Particles implements IParticles {
         else this.burst('ripple', e.pos, { scale })
       }),
       bus.on('player:footstep', e => {
-        if (!e.sprint || (e.surface !== 'sand' && e.surface !== 'dirt')) return
+        if (!e.sprint || (e.surface !== 'sand' && e.surface !== 'dirt' && e.surface !== 'snow')) return
         this.burst('dust', e.pos, { count: 3, scale: 0.65, color: SURFACE_DUST[e.surface] ?? DEFAULT_DUST })
       }),
       bus.on('player:jump', e => {
@@ -340,7 +341,16 @@ export class Particles implements IParticles {
       bus.on('collect:shard', e => this.burst('shard', e.pos)),
       bus.on('enemy:stomp', e => this.burst('stomp', e.pos)),
       bus.on('enemy:defeat', e => this.burst('poof', e.pos, { scale: e.big ? 1.5 : 1 })),
-      bus.on('enemy:hit', e => this.burst('hit', e.pos, { color: '#e2c6ff', scale: e.weapon === 'hammer' ? 1.5 : 1 })),
+      bus.on('enemy:hit', e => {
+        const frost = e.weapon === 'frostHammer'
+        this.burst('hit', e.pos, { color: frost ? '#c8f0ff' : e.weapon === 'starblade' ? '#fff0b8' : '#e2c6ff', scale: KIND[e.weapon] === 'hammer' ? 1.5 : 1 })
+      }),
+      bus.on('portal:enter', e => this.burst('shard', e.pos, { scale: 1.3 })),
+      bus.on('boss:defeat', e => {
+        const color = e.boss === 'frostGolem' ? '#bfeaff' : '#c79bff'
+        this.burst('beacon', e.pos, { color, scale: 1.6 })
+        this.burst('poof', e.pos, { color, scale: 4 })
+      }),
       bus.on('weapon:slam', e => {
         this.burst('land', e.pos, { scale: 2.2, color: dustAt(e.pos) })
         this.burst('stomp', e.pos, { scale: 1.4 })

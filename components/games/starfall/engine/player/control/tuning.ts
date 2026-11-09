@@ -23,6 +23,8 @@ export const MOVE = {
   turnAccel: 90,
   /** How fast sideways velocity dies on the ground (tight curves, no ice-skating). */
   grip: 60,
+  /** On 'ice' every ground acceleration, braking and grip is scaled by this (actual ice-skating). */
+  iceGrip: 0.12,
   /** Speed lost walking up slopes, at full tilt (fraction). */
   uphillSlow: 0.3,
 
@@ -76,6 +78,18 @@ export const MOVE = {
   attackMove: 0.4,
   /** Small hop the first time you spin in each airtime. */
   attackAirLift: 3,
+
+  // ── Creative flight
+  /** Second jump press within this many seconds toggles flight. */
+  flyTapWindow: 0.3,
+  flySpeed: 9,
+  flyFastSpeed: 20,
+  flyClimb: 6,
+  flyFastClimb: 12,
+  /** How quickly flight velocity follows the input (1/s). */
+  flyAccel: 6,
+  /** No climbing above this height. */
+  flyCeiling: 320,
 
   // ── collision
   stepUp: 0.45,

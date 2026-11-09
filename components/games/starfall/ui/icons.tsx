@@ -207,6 +207,16 @@ export function RefreshIcon(p: IconProps) {
   )
 }
 
+/** An isometric block — build mode. */
+export function CubeIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12 3.2 19.6 7.6v8.8L12 20.8l-7.6-4.4V7.6Z" {...stroke} />
+      <path d="M4.6 7.7 12 12l7.4-4.3M12 12v8.6" {...stroke} />
+    </svg>
+  )
+}
+
 /** Two figures — player counts. */
 export function UsersIcon(p: IconProps) {
   return (
@@ -290,6 +300,50 @@ export function BowIcon(p: IconProps) {
       <path d="M6 3.2c7.6 1.4 13.4 7.2 14.8 14.8" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" />
       <path d="M6 3.2 20.8 18" fill="none" stroke="currentColor" strokeWidth={1} strokeOpacity={0.65} />
       <path d="M3.4 20.6 15 9M15 9h-3.2M15 9v3.2M5.6 18.4l-2.4.2.2-2.4" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** The Gloom King's reward: a sword with a star at its tip. */
+export function StarbladeIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M17.6 6.4 9.6 14.4l-1.4-.6.4-1.6 7.8-7.8" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+      <path d="m6.4 12.2 5.4 5.4M7.6 16.4l-3.4 3.4" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" />
+      <circle cx="3.9" cy="20.1" r="1.1" fill="currentColor" />
+      <path d="M19.6 1.4c.3 1.6 1.1 2.4 2.8 2.8-1.7.3-2.5 1.1-2.8 2.8-.3-1.7-1.1-2.5-2.8-2.8 1.7-.4 2.5-1.2 2.8-2.8Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** The Frost Golem's reward: a hammer with a snowflake. */
+export function FrostHammerIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12.6 11.4 4.4 19.6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
+      <path d="m10.4 6.4 4.2-4.2 7.2 7.2-4.2 4.2Z" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+      <path d="M16 4.8v4.6M13.8 6l4.4 2.2M18.2 6l-4.4 2.2" fill="none" stroke="currentColor" strokeWidth={1.1} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** A portal arch (compass, map). */
+export function PortalIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M5 21V10a7 7 0 0 1 14 0v11" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      <path d="M8.6 21v-9.6a3.4 3.4 0 0 1 6.8 0V21Z" fill="currentColor" fillOpacity={0.35} />
+      <path d="M3 21h18" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** A crown (bosses). */
+export function CrownIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M3.5 8.5 7.6 12 12 5l4.4 7 4.1-3.5-1.8 10H5.3Z" fill="currentColor" fillOpacity={0.25} stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+      <path d="M5.6 21h12.8" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
     </svg>
   )
 }

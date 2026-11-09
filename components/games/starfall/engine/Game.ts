@@ -5,21 +5,24 @@
  * (progress, saving, death/respawn, victory). Every other system is built
  * here in a fixed order and updated in a fixed order:
  *
- *   input.poll → zones (moving platforms) → player → weapons → character → enemies →
- *   collectibles → checkpoints → signs → cutscenes → cameraRig → env →
+ *   input.poll → zones (moving platforms) → player → weapons → character → enemies → worlds →
+ *   collectibles → checkpoints → signs → cutscenes → cameraRig → build → env →
  *   vegetation → fx → ambient → audio → HUD → post.render
+ *
+ * Two save slots: the story, and Creative (everything unlocked, no damage, flying, building).
  */
 import * as THREE from 'three'
 import { CollisionWorld } from './collision'
-import { EventBus, v3, type GamePhase, type MusicMood, type WeaponId } from './events'
+import { EventBus, v3, type BossId, type CutsceneName, type GamePhase, type MapId, type MusicMood, type WeaponId } from './events'
 import { Input } from './input'
 import { clearSave, loadProfile, loadSave, newSave, storeProfile, storeSave, type Profile, type SaveGame } from './save'
 import { QUALITY, recommendDevice, type DeviceKind, type Settings } from './settings'
 import { HudStore } from './store'
 import { TextureLib } from './textures'
+import type { CompassMarker } from './store'
 import type { Ctx, GameApi } from './types'
-import { heightAt, zoneAt, WORLD_HALF, waterLevelAt, SEA_LEVEL } from './world/heightfield'
-import { BEACON, CHECKPOINTS, SHARDS, SPAWN, TOTAL_SHARDS } from './world/level'
+import { heightAt, zoneAt, WORLD_HALF, waterLevelAt } from './world/heightfield'
+import { BEACON, CHECKPOINTS, ENEMIES, SHARDS, SPAWN, TOTAL_SHARDS } from './world/level'
 
 import { Environment } from './world/Environment'
 import { Vegetation } from './world/Vegetation'
@@ -38,6 +41,10 @@ import { PostFX } from './fx/PostFX'
 import { AudioEngine } from './audio/AudioEngine'
 import { Network } from './net/Network'
 import { Weapons } from './gameplay/Weapons'
+import { Worlds } from './worlds/Worlds'
+import { BOSS_NAMES, MAP_NAMES, PORTAL_MAPS } from './worlds/defs'
+import { Building } from './build/Building'
+import { HOTBAR } from './gameplay/weapons/defs'
 
 interface Timer {
   at: number
@@ -84,6 +91,8 @@ export class Game implements GameApi {
   /** Game-time scale for hit-stop / slow motion, until the real clock reaches warpUntil. */
   private warpScale = 1
   private warpUntil = 0
+  /** Bumped per cutscene: one that was cut short by a newer one leaves the phase to it. */
+  private cutsceneRun = 0
   private onVisibility = () => {
     if (document.hidden) {
       if (this.phase === 'playing') this.pause()
@@ -122,6 +131,7 @@ export class Game implements GameApi {
 
     const input = new Input(this.canvas)
     input.sensitivity = settings.mouseSensitivity
+    if (this.isTouch) input.device = 'touch'
     let lockedAt = 0
     input.onPointerLockChange = locked => {
       if (locked) {
@@ -168,12 +178,17 @@ export class Game implements GameApi {
     ctx.audio = new AudioEngine(ctx)
     ctx.net = new Network(ctx)
     ctx.weapons = new Weapons(ctx)
+    ctx.worlds = new Worlds(ctx)
+    ctx.build = new Building(ctx)
 
     this.resize()
     this.resizeObs = new ResizeObserver(() => this.resize())
     this.resizeObs.observe(container)
     document.addEventListener('visibilitychange', this.onVisibility)
     this.hud.set({ touch: this.isTouch })
+    this.bus.on('world:travel', e => {
+      if (e.to === 'isle') this.islandObjective()
+    })
   }
 
   /* ── loading ─────────────────────────────────────────────── */
@@ -193,6 +208,8 @@ export class Game implements GameApi {
       ['Forging weapons', 0.5, () => ctx.weapons.init()],
       ['Lighting lanterns', 0.5, () => ctx.checkpoints.init()],
       ['Painting signposts', 0.5, () => ctx.signs.init()],
+      ['Opening the portals', 0.5, () => ctx.worlds.init()],
+      ['Stacking blocks', 0.5, () => ctx.build.init()],
       ['Writing the story', 0.5, () => ctx.cutscenes.init()],
       ['Stirring the air', 1, () => ctx.fx.init()],
       ['Releasing fireflies', 0.5, () => ctx.ambient.init()],
@@ -241,9 +258,14 @@ export class Game implements GameApi {
 
   /* ── public API for the React layer ──────────────────────── */
 
+  /** A story save worth continuing (a finished one too: "Keep exploring" promises the island stays). */
   hasSave(): boolean {
-    const s = loadSave()
-    return !!s && s.introSeen && !s.completed
+    const s = loadSave('story')
+    return !!s && s.introSeen
+  }
+
+  get creative(): boolean {
+    return this.save.mode === 'creative'
   }
 
   get bestTime(): number | null {
@@ -266,12 +288,13 @@ export class Game implements GameApi {
     storeProfile(this.profile)
   }
 
-  /** Must be called from a click/tap so audio and pointer lock can start. */
+  /** Must be called from a click/tap so audio and pointer lock can start. Title screen only (a double click must not start twice). */
   newGame(): void {
+    if (this.phase !== 'title') return
     this.resetTransient()
     this.ctx.audio.unlock()
-    clearSave()
-    this.save = newSave()
+    clearSave('story')
+    this.save = newSave('story')
     this.enemiesDefeatedRun = 0
     this.syncAll()
     const ctx = this.ctx
@@ -288,24 +311,35 @@ export class Game implements GameApi {
   }
 
   continueGame(): void {
-    this.resetTransient()
-    this.ctx.audio.unlock()
-    const s = loadSave()
+    if (this.phase !== 'title') return
+    const s = loadSave('story')
     if (!s) return this.newGame()
-    this.save = s
-    this.syncAll()
-    const sp = this.ctx.checkpoints.spawnPoint(s.checkpoint)
-    this.ctx.player.resetHealth()
-    this.ctx.player.teleport(sp.x, sp.y, sp.z, sp.yaw)
-    this.ctx.cameraRig.mode = 'follow'
-    this.ctx.cameraRig.snapBehind()
-    this.ctx.input.requestPointerLock()
-    this.setPhase('playing')
-    this.setMusic('explore')
-    const n = this.shardCount()
-    this.bus.emit('ui:objective', {
-      text: n >= TOTAL_SHARDS ? 'Return the shards to the Beacon' : `Find the star shards — ${n} of ${TOTAL_SHARDS}`,
-    })
+    this.begin(s)
+  }
+
+  /** The Creative sandbox (its own save slot): everything unlocked, no damage, flying, building from the start. */
+  startCreative(): void {
+    if (this.phase !== 'title') return
+    this.begin(loadSave('creative') ?? this.newCreativeSave())
+    this.ctx.build.setActive(true)
+    const device = this.ctx.input.device
+    const body =
+      device === 'touch' ? 'Tap Build to place blocks. Tap Jump twice to fly.'
+      : device === 'pad' ? 'Press LB to build. Press A twice to fly.'
+      : 'Press B to build. Press Space twice to fly.'
+    this.bus.emit('ui:toast', { kind: 'info', title: 'Creative', body })
+  }
+
+  /** Creative: whether the gloomlings are out. */
+  get creativeEnemies(): boolean {
+    return this.creative && this.save.enemies.length < ENEMIES.length
+  }
+
+  setCreativeEnemies(on: boolean): void {
+    if (!this.creative) return
+    this.save.enemies = on ? [] : ENEMIES.map((_, i) => i)
+    this.saveDirty = true
+    this.ctx.enemies.syncWithSave()
   }
 
   pause(): void {
@@ -338,6 +372,7 @@ export class Game implements GameApi {
     this.ctx.input.exitPointerLock()
     if (this.ctx.cutscenes.active) this.ctx.cutscenes.skip()
     this.closeDialogInternal()
+    this.ctx.worlds.syncWithSave()
     this.ctx.cameraRig.mode = 'title'
     this.setPhase('title')
     this.setMusic('title')
@@ -425,11 +460,24 @@ export class Game implements GameApi {
     const half = WORLD_HALF * 0.86
     const n = (x: number, z: number) => ({ u: (x + half) / (half * 2), v: (z + half) / (half * 2) })
     const p = this.ctx.player.position
+    const worlds = this.ctx.worlds
+    const map: MapId = worlds.current
     return {
+      /** Where the player is: on the island, or away in a portal map. */
+      map: { id: map, name: MAP_NAMES[map] },
       player: { ...n(p.x, p.z), yaw: this.ctx.player.yaw },
       shards: SHARDS.map(s => ({ ...n(s.x, s.z), name: s.name, hint: s.hint, collected: !!this.save.shards[s.index] })),
       checkpoints: CHECKPOINTS.map(c => ({ ...n(c.x, c.z), name: c.name, reached: this.save.checkpoints.includes(c.id) })),
       beacon: n(BEACON.x, BEACON.z),
+      portals: PORTAL_MAPS.map(m => ({
+        ...n(m.arch.x, m.arch.z),
+        id: m.id,
+        name: m.name,
+        shards: m.shards,
+        unlocked: worlds.isUnlocked(m.id),
+        boss: BOSS_NAMES[m.boss],
+        defeated: this.save.bosses.includes(m.boss),
+      })),
     }
   }
 
@@ -439,7 +487,7 @@ export class Game implements GameApi {
     this.resizeObs?.disconnect()
     document.removeEventListener('visibilitychange', this.onVisibility)
     const ctx = this.ctx
-    for (const s of [ctx.net, ctx.audio, ctx.post, ctx.ambient, ctx.fx, ctx.cutscenes, ctx.signs, ctx.checkpoints, ctx.weapons, ctx.enemies, ctx.collectibles, ctx.cameraRig, ctx.player, ctx.character, ctx.zones, ctx.vegetation, ctx.env]) {
+    for (const s of [ctx.net, ctx.audio, ctx.post, ctx.ambient, ctx.fx, ctx.cutscenes, ctx.signs, ctx.checkpoints, ctx.build, ctx.worlds, ctx.weapons, ctx.enemies, ctx.collectibles, ctx.cameraRig, ctx.player, ctx.character, ctx.zones, ctx.vegetation, ctx.env]) {
       try {
         s?.dispose()
       } catch (err) {
@@ -476,13 +524,7 @@ export class Game implements GameApi {
     this.bus.emit('collect:shard', { pos: v3(this.ctx.collectibles.shardPosition(index)), index, collected })
     this.bus.emit('ui:shardBanner', { index, name: def.name, collected, total: TOTAL_SHARDS })
     this.hud.set({ shards: this.save.shards.slice() })
-    this.runCutscene('shard', index).then(() => {
-      if (collected >= TOTAL_SHARDS) {
-        this.bus.emit('ui:objective', { text: 'All shards found — return to the Beacon on the summit' })
-      } else {
-        this.bus.emit('ui:objective', { text: `Find the star shards — ${collected} of ${TOTAL_SHARDS}` })
-      }
-    })
+    this.runCutscene('shard', index).then(() => this.islandObjective())
   }
 
   collectSpark(index: number): void {
@@ -515,6 +557,22 @@ export class Game implements GameApi {
     this.save.weapons = owned.filter(w => w !== 'fists')
     this.save.weapon = equipped
     this.saveDirty = true
+  }
+
+  playCutscene(name: CutsceneName, arg?: number): Promise<void> {
+    return this.runCutscene(name, arg)
+  }
+
+  unlockMap(id: MapId): void {
+    if (id === 'isle' || this.save.maps.includes(id)) return
+    this.save.maps.push(id)
+    storeSave(this.save)
+  }
+
+  defeatBoss(id: BossId): void {
+    if (this.save.bosses.includes(id)) return
+    this.save.bosses.push(id)
+    storeSave(this.save)
   }
 
   reachCheckpoint(id: string): void {
@@ -610,6 +668,36 @@ export class Game implements GameApi {
 
   /* ── internals ───────────────────────────────────────────── */
 
+  /** Loads `save` and drops the player at its checkpoint, playing. */
+  private begin(save: SaveGame): void {
+    this.resetTransient()
+    this.ctx.audio.unlock()
+    this.save = save
+    this.syncAll()
+    const sp = this.ctx.checkpoints.spawnPoint(save.checkpoint)
+    this.ctx.player.resetHealth()
+    this.ctx.player.teleport(sp.x, sp.y, sp.z, sp.yaw)
+    this.ctx.cameraRig.mode = 'follow'
+    this.ctx.cameraRig.snapBehind()
+    this.ctx.input.requestPointerLock()
+    this.setPhase('playing')
+    this.setMusic('explore')
+    this.islandObjective()
+  }
+
+  /** A fresh Creative slot: every weapon and map, the bosses already beaten, no gloomlings. */
+  private newCreativeSave(): SaveGame {
+    const s = newSave('creative')
+    s.introSeen = true
+    s.weapons = HOTBAR.filter(w => w !== 'fists')
+    s.weapon = 'sword'
+    s.maps = PORTAL_MAPS.map(m => m.id)
+    s.bosses = PORTAL_MAPS.map(m => m.boss)
+    s.enemies = ENEMIES.map((_, i) => i)
+    storeSave(s)
+    return s
+  }
+
   /** Drop anything queued for the previous run (respawn fades, death state, ragdolls). */
   private resetTransient(): void {
     this.timers = []
@@ -634,7 +722,24 @@ export class Game implements GameApi {
     this.timers.push({ at: this.ctx.clock.real + seconds, fn })
   }
 
-  private async runCutscene(name: 'intro' | 'shard' | 'beacon', arg?: number): Promise<void> {
+  /** The island's objective line for the current shard count. */
+  private islandObjective(): void {
+    if (this.creative) {
+      this.bus.emit('ui:objective', { text: 'Creative — build anything, fly anywhere' })
+      return
+    }
+    const n = this.shardCount()
+    this.bus.emit('ui:objective', {
+      text: this.save.completed
+        ? 'The Beacon burns bright — explore at your leisure'
+        : n >= TOTAL_SHARDS
+          ? 'All shards found — return to the Beacon on the summit'
+          : `Find the star shards — ${n} of ${TOTAL_SHARDS}`,
+    })
+  }
+
+  private async runCutscene(name: CutsceneName, arg?: number): Promise<void> {
+    const run = ++this.cutsceneRun
     const prev = this.phase === 'title' ? 'playing' : this.phase === 'cutscene' ? 'playing' : this.phase
     this.setPhase('cutscene')
     this.ctx.player.controlEnabled = false
@@ -644,11 +749,12 @@ export class Game implements GameApi {
     } catch (err) {
       console.error('[starfall] cutscene failed', err)
     }
-    if (this.phase !== 'cutscene') return
+    if (this.phase !== 'cutscene' || run !== this.cutsceneRun) return
     this.ctx.cameraRig.mode = 'follow'
     if (name !== 'beacon') {
       this.setPhase(prev === 'paused' ? 'playing' : prev)
-      this.setMusic('explore')
+      // A boss intro hands over to the fight music it already started.
+      if (name !== 'boss') this.setMusic('explore')
       this.ctx.input.requestPointerLock()
     }
   }
@@ -670,7 +776,7 @@ export class Game implements GameApi {
     ctx.player.controlEnabled = false
     this.bus.emit('ui:fade', { to: 1, duration: 0.45 })
     this.after(0.55, () => {
-      const sp = ctx.checkpoints.spawnPoint(this.save.checkpoint)
+      const sp = ctx.worlds.spawnPoint() ?? ctx.checkpoints.spawnPoint(this.save.checkpoint)
       ctx.player.resetHealth()
       ctx.player.teleport(sp.x, sp.y, sp.z, sp.yaw)
       ctx.cameraRig.snapBehind()
@@ -686,12 +792,14 @@ export class Game implements GameApi {
   private victory(): void {
     const t = this.save.playTime
     const prevBest = this.profile.bestTime
-    const newBest = prevBest === null || t < prevBest
+    // Creative runs don't count toward the best time.
+    const newBest = !this.creative && (prevBest === null || t < prevBest)
     if (newBest) this.profile.bestTime = t
-    this.profile.completions++
+    if (!this.creative) this.profile.completions++
     storeProfile(this.profile)
     this.save.completed = true
     storeSave(this.save)
+    this.islandObjective()
     this.ctx.input.exitPointerLock()
     this.setPhase('victory')
     this.setMusic('victory')
@@ -712,7 +820,10 @@ export class Game implements GameApi {
     ctx.enemies.syncWithSave()
     ctx.checkpoints.syncWithSave()
     ctx.weapons.syncWithSave()
+    ctx.worlds.syncWithSave()
+    ctx.build.syncWithSave()
     this.hud.set({
+      creative: this.creative,
       shards: this.save.shards.slice(),
       sparks: this.save.sparks.length,
       sparksTotal: ctx.collectibles.sparkTotal,
@@ -725,6 +836,7 @@ export class Game implements GameApi {
     if (this.phase === 'title' || this.phase === 'loading') return
     storeSave(this.save)
     this.saveDirty = false
+    this.ctx.build.flush()
   }
 
   private applySettings(s: Settings): void {
@@ -773,13 +885,16 @@ export class Game implements GameApi {
     const ctx = this.ctx
     const p = ctx.player.position
     const yaw = ctx.cameraRig.yaw
-    const markers: Array<{ angle: number; dist: number; kind: 'shard' | 'beacon' | 'checkpoint' }> = []
-    const all = this.shardCount() >= TOTAL_SHARDS
-    if (all) {
+    // Portal maps show only their own markers (boss, way home); the island adds its shards / Beacon.
+    const markers: CompassMarker[] = []
+    ctx.worlds.compass(p, yaw, markers)
+    const onIsle = ctx.worlds.current === 'isle'
+    // Once the Beacon is lit there is nothing left to point at on the island.
+    if (onIsle && !this.save.completed && this.shardCount() >= TOTAL_SHARDS) {
       const dx = BEACON.x - p.x
       const dz = BEACON.z - p.z
       markers.push({ angle: wrapAngle(yaw - Math.atan2(dx, dz)), dist: Math.hypot(dx, dz), kind: 'beacon' })
-    } else {
+    } else if (onIsle) {
       for (const sh of SHARDS) {
         if (this.save.shards[sh.index]) continue
         const dx = sh.x - p.x
@@ -792,11 +907,12 @@ export class Game implements GameApi {
       hp: ctx.player.hp,
       maxHp: ctx.player.maxHp,
       playTime: Math.floor(this.save.playTime),
-      zone: zone?.name ?? '',
+      zone: ctx.worlds.mapName ?? zone?.name ?? '',
       fps: Math.round(this.fps),
       dash: Math.round(ctx.player.dashReady * 20) / 20,
       compass: markers,
       heading: Math.round(yaw * 100) / 100,
+      flying: ctx.player.flying,
     })
   }
 
@@ -865,11 +981,13 @@ export class Game implements GameApi {
         ctx.character.update(dt)
         ctx.net.update(frameDt)
         ctx.enemies.update(dt)
+        ctx.worlds.update(dt)
         ctx.collectibles.update(dt)
         ctx.checkpoints.update(dt)
         ctx.signs.update(dt)
         ctx.cutscenes.update(dt)
         ctx.cameraRig.update(dt)
+        ctx.build.update(dt)
         ctx.env.setShadowFocus(ctx.player.position)
         ctx.env.update(dt)
         ctx.vegetation.update(dt)
@@ -885,7 +1003,7 @@ export class Game implements GameApi {
         }
         // Safety net: anything that ends up far below the world respawns.
         const p = ctx.player.position
-        if (phase === 'playing' && !this.dying && (p.y < SEA_LEVEL - 25 || !Number.isFinite(p.y))) this.playerDied('fall')
+        if (phase === 'playing' && !this.dying && (p.y < ctx.worlds.killY || !Number.isFinite(p.y))) this.playerDied('fall')
       } else if (phase === 'title') {
         ctx.clock.t += dt
         ctx.zones.update(dt)
@@ -893,8 +1011,10 @@ export class Game implements GameApi {
         ctx.character.setMotion(ctx.player.motion)
         ctx.character.update(dt)
         ctx.net.update(dt)
+        ctx.worlds.update(dt)
         ctx.collectibles.update(dt)
         ctx.cameraRig.update(dt)
+        ctx.build.update(dt)
         ctx.env.setShadowFocus(ctx.player.position)
         ctx.env.update(dt)
         ctx.vegetation.update(dt)
@@ -906,6 +1026,7 @@ export class Game implements GameApi {
         // The network keeps running so other players keep moving and the link stays alive.
         ctx.audio.update(dt)
         ctx.net.update(dt)
+        ctx.build.update(dt)
         if (++this.pausedFrame % 4 !== 0) return
       }
       this.renderer.setClearColor(ctx.env.fogColor, 1)

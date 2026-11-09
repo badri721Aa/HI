@@ -145,13 +145,14 @@ export class Signs implements ISigns {
       else if (beacon) label = game.shardCount() >= TOTAL_SHARDS && !game.save.completed ? 'Place shards' : 'Inspect'
     }
 
-    const key = ctx.input.device === 'pad' ? 'Y' : ctx.input.device === 'touch' ? 'Tap' : 'E'
+    const key = ctx.input.interactKey
     const want = label ? `${key}|${label}` : ''
     if (want !== this.shown && (want || this.shown === this.mine)) ctx.bus.emit('ui:prompt', label ? { key, label } : null)
     this.mine = want
 
     if (label && ctx.input.state.interact) {
-      if (sign) void game.showDialog(sign.title, sign.lines)
+      const device = ctx.input.device
+      if (sign) void game.showDialog(sign.title, sign.lines.map(l => (typeof l === 'string' ? l : l[device])))
       else game.tryActivateBeacon()
     }
   }

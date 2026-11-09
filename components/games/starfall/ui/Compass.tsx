@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef } from 'react'
 import { useGameUi } from './context'
-import { BeaconIcon, ChevronIcon, StarIcon } from './icons'
+import { BeaconIcon, ChevronIcon, CrownIcon, PortalIcon, StarIcon } from './icons'
 import { cx } from './theme'
 import styles from './ui.module.css'
 
@@ -154,8 +154,10 @@ export function Compass({ active, className }: { active: boolean; className?: st
           >
             <div className="absolute left-0 top-[1px] flex -translate-x-1/2 items-center text-[#F5B455] opacity-60 transition-[opacity,transform] duration-200 group-data-[near=true]/m:scale-125 group-data-[near=true]/m:opacity-100">
               <ChevronIcon className="absolute right-full mr-px hidden h-2.5 w-2.5 rotate-180 group-data-[edge=left]/m:block" />
-              <StarIcon className={cx(styles.hudIcon, 'h-3 w-3 group-data-[kind=beacon]/m:hidden')} />
+              <StarIcon className={cx(styles.hudIcon, 'hidden h-3 w-3 group-data-[kind=shard]/m:block')} />
               <BeaconIcon className={cx(styles.hudIcon, 'hidden h-3.5 w-3.5 group-data-[kind=beacon]/m:block')} />
+              <PortalIcon className={cx(styles.hudIcon, 'hidden h-3.5 w-3.5 group-data-[kind=portal]/m:block')} />
+              <CrownIcon className={cx(styles.hudIcon, 'hidden h-3.5 w-3.5 group-data-[kind=boss]/m:block')} />
               <ChevronIcon className="absolute left-full ml-px hidden h-2.5 w-2.5 group-data-[edge=right]/m:block" />
             </div>
             <div

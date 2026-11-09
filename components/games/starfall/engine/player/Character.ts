@@ -18,6 +18,16 @@ import { dampAngle, wrapAngle } from './anim/math'
 import { HeroRagdoll } from './ragdoll/HeroRagdoll'
 
 const HERO_URL = '/games/starfall/hero.glb'
+
+/** A file's bytes; a failure comes back as an Error rather than a rejection nobody is listening to yet. */
+async function loadBytes(url: string): Promise<ArrayBuffer | Error> {
+  try {
+    const r = await fetch(url)
+    return r.ok ? await r.arrayBuffer() : new Error(`HTTP ${r.status} for ${url}`)
+  } catch (err) {
+    return err instanceof Error ? err : new Error(String(err))
+  }
+}
 const HERO_HEIGHT = 1.62
 /**
  * Visual yaw follows physics this fast (1/s), and never trails it by more than this (rad).
@@ -75,11 +85,14 @@ export class Character implements ICharacter {
   private up = new THREE.Vector3(0, 1, 0)
   private normal = new THREE.Vector3()
   private headLocal = new THREE.Vector3()
+  /** The model's bytes, requested as soon as the game is created so they download while the island builds. */
+  private heroBytes: Promise<ArrayBuffer | Error>
 
   constructor(private ctx: Ctx) {
     this.root.name = 'hero'
     this.root.add(this.pivot)
     this.pivot.add(this.model)
+    this.heroBytes = loadBytes(HERO_URL)
   }
 
   async init(): Promise<void> {
@@ -87,10 +100,9 @@ export class Character implements ICharacter {
     ctx.scene.add(this.root)
     this.makeBlob()
     try {
-      const loader = new GLTFLoader().register(embeddedImagesViaImg)
-      const gltf = await loader.loadAsync(HERO_URL, e => {
-        if (e.total) ctx.progress(e.loaded / e.total)
-      })
+      const bytes = await this.heroBytes
+      if (bytes instanceof Error) throw bytes
+      const gltf = await new GLTFLoader().register(embeddedImagesViaImg).parseAsync(bytes, '')
       this.setupModel(gltf.scene)
     } catch (err) {
       console.error('[starfall] hero model failed to load — using a placeholder', err)

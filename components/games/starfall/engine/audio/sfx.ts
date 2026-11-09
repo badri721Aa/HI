@@ -4,7 +4,8 @@
  * repeats never sound mechanical. Positional effects go through a PannerNode
  * at their world position; the player's own sounds stay centred.
  */
-import type { V3, WeaponId } from '../events'
+import type { BossId, V3, WeaponId } from '../events'
+import { KIND } from '../gameplay/weapons/defs'
 import type { SfxName } from '../types'
 import type { Surface } from '../world/heightfield'
 import type { Bus, Mixer } from './mixer'
@@ -160,6 +161,19 @@ export class Sfx {
       case 'leaves':
         for (let k = 0; k < 3; k++) this.noiseHit(v, t + k * rand(0.012, 0.03), 'highpass', 3400 * p * b, 0.7, 0.07, 0.003, 0.03)
         this.noiseHit(v, t, 'bandpass', 1700 * p, 0.8, 0.08, 0.006, 0.07)
+        break
+      case 'snow':
+        // Packed snow: a soft, grainy squeak-crunch with a muffled body.
+        for (let k = 0; k < 4; k++) this.noiseHit(v, t + k * rand(0.008, 0.02), 'bandpass', 1500 * p * b, 2.2, 0.1, 0.004, 0.035)
+        this.noiseHit(v, t, 'lowpass', 520 * p, 0.7, 0.2, 0.008, 0.1)
+        this.tone(v, t, 'sine', 95 * p, 60, 0.08, 0.006, 0.06)
+        break
+      case 'ice':
+        // Hard and glassy: a sharp click with a short crystalline ring.
+        this.noiseHit(v, t, 'highpass', 4200 * p * b, 1.2, 0.14, 0.001, 0.02)
+        this.tone(v, t, 'sine', 2400 * p, 2350 * p, 0.03, 0.002, 0.12)
+        this.tone(v, t, 'sine', 3720 * p, 3700 * p, 0.018, 0.002, 0.09)
+        this.tone(v, t, 'sine', 150 * p, 90, 0.08, 0.003, 0.04)
         break
       default:
         // grass: a soft, brushy crunch
@@ -377,10 +391,11 @@ export class Sfx {
     if (!this.gate('swing', 0.06)) return
     const t = this.t
     const v = this.voice(this.mix.sfx, 1.6, { wet: 0.25 })
-    if (weapon === 'hammer') {
+    if (KIND[weapon] === 'hammer') {
       this.whoosh(v, t + 0.1, 260, 820, 0.42, 0.22, 0.8)
       return
     }
+    if (weapon === 'starblade') this.chime(v, t + 0.06, 1760 * (1 + combo * 0.12), 0.03, 0.5, 2, 0.8)
     const p = rand(0.94, 1.08) * (1 + combo * 0.1)
     this.whoosh(v, t + 0.04, 900 * p, 3800 * p, 0.1, 0.34, 1.6)
     this.whoosh(v, t + 0.12, 3800 * p, 1200 * p, 0.16, 0.2, 1.6)
@@ -432,11 +447,12 @@ export class Sfx {
   weaponHit(pos: V3, weapon: WeaponId, killed: boolean): void {
     if (!this.gate('whit', 0.03)) return
     const t = this.t
-    const heavy = weapon === 'hammer'
+    const heavy = KIND[weapon] === 'hammer'
     const v = this.voice(this.mix.sfx, 1.3, { pos, ref: 6, wet: 0.3 })
     this.noiseHit(v, t, 'lowpass', heavy ? 1200 : 2600, 3, 0.4, 0.002, heavy ? 0.22 : 0.12, heavy ? 150 : 400)
     this.tone(v, t, 'sine', heavy ? 160 : 300, heavy ? 50 : 110, heavy ? 0.45 : 0.3, 0.002, heavy ? 0.25 : 0.12)
-    if (weapon === 'sword') this.noiseHit(v, t, 'highpass', 5000, 0.7, 0.08, 0.001, 0.05)
+    if (KIND[weapon] === 'sword') this.noiseHit(v, t, 'highpass', 5000, 0.7, 0.08, 0.001, 0.05)
+    if (weapon === 'frostHammer') this.chime(v, t + 0.02, 2600, 0.04, 0.5, 3.5, 1.2)
     if (killed) this.tone(v, t + 0.05, 'triangle', 380, 1500, 0.08, 0.01, 0.28)
   }
 
@@ -445,10 +461,12 @@ export class Sfx {
     if (!this.gate('equip', 0.08)) return
     const t = this.t
     const v = this.voice(this.mix.sfx, 1, { wet: 0.25 })
-    if (weapon === 'sword') {
+    const kind = KIND[weapon]
+    if (kind === 'sword') {
       this.noiseHit(v, t, 'bandpass', 5200, 3, 0.12, 0.01, 0.3, 7600)
       this.chime(v, t + 0.04, 1850, 0.025, 0.7, 3.5, 0.8)
-    } else if (weapon === 'hammer') {
+      if (weapon === 'starblade') this.chime(v, t + 0.1, 2793, 0.02, 1.1, 2, 0.6)
+    } else if (kind === 'hammer') {
       this.tone(v, t, 'sine', 180, 90, 0.25, 0.003, 0.14)
       this.chime(v, t, 420, 0.03, 0.4, 1.41, 1.5)
     } else if (weapon === 'bow') {
@@ -574,5 +592,83 @@ export class Sfx {
         this.tone(v, t + 0.12, 'sine', 1760, 1760, 0.04, 0.006, 0.2)
         break
     }
+  }
+
+  /* ── worlds & bosses ─────────────────────────────────────── */
+
+  /** Stepping into a portal: a rising, swirling rush. */
+  portal(): void {
+    if (!this.gate('portal', 0.5)) return
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1.1, { wet: 0.8 })
+    this.whoosh(v, t, 300, 3200, 0.9, 0.16, 2.5)
+    this.whoosh(v, t + 0.15, 1800, 400, 0.7, 0.08, 3)
+    for (let k = 0; k < 5; k++) this.chime(v, t + 0.05 + k * 0.07, mtof(HIGH_PENTA[(k * 2) % HIGH_PENTA.length]), 0.03, 0.9, 2, 0.7)
+  }
+
+  /** A boss roar: a growling low sweep with a breathy rasp (the Golem's is stonier). */
+  roar(pos: V3, boss: BossId): void {
+    if (!this.gate('roar', 0.6)) return
+    const t = this.t
+    const s = this.s
+    const v = this.voice(this.mix.sfx, 2.2, { pos, ref: 14, wet: 0.6 })
+    const stone = boss === 'frostGolem'
+    const env = s.gain(0, v)
+    const lp = s.filter('lowpass', stone ? 500 : 900, 2, env)
+    s.glide(lp.frequency, t, stone ? 300 : 500, stone ? 900 : 1500, 0.5)
+    const end = s.ahr(env.gain, t, 0.35, 0.18, 0.6, 0.7)
+    s.osc('sawtooth', stone ? 55 : 82, lp, t, end, -12)
+    s.osc('sawtooth', stone ? 56 : 84, lp, t, end, 14)
+    s.osc('square', stone ? 41 : 61, lp, t, end)
+    this.noiseHit(v, t, 'bandpass', stone ? 600 : 1100, 1.2, 0.25, 0.15, 1.2, stone ? 300 : 500, stone ? s.brown : s.pink)
+  }
+
+  /** A boss lands, stomps or crashes: a huge thud and a rumble. */
+  bossSlam(pos: V3): void {
+    if (!this.gate('bslam', 0.12)) return
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 2, { pos, ref: 14, wet: 0.5 })
+    this.tone(v, t, 'sine', 90, 26, 0.8, 0.004, 0.8)
+    this.noiseHit(v, t, 'lowpass', 900, 0.8, 0.5, 0.004, 0.6, 80, this.s.brown)
+    this.noiseHit(v, t + 0.02, 'bandpass', 1800, 1.1, 0.12, 0.003, 0.2, 500)
+  }
+
+  /** A telegraphed hazard goes off. */
+  bossImpact(pos: V3, kind: 'orb' | 'boulder' | 'spike'): void {
+    if (!this.gate(`imp-${kind}`, kind === 'spike' ? 0.05 : 0.08)) return
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1.4, { pos, ref: 8, wet: 0.4 })
+    if (kind === 'spike') {
+      this.noiseHit(v, t, 'highpass', 3000, 1, 0.2, 0.002, 0.08)
+      this.chime(v, t, rand(1900, 2600), 0.05, 0.4, 3.5, 1.5)
+      this.tone(v, t, 'sine', 220, 120, 0.12, 0.002, 0.08)
+    } else if (kind === 'boulder') {
+      this.tone(v, t, 'sine', 110, 34, 0.6, 0.003, 0.5)
+      this.noiseHit(v, t, 'lowpass', 1400, 0.8, 0.4, 0.003, 0.4, 120, this.s.brown)
+    } else {
+      this.tone(v, t, 'sine', 180, 45, 0.4, 0.003, 0.35)
+      this.noiseHit(v, t, 'bandpass', 700, 1.5, 0.3, 0.004, 0.4, 2400, this.s.pink)
+      this.tone(v, t, 'triangle', 640, 160, 0.06, 0.004, 0.3)
+    }
+  }
+
+  /** The boss is beaten: a bright victory sting. */
+  bossVictory(): void {
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1.3, { wet: 0.8 })
+    this.swellChord(v, t, [50, 57, 62, 66, 69], 0.08, 0.5, 1.6, 0.07, 800, 4800)
+    const notes = [74, 78, 81, 86]
+    for (let k = 0; k < notes.length; k++) this.chime(v, t + k * 0.11, mtof(notes[k]), 0.06, 1.6, 2, 0.8)
+    this.swellChord(v, t + 0.5, [50, 57, 62, 66, 69, 74], 0.05, 1.2, 2.4, 0.08, 1200, 5200)
+    this.tone(v, t + 0.5, 'sine', 73, 36, 0.4, 0.01, 1.4)
+  }
+
+  /** A chest creaks open onto something shiny. */
+  chest(): void {
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1.2, { wet: 0.6 })
+    this.noiseHit(v, t, 'bandpass', 700, 6, 0.2, 0.02, 0.3, 1100)
+    this.tone(v, t + 0.25, 'sine', 140, 90, 0.18, 0.004, 0.12)
+    for (let k = 0; k < 6; k++) this.chime(v, t + 0.3 + k * 0.08, mtof(HIGH_PENTA[k % HIGH_PENTA.length] + 12), 0.035, 1.2, 2, 0.6)
   }
 }

@@ -6,7 +6,7 @@
  *
  *   0 u8 kind (1)   1 u8 state   2 u8 flags   3 u8 wading·255
  *   4 f32 t (sender clock, s)   8..19 f32 x y z   20 f32 yaw
- *   24..35 f32 vx vy vz   36 i8 slope·127   37 u8 weapon in hand   38..39 reserved
+ *   24..35 f32 vx vy vz   36 i8 slope·127   37 u8 weapon in hand   38 u8 map   39 reserved
  *
  * Ping/pong: 16 bytes — u8 kind (2 ping, 3 pong), f64 timestamp at offset 8.
  * The Supabase relay uses small JSON objects with the same fields.
@@ -40,7 +40,9 @@ export const FLAG_AWAY = 4
 export const FLAG_ACTIVE = 8
 
 /** Weapon wire codes (append new weapons at the end). */
-const WEAPONS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow']
+const WEAPONS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
+/** Number of map wire codes (see worlds/defs mapCode). */
+const MAP_COUNT = 3
 
 export function weaponCode(w: WeaponId): number {
   return Math.max(0, WEAPONS.indexOf(w))
@@ -70,10 +72,12 @@ export interface Snapshot {
   slope: number
   /** Weapon code (see weaponCode). */
   weapon: number
+  /** Map code (see worlds/defs mapCode). */
+  map: number
 }
 
 export function makeSnapshot(): Snapshot {
-  return { t: 0, x: 0, y: 0, z: 0, yaw: 0, vx: 0, vy: 0, vz: 0, state: 0, flags: FLAG_GROUNDED, wading: 0, slope: 0, weapon: 0 }
+  return { t: 0, x: 0, y: 0, z: 0, yaw: 0, vx: 0, vy: 0, vz: 0, state: 0, flags: FLAG_GROUNDED, wading: 0, slope: 0, weapon: 0, map: 0 }
 }
 
 export function copySnapshot(out: Snapshot, s: Snapshot): Snapshot {
@@ -90,6 +94,7 @@ export function copySnapshot(out: Snapshot, s: Snapshot): Snapshot {
   out.wading = s.wading
   out.slope = s.slope
   out.weapon = s.weapon
+  out.map = s.map
   return out
 }
 
@@ -99,9 +104,10 @@ export const KIND_PONG = 3
 export const STATE_BYTES = 40
 export const PING_BYTES = 16
 
-const LIMIT_XZ = WORLD_HALF + 40
+/** The island plus the portal maps' regions (out to ±2400 m, up to ~140 m). */
+const LIMIT_XZ = 2400 + WORLD_HALF
 const LIMIT_Y_LO = -40
-const LIMIT_Y_HI = 260
+const LIMIT_Y_HI = 400
 const LIMIT_V = 80
 const LIMIT_T = 1e7
 
@@ -124,6 +130,7 @@ function sanitizeSnapshot(s: Snapshot): boolean {
   s.wading = clamp(fin(s.wading) ? s.wading : 0, 0, 1)
   s.slope = clamp(fin(s.slope) ? s.slope : 0, -1, 1)
   if (!(s.weapon >= 0 && s.weapon < WEAPONS.length)) s.weapon = 0
+  if (!(s.map >= 0 && s.map < MAP_COUNT)) s.map = 0
   return true
 }
 
@@ -142,6 +149,7 @@ export function encodeState(view: DataView, s: Snapshot): void {
   view.setFloat32(32, s.vz, true)
   view.setInt8(36, Math.round(clamp(s.slope, -1, 1) * 127))
   view.setUint8(37, s.weapon)
+  view.setUint8(38, s.map)
 }
 
 export function decodeState(view: DataView, out: Snapshot): boolean {
@@ -159,6 +167,7 @@ export function decodeState(view: DataView, out: Snapshot): boolean {
   out.vz = view.getFloat32(32, true)
   out.slope = view.getInt8(36) / 127
   out.weapon = view.getUint8(37)
+  out.map = view.getUint8(38)
   return sanitizeSnapshot(out)
 }
 
@@ -175,6 +184,8 @@ export interface RelayPacket {
   sl: number
   /** Weapon code (absent from older clients). */
   wp?: number
+  /** Map code (absent from older clients: the island). */
+  m?: number
 }
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000
@@ -192,6 +203,7 @@ export function toRelay(from: string, s: Snapshot): RelayPacket {
     w: r2(s.wading),
     sl: r2(s.slope),
     wp: s.weapon,
+    m: s.map,
   }
 }
 
@@ -219,6 +231,7 @@ export function fromRelay(raw: unknown, out: Snapshot): boolean {
   out.wading = fin(o.w) ? o.w : 0
   out.slope = fin(o.sl) ? o.sl : 0
   out.weapon = fin(o.wp) ? Math.floor(o.wp) : 0
+  out.map = fin(o.m) ? Math.floor(o.m) : 0
   return sanitizeSnapshot(out)
 }
 

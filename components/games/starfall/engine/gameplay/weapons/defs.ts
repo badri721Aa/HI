@@ -4,10 +4,19 @@
  */
 import type { WeaponId } from '../../events'
 
-/** Hotbar order: keys 1–4. */
-export const HOTBAR: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow']
+/** Hotbar order: keys 1–6. */
+export const HOTBAR: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
 
-export const WEAPON_NAMES: Record<WeaponId, string> = { fists: 'Fists', sword: 'Sword', hammer: 'Hammer', bow: 'Bow' }
+export const WEAPON_NAMES: Record<WeaponId, string> = {
+  fists: 'Fists', sword: 'Sword', hammer: 'Hammer', bow: 'Bow', starblade: 'Starblade', frostHammer: 'Frost Hammer',
+}
+
+/** The move set (and hand poses, grip, sounds) a weapon uses: reward weapons are variants. */
+export type WeaponKind = 'fists' | 'sword' | 'hammer' | 'bow'
+
+export const KIND: Record<WeaponId, WeaponKind> = {
+  fists: 'fists', sword: 'sword', hammer: 'hammer', bow: 'bow', starblade: 'sword', frostHammer: 'hammer',
+}
 
 /** Fast three-slash combo; pressing attack during a slash chains the next. */
 export const SWORD = {
@@ -24,6 +33,15 @@ export const SWORD = {
   rest: 0.18,
 }
 
+/** The Gloom King's reward: the sword's combo, harder and with a longer reach. */
+export const STARBLADE = {
+  ...SWORD,
+  damage: [55, 55, 80],
+  knock: [8, 8, 14],
+  reach: 1.3,
+  radius: 1.5,
+}
+
 /** Slow wind-up and overhead slam: a heavy direct hit plus a shockwave ring. */
 export const HAMMER = {
   time: 0.92,
@@ -36,6 +54,15 @@ export const HAMMER = {
   wave: { radius: 3.4, damage: 36, knock: 10, lift: 8 },
   moveScale: 0.15,
   rest: 0.15,
+}
+
+/** The Frost Golem's reward: the hammer's slam; survivors freeze solid for a moment. */
+export const FROST_HAMMER = {
+  ...HAMMER,
+  damage: 85,
+  wave: { radius: 3.8, damage: 40, knock: 10, lift: 8 },
+  /** Seconds a gloomling stays frozen. */
+  freeze: 2.6,
 }
 
 /** Hold to draw, release to shoot: speed and damage grow with the draw. */

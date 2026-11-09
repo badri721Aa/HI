@@ -1,3 +1,4 @@
+import type { BlockMsg } from './build/blocks'
 import type { Surface } from './world/heightfield'
 
 export interface V3 {
@@ -15,14 +16,23 @@ export type GamePhase =
   | 'dialog'
   | 'victory'
 
-export type ToastKind = 'shard' | 'checkpoint' | 'heart' | 'info' | 'warning'
+export type ToastKind = 'shard' | 'checkpoint' | 'heart' | 'info' | 'warning' | 'reward'
 
-export type CutsceneName = 'intro' | 'shard' | 'beacon'
+/** 'boss': the short boss introduction (arg = the boss's index in BOSS_IDS). */
+export type CutsceneName = 'intro' | 'shard' | 'beacon' | 'boss'
 
-export type MusicMood = 'title' | 'explore' | 'danger' | 'cutscene' | 'victory'
+export type MusicMood = 'title' | 'explore' | 'danger' | 'cutscene' | 'victory' | 'boss'
 
-/** Hotbar order: fists are always owned; the rest are found in the world. */
-export type WeaponId = 'fists' | 'sword' | 'hammer' | 'bow'
+/**
+ * Hotbar order: fists are always owned; sword, hammer and bow are found on the island,
+ * the starblade and the frost hammer are boss rewards.
+ */
+export type WeaponId = 'fists' | 'sword' | 'hammer' | 'bow' | 'starblade' | 'frostHammer'
+
+/** The worlds: Starfall Isle plus the maps behind its portal arches. */
+export type MapId = 'isle' | 'rift' | 'frost'
+
+export type BossId = 'gloomKing' | 'frostGolem'
 
 export interface VictoryStats {
   time: number
@@ -87,6 +97,23 @@ export interface GameEventMap {
   'cutscene:end': { name: CutsceneName; skipped: boolean }
   'audio:music': { mood: MusicMood }
 
+  // ── worlds & bosses ────────────────────────────────────
+  /** The player stepped into a portal (the fade starts). */
+  'portal:enter': { pos: V3; to: MapId }
+  /** Arrived in another map (after the fade, before it clears). */
+  'world:travel': { from: MapId; to: MapId }
+  'boss:roar': { pos: V3; boss: BossId }
+  /** A boss slam / landing / stomp: a heavy thud and a shockwave. */
+  'boss:slam': { pos: V3; boss: BossId }
+  /** A telegraphed hazard went off (orb, boulder, ice spike). */
+  'boss:impact': { pos: V3; kind: 'orb' | 'boulder' | 'spike' }
+  'boss:defeat': { pos: V3; boss: BossId }
+  'chest:open': { pos: V3 }
+
+  // ── building ───────────────────────────────────────────
+  'block:place': { pos: V3; surface: Surface }
+  'block:break': { pos: V3; surface: Surface }
+
   // ── weapons ────────────────────────────────────────────
   'weapon:pickup': { weapon: WeaponId; pos: V3 }
   'weapon:equip': { weapon: WeaponId }
@@ -106,6 +133,8 @@ export interface GameEventMap {
   'net:room': { code: string; name: string; public: boolean; players: number; max: number } | null
   'net:chat': { id: string; name: string; color: string; text: string; system?: boolean }
   'net:peer': { id: string; name: string; joined: boolean }
+  /** Block edits from another player (validated). */
+  'net:blocks': { id: string } & BlockMsg
 }
 
 type Handler<T> = (payload: T) => void

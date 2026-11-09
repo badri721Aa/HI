@@ -4,14 +4,15 @@
  * and release. Keys are at normalised times (0..1 through the move) and, like gestures, list only
  * what differs from standing; the animator blends them over the upper body.
  */
-import type { WeaponId, WeaponMove } from '../../types'
+import type { WeaponKind } from '../../gameplay/weapons/defs'
+import type { WeaponMove } from '../../types'
 import type { PoseSpec } from './Pose'
 import { IDLE } from './poses'
 
 const k = (s: PoseSpec): PoseSpec => ({ ...IDLE, ...s })
 
 /** Holding pose of the weapon arm (blended partly over the gait's arm swing). */
-export const CARRY: Record<Exclude<WeaponId, 'fists'>, PoseSpec> = {
+export const CARRY: Record<Exclude<WeaponKind, 'fists'>, PoseSpec> = {
   // Blade up and forward, ready.
   sword: k({ armR: [-14, 0, 12], elbowR: 62, handR: [-12, 0, 0], curlR: 1 }),
   // Heavy: hanging at the side, head down by the feet.

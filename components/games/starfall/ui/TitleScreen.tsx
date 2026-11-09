@@ -122,6 +122,7 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
         }]
       : []),
     { id: 'new', label: 'New Game', onSelect: () => (hasSave ? open('confirmNew', 'new') : start()) },
+    { id: 'creative', label: 'Creative', meta: 'Build & fly · no enemies', onSelect: () => game.startCreative() },
     {
       id: 'online',
       label: 'Play Online',

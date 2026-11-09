@@ -13,6 +13,7 @@ import { GLTFLoader, type GLTFParser } from 'three/examples/jsm/loaders/GLTFLoad
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { GroundHit } from '../collision'
 import type { Ctx, GestureName, MotionState, WeaponId, WeaponPose } from '../types'
+import { KIND } from '../gameplay/weapons/defs'
 import { WeaponKit, type HeldWeapon } from '../gameplay/weapons/models'
 import { Animator, type GroundSample } from '../player/Animator'
 import { createGrip } from '../player/anim/grip'
@@ -170,7 +171,7 @@ class Avatar {
     this.weaponPose.weapon = id
     for (const [w, o] of this.weapons) o.visible = w === id
     if (id === 'fists' || this.weapons.has(id)) return
-    const grip = this.grips[id === 'bow' ? 0 : 1]
+    const grip = this.grips[KIND[id] === 'bow' ? 0 : 1]
     if (!grip) return
     const m = this.weaponKit().make(id)
     grip.add(m.group)
@@ -218,7 +219,9 @@ class Avatar {
     const dist = camera.position.distanceTo(p.position)
     _sphere.center.set(p.position.x, p.position.y + 0.9, p.position.z)
     _sphere.radius = 1.4
-    const visible = p.ready && dist < CULL_DIST && frustum.intersectsSphere(_sphere)
+    // Players in another map (behind a portal) are not drawn.
+    const here = p.map === (this.ctx.worlds?.current ?? 'isle')
+    const visible = p.ready && here && dist < CULL_DIST && frustum.intersectsSphere(_sphere)
     root.visible = visible
     this.updateBlob(visible && dist < 60)
     if (!visible) {

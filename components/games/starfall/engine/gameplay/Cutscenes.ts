@@ -15,6 +15,7 @@ import type { Ctx, ICutscenes } from '../types'
 import type { CutsceneName } from '../events'
 import { heightAt, waterLevelAt } from '../world/heightfield'
 import { buildBeacon } from './cutscene/beacon'
+import { buildBoss } from './cutscene/boss'
 import { buildIntro } from './cutscene/intro'
 import { buildShard } from './cutscene/shard'
 import { runAll, type Scene } from './cutscene/scene'
@@ -59,7 +60,11 @@ export class Cutscenes implements ICutscenes {
     if (this.scene) this.complete(true)
     let scene: Scene
     try {
-      scene = name === 'intro' ? buildIntro(this.ctx) : name === 'shard' ? buildShard(this.ctx, arg ?? 0) : buildBeacon(this.ctx)
+      scene =
+        name === 'intro' ? buildIntro(this.ctx)
+        : name === 'shard' ? buildShard(this.ctx, arg ?? 0)
+        : name === 'boss' ? buildBoss(this.ctx)
+        : buildBeacon(this.ctx)
     } catch (err) {
       console.error(`[starfall] cutscene ${name} failed to build`, err)
       return Promise.resolve()

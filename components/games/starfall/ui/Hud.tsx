@@ -1,13 +1,19 @@
 'use client'
-/** In-play HUD: hearts, dash, online chip, objective, compass, shards & sparks, zone card, prompt, weapon hotbar, bow crosshair, pointer-lock hint. */
+/**
+ * In-play HUD: hearts (or the Creative badge), dash, online chip, objective, compass, boss bar, shards & sparks,
+ * zone card, prompt, weapon hotbar or build bar, crosshairs, pointer-lock hint.
+ */
 import { useEffect, useState, type ComponentType, type CSSProperties, type SVGProps } from 'react'
+import { BLOCKS, type BlockDef } from '../engine/build/blocks'
 import type { WeaponId } from '../engine/events'
 import { HOTBAR, WEAPON_NAMES } from '../engine/gameplay/weapons/defs'
 import { Compass } from './Compass'
 import { playUi, useGameUi, useHud, useNet, useUi } from './context'
 import { KeyCap } from './controls'
 import { DamageNumbers } from './DamageNumbers'
-import { BowIcon, DashIcon, FistIcon, HammerIcon, HeartIcon, InteractIcon, MouseIcon, PauseIcon, SparkIcon, StarIcon, SwordIcon } from './icons'
+import {
+  BowIcon, DashIcon, FistIcon, FrostHammerIcon, HammerIcon, HeartIcon, InteractIcon, MouseIcon, PauseIcon, SparkIcon, StarbladeIcon, StarIcon, SwordIcon,
+} from './icons'
 import { NetChip } from './OnlineHud'
 import { cx, LABEL } from './theme'
 import styles from './ui.module.css'
@@ -20,6 +26,7 @@ export function Hud() {
   const phase = useUi(s => s.phase)
   const visible = phase === 'playing' || phase === 'dialog'
   const playing = phase === 'playing'
+  const creative = useHud(h => h.creative)
 
   return (
     <div
@@ -31,7 +38,7 @@ export function Hud() {
       <div className={cx('absolute flex flex-col items-start', GUTTER)}>
         <div className="flex items-center gap-3">
           {touch && <TouchPause enabled={playing} />}
-          <Hearts />
+          {creative ? <CreativeBadge /> : <Hearts />}
         </div>
         {/* On touch the Dash button carries its own charge ring. */}
         {!touch && <DashMeter />}
@@ -40,6 +47,7 @@ export function Hud() {
       </div>
 
       <Compass active={visible} className="absolute left-1/2 top-[clamp(10px,2vw,20px)] w-[min(380px,64vw)] -translate-x-1/2 max-sm:top-[62px]" />
+      <BossBar />
 
       <div className={cx('absolute flex flex-col items-end gap-2', GUTTER_R)}>
         <ShardSlots />
@@ -50,8 +58,11 @@ export function Hud() {
       <ZoneCard visible={visible} />
       <DamageNumbers />
       {playing && <Crosshair />}
+      {playing && <BuildCrosshair />}
       {playing && <Prompt />}
-      <Hotbar />
+      {/* Dialogs sit where the bars are: the bars step aside while one is open. */}
+      {playing && <Hotbar />}
+      {playing && <BuildBar />}
       {playing && !touch && <LookHint />}
     </div>
   )
@@ -125,7 +136,9 @@ function DashMeter() {
 function ObjectiveLine({ hidden }: { hidden: boolean }) {
   const objective = useUi(s => s.objective)
   const online = useNet(s => !!s.room)
-  if (!objective || hidden) return null
+  // In a boss fight the boss bar says it all, and it needs the room (phones, narrow windows).
+  const fighting = useHud(h => h.boss !== null)
+  if (!objective || hidden || fighting) return null
   return (
     <div
       key={objective.id}
@@ -237,9 +250,16 @@ function ZoneCard({ visible }: { visible: boolean }) {
 function Prompt() {
   const { touch } = useGameUi()
   const prompt = useUi(s => s.prompt)
+  // Phones stack the weapon / block bar above the touch buttons: the prompt goes above that bar.
+  const barUp = useHud(h => h.weapons.length > 1 || h.build !== null)
   if (!prompt) return null
   return (
-    <div className={cx('absolute inset-x-0 bottom-[clamp(96px,17vh,150px)] flex justify-center px-6', touch && 'max-sm:bottom-[calc(env(safe-area-inset-bottom)+252px)]')}>
+    <div
+      className={cx(
+        'absolute inset-x-0 bottom-[clamp(96px,17vh,150px)] flex justify-center px-6',
+        touch && (barUp ? 'max-sm:bottom-[calc(env(safe-area-inset-bottom)+326px)]' : 'max-sm:bottom-[calc(env(safe-area-inset-bottom)+252px)]'),
+      )}
+    >
       <div
         key={`${prompt.key}|${prompt.label}`}
         className={cx(styles.prompt, 'flex items-center gap-3 rounded-full border border-[#F3EEE6]/12 bg-[#0B0F14]/72 py-1.5 pl-1.5 pr-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]')}
@@ -257,16 +277,60 @@ function Prompt() {
   )
 }
 
+/* ── boss ───────────────────────────────────────────────────────── */
+
+const BOSS_FILL = 'linear-gradient(90deg, #8E3426, #E8664F)'
+
+/** The boss's name and health across the top while a fight is on; amber while it is stunned (hit it now). */
+function BossBar() {
+  const boss = useHud(h => h.boss)
+  if (!boss) return null
+  const width = `${(Math.max(0, Math.min(1, boss.hp / boss.max)) * 100).toFixed(1)}%`
+  return (
+    <div
+      role="status"
+      aria-label={`${boss.name}: ${boss.hp} of ${boss.max}`}
+      className={cx(styles.bossBar, 'absolute left-1/2 top-[clamp(58px,8vh,78px)] flex w-[min(560px,74vw)] -translate-x-1/2 flex-col items-center gap-1.5 max-sm:top-[112px]')}
+    >
+      <div className="flex items-center gap-3">
+        <span className="h-px w-[clamp(18px,4vw,48px)] bg-[#F5B455]/70" />
+        <span className={cx(styles.hudText, 'font-nacelle text-[clamp(14px,1.6vw,18px)] font-semibold uppercase tracking-[0.18em] text-[#F3EEE6]')}>{boss.name}</span>
+        <span className="h-px w-[clamp(18px,4vw,48px)] bg-[#F5B455]/70" />
+      </div>
+      <div className="relative h-[10px] w-full overflow-hidden rounded-full bg-[#0B0F14]/60 shadow-[0_6px_20px_rgba(0,0,0,0.35)] ring-1 ring-[#F3EEE6]/20">
+        {/* The chunk just lost lingers a moment before draining away. */}
+        <div className="absolute inset-y-0 left-0 rounded-full bg-[#F3EEE6]/45 transition-[width] delay-300 duration-700 ease-out" style={{ width }} />
+        <div
+          className={cx('absolute inset-y-0 left-0 rounded-full transition-[width] duration-150 ease-out', boss.vulnerable && styles.bossStunned)}
+          style={{ width, background: boss.vulnerable ? '#F5B455' : BOSS_FILL }}
+        />
+        {[1 / 3, 2 / 3].map(f => (
+          <span key={f} className="absolute inset-y-0 w-px bg-[#0B0F14]/70" style={{ left: `${f * 100}%` }} />
+        ))}
+      </div>
+      <div className={cx(LABEL, styles.hudText, 'flex h-4 items-center gap-2 text-[10px]')}>
+        {[1, 2, 3].map(n => (
+          <span key={n} className={cx('h-1.5 w-1.5 rotate-45', n <= boss.phase ? 'bg-[#E8664F]' : 'bg-[#F3EEE6]/25')} />
+        ))}
+        <span className={boss.vulnerable ? 'text-[#F5B455]' : 'text-[#F3EEE6]/60'}>{boss.vulnerable ? 'Stunned — strike now!' : `Phase ${boss.phase}`}</span>
+      </div>
+    </div>
+  )
+}
+
 /* ── weapons ────────────────────────────────────────────────────── */
 
-const WEAPON_ICON: Record<WeaponId, ComponentType<SVGProps<SVGSVGElement>>> = { fists: FistIcon, sword: SwordIcon, hammer: HammerIcon, bow: BowIcon }
+const WEAPON_ICON: Record<WeaponId, ComponentType<SVGProps<SVGSVGElement>>> = {
+  fists: FistIcon, sword: SwordIcon, hammer: HammerIcon, bow: BowIcon, starblade: StarbladeIcon, frostHammer: FrostHammerIcon,
+}
 
 /** Owned weapons, bottom centre; the one in hand is lit. On touch the slots are the way to switch. */
 function Hotbar() {
   const { game, touch } = useGameUi()
   const owned = useHud(h => h.weapons)
   const current = useHud(h => h.weapon)
-  if (owned.length < 2) return null
+  const building = useHud(h => h.build !== null)
+  if (owned.length < 2 || building) return null
   return (
     <div
       className={cx(
@@ -327,14 +391,117 @@ function Crosshair() {
 function LookHint() {
   const locked = useUi(s => s.pointerLocked)
   const typing = useNet(s => s.chatOpen)
-  const armed = useHud(h => h.weapons.length > 1)
+  const raised = useHud(h => h.weapons.length > 1 || h.build !== null)
   if (locked || typing) return null
   return (
-    <div className={cx('absolute inset-x-0 flex justify-center', armed ? 'bottom-[clamp(100px,14vh,112px)]' : 'bottom-[clamp(28px,6vh,56px)]')}>
+    <div className={cx('absolute inset-x-0 flex justify-center', raised ? 'bottom-[clamp(100px,14vh,112px)]' : 'bottom-[clamp(28px,6vh,56px)]')}>
       <div className={cx(styles.presence, 'flex items-center gap-2 text-[12px] uppercase tracking-[0.18em] text-[#F3EEE6]/75')} data-state="open" style={{ animationDelay: '700ms' }}>
         <MouseIcon className={cx(styles.hudIcon, styles.hintBreath, 'h-4 w-4')} />
         <span className={styles.hudText}>Click to look around</span>
       </div>
     </div>
+  )
+}
+
+/* ── Creative & building ────────────────────────────────────────── */
+
+/** Creative games say so where the hearts would be (nothing hurts here), with a tag while flying. */
+function CreativeBadge() {
+  const flying = useHud(h => h.flying)
+  return (
+    <div className="flex h-[22px] items-center gap-2 max-sm:h-5">
+      <span className={cx(LABEL, styles.hudText, 'rounded-[4px] border border-[#F5B455]/60 bg-[#F5B455]/15 px-2.5 py-[3px] text-[10px] text-[#F5B455]')}>
+        Creative
+      </span>
+      {flying && (
+        <span className={cx(LABEL, styles.hudText, styles.pop, 'rounded-[4px] border border-[#A9D8F2]/45 bg-[#A9D8F2]/10 px-2 py-[3px] text-[10px] text-[#D4ECF8]')}>
+          Flying
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** Build mode: a plus where the block goes. */
+function BuildCrosshair() {
+  const building = useHud(h => h.build !== null)
+  if (!building) return null
+  return (
+    <svg aria-hidden width="28" height="28" viewBox="0 0 28 28" className={cx(styles.hudIcon, 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2')}>
+      <path d="M14 7v14M7 14h14" stroke="#F3EEE6" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** Build mode: the block bar (icons from the block textures), our count against the cap, and the controls. */
+function BuildBar() {
+  const { game, touch } = useGameUi()
+  const build = useHud(h => h.build)
+  if (!build) return null
+  const full = build.count >= build.max
+  return (
+    <div
+      className={cx(
+        'absolute inset-x-0 flex flex-col items-center gap-1.5',
+        touch ? 'bottom-[calc(env(safe-area-inset-bottom)+14px)] max-sm:bottom-[calc(env(safe-area-inset-bottom)+238px)]' : 'bottom-[clamp(14px,2.6vh,24px)]',
+      )}
+    >
+      <div className="flex items-baseline gap-3">
+        <span key={build.slot} className={cx(LABEL, styles.hudText, styles.pop, 'text-[10px] text-[#F3EEE6]/80')}>{BLOCKS[build.slot].name}</span>
+        <span className={cx(styles.hudText, 'text-[11px] tabular-nums', full ? 'text-[#E8664F]' : 'text-[#F3EEE6]/55')}>
+          {build.count} / {build.max}
+        </span>
+      </div>
+      <div role="toolbar" aria-label="Blocks" className="flex gap-1 rounded-[6px] border border-[#F3EEE6]/10 bg-[#0B0F14]/40 p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.3)] max-sm:gap-0.5 max-sm:p-1">
+        {BLOCKS.map((def, i) => {
+          const on = i === build.slot
+          return (
+            <button
+              key={def.name}
+              type="button"
+              tabIndex={-1}
+              aria-label={def.name}
+              aria-pressed={on}
+              onPointerDown={e => {
+                e.preventDefault()
+                game.ctx.build.select(i)
+              }}
+              className={cx(
+                'relative grid h-11 w-11 place-items-center rounded-[4px] border max-sm:h-8 max-sm:w-8',
+                touch && 'pointer-events-auto touch-none',
+                on ? 'border-[#F5B455]/80 bg-[#F5B455]/15' : 'border-[#F3EEE6]/15 bg-[#0B0F14]/30',
+              )}
+            >
+              <BlockIcon def={def} />
+              {!touch && i < 10 && <span className="absolute left-1 top-0.5 text-[9px] font-semibold tabular-nums text-[#F3EEE6]/45">{(i + 1) % 10}</span>}
+            </button>
+          )
+        })}
+      </div>
+      {!touch && (
+        <div className={cx(styles.hudText, 'flex items-center gap-3 text-[11px] uppercase tracking-[0.14em] text-[#F3EEE6]/60')}>
+          <span className="flex items-center gap-1.5"><KeyCap>LMB</KeyCap>place</span>
+          <span className="flex items-center gap-1.5"><KeyCap>RMB</KeyCap>break</span>
+          <span className="flex items-center gap-1.5"><KeyCap>R</KeyCap>rotate</span>
+          <span className="flex items-center gap-1.5"><KeyCap>B</KeyCap>exit</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The folder TextureLib loads from (engine/textures.ts), spelled out so the HUD bundle doesn't pull in three.js. */
+const texUrl = (name: string) => `url(/games/starfall/textures/${name}.webp)`
+
+/** A little isometric cube painted with the block's own textures (stairs: their profile). */
+function BlockIcon({ def }: { def: BlockDef }) {
+  const vars = { '--top': texUrl(def.top), '--side': texUrl(def.side), '--tint': def.tint } as CSSProperties
+  if (def.shape === 'stairs') return <span aria-hidden className={styles.blockStairs} style={vars} />
+  return (
+    <span aria-hidden className={styles.blockIcon} data-look={def.look} style={vars}>
+      <i data-face="top" />
+      <i data-face="front" />
+      <i data-face="side" />
+    </span>
   )
 }

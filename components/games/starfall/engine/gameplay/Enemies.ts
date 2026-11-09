@@ -10,12 +10,15 @@
  * impact) before it pops.
  *
  * Rendering: one InstancedMesh for every body (eyes, horns and grin are part of
- * the merged geometry; per-instance eye glow / hurt flash via an instanced
+ * the merged geometry; per-instance eye glow / hurt flash / frost via an instanced
  * attribute), one batch of eye glows and one of soft blob shadows.
+ *
+ * Besides the island's gloomlings the list holds a small pool of minions (boss summons:
+ * never saved), and `addTarget` lets weapon blows reach other things too (bosses).
  */
 import * as THREE from 'three'
 import type { MusicMood, V3 } from '../events'
-import type { Ctx, IEnemies, WeaponHit } from '../types'
+import type { Ctx, HitTarget, IEnemies, WeaponHit } from '../types'
 import { ENEMIES } from '../world/level'
 import { heightAt, waterLevelAt } from '../world/heightfield'
 import { Billboards } from './parts/Billboards'
@@ -60,6 +63,9 @@ const TUMBLE_TIME = 2.4
 const CALM_DELAY = 4
 /** Beyond this distance from the player gloomlings doze (no AI, no ground queries). */
 const SLEEP_RANGE = 90
+/** Boss minions: pool size, and how far they follow the player from where they appeared. */
+const MINIONS = 6
+const MINION_LEASH = 60
 
 const EYE_LOCAL = [
   new THREE.Vector3(-0.165, 0.5, 0.47),
@@ -67,7 +73,9 @@ const EYE_LOCAL = [
 ]
 
 interface Gloom {
+  /** Spawn index in ENEMIES (saved when defeated); -1 for minions. */
   index: number
+  minion: boolean
   big: boolean
   scale: number
   hp: number
@@ -75,6 +83,9 @@ interface Gloom {
   homeX: number
   homeZ: number
   patrol: number
+  leash: number
+  /** Frozen solid (frost hammer) for this many more seconds. */
+  frost: number
   x: number
   y: number
   z: number
@@ -127,6 +138,7 @@ export class Enemies implements IEnemies {
   frozen = false
 
   private list: Gloom[] = []
+  private targets: HitTarget[] = []
   private body: THREE.InstancedMesh | null = null
   private shadows: THREE.InstancedMesh | null = null
   private stateAttr: THREE.InstancedBufferAttribute | null = null
@@ -151,27 +163,35 @@ export class Enemies implements IEnemies {
 
   constructor(private ctx: Ctx) {}
 
+  get minionCount(): number {
+    let n = 0
+    for (const g of this.list) if (g.minion && this.alive(g)) n++
+    return n
+  }
+
   init(): void {
     const ctx = this.ctx
-    this.list = ENEMIES.map((sp, index) => {
-      const scale = sp.big ? 1.6 : 1
-      const y = supportHeight(ctx, sp.x, sp.z, heightAt(sp.x, sp.z) + 0.3, 0.5 * scale)
+    const make = (index: number, x: number, z: number, big: boolean, patrol: number): Gloom => {
+      const scale = big ? 1.6 : 1
+      const y = index < 0 ? 0 : supportHeight(ctx, x, z, heightAt(x, z) + 0.3, 0.5 * scale)
       const yaw = this.random() * Math.PI * 2
       return {
-        index, big: !!sp.big, scale, hp: sp.big ? HP_BIG : HP_SMALL, maxHp: sp.big ? HP_BIG : HP_SMALL,
-        homeX: sp.x, homeZ: sp.z, patrol: sp.patrol,
-        x: sp.x, y, z: sp.z, yaw, targetYaw: yaw,
-        state: IDLE, stateT: 0, idleFor: 0.5 + this.random() * 2, tx: sp.x, tz: sp.z,
+        index, minion: index < 0, big, scale, hp: big ? HP_BIG : HP_SMALL, maxHp: big ? HP_BIG : HP_SMALL,
+        homeX: x, homeZ: z, patrol, leash: index < 0 ? MINION_LEASH : LEASH, frost: 0,
+        x, y, z, yaw, targetYaw: yaw,
+        state: index < 0 ? DEAD : IDLE, stateT: 0, idleFor: 0.5 + this.random() * 2, tx: x, tz: z,
         hop: REST, hopT: 0, hopDur: 0, restFor: 0, hopH: 0,
-        sx: sp.x, sy: y, sz: sp.z, lx: sp.x, ly: y, lz: sp.z,
+        sx: x, sy: y, sz: z, lx: x, ly: y, lz: z,
         sq: 0, sqv: 0, hitCd: 0, invuln: 0, flash: 0, eye: 1, anger: 0,
         blinkIn: 1 + this.random() * 4, blinkT: 0, ignoreT: 0, deathT: 0, alertHop: false,
         vx: 0, vy: 0, vz: 0, rx: 0, rz: 0, wx: 0, wz: 0, bounces: 0,
       }
-    })
+    }
+    this.list = ENEMIES.map((sp, index) => make(index, sp.x, sp.z, !!sp.big, sp.patrol))
+    for (let i = 0; i < MINIONS; i++) this.list.push(make(-1, 0, 0, false, 3))
 
     const geo = gloomlingGeometry()
-    this.stateAttr = new THREE.InstancedBufferAttribute(new Float32Array(this.list.length * 3), 3).setUsage(THREE.DynamicDrawUsage)
+    this.stateAttr = new THREE.InstancedBufferAttribute(new Float32Array(this.list.length * 4), 4).setUsage(THREE.DynamicDrawUsage)
     geo.setAttribute('aState', this.stateAttr)
     const body = new THREE.InstancedMesh(geo, gloomMaterial(), this.list.length)
     body.name = 'gloomlings'
@@ -218,7 +238,12 @@ export class Enemies implements IEnemies {
   syncWithSave(): void {
     const defeated = new Set(this.ctx.game.save.enemies)
     for (const g of this.list) {
+      if (g.minion) {
+        this.setState(g, DEAD)
+        continue
+      }
       g.hp = g.maxHp
+      g.frost = 0
       g.x = g.sx = g.lx = g.tx = g.homeX
       g.z = g.sz = g.lz = g.tz = g.homeZ
       g.y = g.sy = g.ly = supportHeight(this.ctx, g.x, g.z, heightAt(g.x, g.z) + 0.3, 0.5 * g.scale)
@@ -261,22 +286,70 @@ export class Enemies implements IEnemies {
       n++
       this.weaponHit(g, h)
     }
+    for (const t of this.targets) {
+      if (n >= max) break
+      if (t.takeHit(h)) n++
+    }
     return n
   }
 
   nearest(p: V3, radius: number, out: THREE.Vector3): boolean {
     let best = radius * radius
-    let found: Gloom | null = null
+    let found = false
     for (const g of this.list) {
       if (!this.alive(g) || Math.abs(g.y - p.y) > 2.5) continue
       const d = (g.x - p.x) ** 2 + (g.z - p.z) ** 2
       if (d < best) {
         best = d
-        found = g
+        found = true
+        out.set(g.x, g.y, g.z)
       }
     }
-    if (found) out.set(found.x, found.y, found.z)
-    return !!found
+    for (const t of this.targets) {
+      if (!t.aimPoint(this.v)) continue
+      const d = (this.v.x - p.x) ** 2 + (this.v.z - p.z) ** 2
+      if (d < best) {
+        best = d
+        found = true
+        out.copy(this.v)
+      }
+    }
+    return found
+  }
+
+  addTarget(t: HitTarget): () => void {
+    this.targets.push(t)
+    return () => {
+      const i = this.targets.indexOf(t)
+      if (i >= 0) this.targets.splice(i, 1)
+    }
+  }
+
+  spawnMinion(x: number, y: number, z: number): boolean {
+    const g = this.list.find(m => m.minion && m.state === DEAD)
+    if (!g) return false
+    const yaw = Math.atan2(this.ctx.player.position.x - x, this.ctx.player.position.z - z)
+    g.hp = g.maxHp
+    g.x = g.sx = g.lx = g.tx = g.homeX = x
+    g.z = g.sz = g.lz = g.tz = g.homeZ = z
+    g.y = g.sy = g.ly = y
+    g.yaw = g.targetYaw = yaw
+    g.hop = REST
+    g.hopT = g.restFor = 0
+    g.sq = -0.5
+    g.sqv = 8
+    g.flash = g.hitCd = g.ignoreT = g.frost = 0
+    g.invuln = 0.4
+    g.eye = g.anger = 1
+    g.alertHop = true
+    this.setState(g, CHASE)
+    this.ctx.fx.burst('poof', { x, y: y + 0.4, z }, { scale: 1.2, color: '#9a6bff' })
+    return true
+  }
+
+  clearMinions(): void {
+    for (const g of this.list) if (g.minion && g.state !== DEAD) this.setState(g, DEAD)
+    this.render()
   }
 
   /* ── frame ───────────────────────────────────────────────── */
@@ -301,6 +374,7 @@ export class Enemies implements IEnemies {
       g.invuln = Math.max(0, g.invuln - dt)
       g.ignoreT = Math.max(0, g.ignoreT - dt)
       g.flash = Math.max(0, g.flash - dt * 5)
+      g.frost = Math.max(0, g.frost - dt)
 
       if (g.state === DYING) {
         g.deathT += dt
@@ -317,11 +391,13 @@ export class Enemies implements IEnemies {
       const pd = Math.hypot(dx, dz)
       const asleep = pd > SLEEP_RANGE && g.hop === REST && (g.state === IDLE || g.state === WANDER)
 
-      if (active && !asleep) {
+      // Frozen solid: no thinking, no contact damage, no new hops (a hop in the air still lands).
+      const frozen = g.frost > 0
+      if (active && !asleep && !frozen) {
         this.think(g, pd, playerAlive)
         if (this.interact(g, pd, feetPrev)) continue
       }
-      if (!asleep) this.move(g, dt, active)
+      if (!asleep) this.move(g, dt, active && !frozen)
       if (g.state === CHASE || g.state === ALERT) chasing++
 
       // facing
@@ -352,7 +428,7 @@ export class Enemies implements IEnemies {
     switch (g.state) {
       case IDLE:
       case WANDER:
-        if (playerAlive && g.ignoreT <= 0 && pd < NOTICE_RANGE && Math.abs(pp.y - g.y) < NOTICE_DY && homeD < LEASH - 1) {
+        if (playerAlive && g.ignoreT <= 0 && pd < NOTICE_RANGE && Math.abs(pp.y - g.y) < NOTICE_DY && homeD < g.leash - 1) {
           this.setState(g, ALERT)
           g.targetYaw = Math.atan2(pp.x - g.x, pp.z - g.z)
           g.alertHop = false
@@ -361,7 +437,7 @@ export class Enemies implements IEnemies {
         }
         break
       case CHASE:
-        if (!playerAlive || selfHome > LEASH || homeD > LEASH + 2 || pd > LEASH + 2) {
+        if (!playerAlive || selfHome > g.leash || homeD > g.leash + 2 || pd > g.leash + 2) {
           this.setState(g, RETURN)
           g.ignoreT = 2
         }
@@ -412,7 +488,7 @@ export class Enemies implements IEnemies {
       g.deathT = 0
       const pos = { x: g.x, y: g.y + 0.45 * g.scale, z: g.z }
       this.ctx.bus.emit('enemy:defeat', { pos, big: g.big })
-      this.ctx.game.defeatEnemy(g.index)
+      if (!g.minion) this.ctx.game.defeatEnemy(g.index)
       this.ctx.game.shake(g.big ? 0.35 : 0.2, 0.18)
       return true
     }
@@ -451,13 +527,15 @@ export class Enemies implements IEnemies {
     this.ctx.bus.emit('enemy:hit', { pos, damage: dmg, killed, big: g.big, weapon: h.weapon })
     if (!killed) {
       g.invuln = 0.3
+      if (h.freeze) g.frost = Math.max(g.frost, h.freeze)
       this.setState(g, STUN)
       // A short shove, so a sword combo can keep connecting.
       const push = Math.min(3, h.knock * 0.15)
       this.startHop(g, g.x + kx * push, g.z + kz * push, 0.36, 0.5, true)
       return
     }
-    this.ctx.game.defeatEnemy(g.index)
+    if (!g.minion) this.ctx.game.defeatEnemy(g.index)
+    g.frost = 0
     // Heavier bodies fly less far.
     const k = 1 / Math.sqrt(g.scale)
     g.vx = kx * h.knock * k
@@ -640,6 +718,8 @@ export class Enemies implements IEnemies {
   }
 
   private walkable(g: Gloom, x: number, z: number): boolean {
+    // Minions live on boss arenas built from colliders: stay on them, away from the edges.
+    if (g.minion) return Math.abs(supportHeight(this.ctx, x, z, g.y + 1.1 * g.scale, 0.42 * g.scale) - g.y) < 1.1 * g.scale
     const h = heightAt(x, z)
     if (waterLevelAt(x, z) - h > MAX_WADE) return false
     // Too steep to hop up or down (cliffs, mesa walls).
@@ -713,16 +793,20 @@ export class Enemies implements IEnemies {
     if (!body || !shadows || !eyes || !this.stateAttr) return
     const st = this.stateAttr.array as Float32Array
     const t = this.ctx.clock.t
+    const cam = this.ctx.camera.position
+    // Past the fog's end a gloomling is invisible anyway.
+    const far = this.ctx.quality.viewDistance + 10
+    // Only the drawn gloomlings take instance slots (packed from 0): the dead, the minion pool
+    // and the far-off cost no vertices, here or in the shadow pass.
+    let n = 0
     for (let i = 0; i < this.list.length; i++) {
       const g = this.list[i]
-      if (g.state === DEAD) {
-        this.m.makeScale(0, 0, 0)
-        body.setMatrixAt(i, this.m)
-        shadows.setMatrixAt(i, this.m)
+      if (g.state === DEAD || (g.x - cam.x) ** 2 + (g.z - cam.z) ** 2 > far * far) {
         eyes.hide(i * 2)
         eyes.hide(i * 2 + 1)
         continue
       }
+      const slot = n++
       let sy: number
       let sxz: number
       let lean = 0
@@ -755,13 +839,14 @@ export class Enemies implements IEnemies {
       this.e.set(lean, g.yaw, roll)
       this.q.setFromEuler(this.e)
       this.m.compose(this.p.set(g.x, g.y, g.z), this.q, this.s.set(sxz * sc, sy * sc, sxz * sc))
-      body.setMatrixAt(i, this.m)
+      body.setMatrixAt(slot, this.m)
 
       // per-instance shading: eye glow (blink), hurt flash, anger
       const blink = g.blinkT > 0 ? 0.05 : 1
-      st[i * 3] = g.state === DYING ? 0 : g.eye * blink
-      st[i * 3 + 1] = g.state === DYING ? 1 : g.flash
-      st[i * 3 + 2] = g.anger
+      st[slot * 4] = g.state === DYING ? 0 : g.eye * blink
+      st[slot * 4 + 1] = g.state === DYING ? 1 : g.flash
+      st[slot * 4 + 2] = g.anger
+      st[slot * 4 + 3] = Math.min(1, g.frost * 2)
 
       // eye glows follow the body transform
       for (let k = 0; k < 2; k++) {
@@ -779,8 +864,10 @@ export class Enemies implements IEnemies {
       const above = Math.max(0, g.y - ground)
       const k = Math.max(0.35, 1 - above * 0.6) * sxz * sc * 1.15
       this.m.compose(this.p.set(g.x, ground + 0.06, g.z), this.q.identity(), this.s.set(k, 1, k))
-      shadows.setMatrixAt(i, this.m)
+      shadows.setMatrixAt(slot, this.m)
     }
+    body.count = shadows.count = n
+    body.visible = shadows.visible = n > 0
     body.instanceMatrix.needsUpdate = true
     shadows.instanceMatrix.needsUpdate = true
     this.stateAttr.needsUpdate = true
@@ -805,35 +892,44 @@ export class Enemies implements IEnemies {
   }
 }
 
-/** Vertex-coloured jelly with a violet rim light and instanced eye glow / hurt flash. */
-function gloomMaterial(): THREE.MeshStandardMaterial {
+/**
+ * Vertex-coloured jelly with a violet rim light and eye glow / hurt flash / frost.
+ * State (x eye glow, y hurt flash, z anger, w frost) comes from the instanced `aState`
+ * attribute, or — for a single big body such as the Gloom King — from the `state` uniform.
+ */
+export function gloomMaterial(state?: { value: THREE.Vector4 }): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0 })
   const eye = new THREE.Color('#ffc42e').multiplyScalar(2.4)
   const angry = new THREE.Color('#ff6a1f').multiplyScalar(3)
   const rim = new THREE.Color('#9c6bff').multiplyScalar(0.85)
+  const source = state ? 'uniform vec4 uState;' : 'attribute vec4 aState;'
   mat.onBeforeCompile = shader => {
     shader.uniforms.uEye = { value: eye }
     shader.uniforms.uEyeAngry = { value: angry }
     shader.uniforms.uRim = { value: rim }
+    if (state) shader.uniforms.uState = state
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aGlow;\nattribute vec3 aState;\nvarying float vGlow;\nvarying vec3 vState;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow;\nvState = aState;')
+      .replace('#include <common>', `#include <common>\nattribute float aGlow;\n${source}\nvarying float vGlow;\nvarying vec4 vState;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\nvGlow = aGlow;\nvState = ${state ? 'uState' : 'aState'};`)
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uEye;\nuniform vec3 uEyeAngry;\nuniform vec3 uRim;\nvarying float vGlow;\nvarying vec3 vState;')
+      .replace('#include <common>', '#include <common>\nuniform vec3 uEye;\nuniform vec3 uEyeAngry;\nuniform vec3 uRim;\nvarying float vGlow;\nvarying vec4 vState;')
       .replace(
         '#include <color_fragment>',
-        '#include <color_fragment>\ndiffuseColor.rgb *= mix(1.0, 0.25 + 0.75 * min(vState.x, 1.0), vGlow);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), vState.y * 0.8);',
+        `#include <color_fragment>
+        diffuseColor.rgb *= mix(1.0, 0.25 + 0.75 * min(vState.x, 1.0), vGlow);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), vState.y * 0.8);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.86, 1.0), vState.w * 0.75 * (1.0 - vGlow));`,
       )
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
         totalEmissiveRadiance += vGlow * mix(uEye, uEyeAngry, vState.z) * vState.x;
         float rimF = pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0);
-        totalEmissiveRadiance += (1.0 - vGlow) * uRim * rimF;
+        totalEmissiveRadiance += (1.0 - vGlow) * mix(uRim, vec3(0.5, 0.85, 1.1), vState.w) * rimF;
         totalEmissiveRadiance += vState.y * vec3(0.55, 0.45, 0.7);`,
       )
   }
-  mat.customProgramCacheKey = () => 'starfall-gloomling'
+  mat.customProgramCacheKey = () => (state ? 'starfall-gloomling-single' : 'starfall-gloomling')
   return mat
 }
 

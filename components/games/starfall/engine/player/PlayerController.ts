@@ -8,6 +8,9 @@
  * buffering, a double jump, a dash, a spin attack, moving-platform riding, bounce pads,
  * wading and drowning. Every frame `motion` is filled for the animator.
  *
+ * Creative: nothing hurts, and a double-tapped jump toggles flight (no gravity; jump rises,
+ * descend sinks, boost speeds up; touching down ends it).
+ *
  * Ragdoll: R (or a landing far too hard, or death) makes the Character go limp. The capsule then
  * stops colliding and rides along with the body (so the camera follows it); when the get-up
  * starts it moves to where the hero stands up, and control returns once he is on his feet.
@@ -19,6 +22,8 @@ import type { Ctx, IPlayerController, MotionState, PlayerState } from '../types'
 import { clamp, lerp, PLAY_RADIUS, smoothstep, type Surface } from '../world/heightfield'
 import { approach, damp, wrapAngle } from './control/math'
 import { MOVE as M } from './control/tuning'
+
+const ISLE_BOUNDS = { x: 0, z: 0, r: PLAY_RADIUS }
 
 const GROUND_STATES: ReadonlySet<PlayerState> = new Set<PlayerState>(['idle', 'move', 'wade', 'land', 'cutscene'])
 
@@ -109,6 +114,10 @@ export class PlayerController implements IPlayerController {
   private drownT = 0
   private readonly anchor = new THREE.Vector3()
 
+  /** Creative flight, and when jump was last pressed (real clock) for the double-tap toggle. */
+  private _flying = false
+  private lastJumpTap = -1
+
   private failed = false
 
   constructor(private ctx: Ctx) {}
@@ -135,6 +144,9 @@ export class PlayerController implements IPlayerController {
   }
   get stompSpeed(): number {
     return this._stompSpeed
+  }
+  get flying(): boolean {
+    return this._flying
   }
   get dashReady(): number {
     if (this.dashT > 0) return 0
@@ -166,6 +178,7 @@ export class PlayerController implements IPlayerController {
 
   teleport(x: number, y: number, z: number, yaw: number): void {
     this.ctx.character?.cancelRagdoll()
+    this._flying = false
     this.position.set(x, y, z)
     this.velocity.set(0, 0, 0)
     this._yaw = wrapAngle(yaw)
@@ -210,6 +223,7 @@ export class PlayerController implements IPlayerController {
   }
 
   hurt(amount: number, from: V3): void {
+    if (this.ctx.game.creative) return
     if (!(amount > 0) || this.invulnT > 0 || this.dashT > 0 || this.dead || !this.controlEnabled) return
     const p = this.position
     const v = this.velocity
@@ -291,6 +305,7 @@ export class PlayerController implements IPlayerController {
     this.setBlink(this.invulnT > 0 && this._hp > 0 && ctx.game.phase !== 'cutscene')
     if (!this._grounded && !this.sliding) this.airTime += dt
 
+    if (this._flying && (ctx.character.ragdolling || !ctx.game.creative)) this._flying = false
     if (ctx.character.ragdolling) {
       this.ragdollTick(dt)
       this.writeMotion()
@@ -314,20 +329,26 @@ export class PlayerController implements IPlayerController {
       if (this.dashT <= 0) this.endDash(false)
     }
 
-    if (live) {
-      if (s.jump) this.pressJump()
-      if (s.dash) this.dashBufT = M.actionBuffer
-      // With a weapon in hand the Weapons system owns the attack button.
-      if (s.attack && !ctx.weapons.armed) this.attackBufT = M.actionBuffer
+    // Creative: a quick second jump press toggles flight instead of jumping.
+    const toggled = live && s.jump && this.flyTap()
+    if (this._flying) {
+      this.flySteer(dt, live)
     } else {
-      this.jumpBufT = this.dashBufT = this.attackBufT = 0
-    }
-    if (this.jumpBufT > 0 && (this._grounded || this.coyoteT > 0)) this.jump(false)
-    if (this.dashBufT > 0) this.tryDash()
-    if (this.attackBufT > 0) this.tryAttack()
+      if (live) {
+        if (s.jump && !toggled) this.pressJump()
+        if (s.dash) this.dashBufT = M.actionBuffer
+        // With a weapon in hand the Weapons system owns the attack button.
+        if (s.attack && !ctx.weapons.armed) this.attackBufT = M.actionBuffer
+      } else {
+        this.jumpBufT = this.dashBufT = this.attackBufT = 0
+      }
+      if (this.jumpBufT > 0 && (this._grounded || this.coyoteT > 0)) this.jump(false)
+      if (this.dashBufT > 0) this.tryDash()
+      if (this.attackBufT > 0) this.tryAttack()
 
-    this.steer(dt)
-    this.gravity(dt, live && s.jumpHeld)
+      this.steer(dt)
+      this.gravity(dt, live && s.jumpHeld)
+    }
 
     // Integrate in sub-steps short enough that nothing tunnels.
     const travel = Math.max(Math.hypot(v.x, v.z), Math.abs(v.y)) * dt
@@ -393,6 +414,38 @@ export class PlayerController implements IPlayerController {
   }
 
   /* ── abilities ───────────────────────────────────────────── */
+
+  /** Creative: true when this jump press came soon enough after the last one to toggle flight. */
+  private flyTap(): boolean {
+    if (!this.ctx.game.creative) return false
+    const now = this.ctx.clock.real
+    if (now - this.lastJumpTap > M.flyTapWindow) {
+      this.lastJumpTap = now
+      return false
+    }
+    this.lastJumpTap = -1
+    this._flying = !this._flying
+    if (this._flying) {
+      this.leaveGround(false)
+      this.dashT = this.attackT = this.jumpBufT = 0
+      this.jumpCut = false
+    }
+    return true
+  }
+
+  /** Flight: glide toward the stick's direction; jump rises, descend sinks, boost goes faster. */
+  private flySteer(dt: number, live: boolean): void {
+    const s = this.ctx.input.state
+    const v = this.velocity
+    const fast = live && s.boost
+    const speed = (fast ? M.flyFastSpeed : M.flySpeed) * this.wishMag
+    v.x = damp(v.x, this.wishX * speed, M.flyAccel, dt)
+    v.z = damp(v.z, this.wishZ * speed, M.flyAccel, dt)
+    let rise = live ? (s.jumpHeld ? 1 : 0) - (s.descend ? 1 : 0) : 0
+    if (rise > 0 && this.position.y > M.flyCeiling) rise = 0
+    v.y = damp(v.y, rise * (fast ? M.flyFastClimb : M.flyClimb), M.flyAccel, dt)
+    this.vyMove = v.y
+  }
 
   private pressJump(): void {
     // About to touch down? Keep the press for a proper ground jump instead of wasting the double.
@@ -517,6 +570,8 @@ export class PlayerController implements IPlayerController {
     const sp = Math.hypot(v.x, v.z)
 
     if (this._grounded) {
+      // Ice: little grip — slow to get going, slow to stop, slides through turns.
+      const grip = this.hit.surface === 'ice' ? M.iceGrip : 1
       if (this.wishMag > 0) {
         // Split velocity along / across the wish direction: accelerate along it, kill drift across it.
         const wx = this.wishX
@@ -525,14 +580,14 @@ export class PlayerController implements IPlayerController {
         const px = v.x - wx * par
         const pz = v.z - wz * par
         const target = this.wishSpeed
-        const rate = par < 0 ? M.turnAccel : par < target ? M.accel : M.decel
+        const rate = (par < 0 ? M.turnAccel : par < target ? M.accel : M.decel) * grip
         const npar = approach(par, target, rate * dt)
         const perp = Math.hypot(px, pz)
-        const k = perp > 1e-6 ? approach(perp, 0, M.grip * dt) / perp : 0
+        const k = perp > 1e-6 ? approach(perp, 0, M.grip * grip * dt) / perp : 0
         v.x = wx * npar + px * k
         v.z = wz * npar + pz * k
       } else if (sp > 0) {
-        const k = approach(sp, 0, M.decel * dt) / sp
+        const k = approach(sp, 0, M.decel * grip * dt) / sp
         v.x *= k
         v.z *= k
       }
@@ -694,6 +749,8 @@ export class PlayerController implements IPlayerController {
   }
 
   private land(g: GroundHit, steep: boolean): void {
+    // Touching down ends a flight.
+    this._flying = false
     const v = this.velocity
     const c = g.collider
     const impact = Math.max(0, -v.y)
@@ -797,24 +854,27 @@ export class PlayerController implements IPlayerController {
     this.markSupport(c)
   }
 
-  /** Soft invisible wall at PLAY_RADIUS. */
+  /** Soft invisible wall around the current map (the island: PLAY_RADIUS around its centre). */
   private keepInBounds(): void {
     const p = this.position
     const v = this.velocity
-    const r = Math.hypot(p.x, p.z)
-    const inner = PLAY_RADIUS - 4
+    const b = this.ctx.worlds?.bounds ?? ISLE_BOUNDS
+    const dx = p.x - b.x
+    const dz = p.z - b.z
+    const r = Math.hypot(dx, dz)
+    const inner = b.r - 4
     if (r <= inner) return
-    const nx = p.x / r
-    const nz = p.z / r
+    const nx = dx / r
+    const nz = dz / r
     const out = v.x * nx + v.z * nz
     if (out > 0) {
-      const k = smoothstep(inner, PLAY_RADIUS, r)
+      const k = smoothstep(inner, b.r, r)
       v.x -= nx * out * k
       v.z -= nz * out * k
     }
-    if (r > PLAY_RADIUS) {
-      p.x = nx * PLAY_RADIUS
-      p.z = nz * PLAY_RADIUS
+    if (r > b.r) {
+      p.x = b.x + nx * b.r
+      p.z = b.z + nz * b.r
     }
   }
 
@@ -1010,6 +1070,7 @@ export class PlayerController implements IPlayerController {
     else if (this.dashT > 0) next = 'dash'
     else if (this.attackT > 0) next = 'attack'
     else if (this.sliding) next = 'fall'
+    else if (this._flying) next = v.y < M.fallAfterVy ? 'fall' : 'jump'
     else if (!this._grounded) {
       if (cur === 'jump' || cur === 'bounce') next = v.y < M.fallAfterVy ? 'fall' : cur
       else if (cur === 'doubleJump') next = v.y < M.fallAfterVy && this.stateTime > 0.45 ? 'fall' : cur

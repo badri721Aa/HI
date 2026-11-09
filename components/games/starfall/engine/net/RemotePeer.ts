@@ -10,7 +10,8 @@
  * relay ↔ direct switches. Jumps over `TELEPORT_DIST` snap.
  */
 import * as THREE from 'three'
-import type { NetPeer, PlayerState, WeaponId } from '../types'
+import type { MapId, NetPeer, PlayerState, WeaponId } from '../types'
+import { mapFromCode } from '../worlds/defs'
 import { heightAt } from '../world/heightfield'
 import { EXTRAPOLATE_DIRECT, EXTRAPOLATE_RELAY, INTERP_DELAY, TELEPORT_DIST } from './config'
 import type { PeerLink } from './p2p'
@@ -48,6 +49,7 @@ export class RemotePeer implements NetPeer {
   wading = 0
   slope = 0
   weapon: WeaponId = 'fists'
+  map: MapId = 'isle'
   /** Seconds since `state` changed. */
   stateTime = 0
   /** Downward speed at the last touchdown (m/s). */
@@ -67,6 +69,8 @@ export class RemotePeer implements NetPeer {
   readonly chat = new Bucket(4, 0.8)
   readonly emotes = new Bucket(3, 1)
   readonly rags = new Bucket(2, 0.5)
+  /** Block edits and list parts (senders pace themselves at 4 a second). */
+  readonly blocks = new Bucket(24, 6)
 
   private buf: Snapshot[] = Array.from({ length: BUFFER }, makeSnapshot)
   private head = 0
@@ -189,6 +193,7 @@ export class RemotePeer implements NetPeer {
     this.wading = a.wading
     this.slope = a.slope
     this.weapon = weaponFromCode(a.weapon)
+    this.map = mapFromCode(a.map)
 
     const pos = this.position
     if (!this.ready || pos.distanceToSquared(tgt) > TELEPORT_DIST * TELEPORT_DIST) {

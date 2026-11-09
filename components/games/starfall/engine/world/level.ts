@@ -149,24 +149,65 @@ export const ENEMIES: EnemySpawn[] = [
    Signposts
    ──────────────────────────────────────────────────────────── */
 
+/** A sign line that names controls, worded for each input device. */
+export interface ControlLine {
+  kbm: string
+  pad: string
+  touch: string
+}
+
 export interface SignDef {
   x: number
   z: number
   yaw: number
   title: string
-  lines: string[]
+  /** One dialog page per line. */
+  lines: Array<string | ControlLine>
 }
 
 export const SIGNS: SignDef[] = [
-  { x: -3, z: 116, yaw: Math.PI, title: 'Sunset Beach', lines: ['Seven shards of a fallen star are scattered across the isle.', 'Bring them to the Beacon on the summit to light it again.', 'Move with WASD or the left stick. Jump with Space.'] },
-  { x: 11, z: 124, yaw: Math.PI, title: 'Old Pier', lines: ['Mind the gaps between the planks.', 'Press jump again in mid-air to double jump.'] },
-  { x: 2, z: 64, yaw: Math.PI, title: 'Meadow Village', lines: ['Hold Shift to sprint.', 'Dash with Q or right-click — it works in mid-air too.', 'Something shiny got stuck on top of the windmill.'] },
-  { x: -64, z: 26, yaw: -Math.PI / 2, title: 'Whispering Wood', lines: ['Gloomlings lurk in the shade.', 'Jump on them, or spin with F / left-click.', 'The giant mushrooms are springy.'] },
+  {
+    x: -3, z: 116, yaw: Math.PI, title: 'Sunset Beach',
+    lines: [
+      'Seven shards of a fallen star lie scattered across the isle.',
+      'Carry them to the Beacon on the summit and light it once more.',
+      { kbm: 'Move with W A S D and jump with Space.', pad: 'Move with the left stick and jump with A.', touch: 'Drag on the left of the screen to move, and tap Jump to leap.' },
+    ],
+  },
+  {
+    x: 11, z: 124, yaw: Math.PI, title: 'Old Pier',
+    lines: [
+      'Mind the gaps between the planks.',
+      { kbm: 'Press Space again in mid-air to double jump.', pad: 'Press A again in mid-air to double jump.', touch: 'Tap Jump again in mid-air to double jump.' },
+    ],
+  },
+  {
+    x: 2, z: 64, yaw: Math.PI, title: 'Meadow Village',
+    lines: [
+      { kbm: 'Hold Shift to sprint.', pad: 'Hold RB or RT to sprint.', touch: 'Push the stick to its edge to sprint.' },
+      { kbm: 'Dash with Q or a right-click. It works in mid-air, too.', pad: 'Dash with B. It works in mid-air, too.', touch: 'Tap Dash to surge ahead. It works in mid-air, too.' },
+      'Something bright is caught at the top of the windmill.',
+    ],
+  },
+  {
+    x: -64, z: 26, yaw: -Math.PI / 2, title: 'Whispering Wood',
+    lines: [
+      'Gloomlings lurk in the shade.',
+      { kbm: 'Land on one to stomp it, or strike with F or a left-click.', pad: 'Land on one to stomp it, or strike with X.', touch: 'Land on one to stomp it, or tap the attack button to strike.' },
+      'Land on the violet mushroom to bounce up into the grove.',
+    ],
+  },
   { x: 72, z: 14, yaw: Math.PI / 2, title: 'Sky Ruins', lines: ['The old stones still drift with the rhythm of the stars.', 'Time your jumps between the moving platforms.'] },
   { x: -48, z: -36, yaw: -Math.PI / 2, title: 'Silver Falls', lines: ['Fishermen say a light shines behind the falling water.'] },
   { x: 66, z: -46, yaw: Math.PI, title: 'Mirror Lake', lines: ['The lily pads are sturdier than they look.'] },
-  { x: 86, z: 68, yaw: 0.8, title: 'Wreck Cove', lines: ['The Driftwood ran aground here long ago.', "Its crow's nest still keeps watch."] },
-  { x: 4, z: -34, yaw: Math.PI, title: 'Beacon Summit', lines: ['The Beacon has guided ships home for a thousand years.', 'Return all seven shards and press E at the altar.'] },
+  { x: 86, z: 68, yaw: 0.8, title: 'Wreck Cove', lines: ['The Driftwood ran aground here long ago.', "Her crow's nest still keeps watch."] },
+  {
+    x: 4, z: -34, yaw: Math.PI, title: 'Beacon Summit',
+    lines: [
+      'The Beacon has guided ships home for a thousand years.',
+      { kbm: 'Bring all seven shards here, then press E at the altar.', pad: 'Bring all seven shards here, then press Y at the altar.', touch: 'Bring all seven shards here, then tap Use at the altar.' },
+    ],
+  },
 ]
 
 /* ────────────────────────────────────────────────────────────

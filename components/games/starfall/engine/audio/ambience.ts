@@ -23,6 +23,8 @@ export interface AmbienceInput {
   daylight: number
   /** Seconds since the previous tick. */
   dt: number
+  /** In a portal map: no sea, birds or forest — only wind. */
+  away: boolean
 }
 
 /** Coast estimate samples: 8 bearings × 3 radii (nearer rings count more). */
@@ -145,13 +147,14 @@ export class Ambience {
     const night = 1 - i.daylight
 
     const L = this.levels
-    L.ocean = Math.min(1, 0.08 + this.seaFrac * 2.6) * (1 - altitude * 0.5)
-    L.wind = Math.min(1, 0.16 + altitude * 0.5 + summit * 0.25 + cliffs * 0.18)
-    L.rustle = Math.min(1, 0.06 + forest * 0.6 + inland * 0.08)
-    L.crickets = night * Math.min(1, 0.25 + inland * 0.5 + forest * 0.5)
-    L.birds = i.daylight * Math.min(1, 0.15 + inland * 0.45 + forest * 0.6) * (1 - altitude * 0.6)
+    const isle = i.away ? 0 : 1
+    L.ocean = Math.min(1, 0.08 + this.seaFrac * 2.6) * (1 - altitude * 0.5) * isle
+    L.wind = i.away ? 0.75 : Math.min(1, 0.16 + altitude * 0.5 + summit * 0.25 + cliffs * 0.18)
+    L.rustle = Math.min(1, 0.06 + forest * 0.6 + inland * 0.08) * isle
+    L.crickets = night * Math.min(1, 0.25 + inland * 0.5 + forest * 0.5) * isle
+    L.birds = i.daylight * Math.min(1, 0.15 + inland * 0.45 + forest * 0.6) * (1 - altitude * 0.6) * isle
     const fd = Math.hypot(i.x - FALLS_POS.x, i.z - FALLS_POS.z)
-    L.falls = 1 - smoothstep(60, 115, fd)
+    L.falls = (1 - smoothstep(60, 115, fd)) * isle
 
     this.ocean.gain.setTargetAtTime(L.ocean * 0.5, now, 1.2)
     this.oceanPan.pan.setTargetAtTime(this.seaPan, now, 0.8)

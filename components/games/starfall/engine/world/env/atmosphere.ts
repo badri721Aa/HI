@@ -6,6 +6,7 @@
  * light: the sun by day, the moon at night.
  */
 import * as THREE from 'three'
+import type { MapId } from '../../events'
 import type { TimeOfDay } from '../../types'
 
 export class Atmosphere {
@@ -40,6 +41,8 @@ export class Atmosphere {
   readonly waterDeep = new THREE.Color()
   /** Strength of underwater caustics (scaled by the light colour). */
   caustics = 0
+  /** Multiplies the fog distances (< 1 = thicker fog). */
+  fogScale = 1
 
   copy(a: Atmosphere): this {
     return this.lerpBetween(a, a, 0)
@@ -67,6 +70,7 @@ export class Atmosphere {
     this.envIntensity = mix(a.envIntensity, b.envIntensity, t)
     this.exposure = mix(a.exposure, b.exposure, t)
     this.caustics = mix(a.caustics, b.caustics, t)
+    this.fogScale = mix(a.fogScale, b.fogScale, t)
     return this
   }
 }
@@ -118,6 +122,9 @@ interface PresetDef {
   waterShallow: string
   waterDeep: string
   caustics: number
+  /** Fog colour (defaults to the horizon) and distance scale. */
+  fog?: string
+  fogScale?: number
 }
 
 /** The sun sets in the west-north-west; the moon rides high in the south-east. */
@@ -218,7 +225,7 @@ function build(d: PresetDef): Atmosphere {
   a.halo.set(d.halo)
   a.bounce.set(d.bounce)
   // Fog is the horizon colour, so distant land and sea melt into the sky.
-  a.fog.set(d.horizon)
+  a.fog.set(d.fog ?? d.horizon)
   a.cloudLit.set(d.cloudLit)
   a.cloudShade.set(d.cloudShade)
   a.hemiSky.set(d.hemiSky)
@@ -234,6 +241,7 @@ function build(d: PresetDef): Atmosphere {
   a.envIntensity = d.envIntensity
   a.exposure = d.exposure
   a.caustics = d.caustics
+  a.fogScale = d.fogScale ?? 1
   return a
 }
 
@@ -241,4 +249,72 @@ export const PRESETS: Record<TimeOfDay, Atmosphere> = {
   dusk: build(DEFS.dusk),
   night: build(DEFS.night),
   dawn: build(DEFS.dawn),
+}
+
+/**
+ * The portal maps' looks. Shadow Rift: a starry violet void with storm clouds and cold
+ * moonlight from above. Frost Peak: a pale low sun, overcast sky and thick, cold blue fog.
+ */
+const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
+  rift: {
+    lightDir: [0.35, 0.85, 0.4],
+    lightColor: '#cdb0ff',
+    lightIntensity: 2.4,
+    sunDir: [-0.3, -0.5, 0.8],
+    sunDisc: 0,
+    sunColor: '#ffffff',
+    moonDir: [0.45, 0.42, -0.78],
+    moon: 0.7,
+    stars: 1,
+    zenith: '#07030f',
+    horizon: '#3a1563',
+    halo: '#7a2fb8',
+    bounce: '#1a0d2a',
+    cloudLit: '#9a5ad8',
+    cloudShade: '#1a0a2c',
+    cloudCover: 0.64,
+    hemiSky: '#9a7ad8',
+    hemiGround: '#3a2450',
+    hemiIntensity: 1.3,
+    envIntensity: 0.75,
+    exposure: 1.35,
+    waterShallow: '#2a1a40',
+    waterDeep: '#0a0618',
+    caustics: 0,
+    fog: '#2c1050',
+    fogScale: 0.8,
+  },
+  frost: {
+    lightDir: [0.45, 0.5, -0.74],
+    lightColor: '#e2efff',
+    lightIntensity: 2.4,
+    sunDir: [0.45, 0.32, -0.83],
+    sunDisc: 0.65,
+    sunColor: '#fff6ea',
+    moonDir: [-0.4, 0.3, 0.86],
+    moon: 0,
+    stars: 0,
+    zenith: '#577fae',
+    horizon: '#c4d8ea',
+    halo: '#eef4ff',
+    bounce: '#8aa0b8',
+    cloudLit: '#f2f6ff',
+    cloudShade: '#8494ab',
+    cloudCover: 0.72,
+    hemiSky: '#b8d4f0',
+    hemiGround: '#8b9db2',
+    hemiIntensity: 1.0,
+    envIntensity: 0.85,
+    exposure: 1.0,
+    waterShallow: '#9fd4ea',
+    waterDeep: '#3a6f96',
+    caustics: 0,
+    fog: '#a9c4de',
+    fogScale: 0.42,
+  },
+}
+
+export const MAP_PRESETS: Record<Exclude<MapId, 'isle'>, Atmosphere> = {
+  rift: build(MAP_DEFS.rift),
+  frost: build(MAP_DEFS.frost),
 }

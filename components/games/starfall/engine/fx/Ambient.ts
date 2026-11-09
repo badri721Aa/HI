@@ -85,9 +85,14 @@ export class Ambient implements IAmbient {
     this.pollen!.uniforms.uIntensity.value = 1 - 0.6 * this.dark
     this.leaves!.uniforms.uLight!.value.setRGB(1, 0.92, 0.8).multiplyScalar(1 - 0.7 * this.dark)
 
+    // Fireflies, pollen, leaves, birds, spray and mist belong to the island, not the portal maps.
+    const isle = (ctx.worlds?.current ?? 'isle') === 'isle'
+    this.fireflies!.mesh.visible = this.pollen!.mesh.visible = this.leaves!.mesh.visible = this.birds!.mesh.visible = isle
     this.birds!.update(dt, this.time, this.center, this.dark < 0.5)
-    this.emitSpray(dt)
-    this.emitMist(dt)
+    if (isle) {
+      this.emitSpray(dt)
+      this.emitMist(dt)
+    }
     this.pool!.update(this.time, shared.uViewHeight.value)
   }
 

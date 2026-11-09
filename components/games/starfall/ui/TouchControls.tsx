@@ -2,27 +2,32 @@
 /**
  * On-screen controls for touch: the floating move stick (drawn from
  * input.touchStick — the engine owns the touch itself), and the action
- * buttons, which drive game.setVirtualButton().
+ * buttons, which drive game.setVirtualButton(). In build mode the same
+ * buttons place, break and turn blocks.
  */
 import { useEffect, useEffectEvent, useRef, useState, type ComponentType, type SVGProps } from 'react'
+import type { WeaponId } from '../engine/events'
 import type { Action } from '../engine/input'
 import { useGameUi, useHud, useUi } from './context'
-import { BowIcon, DashIcon, HammerIcon, InteractIcon, JumpIcon, SpinIcon, SwordIcon } from './icons'
+import { BowIcon, CubeIcon, DashIcon, FrostHammerIcon, HammerIcon, InteractIcon, JumpIcon, RefreshIcon, SpinIcon, StarbladeIcon, SwordIcon } from './icons'
+import { cx } from './theme'
 
 /** The attack button shows what it does: the fists' spin or the weapon in hand. */
-const ATTACK = {
+const ATTACK: Record<WeaponId, { label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }> = {
   fists: { label: 'Spin', Icon: SpinIcon },
   sword: { label: 'Slash', Icon: SwordIcon },
   hammer: { label: 'Slam', Icon: HammerIcon },
   bow: { label: 'Shoot', Icon: BowIcon },
+  starblade: { label: 'Slash', Icon: StarbladeIcon },
+  frostHammer: { label: 'Slam', Icon: FrostHammerIcon },
 }
-import { cx } from './theme'
 
 export function TouchControls() {
   const { touch } = useGameUi()
   const phase = useUi(s => s.phase)
   const hasPrompt = useUi(s => !!s.prompt)
   const attack = ATTACK[useHud(h => h.weapon)]
+  const building = useHud(h => h.build !== null)
   if (!touch) return null
   const playing = phase === 'playing'
 
@@ -35,9 +40,20 @@ export function TouchControls() {
       {playing && (
         <div className="absolute bottom-[env(safe-area-inset-bottom)] right-[env(safe-area-inset-right)] h-[230px] w-[230px]">
           <TouchButton action="jump" label="Jump" Icon={JumpIcon} className="bottom-[34px] right-[22px] h-[80px] w-[80px]" big />
-          <TouchButton action="dash" label="Dash" Icon={DashIcon} className="bottom-[28px] right-[118px] h-[58px] w-[58px]" charge />
-          <TouchButton action="attack" label={attack.label} Icon={attack.Icon} className="bottom-[104px] right-[112px] h-[58px] w-[58px]" />
-          <TouchButton action="interact" label="Use" Icon={InteractIcon} className="bottom-[128px] right-[32px] h-[58px] w-[58px]" highlight={hasPrompt} />
+          {building ? (
+            <>
+              <TouchButton action="dash" label="Break" Icon={HammerIcon} className="bottom-[28px] right-[118px] h-[58px] w-[58px]" />
+              <TouchButton action="attack" label="Place" Icon={CubeIcon} className="bottom-[104px] right-[112px] h-[58px] w-[58px]" />
+              <TouchButton action="ragdoll" label="Turn" Icon={RefreshIcon} className="bottom-[128px] right-[32px] h-[58px] w-[58px]" />
+            </>
+          ) : (
+            <>
+              <TouchButton action="dash" label="Dash" Icon={DashIcon} className="bottom-[28px] right-[118px] h-[58px] w-[58px]" charge />
+              <TouchButton action="attack" label={attack.label} Icon={attack.Icon} className="bottom-[104px] right-[112px] h-[58px] w-[58px]" />
+              <TouchButton action="interact" label="Use" Icon={InteractIcon} className="bottom-[128px] right-[32px] h-[58px] w-[58px]" highlight={hasPrompt} />
+            </>
+          )}
+          <TouchButton action="build" label={building ? 'Done' : 'Build'} Icon={CubeIcon} className="bottom-[184px] right-[122px] h-[46px] w-[46px]" highlight={building} />
         </div>
       )}
     </div>

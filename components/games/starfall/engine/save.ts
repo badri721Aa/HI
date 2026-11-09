@@ -1,13 +1,18 @@
-import type { WeaponId } from './events'
+import type { BossId, MapId, WeaponId } from './events'
 import { DEFAULT_SETTINGS, detectQuality, type Settings } from './settings'
 import { TOTAL_SHARDS } from './world/level'
 
-const SAVE_KEY = 'starfall:save:v1'
+/** The save slots: the story, and the Creative sandbox. */
+export type GameMode = 'story' | 'creative'
+
+const SAVE_KEYS: Record<GameMode, string> = { story: 'starfall:save:v1', creative: 'starfall:save:creative:v1' }
+const BLOCK_KEYS: Record<GameMode, string> = { story: 'starfall:blocks:v1', creative: 'starfall:blocks:creative:v1' }
 const PROFILE_KEY = 'starfall:profile:v1'
 
 /** One playthrough in progress. */
 export interface SaveGame {
   version: 1
+  mode: GameMode
   shards: boolean[]
   /** Indices into the generated spark list. */
   sparks: number[]
@@ -24,6 +29,10 @@ export interface SaveGame {
   /** Weapons picked up (fists are always owned) and the one in hand. */
   weapons: WeaponId[]
   weapon: WeaponId
+  /** Portal maps unlocked so far (the island is always open). */
+  maps: MapId[]
+  /** Bosses defeated. */
+  bosses: BossId[]
 }
 
 /** Survives across playthroughs. */
@@ -36,12 +45,17 @@ export interface Profile {
   deviceSetup: boolean
 }
 
-const WEAPON_IDS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow']
+const WEAPON_IDS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
+const MAP_IDS: readonly MapId[] = ['rift', 'frost']
+const BOSS_IDS: readonly BossId[] = ['gloomKing', 'frostGolem']
 const isWeapon = (w: unknown): w is WeaponId => WEAPON_IDS.includes(w as WeaponId)
+const isMap = (m: unknown): m is MapId => MAP_IDS.includes(m as MapId)
+const isBoss = (b: unknown): b is BossId => BOSS_IDS.includes(b as BossId)
 
-export function newSave(): SaveGame {
+export function newSave(mode: GameMode = 'story'): SaveGame {
   return {
     version: 1,
+    mode,
     shards: Array.from({ length: TOTAL_SHARDS }, () => false),
     sparks: [],
     hearts: [],
@@ -54,6 +68,8 @@ export function newSave(): SaveGame {
     completed: false,
     weapons: [],
     weapon: 'fists',
+    maps: [],
+    bosses: [],
   }
 }
 
@@ -74,10 +90,10 @@ function write(key: string, value: unknown): void {
   }
 }
 
-export function loadSave(): SaveGame | null {
-  const data = read<SaveGame>(SAVE_KEY)
+export function loadSave(mode: GameMode = 'story'): SaveGame | null {
+  const data = read<SaveGame>(SAVE_KEYS[mode])
   if (!data || data.version !== 1) return null
-  const base = newSave()
+  const base = newSave(mode)
   const shards = Array.isArray(data.shards) ? data.shards.slice(0, TOTAL_SHARDS) : base.shards
   while (shards.length < TOTAL_SHARDS) shards.push(false)
   return {
@@ -90,18 +106,41 @@ export function loadSave(): SaveGame | null {
     checkpoints: Array.isArray(data.checkpoints) ? data.checkpoints : base.checkpoints,
     weapons: Array.isArray(data.weapons) ? data.weapons.filter(isWeapon) : [],
     weapon: isWeapon(data.weapon) ? data.weapon : 'fists',
+    maps: Array.isArray(data.maps) ? data.maps.filter(isMap) : [],
+    bosses: Array.isArray(data.bosses) ? data.bosses.filter(isBoss) : [],
+    mode,
   }
 }
 
 export function storeSave(save: SaveGame): void {
-  write(SAVE_KEY, save)
+  write(SAVE_KEYS[save.mode], save)
 }
 
-export function clearSave(): void {
+/** Erases a slot's progress and its blocks. */
+export function clearSave(mode: GameMode = 'story'): void {
   try {
-    localStorage.removeItem(SAVE_KEY)
+    localStorage.removeItem(SAVE_KEYS[mode])
+    localStorage.removeItem(BLOCK_KEYS[mode])
   } catch {
     /* ignore */
+  }
+}
+
+/** A slot's placed blocks, encoded by build/blocks.ts (null if none). */
+export function loadBlockData(mode: GameMode): string | null {
+  try {
+    return localStorage.getItem(BLOCK_KEYS[mode])
+  } catch {
+    return null
+  }
+}
+
+export function storeBlockData(mode: GameMode, data: string): void {
+  try {
+    if (data) localStorage.setItem(BLOCK_KEYS[mode], data)
+    else localStorage.removeItem(BLOCK_KEYS[mode])
+  } catch {
+    /* storage full or blocked — the blocks just won't persist */
   }
 }
 

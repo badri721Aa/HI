@@ -1,6 +1,6 @@
 'use client'
 /** Pause menu: resume / map / online / settings / controls / restart / quit, with run stats. */
-import { useEffect, useRef, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { playUi, useGameUi, useHud, useNet, usePresence, useUi } from './context'
 import { Button, KeyCap, MenuList, PanelHeader, type MenuEntry } from './controls'
 import { ControlsPanel } from './ControlsPanel'
@@ -34,6 +34,8 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
   const lastOpener = useRef<PausePanel>('root')
   const room = useNet(s => s.room)
   const roomPlayers = useNet(s => s.players.length)
+  const creative = useHud(h => h.creative)
+  const [enemies, setEnemies] = useState(() => game.creativeEnemies)
 
   useEffect(() => {
     if (state !== 'open') return
@@ -82,6 +84,17 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
     },
     { id: 'settings', label: 'Settings', onSelect: () => go('settings') },
     { id: 'controls', label: 'Controls', onSelect: () => go('controls') },
+    ...(creative
+      ? [{
+          id: 'enemies',
+          label: 'Enemies',
+          meta: enemies ? 'On' : 'Off',
+          onSelect: () => {
+            game.setCreativeEnemies(!enemies)
+            setEnemies(game.creativeEnemies)
+          },
+        }]
+      : []),
     { id: 'restart', label: 'Restart from checkpoint', onSelect: () => game.restartFromCheckpoint(), separated: true },
     { id: 'quit', label: 'Quit to title', onSelect: () => go('quit') },
   ]

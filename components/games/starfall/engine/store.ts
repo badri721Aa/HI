@@ -5,7 +5,25 @@ export interface CompassMarker {
   /** Bearing relative to the camera's forward, radians, -PI..PI (negative = left). */
   angle: number
   dist: number
-  kind: 'shard' | 'beacon' | 'checkpoint'
+  kind: 'shard' | 'beacon' | 'checkpoint' | 'portal' | 'boss'
+}
+
+/** The boss health bar (null when no fight is on). */
+export interface BossHud {
+  name: string
+  hp: number
+  max: number
+  /** 1-based fight phase. */
+  phase: number
+  /** Stunned: hits do bonus damage. */
+  vulnerable: boolean
+}
+
+/** Build mode: the block in hand (index into BLOCKS) and our blocks placed vs the cap. */
+export interface BuildHud {
+  slot: number
+  count: number
+  max: number
 }
 
 /** Snapshot the HUD renders. Updated by the engine a few times per second. */
@@ -30,6 +48,12 @@ export interface HudState {
   weapon: WeaponId
   /** Drawing the bow: crosshair + draw meter (0..1), or -1 when not aiming. */
   aim: number
+  boss: BossHud | null
+  /** Null when not building. */
+  build: BuildHud | null
+  /** A Creative game, and flying in it. */
+  creative: boolean
+  flying: boolean
 }
 
 export function initialHud(): HudState {
@@ -50,6 +74,10 @@ export function initialHud(): HudState {
     weapons: ['fists'],
     weapon: 'fists',
     aim: -1,
+    boss: null,
+    build: null,
+    creative: false,
+    flying: false,
   }
 }
 

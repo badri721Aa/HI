@@ -5,7 +5,7 @@
  */
 
 export type Device = 'kbm' | 'pad' | 'touch'
-export type Action = 'jump' | 'dash' | 'attack' | 'interact' | 'pause' | 'map' | 'sprint' | 'skip' | 'ragdoll'
+export type Action = 'jump' | 'dash' | 'attack' | 'interact' | 'pause' | 'map' | 'sprint' | 'skip' | 'ragdoll' | 'build'
 
 export interface InputState {
   /** Movement intent, x = right, y = forward. Length ≤ 1. */
@@ -16,7 +16,7 @@ export interface InputState {
   lookY: number
   /** Scroll / trigger zoom delta this frame (+ = zoom out). */
   zoom: number
-  /** Hotbar slot picked this frame (keys 1–4 → 0..3), or -1. */
+  /** Hotbar slot picked this frame (keys 1–9, 0 → 0..9), or -1. */
   slot: number
   /** Weapon cycling this frame: +1 next, -1 previous, 0 none (wheel, d-pad left/right). */
   cycle: number
@@ -26,6 +26,9 @@ export interface InputState {
   attackHeld: boolean
   sprint: boolean
   skipHeld: boolean
+  /** Flying (Creative): sink (C, Shift, pad B) and fly fast (Q, pad sprint, stick at its edge). */
+  descend: boolean
+  boost: boolean
   /** Edge-triggered (one frame). */
   jump: boolean
   dash: boolean
@@ -35,6 +38,12 @@ export interface InputState {
   map: boolean
   /** Flop into a ragdoll (R / right stick click). */
   ragdoll: boolean
+  /** Toggle build mode (B / pad LB). */
+  build: boolean
+  /** Build mode only: the attack button places, dash breaks, ragdoll turns (these then stay false). */
+  place: boolean
+  remove: boolean
+  rotate: boolean
 }
 
 const KEYMAP: Record<string, Action> = {
@@ -47,13 +56,16 @@ const KEYMAP: Record<string, Action> = {
   Escape: 'pause',
   KeyM: 'map',
   KeyR: 'ragdoll',
+  KeyB: 'build',
   ShiftLeft: 'sprint',
   ShiftRight: 'sprint',
 }
 
 const SLOT_KEYS: Record<string, number> = {
-  Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3,
+  Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5, Digit7: 6, Digit8: 7, Digit9: 8, Digit0: 9,
+  Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4, Numpad6: 5, Numpad7: 6, Numpad8: 7, Numpad9: 8, Numpad0: 9,
 }
+const DESCEND_KEYS = ['KeyC', 'ShiftLeft', 'ShiftRight']
 const ZOOM_IN = ['Equal', 'NumpadAdd']
 const ZOOM_OUT = ['Minus', 'NumpadSubtract']
 
@@ -68,8 +80,9 @@ function isTyping(t: EventTarget | null): boolean {
 function emptyState(): InputState {
   return {
     moveX: 0, moveY: 0, lookX: 0, lookY: 0, zoom: 0, slot: -1, cycle: 0,
-    jumpHeld: false, attackHeld: false, sprint: false, skipHeld: false,
+    jumpHeld: false, attackHeld: false, sprint: false, skipHeld: false, descend: false, boost: false,
     jump: false, dash: false, attack: false, interact: false, pause: false, map: false, ragdoll: false,
+    build: false, place: false, remove: false, rotate: false,
   }
 }
 
@@ -83,6 +96,13 @@ export class Input {
   sensitivity = 1
   /** The plain mouse wheel cycles weapons (set while more than one is owned); otherwise, and with Alt, it zooms. */
   wheelCycles = false
+  /** Build mode (set by Building): attack → place, dash → remove, ragdoll → rotate; the wheel picks blocks. */
+  buildMode = false
+
+  /** The interact control as the HUD prompt names it on the current device (the touch button reads "Use"). */
+  get interactKey(): string {
+    return this.device === 'pad' ? 'Y' : this.device === 'touch' ? 'Use' : 'E'
+  }
 
   private keys = new Set<string>()
   private edges = new Set<Action>()
@@ -153,7 +173,7 @@ export class Input {
     })
     on<MouseEvent>(el, 'contextmenu', e => e.preventDefault())
     on<WheelEvent>(el, 'wheel', e => {
-      if (this.wheelCycles && !e.altKey) this.wheelCycle += Math.sign(e.deltaY)
+      if ((this.wheelCycles || this.buildMode) && !e.altKey) this.wheelCycle += Math.sign(e.deltaY)
       else this.wheel += Math.sign(e.deltaY) * 0.6
       e.preventDefault()
     }, { passive: false })
@@ -271,6 +291,8 @@ export class Input {
     let jumpHeld = k.has('Space') || this.virtualHeld.has('jump')
     let skipHeld = k.has('Space') || k.has('Enter') || this.virtualHeld.has('skip')
     let attackHeld = this.mouseHeld || k.has('KeyF') || this.virtualHeld.has('attack')
+    let descend = DESCEND_KEYS.some(c => k.has(c)) || this.virtualHeld.has('dash')
+    let boost = k.has('KeyQ') || this.virtualHeld.has('sprint')
 
     if (this.moveTouch.id >= 0) {
       const dx = this.moveTouch.x - this.moveTouch.ox
@@ -280,7 +302,7 @@ export class Input {
         const m = Math.min(1, len / 56)
         mx = (dx / len) * m
         my = (-dy / len) * m
-        if (m > 0.92) sprint = true
+        if (m > 0.92) sprint = boost = true
       }
     }
 
@@ -311,11 +333,13 @@ export class Input {
       if (edge(9)) this.edges.add('pause')
       if (edge(8)) this.edges.add('map')
       if (edge(11)) this.edges.add('ragdoll')
+      if (edge(4)) this.edges.add('build')
       if (edge(14)) cycle = -1
       if (edge(15)) cycle = 1
       if (btn(0)) { jumpHeld = true; skipHeld = true }
       if (btn(2)) attackHeld = true
-      if (btn(5) || btn(10) || btn(7)) sprint = true
+      if (btn(5) || btn(10) || btn(7)) sprint = boost = true
+      if (btn(1)) descend = true
       if (btn(12)) zoom -= 4 * dt
       if (btn(13)) zoom += 4 * dt
       this.padPrev = pad.buttons.map(b => b.pressed)
@@ -338,16 +362,24 @@ export class Input {
     this.slot = -1
     s.sprint = on && sprint
     s.jumpHeld = on && jumpHeld
-    s.attackHeld = on && attackHeld
     s.skipHeld = skipHeld
+    s.descend = on && descend
+    s.boost = on && boost
     const e = this.edges
+    const play = on && !this.buildMode
+    const build = on && this.buildMode
+    s.attackHeld = play && attackHeld
     s.jump = on && e.has('jump')
-    s.dash = on && e.has('dash')
-    s.attack = on && e.has('attack')
+    s.dash = play && e.has('dash')
+    s.attack = play && e.has('attack')
     s.interact = on && e.has('interact')
     s.pause = e.has('pause')
     s.map = e.has('map')
-    s.ragdoll = on && e.has('ragdoll')
+    s.ragdoll = play && e.has('ragdoll')
+    s.build = on && e.has('build')
+    s.place = build && e.has('attack')
+    s.remove = build && e.has('dash')
+    s.rotate = build && e.has('ragdoll')
     e.clear()
   }
 

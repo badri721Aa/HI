@@ -1,5 +1,6 @@
 /**
- * Procedural weapon models — sword, hammer, bow and the arrow — built once and shared: every
+ * Procedural weapon models — sword, hammer, bow, the boss rewards (starblade, frost hammer) and
+ * the arrow — built once and shared: every
  * copy in a hand, on a stand or in flight reuses the same geometries and materials.
  *
  * Model frame (metres): the grip is at the origin, +Y runs out of the fist on the thumb side
@@ -12,7 +13,7 @@ import type { WeaponId } from '../../events'
 import type { TextureLib } from '../../textures'
 
 export type HeldWeapon = Exclude<WeaponId, 'fists'>
-type MatName = 'steel' | 'iron' | 'brass' | 'leather' | 'wood' | 'bowWood'
+type MatName = 'steel' | 'iron' | 'brass' | 'leather' | 'wood' | 'bowWood' | 'starsteel' | 'gold' | 'gem' | 'ice'
 
 /** Bow limb tips (the string's ends) and how far the string comes back at full draw (m). */
 export const BOW_TIP = { y: 0.6, z: -0.085 }
@@ -51,10 +52,15 @@ export class WeaponKit {
       leather: new THREE.MeshStandardMaterial({ color: 0x7a4a2e, map: cloth, roughness: 0.82 }),
       wood: new THREE.MeshStandardMaterial({ color: 0xb98a5c, map: wood, roughness: 0.7 }),
       bowWood: new THREE.MeshStandardMaterial({ color: 0x9a6236, map: wood, roughness: 0.55 }),
+      // Reward weapons: a blade that glows with starlight, and a head of never-melting ice.
+      starsteel: new THREE.MeshStandardMaterial({ color: 0xe6f0ff, emissive: 0x6fa8ff, emissiveIntensity: 1.5, metalness: 0.55, roughness: 0.18 }),
+      gold: new THREE.MeshStandardMaterial({ color: 0xffcf5a, metalness: 1, roughness: 0.22 }),
+      gem: new THREE.MeshStandardMaterial({ color: 0xfff1c0, emissive: 0xffc14a, emissiveIntensity: 2.6, roughness: 0.2 }),
+      ice: new THREE.MeshStandardMaterial({ color: 0xc4ecff, emissive: 0x2f9be0, emissiveIntensity: 0.8, metalness: 0.05, roughness: 0.1 }),
     }
     this.arrowMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide })
     this.arrowGeometry = arrowGeometry()
-    this.parts = { sword: sword(), hammer: hammer(), bow: bow() }
+    this.parts = { sword: sword(), hammer: hammer(), bow: bow(), starblade: starblade(), frostHammer: frostHammer() }
   }
 
   make(id: HeldWeapon): WeaponModel {
@@ -194,6 +200,46 @@ function hammer(): Array<[MatName, THREE.BufferGeometry]> {
     ['brass', at(new THREE.CylinderGeometry(0.094, 0.094, 0.03, 8), 0, headY, -0.075, R, 0, Math.PI / 8)],
     ['brass', at(new THREE.CylinderGeometry(0.04, 0.034, 0.06, 10), 0, headY - 0.11, 0)],
     ['iron', at(new THREE.ConeGeometry(0.032, 0.07, 8), 0, headY + 0.12, 0)],
+  ])
+}
+
+/** A longer, broader blade of glowing starsteel, a winged gold guard and star gems. */
+function starblade(): Array<[MatName, THREE.BufferGeometry]> {
+  const R = Math.PI / 2
+  return group([
+    ['starsteel', loftDiamond([[0.06, 0.04, 0.012], [0.2, 0.043, 0.011], [0.7, 0.034, 0.01], [0.86, 0.02, 0.008], [0.98, 0.0008, 0.0008]])],
+    // Bright core line down each face.
+    ['gem', at(new THREE.BoxGeometry(0.004, 0.62, 0.008), 0.0105, 0.42, 0)],
+    ['gem', at(new THREE.BoxGeometry(0.004, 0.62, 0.008), -0.0105, 0.42, 0)],
+    // Winged guard sweeping up toward the blade.
+    ['gold', at(new THREE.BoxGeometry(0.046, 0.034, 0.17), 0, 0.045, 0)],
+    ['gold', at(new THREE.ConeGeometry(0.022, 0.12, 6), 0, 0.085, 0.12, -R + 0.75)],
+    ['gold', at(new THREE.ConeGeometry(0.022, 0.12, 6), 0, 0.085, -0.12, R - 0.75)],
+    ['gem', at(new THREE.OctahedronGeometry(0.03, 0), 0, 0.05, 0, 0, 0, 0, 0.9, 1.3, 0.9)],
+    ['leather', at(new THREE.CylinderGeometry(0.018, 0.02, 0.17, 10), 0, -0.04, 0)],
+    ['gold', at(new THREE.CylinderGeometry(0.024, 0.024, 0.016, 12), 0, 0.03, 0)],
+    ['gold', at(new THREE.CylinderGeometry(0.024, 0.024, 0.016, 12), 0, -0.125, 0)],
+    ['gold', at(new THREE.SphereGeometry(0.03, 14, 10), 0, -0.152, 0, 0, 0, 0, 1, 0.85, 1)],
+    ['gem', at(new THREE.OctahedronGeometry(0.018, 0), 0, -0.175, 0)],
+  ])
+}
+
+/** The hammer's frame with a head of glowing blue ice crowned by crystal spikes. */
+function frostHammer(): Array<[MatName, THREE.BufferGeometry]> {
+  const R = Math.PI / 2
+  const headY = 0.62
+  return group([
+    ['wood', at(new THREE.CylinderGeometry(0.022, 0.026, 0.9, 10), 0, 0.21, 0)],
+    ['leather', at(new THREE.CylinderGeometry(0.029, 0.029, 0.2, 10), 0, -0.04, 0)],
+    ['steel', at(new THREE.CylinderGeometry(0.034, 0.03, 0.05, 10), 0, -0.24, 0)],
+    // Hexagonal ice block along Z, steel-capped, with three crystal spikes on top.
+    ['ice', at(new THREE.CylinderGeometry(0.11, 0.11, 0.32, 6), 0, headY, 0, R, 0, 0)],
+    ['steel', at(new THREE.CylinderGeometry(0.118, 0.112, 0.035, 6), 0, headY, 0.17, R, 0, 0)],
+    ['steel', at(new THREE.CylinderGeometry(0.112, 0.118, 0.035, 6), 0, headY, -0.17, R, 0, 0)],
+    ['steel', at(new THREE.CylinderGeometry(0.04, 0.034, 0.07, 10), 0, headY - 0.13, 0)],
+    ['ice', at(new THREE.ConeGeometry(0.035, 0.16, 5), 0, headY + 0.17, 0)],
+    ['ice', at(new THREE.ConeGeometry(0.025, 0.11, 5), 0, headY + 0.14, 0.08, 0.5)],
+    ['ice', at(new THREE.ConeGeometry(0.025, 0.11, 5), 0, headY + 0.14, -0.08, -0.5)],
   ])
 }
 

@@ -1,6 +1,6 @@
 /**
  * One joined room: the Supabase channel `starfall:room:<code>` with presence
- * (who is here), broadcast events (chat, emotes, ragdolls, signalling and the
+ * (who is here), broadcast events (chat, emotes, ragdolls, block edits, signalling and the
  * movement relay) and one WebRTC link per other player.
  *
  * Joining waits briefly for the first presence snapshot so a full room can be
@@ -9,6 +9,7 @@
  * or the snapshot lagged, the later joiner (by joinedAt, then id) is asked to leave.
  */
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
+import { parseBlockMsg, type BlockMsg } from '../build/blocks'
 import type { GestureName } from '../types'
 import { DIRECT_GRACE, LINK_RETRY, LINK_TIMEOUT, MAX_PLAYERS, PING_INTERVAL, ROOM_CHANNEL_PREFIX } from './config'
 import { PeerLink, rtcSupported } from './p2p'
@@ -30,6 +31,7 @@ export interface RoomHost {
   chat(peer: RemotePeer, text: string): void
   emote(peer: RemotePeer, name: GestureName): void
   ragdoll(peer: RemotePeer, v: [number, number, number]): void
+  blocks(peer: RemotePeer, msg: BlockMsg): void
   count(players: number): void
   /** Connection to the server changed after the join completed. */
   connection(state: 'online' | 'connecting' | 'error', message?: string): void
@@ -49,11 +51,20 @@ const EXIST_WAIT = 4000
 const LOST_AFTER = 20000
 /** Signals from ids not (yet) in presence are held this long (s). */
 const ORPHAN_TTL = 4
+/** Block messages likewise (a newcomer's list can beat their presence by a few seconds), and at most this many. */
+const HELD_BLOCKS_TTL = 8
+const MAX_HELD_BLOCKS = 32
 /** Ignore presence entries beyond this many (flood guard). */
 const MAX_SEEN = 24
 
 interface Orphan {
   msg: SignalMsg
+  at: number
+}
+
+interface HeldBlocks {
+  from: string
+  msg: BlockMsg
   at: number
 }
 
@@ -86,6 +97,7 @@ export class Room {
   private timers: ReturnType<typeof setTimeout>[] = []
   private lostTimer: ReturnType<typeof setTimeout> | null = null
   private orphans: Orphan[] = []
+  private heldBlocks: HeldBlocks[] = []
   private rtc = rtcSupported()
   private ping = new DataView(new ArrayBuffer(PING_BYTES))
   private scratch: Snapshot = makeSnapshot()
@@ -109,6 +121,7 @@ export class Room {
     ch.on('broadcast', { event: 'chat' }, ({ payload }) => this.onChat(payload))
     ch.on('broadcast', { event: 'emote' }, ({ payload }) => this.onEmote(payload))
     ch.on('broadcast', { event: 'rag' }, ({ payload }) => this.onRag(payload))
+    ch.on('broadcast', { event: 'blk' }, ({ payload }) => this.onBlocks(payload))
   }
 
   get online(): boolean {
@@ -158,9 +171,11 @@ export class Room {
     if (this.online) void this.channel.track(this.host.member()).catch(() => {})
   }
 
-  send(event: 'pos' | 'chat' | 'emote' | 'rag' | 'sig', payload: object): void {
-    if (!this.subscribed || this.closed) return
+  /** Broadcasts an event; false if the channel isn't up. */
+  send(event: 'pos' | 'chat' | 'emote' | 'rag' | 'sig' | 'blk', payload: object): boolean {
+    if (!this.subscribed || this.closed) return false
     this.channel.send({ type: 'broadcast', event, payload }).catch(() => {})
+    return true
   }
 
   /**
@@ -209,6 +224,7 @@ export class Room {
       }
     }
     if (this.orphans.length) this.orphans = this.orphans.filter(o => now - o.at < ORPHAN_TTL)
+    if (this.heldBlocks.length) this.heldBlocks = this.heldBlocks.filter(h => now - h.at < HELD_BLOCKS_TTL)
   }
 
   /* ── channel ─────────────────────────────────────────────── */
@@ -356,6 +372,7 @@ export class Room {
       this.relayNow = true
       this.host.peerJoined(peer, initial)
       this.replayOrphans(peer)
+      this.replayBlocks(peer)
     }
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i]
@@ -460,6 +477,30 @@ export class Room {
     const s = this.sender(raw)
     if (!s || !isEmote(s.o.name) || !s.peer.emotes.take(this.host.now())) return
     this.host.emote(s.peer, s.o.name)
+  }
+
+  /** Block edits; `to` addresses a list to one player (the others ignore it). */
+  private onBlocks(raw: unknown): void {
+    if (!raw || typeof raw !== 'object' || this.closed) return
+    const o = raw as Record<string, unknown>
+    if (!isPeerId(o.from) || (o.to !== undefined && o.to !== this.host.selfId)) return
+    const msg = parseBlockMsg(o.op, o.b)
+    if (!msg) return
+    const peer = this.peers.get(o.from)
+    if (peer) this.takeBlocks(peer, msg)
+    else if (this.heldBlocks.length < MAX_HELD_BLOCKS) this.heldBlocks.push({ from: o.from, msg, at: this.host.now() })
+  }
+
+  private takeBlocks(peer: RemotePeer, msg: BlockMsg): void {
+    if (peer.blocks.take(this.host.now())) this.host.blocks(peer, msg)
+  }
+
+  private replayBlocks(peer: RemotePeer): void {
+    if (!this.heldBlocks.length) return
+    const mine = this.heldBlocks.filter(h => h.from === peer.id)
+    if (!mine.length) return
+    this.heldBlocks = this.heldBlocks.filter(h => h.from !== peer.id)
+    for (const h of mine) this.takeBlocks(peer, h.msg)
   }
 
   private onRag(raw: unknown): void {

@@ -1,12 +1,14 @@
 /**
- * Weapons — the sword, hammer and bow.
+ * Weapons — the sword, hammer and bow, and the boss rewards (starblade, frost hammer).
  *
- *   stands   each weapon waits on a stand in the world; walk into it or press E nearby to take it
+ *   stands   each island weapon waits on a stand; walk into it or press E nearby to take it.
+ *            Rewards arrive through grant() (the bosses' chests)
  *   hand     the equipped weapon rides in the hero's hand grip (bow in the left), so it follows the
  *            animation and the ragdoll
- *   hotbar   keys 1–4, the mouse wheel or the d-pad switch between owned weapons
+ *   hotbar   keys 1–6, the mouse wheel or the d-pad switch between owned weapons
  *   moves    sword: three-slash combo · hammer: wind-up and overhead slam with a shockwave ·
- *            bow: hold to draw, release to shoot toward the camera's aim point
+ *            bow: hold to draw, release to shoot toward the camera's aim point. The starblade
+ *            is a stronger sword; the frost hammer's slam also freezes the gloomlings it hits
  *   hits     damage by weapon, knockback, ~60 ms hit-stop and a little shake; impact sparks,
  *            sounds and damage numbers react to 'enemy:hit' on the bus
  *
@@ -17,7 +19,7 @@ import { v3, type WeaponId } from '../events'
 import type { Ctx, IWeapons, WeaponHit, WeaponMove, WeaponPose } from '../types'
 import { WEAPON_STANDS } from '../world/level'
 import { Arrows } from './weapons/Arrows'
-import { ARROW, BOW, HAMMER, HOTBAR, SWORD, WEAPON_NAMES } from './weapons/defs'
+import { ARROW, BOW, FROST_HAMMER, HAMMER, HOTBAR, KIND, STARBLADE, SWORD, WEAPON_NAMES } from './weapons/defs'
 import { WeaponKit, type HeldWeapon, type WeaponModel } from './weapons/models'
 import { standMaterials, standShape } from './weapons/stands'
 import { glowTexture } from './parts/util'
@@ -52,6 +54,8 @@ export class Weapons implements IWeapons {
   private _aimYaw: number | null = null
   private kit: WeaponKit | null = null
   private held = new Map<HeldWeapon, WeaponModel>()
+  /** Cutscenes show the hero empty-handed (raising a shard, lighting the Beacon). */
+  private stowed = false
   private stands: Stand[] = []
   private glowMat: THREE.SpriteMaterial | null = null
   private arrows: Arrows | null = null
@@ -115,10 +119,10 @@ export class Weapons implements IWeapons {
   init(): void {
     const ctx = this.ctx
     const kit = (this.kit = new WeaponKit(ctx.textures))
-    for (const id of ['sword', 'hammer', 'bow'] as const) {
+    for (const id of ['sword', 'hammer', 'bow', 'starblade', 'frostHammer'] as const) {
       const m = kit.make(id)
       m.group.visible = false
-      ctx.character.holdInHand(id === 'bow' ? 'left' : 'right', m.group)
+      ctx.character.holdInHand(KIND[id] === 'bow' ? 'left' : 'right', m.group)
       this.held.set(id, m)
     }
 
@@ -184,6 +188,15 @@ export class Weapons implements IWeapons {
     this.ctx.bus.emit('weapon:equip', { weapon: id })
   }
 
+  grant(id: WeaponId): void {
+    const ctx = this.ctx
+    if (id === 'fists') return
+    const p = ctx.player.position
+    ctx.bus.emit('weapon:pickup', { weapon: id, pos: { x: p.x, y: p.y + 1, z: p.z } })
+    ctx.bus.emit('ui:toast', { kind: 'reward', title: `${WEAPON_NAMES[id]} obtained`, body: this.switchHint(id) })
+    this.add(id)
+  }
+
   dispose(): void {
     this.setPrompt(null)
     for (const m of this.held.values()) m.group.removeFromParent()
@@ -215,7 +228,8 @@ export class Weapons implements IWeapons {
     this.arrows?.update(dt)
 
     const s = ctx.input.state
-    if (playing) {
+    // In build mode the number keys and the wheel pick blocks instead.
+    if (playing && !ctx.build.active) {
       if (s.slot >= 0 && s.slot < HOTBAR.length) this.equip(HOTBAR[s.slot])
       else if (s.cycle) this.cycle(s.cycle)
     }
@@ -223,8 +237,13 @@ export class Weapons implements IWeapons {
     if (able) this.updateMove(dt)
     else if (this.move !== 'none') this.cancelMove()
 
+    const stowed = ctx.cutscenes.active
+    if (stowed !== this.stowed) {
+      this.stowed = stowed
+      this.showHeld()
+    }
     const pose = this.pose
-    pose.weapon = this._equipped
+    pose.weapon = stowed ? 'fists' : this._equipped
     pose.move = this.move
     pose.t = this.moveT
     pose.charge = this.charge
@@ -242,9 +261,13 @@ export class Weapons implements IWeapons {
     this.equip(list[(i + dir + list.length) % list.length])
   }
 
+  private showHeld(): void {
+    for (const [w, m] of this.held) m.group.visible = !this.stowed && w === this._equipped
+  }
+
   private setEquipped(id: WeaponId): void {
     this._equipped = id
-    for (const [w, m] of this.held) m.group.visible = w === id
+    this.showHeld()
     this.ctx.hud.set({ weapon: id })
   }
 
@@ -282,9 +305,7 @@ export class Weapons implements IWeapons {
   private setPrompt(st: Stand | null): void {
     if (st === this.prompted) return
     this.prompted = st
-    const device = this.ctx.input.device
-    const key = device === 'pad' ? 'Y' : device === 'touch' ? 'Tap' : 'E'
-    this.ctx.bus.emit('ui:prompt', st ? { key, label: `Take the ${WEAPON_NAMES[st.weapon].toLowerCase()}` } : null)
+    this.ctx.bus.emit('ui:prompt', st ? { key: this.ctx.input.interactKey, label: `Take the ${WEAPON_NAMES[st.weapon].toLowerCase()}` } : null)
   }
 
   private take(st: Stand): void {
@@ -293,19 +314,31 @@ export class Weapons implements IWeapons {
     st.base.children.forEach(c => (c.visible = false))
     st.glow.visible = false
     if (this.prompted === st) this.setPrompt(null)
-    this._owned = HOTBAR.filter(w => w === st.weapon || this._owned.includes(w))
-    ctx.input.wheelCycles = true
-    ctx.hud.set({ weapons: this._owned.slice() })
     const pos = { x: st.x, y: st.midY, z: st.z }
     ctx.bus.emit('weapon:pickup', { weapon: st.weapon, pos })
     ctx.fx.burst('spark', pos, { scale: 1.3 })
-    const slot = HOTBAR.indexOf(st.weapon) + 1
-    const how = ctx.game.isTouch ? 'Tap its slot on the hotbar to switch.' : `Press ${slot} or scroll the mouse wheel to switch.`
-    ctx.bus.emit('ui:toast', { kind: 'info', title: `${WEAPON_NAMES[st.weapon]} found`, body: how })
+    ctx.bus.emit('ui:toast', { kind: 'info', title: `${WEAPON_NAMES[st.weapon]} found`, body: this.switchHint(st.weapon) })
+    this.add(st.weapon)
+  }
+
+  /** How to switch to `id` on the current device. */
+  private switchHint(id: WeaponId): string {
+    const device = this.ctx.input.device
+    if (device === 'touch') return 'Tap its slot on the hotbar to switch.'
+    if (device === 'pad') return 'Press left or right on the D-pad to switch.'
+    return `Press ${HOTBAR.indexOf(id) + 1} or turn the mouse wheel to switch.`
+  }
+
+  /** Own `id` (in hotbar order), put it in hand and save. */
+  private add(id: WeaponId): void {
+    const ctx = this.ctx
+    this._owned = HOTBAR.filter(w => w === id || this._owned.includes(w))
+    ctx.input.wheelCycles = true
+    ctx.hud.set({ weapons: this._owned.slice() })
     this.cancelMove()
-    this.setEquipped(st.weapon)
-    ctx.game.setWeapons(this._owned, st.weapon)
-    ctx.bus.emit('weapon:equip', { weapon: st.weapon })
+    this.setEquipped(id)
+    ctx.game.setWeapons(this._owned, id)
+    ctx.bus.emit('weapon:equip', { weapon: id })
   }
 
   /* ── moves ───────────────────────────────────────────────── */
@@ -313,14 +346,14 @@ export class Weapons implements IWeapons {
   private updateMove(dt: number): void {
     const s = this.ctx.input.state
     this.rest -= dt
-    const eq = this._equipped
-    if (eq === 'fists') return
-    if (eq === 'bow') {
+    const kind = KIND[this._equipped]
+    if (kind === 'fists') return
+    if (kind === 'bow') {
       this.updateBow(dt)
       return
     }
     if (this.move === 'none') {
-      if (s.attack && this.rest <= 0) this.startMelee(eq === 'sword' ? 'slash1' : 'slam')
+      if (s.attack && this.rest <= 0) this.startMelee(kind === 'sword' ? 'slash1' : 'slam')
       return
     }
     this.moveT += dt / this.moveTime
@@ -335,7 +368,7 @@ export class Weapons implements IWeapons {
     if (next) this.startMelee(next)
     else {
       this.cancelMove()
-      this.rest = eq === 'sword' ? SWORD.rest : HAMMER.rest
+      this.rest = kind === 'sword' ? SWORD.rest : HAMMER.rest
     }
   }
 
@@ -356,15 +389,17 @@ export class Weapons implements IWeapons {
     const yaw = p.yaw
     const b = this.blow
     const i = this.combo
-    b.weapon = 'sword'
-    b.center.x = p.position.x + Math.sin(yaw) * SWORD.reach
+    const def = this._equipped === 'starblade' ? STARBLADE : SWORD
+    b.weapon = this._equipped
+    b.center.x = p.position.x + Math.sin(yaw) * def.reach
     b.center.y = p.position.y + 0.9
-    b.center.z = p.position.z + Math.cos(yaw) * SWORD.reach
-    b.radius = SWORD.radius
-    b.damage = SWORD.damage[i]
-    b.knock = SWORD.knock[i]
-    b.lift = SWORD.lift[i]
+    b.center.z = p.position.z + Math.cos(yaw) * def.reach
+    b.radius = def.radius
+    b.damage = def.damage[i]
+    b.knock = def.knock[i]
+    b.lift = def.lift[i]
     b.max = undefined
+    b.freeze = undefined
     this.setFrom(p.position)
     this.landed(this.ctx.enemies.hit(b), i === 2 ? 0.3 : 0.18)
   }
@@ -373,28 +408,32 @@ export class Weapons implements IWeapons {
     const ctx = this.ctx
     const p = ctx.player
     const yaw = p.yaw
-    const x = p.position.x + Math.sin(yaw) * HAMMER.reach
-    const z = p.position.z + Math.cos(yaw) * HAMMER.reach
+    const frost = this._equipped === 'frostHammer'
+    const def = frost ? FROST_HAMMER : HAMMER
+    const x = p.position.x + Math.sin(yaw) * def.reach
+    const z = p.position.z + Math.cos(yaw) * def.reach
     const y = ctx.collision.groundAt(x, z, p.position.y + 0.6, 0.2).y
     ctx.bus.emit('weapon:slam', { pos: { x, y, z } })
+    if (frost) ctx.fx.burst('stomp', { x, y: y + 0.2, z }, { color: '#bfeaff', scale: 1.6 })
     ctx.game.shake(0.5, 0.32)
     const b = this.blow
-    b.weapon = 'hammer'
+    b.weapon = this._equipped
     b.center.x = x
     b.center.y = y + 0.4
     b.center.z = z
     b.max = undefined
+    b.freeze = frost ? FROST_HAMMER.freeze : undefined
     this.setFrom(p.position)
     // The head itself, then the shockwave ring for everything else nearby.
-    b.radius = HAMMER.radius
-    b.damage = HAMMER.damage
-    b.knock = HAMMER.knock
-    b.lift = HAMMER.lift
+    b.radius = def.radius
+    b.damage = def.damage
+    b.knock = def.knock
+    b.lift = def.lift
     let n = ctx.enemies.hit(b)
-    b.radius = HAMMER.wave.radius
-    b.damage = HAMMER.wave.damage
-    b.knock = HAMMER.wave.knock
-    b.lift = HAMMER.wave.lift
+    b.radius = def.wave.radius
+    b.damage = def.wave.damage
+    b.knock = def.wave.knock
+    b.lift = def.wave.lift
     n += ctx.enemies.hit(b)
     this.landed(n, 0)
   }

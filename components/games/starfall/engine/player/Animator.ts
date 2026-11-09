@@ -24,6 +24,7 @@ import { DEG, TAU, clamp, clamp01, damp, easeOut, envelope, lerp, noise1, ramp, 
 import { J, Pose, PoseBuilder } from './anim/Pose'
 import * as POSES from './anim/poses'
 import type { Rig } from './anim/Rig'
+import { KIND } from '../gameplay/weapons/defs'
 import { CARRY, WEAPON_CLIPS } from './anim/weaponPoses'
 
 export interface GroundSample {
@@ -709,11 +710,12 @@ export class Animator {
   /** The weapon arm holds its weapon; a move in progress takes over the upper body. */
   private applyWeapon(dt: number, out: Pose): void {
     const w = this.weapon
-    const carry = this.carry.get(w.weapon)
+    const kind = KIND[w.weapon]
+    const carry = this.carry.get(kind)
     // Put away: the last carry pose fades out.
     if (carry) {
       this.lastCarry = carry
-      this.carrySide = w.weapon === 'bow' ? 0 : 1
+      this.carrySide = kind === 'bow' ? 0 : 1
     }
     this.carryW = damp(this.carryW, carry ? 1 : 0, 8, dt)
     if (this.carryW > 0.002 && this.lastCarry) {

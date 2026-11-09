@@ -21,7 +21,7 @@ export const EMOTES: Array<{ name: GestureName; label: string }> = [
   { name: 'point', label: 'Point' },
   { name: 'shrug', label: 'Shrug' },
 ]
-/** G plays the next emote in turn (1–4 select weapons). */
+/** G plays the next emote in turn (1–6 select weapons). */
 const EMOTE_KEY = 'KeyG'
 
 /* ── connection chip ────────────────────────────────────────────── */
@@ -264,7 +264,7 @@ function ChatPanel({ open }: { open: boolean }) {
         {shown.map(l => (
           <ChatRow key={l.key} line={l} fading={!open && l.leaving} />
         ))}
-        {open && shown.length === 0 && <li className={cx(styles.hudText, 'px-1 pb-1 text-[13px] text-[#F3EEE6]/50')}>Say hello to the room.</li>}
+        {open && shown.length === 0 && <li className={cx(styles.hudText, 'px-1 pb-1 text-[13px] text-[#F3EEE6]/50')}>No messages yet.</li>}
       </ul>
       {open && <ChatInput />}
     </div>

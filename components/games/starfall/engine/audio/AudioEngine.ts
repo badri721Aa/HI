@@ -44,7 +44,7 @@ export class AudioEngine implements IAudio {
   private phase: GamePhase | null = null
   private ambT = 0
   private unsubs: Array<() => void> = []
-  private ambIn: AmbienceInput = { x: 0, y: 0, z: 0, rx: 1, rz: 0, daylight: 1, dt: 0 }
+  private ambIn: AmbienceInput = { x: 0, y: 0, z: 0, rx: 1, rz: 0, daylight: 1, dt: 0, away: false }
 
   constructor(private ctx: Ctx) {}
 
@@ -89,6 +89,19 @@ export class AudioEngine implements IAudio {
       bus.on('weapon:pickup', () => this.sfx?.pickup()),
       bus.on('arrow:stick', e => this.sfx?.arrowStick(e.pos)),
       bus.on('enemy:hit', e => this.sfx?.weaponHit(e.pos, e.weapon, e.killed)),
+      bus.on('portal:enter', () => this.sfx?.portal()),
+      bus.on('boss:roar', e => this.sfx?.roar(e.pos, e.boss)),
+      bus.on('boss:slam', e => this.sfx?.bossSlam(e.pos)),
+      bus.on('boss:impact', e => this.sfx?.bossImpact(e.pos, e.kind)),
+      bus.on('boss:defeat', () => {
+        if (!this.sfx) return
+        this.sfx.bossVictory()
+        this.music?.duck(0.2, 3)
+      }),
+      bus.on('chest:open', () => this.sfx?.chest()),
+      // Blocks: a soft thud of their material going down, a heavier one breaking.
+      bus.on('block:place', e => this.sfx?.land(3.5, e.surface)),
+      bus.on('block:break', e => this.sfx?.land(7, e.surface)),
       bus.on('cutscene:start', () => this.sfx?.cutscene(true)),
       bus.on('cutscene:end', e => this.sfx?.cutscene(false, e.skipped)),
     )
@@ -234,6 +247,7 @@ export class AudioEngine implements IAudio {
     if (!amb) return
     const ctx = this.ctx
     const i = this.ambIn
+    i.away = (ctx.worlds?.current ?? 'isle') !== 'isle'
     // Habitat follows the player while playing; on the title screen, the camera's focus area.
     const p = ctx.player?.position
     const m = ctx.camera.matrixWorld.elements

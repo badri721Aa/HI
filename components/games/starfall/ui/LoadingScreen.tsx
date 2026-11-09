@@ -8,13 +8,13 @@ import styles from './ui.module.css'
 import { Wordmark } from './Wordmark'
 
 const TIPS = [
-  'Jump again in mid-air for a double jump — it carries you onto rooftops and ledges.',
-  'Dash with Q or right-click. It crosses gaps a jump alone cannot.',
-  'Land on a gloomling to stomp it, or spin with F to send it packing.',
-  'Lanterns are checkpoints. Touch one and you will wake there after a fall.',
-  'Golden sparks are scattered everywhere. Grab them in quick succession to build a chain.',
-  'Lost? Press M to open the map — every shard has a hint pinned to it.',
-  'The sea is cold and deep. Fall in and you will wake at the last lantern you lit.',
+  'Jump again in mid-air for a double jump. It carries you onto rooftops and ledges.',
+  'A dash crosses gaps that a jump alone cannot, and it works in mid-air.',
+  'Land on a gloomling to stomp it, or strike before it reaches you.',
+  'Lanterns are checkpoints. Touch one, and you will return to it after a fall.',
+  'Golden sparks are scattered everywhere. Collect them in quick succession to build a chain.',
+  'Lost? The map in the pause menu pins a hint to every shard.',
+  'The sea is cold and deep. Fall in, and you will return to the last lantern you lit.',
 ]
 
 /** Deterministic star field (identical on server and client — no hydration drift). */

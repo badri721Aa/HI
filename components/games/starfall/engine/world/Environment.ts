@@ -7,9 +7,9 @@
  * a transition is running, and keeps the texel-snapped shadow frustum on the player.
  */
 import * as THREE from 'three'
-import type { V3 } from '../events'
+import type { MapId, V3 } from '../events'
 import type { Ctx, IEnvironment, TimeOfDay } from '../types'
-import { Atmosphere, PRESETS } from './env/atmosphere'
+import { Atmosphere, MAP_PRESETS, PRESETS } from './env/atmosphere'
 import { HeightGrid, SunShadowBaker } from './env/heightGrid'
 import { buildSeaStacks } from './env/seaStacks'
 import { Sky } from './env/sky'
@@ -54,6 +54,9 @@ export class Environment implements IEnvironment {
   private blend = 1
   private blendDuration = 0
   private envTimer = 0
+  /** The island's time of day, and the map whose look is showing. */
+  private tod: TimeOfDay = 'dusk'
+  private map: MapId = 'isle'
 
   private focus = new THREE.Vector3()
   /** Shadow settings the light was last configured for (re-read from ctx.quality). */
@@ -145,9 +148,21 @@ export class Environment implements IEnvironment {
   }
 
   setTimeOfDay(tod: TimeOfDay, seconds: number): void {
+    this.tod = tod
+    // Away from the island the map keeps its own look; this applies on the way back.
+    if (this.map !== 'isle') return
+    this.blendTo(PRESETS[tod], seconds)
+  }
+
+  setAtmosphere(map: MapId, seconds: number): void {
+    this.map = map
+    this.blendTo(map === 'isle' ? PRESETS[this.tod] : MAP_PRESETS[map], seconds)
+  }
+
+  private blendTo(to: Atmosphere, seconds: number): void {
     // Already there (e.g. the intro re-asserting dusk): nothing to re-bake.
-    if (this.to === PRESETS[tod] && this.blend >= 1) return
-    this.to = PRESETS[tod]
+    if (this.to === to && this.blend >= 1) return
+    this.to = to
     this.from.copy(this.atmo)
     if (!this.ready) {
       // Before init: just start from the requested preset.
@@ -253,9 +268,10 @@ export class Environment implements IEnvironment {
   /** Re-reads the quality knobs this module honours (cheap; runs every frame). */
   private syncQuality(): void {
     const q = this.ctx.quality
-    if (this.fog.far !== q.viewDistance) {
-      this.fog.far = q.viewDistance
-      this.fog.near = Math.round(q.viewDistance * 0.35)
+    const far = Math.round(q.viewDistance * this.atmo.fogScale)
+    if (this.fog.far !== far) {
+      this.fog.far = far
+      this.fog.near = Math.round(far * 0.35)
     }
     if (q.shadowMapSize !== this.shadowSize || q.shadowRadius !== this.shadowRadius) {
       this.shadowSize = q.shadowMapSize

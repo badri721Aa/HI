@@ -140,12 +140,13 @@ export function PanelHeader({ eyebrow, title, aside }: { eyebrow: string; title:
 
 export function SettingRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[58px] items-center justify-between gap-6 border-b border-[#F3EEE6]/[0.07] py-2.5 last:border-b-0">
-      <div className="min-w-0">
+    // Narrow panels (phones): a control too wide to share the line drops below its label.
+    <div className="flex min-h-[58px] flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-[#F3EEE6]/[0.07] py-2.5 last:border-b-0">
+      <div className="min-w-[min(100%,180px)] flex-1">
         <div className="text-[14px] text-[#F3EEE6]/90">{label}</div>
         {hint && <div className="mt-0.5 text-[12px] leading-snug text-[#F3EEE6]/40">{hint}</div>}
       </div>
-      <div className="flex shrink-0 items-center">{children}</div>
+      <div className="ml-auto flex shrink-0 items-center">{children}</div>
     </div>
   )
 }
@@ -384,7 +385,7 @@ export function Tabs<T extends string>({ value, options, onChange, label }: { va
         else return
         e.preventDefault()
       }}
-      className="group/tabs mb-2 flex gap-6 overflow-x-auto border-b border-[#F3EEE6]/10 outline-none [scrollbar-width:none]"
+      className="group/tabs mb-2 flex gap-6 overflow-x-auto border-b border-[#F3EEE6]/10 outline-none [scrollbar-width:none] max-sm:gap-5 max-sm:[mask-image:linear-gradient(to_right,black_82%,transparent)]"
     >
       {options.map((o, i) => (
         <button

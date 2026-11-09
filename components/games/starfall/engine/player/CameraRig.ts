@@ -14,6 +14,7 @@
  */
 import * as THREE from 'three'
 import type { Ctx, ICameraRig } from '../types'
+import type { Collider } from '../collision'
 import { clamp, heightAt, lerp, noise2, smoothstep, waterLevelAt } from '../world/heightfield'
 import { damp, wrapAngle } from './control/math'
 import { CAM as C, MOVE } from './control/tuning'
@@ -23,6 +24,10 @@ type Mode = 'follow' | 'scripted' | 'title'
 const TAU = Math.PI * 2
 /** Angles sampled around the hero when planning the title orbit. */
 const TITLE_SAMPLES = 72
+/** Posts, trunks and railings: the camera may look past them. */
+const isThin = (c: Collider) => (c.shape === 'cylinder' ? c.r < 0.6 : Math.max(c.hx, c.hz) < 0.35)
+/** How far (m) the title camera keeps from props so they never fill the frame. */
+const TITLE_CLEARANCE = 1.8
 /** Title swing shape: asin(K·sin θ)/asin(K) is a triangle wave with eased turnarounds (near-constant drift speed). */
 const SWING_K = 0.95
 const SWING_NORM = Math.asin(SWING_K)
@@ -189,7 +194,8 @@ export class CameraRig implements ICameraRig {
     this.pitch = clamp(this.pitch + ly, C.pitchMin, C.pitchMax)
     if (s.zoom) this.zoom = clamp(this.zoom + s.zoom * C.zoomStep, C.zoomMin, C.zoomMax)
     const move = this.ctx.weapons?.pose.move
-    this.aimW = damp(this.aimW, move === 'draw' || move === 'release' ? 1 : 0, 7, dt)
+    // Bow drawn or building: over the shoulder, so the crosshair isn't on the hero.
+    this.aimW = damp(this.aimW, move === 'draw' || move === 'release' || this.ctx.build?.active ? 1 : 0, 7, dt)
     this.boom = damp(this.boom, this.zoom * (1 - AIM_ZOOM * this.aimW), 10, dt)
     this.assist(dt)
     this.followPivot(dt)
@@ -223,7 +229,7 @@ export class CameraRig implements ICameraRig {
     if (Math.abs(this.pivot.x - p.x) + Math.abs(this.pivot.z - p.z) > 12) this.resetPivot()
 
     // Hold the take-off height in the air; follow drops at once and big rises past airRise.
-    if (pl.grounded || p.y < this.refY) this.refY = p.y
+    if (pl.grounded || pl.flying || p.y < this.refY) this.refY = p.y
     else if (p.y > this.refY + C.airRise) this.refY = p.y - C.airRise
 
     const kH = 1 - Math.exp(-C.followRate * dt)
@@ -290,8 +296,7 @@ export class CameraRig implements ICameraRig {
       const hit = col.raycast(ox + dx * travelled, oy + dy * travelled, oz + dz * travelled, dx, dy, dz, remain)
       if (!hit) break
       const c = hit.collider
-      const thin = c && (c.shape === 'cylinder' ? c.r < 0.6 : Math.max(c.hx, c.hz) < 0.35)
-      if (!thin) return travelled + hit.t
+      if (!c || !isThin(c)) return travelled + hit.t
       travelled += hit.t + (c.shape === 'cylinder' ? c.r * 2 : Math.max(c.hx, c.hz) * 2) + 0.05
     }
     return len
@@ -326,10 +331,25 @@ export class CameraRig implements ICameraRig {
     // Aim a little to the side so the hero sits on the right third, clear of the menu.
     const fx = (p.x - cam.position.x) / r
     const fz = (p.z - cam.position.z) / r
-    this.target.set(p.x + fz * C.titleSide, p.y + C.titleLookY, p.z - fx * C.titleSide)
+    // Portrait screens are too narrow for the side offset: keep him in frame, nearer the centre.
+    const side = C.titleSide * Math.min(1, cam.aspect / 1.6)
+    this.target.set(p.x + fz * side, p.y + C.titleLookY, p.z - fx * side)
     cam.lookAt(this.target)
     this.yaw = Math.atan2(fx, fz)
     this.pitch = C.defaultPitch
+  }
+
+  /** Whether any prop stands within TITLE_CLEARANCE of a title camera spot, at lens or waist height (it would fill the frame). */
+  private crowded(x: number, y: number, z: number): boolean {
+    const col = this.ctx.collision
+    for (let i = 0; i < 8; i++) {
+      const dx = Math.sin((i / 8) * TAU)
+      const dz = Math.cos((i / 8) * TAU)
+      for (const dy of [0, -0.6]) {
+        if (col.raycast(x, y + dy, z, dx, 0, dz, TITLE_CLEARANCE, true)?.collider) return true
+      }
+    }
+    return false
   }
 
   /**
@@ -362,6 +382,11 @@ export class CameraRig implements ICameraRig {
           any = true
           break
         }
+      }
+      // A clear line of sight is not enough if a prop (a plinth, a wall, a trunk) sits right beside the lens.
+      if (!blocked[k] && this.crowded(cx, camY, cz)) {
+        blocked[k] = 1
+        any = true
       }
     }
     this.titlePlanned = true

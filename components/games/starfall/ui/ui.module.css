@@ -227,6 +227,17 @@
 .zoneRuleL { transform-origin: 100% 50%; }
 .zoneRuleR { transform-origin: 0% 50%; }
 
+.bossBar {
+  animation: riseIn 420ms var(--sf-ease) both;
+}
+.bossStunned {
+  animation: bossGlow 0.6s ease-in-out infinite alternate;
+}
+@keyframes bossGlow {
+  from { box-shadow: 0 0 4px rgba(245, 180, 85, 0.4); }
+  to { box-shadow: 0 0 14px rgba(245, 180, 85, 0.95); }
+}
+
 .objective[data-state='open'] {
   animation: slideIn 420ms var(--sf-ease) both;
 }
@@ -347,6 +358,59 @@
 }
 .markerPulse {
   animation: markerPulse 1.8s ease-out infinite;
+}
+
+/* ── build bar: block icons ─────────────────────────────────────────── */
+
+/* An orthographic cube (top, front, side) painted with the block's textures. */
+.blockIcon {
+  position: relative;
+  width: 17px;
+  height: 17px;
+  transform-style: preserve-3d;
+  transform: rotateX(-30deg) rotateY(-45deg);
+}
+.blockIcon > i {
+  position: absolute;
+  inset: 0;
+  background: var(--side) center / cover;
+  background-color: var(--tint);
+  background-blend-mode: multiply;
+}
+.blockIcon > i[data-face='top'] {
+  background-image: var(--top);
+  transform: rotateX(90deg) translateZ(8.5px);
+}
+.blockIcon > i[data-face='front'] {
+  transform: translateZ(8.5px);
+  filter: brightness(0.8);
+}
+.blockIcon > i[data-face='side'] {
+  transform: rotateY(90deg) translateZ(8.5px);
+  filter: brightness(0.62);
+}
+.blockIcon[data-look='grass'] > i:not([data-face='top']) {
+  background-image: linear-gradient(to bottom, #6f8a43 0 24%, rgb(0 0 0 / 0.18) 24% 30%, transparent 30%), var(--side);
+  background-blend-mode: normal;
+}
+.blockIcon[data-look='glass'] > i {
+  background: rgb(190 225 236 / 0.3);
+  box-shadow: inset 0 0 0 1.5px rgb(246 250 252 / 0.85);
+}
+.blockIcon[data-look='lamp'] > i {
+  background-image: radial-gradient(circle, #fff4d4 0 20%, #f5b455 46%, transparent 48%), var(--side);
+  background-blend-mode: normal;
+}
+.blockIcon[data-look='lamp'] > i[data-face='front'] {
+  filter: brightness(1) drop-shadow(0 0 4px rgb(245 180 85 / 0.8));
+}
+.blockStairs {
+  width: 22px;
+  height: 22px;
+  background: var(--side) center / 44px;
+  background-color: var(--tint);
+  background-blend-mode: multiply;
+  clip-path: polygon(0 100%, 0 75%, 25% 75%, 25% 50%, 50% 50%, 50% 25%, 75% 25%, 75% 0, 100% 0, 100% 100%);
 }
 
 /* ── victory ────────────────────────────────────────────────────────── */

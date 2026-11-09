@@ -311,4 +311,47 @@ const victory: Song = {
   },
 }
 
-export const SONGS: Record<MusicMood, Song> = { title, explore, danger, cutscene, victory }
+/* ── boss: driving minor riff, war drums, brass stabs (D minor) ── */
+
+const BOSS = [
+  { root: 38, pad: [50, 53, 57], stab: [62, 65, 69] },
+  { root: 38, pad: [50, 53, 57], stab: [62, 65, 69] },
+  { root: 34, pad: [50, 53, 58], stab: [58, 62, 65] },
+  { root: 36, pad: [48, 52, 55], stab: [60, 64, 67] },
+  { root: 38, pad: [50, 53, 57], stab: [62, 65, 69] },
+  { root: 38, pad: [50, 53, 57], stab: [62, 65, 69] },
+  { root: 41, pad: [53, 57, 60], stab: [65, 69, 72] },
+  { root: 40, pad: [49, 52, 57], stab: [61, 64, 69] },
+]
+/** Bass riff offsets per 16th (null = rest). */
+const RIFF = [0, null, 0, 0, 12, null, 0, 0, 10, null, 0, 0, 7, null, 8, 7]
+const BOSS_LEAD = melody('D5:2 F5 A5 G5:2 F5 E5 | F5:3 E5 D5:4 | Bb4:2 D5 F5 E5:2 D5 C5 | E5:4 C#5:4')
+
+const boss: Song = {
+  bpm: 132,
+  swing: 0,
+  restart: true,
+  step(p, i, t) {
+    const ins = p.ins
+    const bar = i >> 4
+    const s = i & 15
+    const b = bar % 8
+    const ch = BOSS[b]
+    if (s === 0) ins.pad(t, ch.pad, p.t16 * 16, 0.8, { attack: 0.2, release: 0.6, bright: 900 })
+    const o = RIFF[s]
+    if (o !== null) ins.pulse(t, ch.root + o, s === 0 || s === 8 ? 1 : 0.75)
+    if (s === 0 || s === 8) ins.kick(t, 1)
+    if (s === 4 || s === 12) ins.snare(t, 0.8)
+    if (s === 0 || s === 3 || s === 10) ins.tom(t, s === 0 ? 38 : 43, s === 0 ? 1 : 0.7)
+    if ((s & 1) === 0) ins.tick(t, (s & 3) === 0 ? 0.7 : 0.4)
+    if ((b === 3 || b === 7) && (s === 0 || s === 6 || s === 12)) ins.brass(t, ch.stab, p.t16 * 3, 0.75)
+    // The lead enters on the second pass of the loop.
+    if (bar >= 8) {
+      const ev = BOSS_LEAD[(b & 3) * 16 + s]
+      if (ev && b < 4) ins.brass(t, [ev.midi], ev.len * p.t16, 0.55)
+    }
+    if (b === 0 && s === 0) ins.swell(t, p.t16 * 14, 0.5)
+  },
+}
+
+export const SONGS: Record<MusicMood, Song> = { title, explore, danger, cutscene, victory, boss }

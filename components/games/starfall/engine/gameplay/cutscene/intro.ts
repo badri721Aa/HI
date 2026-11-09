@@ -13,7 +13,7 @@ import { SceneBuilder, heroFrame, settlePose, vec, type Scene } from './scene'
 const LINES = [
   'For a thousand years, the Beacon on Starfall Isle lit the way home for every ship at sea.',
   'One quiet evening its flame went dark, and the star at its heart broke apart.',
-  'Seven shards fell across the island — on rooftops, in the woods, beneath the falls.',
+  'Seven shards fell across the island — on rooftops, in the woods, behind the falls.',
   'Find them. Carry them to the summit. Light the Beacon again.',
 ]
 
