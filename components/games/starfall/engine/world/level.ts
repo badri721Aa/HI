@@ -56,6 +56,13 @@ export const WRECK = { x: 98, z: 84, yaw: -0.7, deckY: 3.2, nestY: 12 }
 /** The Beacon at the summit. */
 export const BEACON = { x: 0, z: -60, towerHeight: 11 }
 
+/** Weapons waiting on their stands: the sword in a stone by the spawn, the hammer by the well, the bow at the ruins gate. */
+export const WEAPON_STANDS: Array<{ weapon: 'sword' | 'hammer' | 'bow'; x: number; z: number; yaw: number }> = [
+  { weapon: 'sword', x: -2.4, z: 112.4, yaw: 0.35 },
+  { weapon: 'hammer', x: 4.1, z: 50.6, yaw: -0.6 },
+  { weapon: 'bow', x: 75.2, z: 15.8, yaw: -2.2 },
+]
+
 /* ────────────────────────────────────────────────────────────
    Star shards
    ──────────────────────────────────────────────────────────── */

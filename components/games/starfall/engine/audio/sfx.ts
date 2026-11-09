@@ -4,7 +4,7 @@
  * repeats never sound mechanical. Positional effects go through a PannerNode
  * at their world position; the player's own sounds stay centred.
  */
-import type { V3 } from '../events'
+import type { V3, WeaponId } from '../events'
 import type { SfxName } from '../types'
 import type { Surface } from '../world/heightfield'
 import type { Bus, Mixer } from './mixer'
@@ -368,6 +368,132 @@ export class Sfx {
     // The gloom dissolves into a little light.
     this.chime(v, t + 0.14, mtof(93), 0.03, 0.6, 2, 0.5)
     this.chime(v, t + 0.2, mtof(98), 0.025, 0.6, 2, 0.5)
+  }
+
+  /* ── weapons ─────────────────────────────────────────────── */
+
+  /** Blade through the air (pitch rises along the combo), or the hammer's heavy lift. */
+  swing(weapon: WeaponId, combo: number): void {
+    if (!this.gate('swing', 0.06)) return
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1.6, { wet: 0.25 })
+    if (weapon === 'hammer') {
+      this.whoosh(v, t + 0.1, 260, 820, 0.42, 0.22, 0.8)
+      return
+    }
+    const p = rand(0.94, 1.08) * (1 + combo * 0.1)
+    this.whoosh(v, t + 0.04, 900 * p, 3800 * p, 0.1, 0.34, 1.6)
+    this.whoosh(v, t + 0.12, 3800 * p, 1200 * p, 0.16, 0.2, 1.6)
+    this.chime(v, t + 0.05, 2300 * p, 0.01, 0.25, 3.5, 0.6)
+  }
+
+  /** The hammer meets the ground: a deep thud, crunching earth and a short metallic boom. */
+  slam(pos: V3): void {
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1.5, { pos, ref: 8, wet: 0.5 })
+    this.tone(v, t, 'sine', 120, 32, 0.6, 0.003, 0.5)
+    this.noiseHit(v, t, 'lowpass', 1600, 0.8, 0.4, 0.003, 0.34, 140, this.s.brown)
+    this.noiseHit(v, t + 0.01, 'bandpass', 2600, 1.4, 0.12, 0.002, 0.12, 900)
+    this.chime(v, t, 170, 0.05, 1.1, 1.41, 2)
+  }
+
+  /** The bow limbs creak as the string comes back. */
+  bowDraw(): void {
+    if (!this.gate('draw', 0.2)) return
+    const t = this.t
+    const s = this.s
+    const v = this.voice(this.mix.sfx, 0.9)
+    const env = s.gain(0, v)
+    const bp = s.filter('bandpass', 500, 7, env)
+    s.glide(bp.frequency, t, 480, 1250, 0.6)
+    s.noise(bp, t, s.ahr(env.gain, t, 0.16, 0.3, 0.2, 0.2), s.pink)
+  }
+
+  /** String twang and the arrow's whip; a fuller draw sounds stronger. */
+  bowFire(charge: number): void {
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1.2, { wet: 0.2 })
+    this.tone(v, t, 'triangle', 230 + 90 * charge, 150, 0.3, 0.002, 0.24)
+    this.tone(v, t, 'sine', 110, 68, 0.22, 0.002, 0.16)
+    this.whoosh(v, t + 0.01, 2400, 6200, 0.14, 0.1 + 0.14 * charge, 2)
+  }
+
+  /** An arrow thunks into the ground and its shaft quivers. */
+  arrowStick(pos: V3): void {
+    if (!this.gate('thunk', 0.04)) return
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1, { pos, ref: 5 })
+    this.noiseHit(v, t, 'bandpass', 900, 2, 0.25, 0.002, 0.06)
+    this.tone(v, t, 'sine', 320, 140, 0.18, 0.002, 0.08)
+    this.tone(v, t + 0.01, 'triangle', 190, 176, 0.05, 0.004, 0.24)
+  }
+
+  /** A blow lands on a gloomling: a squelchy smack (heavier for the hammer); a launch adds a cartoon "fwip". */
+  weaponHit(pos: V3, weapon: WeaponId, killed: boolean): void {
+    if (!this.gate('whit', 0.03)) return
+    const t = this.t
+    const heavy = weapon === 'hammer'
+    const v = this.voice(this.mix.sfx, 1.3, { pos, ref: 6, wet: 0.3 })
+    this.noiseHit(v, t, 'lowpass', heavy ? 1200 : 2600, 3, 0.4, 0.002, heavy ? 0.22 : 0.12, heavy ? 150 : 400)
+    this.tone(v, t, 'sine', heavy ? 160 : 300, heavy ? 50 : 110, heavy ? 0.45 : 0.3, 0.002, heavy ? 0.25 : 0.12)
+    if (weapon === 'sword') this.noiseHit(v, t, 'highpass', 5000, 0.7, 0.08, 0.001, 0.05)
+    if (killed) this.tone(v, t + 0.05, 'triangle', 380, 1500, 0.08, 0.01, 0.28)
+  }
+
+  /** Drawing a weapon: a steel "shing", a heavy clunk, a wooden tap — or just a cloth rustle for fists. */
+  equip(weapon: WeaponId): void {
+    if (!this.gate('equip', 0.08)) return
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1, { wet: 0.25 })
+    if (weapon === 'sword') {
+      this.noiseHit(v, t, 'bandpass', 5200, 3, 0.12, 0.01, 0.3, 7600)
+      this.chime(v, t + 0.04, 1850, 0.025, 0.7, 3.5, 0.8)
+    } else if (weapon === 'hammer') {
+      this.tone(v, t, 'sine', 180, 90, 0.25, 0.003, 0.14)
+      this.chime(v, t, 420, 0.03, 0.4, 1.41, 1.5)
+    } else if (weapon === 'bow') {
+      this.noiseHit(v, t, 'bandpass', 1200, 4, 0.12, 0.002, 0.05)
+      this.tone(v, t + 0.02, 'triangle', 196, 192, 0.06, 0.003, 0.3)
+    } else {
+      this.whoosh(v, t, 600, 1400, 0.14, 0.08, 1)
+    }
+  }
+
+  pickup(): void {
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1, { wet: 0.55 })
+    ;[74, 78, 81, 86].forEach((n, i) => this.chime(v, t + i * 0.07, mtof(n), 0.05, 1.2, 2, 0.9))
+  }
+
+  /** A hard limp landing: a springy cartoon "boing" or a little "oof". */
+  flop(impact: number): void {
+    if (!this.gate('flop', 0.35)) return
+    const t = this.t
+    const s = this.s
+    const v = this.voice(this.mix.sfx, 1.2, { wet: 0.2 })
+    if (Math.random() < 0.5) {
+      const env = s.gain(0, v)
+      const end = s.perc(env.gain, t, 0.2, 0.005, 0.6)
+      const o = s.osc('triangle', 150, env, t, end)
+      o.frequency.setValueAtTime(150, t)
+      o.frequency.exponentialRampToValueAtTime(620, t + 0.08)
+      o.frequency.exponentialRampToValueAtTime(330, t + 0.6)
+      const wob = s.gain(0, o.frequency)
+      wob.gain.setValueAtTime(70, t)
+      wob.gain.linearRampToValueAtTime(0, t + 0.6)
+      s.osc('sine', 19, wob, t, end)
+      return
+    }
+    // "Oof": a buzzy voice through two "oo" formants, falling in pitch, with a breathy tail.
+    const p = rand(0.9, 1.15) * (impact > 20 ? 0.9 : 1)
+    const env = s.gain(0, v)
+    const end = s.ahr(env.gain, t, 0.5, 0.012, 0.07, 0.16)
+    const f1 = s.filter('bandpass', 330, 5, env)
+    const f2 = s.filter('bandpass', 900, 7, env)
+    const o = s.osc('sawtooth', 200 * p, f1, t, end)
+    o.connect(f2)
+    s.glide(o.frequency, t, 210 * p, 120 * p, 0.25)
+    this.noiseHit(v, t + 0.14, 'highpass', 2500, 0.7, 0.03, 0.02, 0.12)
   }
 
   /* ── world ───────────────────────────────────────────────── */

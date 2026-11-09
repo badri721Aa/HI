@@ -317,7 +317,8 @@ export class PlayerController implements IPlayerController {
     if (live) {
       if (s.jump) this.pressJump()
       if (s.dash) this.dashBufT = M.actionBuffer
-      if (s.attack) this.attackBufT = M.actionBuffer
+      // With a weapon in hand the Weapons system owns the attack button.
+      if (s.attack && !ctx.weapons.armed) this.attackBufT = M.actionBuffer
     } else {
       this.jumpBufT = this.dashBufT = this.attackBufT = 0
     }
@@ -381,6 +382,7 @@ export class PlayerController implements IPlayerController {
     if ((s.sprint || this.fullTiltT > M.padSprintDelay) && mag >= 0.5) speed = lerp(M.runSpeed, M.sprintSpeed, tilt)
     if (this.depth > M.wadeMin) speed *= M.wadeSlow
     if (this.attackT > 0) speed *= M.attackMove
+    speed *= this.ctx.weapons.moveScale
     // Walking uphill costs a little speed (feels weighty, and reads on the steep paths).
     if (this._grounded && !this.hit.collider) {
       const g = this.hit
@@ -940,13 +942,15 @@ export class PlayerController implements IPlayerController {
   /** Turns the facing smoothly toward where we're going. */
   private face(dt: number): void {
     const v = this.velocity
+    const aim = this.ctx.weapons.aimYaw
     let target: number
     if (this.dashT > 0) target = Math.atan2(this.dashX, this.dashZ)
     else if (this.dead || this.hurtT > 0) return
     else if (this.sliding) {
       if (Math.hypot(v.x, v.z) < 1.5) return
       target = Math.atan2(v.x, v.z)
-    } else if (this.wishMag > 0) target = Math.atan2(this.wishX, this.wishZ)
+    } else if (aim !== null) target = aim
+    else if (this.wishMag > 0) target = Math.atan2(this.wishX, this.wishZ)
     else return
     const diff = wrapAngle(target - this._yaw)
     const air = !this._grounded

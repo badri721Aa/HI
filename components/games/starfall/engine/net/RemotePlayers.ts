@@ -12,8 +12,10 @@ import * as THREE from 'three'
 import { GLTFLoader, type GLTFParser } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { GroundHit } from '../collision'
-import type { Ctx, GestureName, MotionState } from '../types'
+import type { Ctx, GestureName, MotionState, WeaponId, WeaponPose } from '../types'
+import { WeaponKit, type HeldWeapon } from '../gameplay/weapons/models'
 import { Animator, type GroundSample } from '../player/Animator'
+import { createGrip } from '../player/anim/grip'
 import { Rig } from '../player/anim/Rig'
 import { BUBBLE_TIME, TAG_FADE_START, TAG_HIDE } from './config'
 import { BUBBLE_H, BUBBLE_W, CanvasSprite, TAG_H, TAG_W, drawBubble, drawNameTag } from './labels'
@@ -78,6 +80,10 @@ class Avatar {
   wasVisible = false
   animAcc = 0
   frame = 0
+  /** Hand grips [left, right] and the weapon copies made so far (shown: the one in the peer's hand). */
+  private grips: [THREE.Object3D | null, THREE.Object3D | null] = [null, null]
+  private weapons = new Map<HeldWeapon, THREE.Object3D>()
+  private readonly weaponPose: WeaponPose = { weapon: 'fists', move: 'none', t: 0, charge: 0 }
   prevYaw = 0
   turnRate = 0
   /** 0..1 how far the body has gone limp onto the ground. */
@@ -92,6 +98,7 @@ class Avatar {
     template: Template | null,
     blobGeo: THREE.BufferGeometry,
     blobMat: THREE.Material,
+    private weaponKit: () => WeaponKit,
   ) {
     const anisotropy = Math.min(4, ctx.renderer.capabilities.getMaxAnisotropy())
     this.root.name = `remote-${peer.id}`
@@ -140,6 +147,7 @@ class Avatar {
     this.model.scale.setScalar(t.scale)
     this.model.add(scene)
     try {
+      this.grips = [createGrip(scene, 'L', t.scale), createGrip(scene, 'R', t.scale)]
       this.rig = new Rig(scene, t.scale)
       this.animator = new Animator(this.rig, this.probe)
     } catch (err) {
@@ -155,6 +163,18 @@ class Avatar {
     m.castShadow = true
     this.model.add(m)
     this.placeholder = m
+  }
+
+  /** Puts the peer's weapon in the right hand grip (the bow in the left); copies are made on first use. */
+  private showWeapon(id: WeaponId): void {
+    this.weaponPose.weapon = id
+    for (const [w, o] of this.weapons) o.visible = w === id
+    if (id === 'fists' || this.weapons.has(id)) return
+    const grip = this.grips[id === 'bow' ? 0 : 1]
+    if (!grip) return
+    const m = this.weaponKit().make(id)
+    grip.add(m.group)
+    this.weapons.set(id, m.group)
   }
 
   /** Ground probe for the animator's foot planting (same as the local hero's). */
@@ -220,6 +240,8 @@ class Avatar {
       m.wading = p.wading
       m.slope = p.slope
       a.setMotion(m)
+      if (p.weapon !== this.weaponPose.weapon) this.showWeapon(p.weapon)
+      a.setWeapon(this.weaponPose)
       if (p.snapped || !this.wasVisible) a.resetFeet()
       this.animAcc += dt
       const every = dist > LOD2 ? 4 : dist > LOD1 ? 2 : 1
@@ -319,6 +341,10 @@ export class RemotePlayers {
   private blob: { geo: THREE.PlaneGeometry; mat: THREE.MeshBasicMaterial } | null = null
   private frustum = new THREE.Frustum()
 
+  /** Shared weapon models for every avatar, made when the first one holds something. */
+  private kit: WeaponKit | null = null
+  private weaponKit = (): WeaponKit => (this.kit ??= new WeaponKit(this.ctx.textures))
+
   constructor(private ctx: Ctx) {}
 
   /** Shared blob-shadow quad, made on first use (textures are only loaded after construction). */
@@ -398,7 +424,7 @@ export class RemotePlayers {
       if (!av) {
         if (!peer.ready || !this.settled) continue
         const blob = this.blobParts()
-        av = new Avatar(this.ctx, peer, this.template, blob.geo, blob.mat)
+        av = new Avatar(this.ctx, peer, this.template, blob.geo, blob.mat, this.weaponKit)
         this.avatars.set(peer.id, av)
       }
       av.update(dt, camera, this.frustum)
@@ -444,6 +470,8 @@ export class RemotePlayers {
     for (const d of this.owned) d.dispose()
     this.owned = []
     this.template = null
+    this.kit?.dispose()
+    this.kit = null
     this.blob?.geo.dispose()
     this.blob?.mat.dispose()
     this.blob = null

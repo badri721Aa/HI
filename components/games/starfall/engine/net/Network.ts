@@ -22,7 +22,7 @@ import {
 import {
   Bucket, FLAG_ACTIVE, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, STATE_BYTES, defaultColor, defaultName,
   encodeState, isEmote, makeSnapshot, normalizeRoomCode, randomId, sanitizeChat, sanitizeColor, sanitizeName,
-  stateCode, toRelay, type MemberInfo,
+  stateCode, toRelay, weaponCode, type MemberInfo,
 } from './protocol'
 import { RemotePlayers } from './RemotePlayers'
 import { JoinError, Room, type RoomHost } from './Room'
@@ -111,6 +111,7 @@ export class Network implements INetwork {
   private lastChange = -1
   private lastState = -1
   private lastFlags = -1
+  private lastWeapon = -1
   private lastYaw = 0
   private lastX = 0
   private lastY = 0
@@ -500,6 +501,7 @@ export class Network implements INetwork {
     s.state = stateCode(ragdoll ? 'ragdoll' : p.state)
     s.wading = p.motion?.wading ?? 0
     s.slope = p.motion?.slope ?? 0
+    s.weapon = weaponCode(ctx.weapons?.equipped ?? 'fists')
 
     // Moving platforms carry the player with zero velocity, so position changes count too.
     const dx = pos.x - this.lastX
@@ -511,7 +513,8 @@ export class Network implements INetwork {
     const moving = v.x * v.x + v.z * v.z > 0.01 || Math.abs(v.y) > 0.05 || !p.grounded || dx * dx + dy * dy + dz * dz > 1e-6
     const baseFlags = (p.grounded || ragdoll ? FLAG_GROUNDED : 0) | (ragdoll ? FLAG_RAGDOLL : 0) | (away ? FLAG_AWAY : 0)
     const turned = Math.abs(Math.atan2(Math.sin(s.yaw - this.lastYaw), Math.cos(s.yaw - this.lastYaw))) > 0.02
-    if (moving || turned || s.state !== this.lastState || baseFlags !== this.lastFlags) this.lastChange = now
+    if (moving || turned || s.state !== this.lastState || baseFlags !== this.lastFlags || s.weapon !== this.lastWeapon) this.lastChange = now
+    this.lastWeapon = s.weapon
     this.lastState = s.state
     this.lastFlags = baseFlags
     this.lastYaw = s.yaw

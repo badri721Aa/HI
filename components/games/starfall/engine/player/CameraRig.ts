@@ -5,6 +5,7 @@
  *             pitch, the wheel zooms. A raycast shortens the boom so walls never hide the
  *             hero; vertical follow is damped in the air so jumps don't bob the view; after a
  *             while without look input the view drifts gently to look where you're running.
+ *             Drawing the bow eases the camera in over the right shoulder.
  *  title    — a slow, low cinematic drift around the hero for the menus.
  *  scripted — hands-off: cutscenes drive ctx.camera (shake still layers on top, safely).
  *
@@ -25,6 +26,9 @@ const TITLE_SAMPLES = 72
 /** Title swing shape: asin(K·sin θ)/asin(K) is a triangle wave with eased turnarounds (near-constant drift speed). */
 const SWING_K = 0.95
 const SWING_NORM = Math.asin(SWING_K)
+/** Over-the-shoulder aim (bow): sideways offset (m) and how much the boom shortens. */
+const AIM_SIDE = 0.6
+const AIM_ZOOM = 0.45
 
 interface FovKick {
   amp: number
@@ -45,6 +49,8 @@ export class CameraRig implements ICameraRig {
   private boom: number = C.distance
   /** How far obstacles currently pull the camera in from `boom` (jumps up, eases back down). */
   private pull = 0
+  private aimW = 0
+  private readonly aimPivot = new THREE.Vector3()
   private lookIdle = 0
   /** Seconds the hero has been running (assist waits for both). */
   private moveT = 0
@@ -182,7 +188,9 @@ export class CameraRig implements ICameraRig {
     this.yaw = wrapAngle(this.yaw - lx)
     this.pitch = clamp(this.pitch + ly, C.pitchMin, C.pitchMax)
     if (s.zoom) this.zoom = clamp(this.zoom + s.zoom * C.zoomStep, C.zoomMin, C.zoomMax)
-    this.boom = damp(this.boom, this.zoom, 10, dt)
+    const move = this.ctx.weapons?.pose.move
+    this.aimW = damp(this.aimW, move === 'draw' || move === 'release' ? 1 : 0, 7, dt)
+    this.boom = damp(this.boom, this.zoom * (1 - AIM_ZOOM * this.aimW), 10, dt)
     this.assist(dt)
     this.followPivot(dt)
     this.placeOrbit(dt, false)
@@ -233,7 +241,7 @@ export class CameraRig implements ICameraRig {
     const dx = -Math.sin(this.yaw) * cp
     const dy = Math.sin(this.pitch)
     const dz = -Math.cos(this.yaw) * cp
-    const pv = this.pivot
+    const pv = this.shoulder()
     const need = this.boom - this.castBoom(pv.x, pv.y, pv.z, dx, dy, dz, this.boom)
     // Pull in at once (never see through a wall), ease back out once it clears.
     if (instant || need > this.pull) this.pull = need
@@ -251,6 +259,16 @@ export class CameraRig implements ICameraRig {
     this.keepAboveGround(cam.position)
     this.target.set(pv.x, pv.y + C.lookLift + lift * 0.6, pv.z)
     cam.lookAt(this.target)
+  }
+
+  /** The orbit pivot, moved out over the right shoulder while aiming (never into a wall). */
+  private shoulder(): THREE.Vector3 {
+    const pv = this.pivot
+    if (this.aimW < 0.001) return pv
+    const rx = -Math.cos(this.yaw)
+    const rz = Math.sin(this.yaw)
+    const side = Math.max(0, Math.min(AIM_SIDE, this.freeLength(pv.x, pv.y, pv.z, rx, 0, rz, AIM_SIDE + C.margin) - C.margin)) * this.aimW
+    return this.aimPivot.set(pv.x + rx * side, pv.y, pv.z + rz * side)
   }
 
   /** Boom length that fits from the pivot along the unit direction (dx, dy, dz), keeping the margin. */

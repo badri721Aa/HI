@@ -41,6 +41,8 @@ export class Signs implements ISigns {
   private signs: Placed[] = []
   /** What the HUD currently shows (tracked from the bus, whoever emitted it). */
   private shown = ''
+  /** The prompt this module last asked for: it only clears its own (weapon stands show theirs too). */
+  private mine = ''
   private unsub: (() => void) | null = null
 
   private readonly m = new THREE.Matrix4()
@@ -145,7 +147,8 @@ export class Signs implements ISigns {
 
     const key = ctx.input.device === 'pad' ? 'Y' : ctx.input.device === 'touch' ? 'Tap' : 'E'
     const want = label ? `${key}|${label}` : ''
-    if (want !== this.shown) ctx.bus.emit('ui:prompt', label ? { key, label } : null)
+    if (want !== this.shown && (want || this.shown === this.mine)) ctx.bus.emit('ui:prompt', label ? { key, label } : null)
+    this.mine = want
 
     if (label && ctx.input.state.interact) {
       if (sign) void game.showDialog(sign.title, sign.lines)

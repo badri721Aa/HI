@@ -7,13 +7,22 @@
 import { useEffect, useEffectEvent, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import type { Action } from '../engine/input'
 import { useGameUi, useHud, useUi } from './context'
-import { DashIcon, InteractIcon, JumpIcon, SpinIcon } from './icons'
+import { BowIcon, DashIcon, HammerIcon, InteractIcon, JumpIcon, SpinIcon, SwordIcon } from './icons'
+
+/** The attack button shows what it does: the fists' spin or the weapon in hand. */
+const ATTACK = {
+  fists: { label: 'Spin', Icon: SpinIcon },
+  sword: { label: 'Slash', Icon: SwordIcon },
+  hammer: { label: 'Slam', Icon: HammerIcon },
+  bow: { label: 'Shoot', Icon: BowIcon },
+}
 import { cx } from './theme'
 
 export function TouchControls() {
   const { touch } = useGameUi()
   const phase = useUi(s => s.phase)
   const hasPrompt = useUi(s => !!s.prompt)
+  const attack = ATTACK[useHud(h => h.weapon)]
   if (!touch) return null
   const playing = phase === 'playing'
 
@@ -27,7 +36,7 @@ export function TouchControls() {
         <div className="absolute bottom-[env(safe-area-inset-bottom)] right-[env(safe-area-inset-right)] h-[230px] w-[230px]">
           <TouchButton action="jump" label="Jump" Icon={JumpIcon} className="bottom-[34px] right-[22px] h-[80px] w-[80px]" big />
           <TouchButton action="dash" label="Dash" Icon={DashIcon} className="bottom-[28px] right-[118px] h-[58px] w-[58px]" charge />
-          <TouchButton action="attack" label="Spin" Icon={SpinIcon} className="bottom-[104px] right-[112px] h-[58px] w-[58px]" />
+          <TouchButton action="attack" label={attack.label} Icon={attack.Icon} className="bottom-[104px] right-[112px] h-[58px] w-[58px]" />
           <TouchButton action="interact" label="Use" Icon={InteractIcon} className="bottom-[128px] right-[32px] h-[58px] w-[58px]" highlight={hasPrompt} />
         </div>
       )}

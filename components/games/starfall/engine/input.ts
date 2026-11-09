@@ -16,8 +16,14 @@ export interface InputState {
   lookY: number
   /** Scroll / trigger zoom delta this frame (+ = zoom out). */
   zoom: number
+  /** Hotbar slot picked this frame (keys 1–4 → 0..3), or -1. */
+  slot: number
+  /** Weapon cycling this frame: +1 next, -1 previous, 0 none (wheel, d-pad left/right). */
+  cycle: number
   /** Held states. */
   jumpHeld: boolean
+  /** Attack held (bow draw): left mouse button, F, pad X or the touch button. */
+  attackHeld: boolean
   sprint: boolean
   skipHeld: boolean
   /** Edge-triggered (one frame). */
@@ -45,6 +51,12 @@ const KEYMAP: Record<string, Action> = {
   ShiftRight: 'sprint',
 }
 
+const SLOT_KEYS: Record<string, number> = {
+  Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3,
+}
+const ZOOM_IN = ['Equal', 'NumpadAdd']
+const ZOOM_OUT = ['Minus', 'NumpadSubtract']
+
 const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'])
 
 function isTyping(t: EventTarget | null): boolean {
@@ -55,8 +67,8 @@ function isTyping(t: EventTarget | null): boolean {
 
 function emptyState(): InputState {
   return {
-    moveX: 0, moveY: 0, lookX: 0, lookY: 0, zoom: 0,
-    jumpHeld: false, sprint: false, skipHeld: false,
+    moveX: 0, moveY: 0, lookX: 0, lookY: 0, zoom: 0, slot: -1, cycle: 0,
+    jumpHeld: false, attackHeld: false, sprint: false, skipHeld: false,
     jump: false, dash: false, attack: false, interact: false, pause: false, map: false, ragdoll: false,
   }
 }
@@ -69,6 +81,8 @@ export class Input {
   /** Swallow page-scrolling keys while the game has focus. */
   capture = true
   sensitivity = 1
+  /** The plain mouse wheel cycles weapons (set while more than one is owned); otherwise, and with Alt, it zooms. */
+  wheelCycles = false
 
   private keys = new Set<string>()
   private edges = new Set<Action>()
@@ -76,6 +90,9 @@ export class Input {
   private mouseDX = 0
   private mouseDY = 0
   private wheel = 0
+  private wheelCycle = 0
+  private slot = -1
+  private mouseHeld = false
   private locked = false
   private dragging = false
   private padPrev: boolean[] = []
@@ -98,6 +115,8 @@ export class Input {
       if (!e.repeat) {
         const a = KEYMAP[e.code]
         if (a) this.edges.add(a)
+        const slot = SLOT_KEYS[e.code]
+        if (slot !== undefined && !e.ctrlKey && !e.metaKey && !e.altKey) this.slot = slot
       }
       this.keys.add(e.code)
     })
@@ -105,6 +124,7 @@ export class Input {
     on(window, 'blur', () => {
       this.keys.clear()
       this.virtualHeld.clear()
+      this.mouseHeld = false
     })
 
     on<MouseEvent>(window, 'mousemove', e => {
@@ -115,8 +135,9 @@ export class Input {
       this.mouseDX += e.movementX
       this.mouseDY += e.movementY
     })
-    on<MouseEvent>(window, 'mouseup', () => {
+    on<MouseEvent>(window, 'mouseup', e => {
       this.dragging = false
+      if (e.button === 0) this.mouseHeld = false
     })
     on<MouseEvent>(el, 'mousedown', e => {
       this.device = 'kbm'
@@ -124,12 +145,16 @@ export class Input {
         this.dragging = true
         return
       }
-      if (e.button === 0) this.edges.add('attack')
+      if (e.button === 0) {
+        this.edges.add('attack')
+        this.mouseHeld = true
+      }
       if (e.button === 2) this.edges.add('dash')
     })
     on<MouseEvent>(el, 'contextmenu', e => e.preventDefault())
     on<WheelEvent>(el, 'wheel', e => {
-      this.wheel += Math.sign(e.deltaY) * 0.6
+      if (this.wheelCycles && !e.altKey) this.wheelCycle += Math.sign(e.deltaY)
+      else this.wheel += Math.sign(e.deltaY) * 0.6
       e.preventDefault()
     }, { passive: false })
     on(document, 'pointerlockchange', () => {
@@ -232,6 +257,10 @@ export class Input {
     this.mouseDX = this.mouseDY = 0
     let zoom = this.wheel
     this.wheel = 0
+    let cycle = Math.sign(this.wheelCycle)
+    this.wheelCycle = 0
+    if (ZOOM_IN.some(c => k.has(c))) zoom -= 4 * dt
+    if (ZOOM_OUT.some(c => k.has(c))) zoom += 4 * dt
 
     if (k.has('KeyW') || k.has('ArrowUp')) my += 1
     if (k.has('KeyS') || k.has('ArrowDown')) my -= 1
@@ -241,6 +270,7 @@ export class Input {
     let sprint = k.has('ShiftLeft') || k.has('ShiftRight') || this.virtualHeld.has('sprint')
     let jumpHeld = k.has('Space') || this.virtualHeld.has('jump')
     let skipHeld = k.has('Space') || k.has('Enter') || this.virtualHeld.has('skip')
+    let attackHeld = this.mouseHeld || k.has('KeyF') || this.virtualHeld.has('attack')
 
     if (this.moveTouch.id >= 0) {
       const dx = this.moveTouch.x - this.moveTouch.ox
@@ -281,7 +311,10 @@ export class Input {
       if (edge(9)) this.edges.add('pause')
       if (edge(8)) this.edges.add('map')
       if (edge(11)) this.edges.add('ragdoll')
+      if (edge(14)) cycle = -1
+      if (edge(15)) cycle = 1
       if (btn(0)) { jumpHeld = true; skipHeld = true }
+      if (btn(2)) attackHeld = true
       if (btn(5) || btn(10) || btn(7)) sprint = true
       if (btn(12)) zoom -= 4 * dt
       if (btn(13)) zoom += 4 * dt
@@ -300,8 +333,12 @@ export class Input {
     s.lookX = on ? lx : 0
     s.lookY = on ? ly : 0
     s.zoom = on ? zoom : 0
+    s.slot = on ? this.slot : -1
+    s.cycle = on ? cycle : 0
+    this.slot = -1
     s.sprint = on && sprint
     s.jumpHeld = on && jumpHeld
+    s.attackHeld = on && attackHeld
     s.skipHeld = skipHeld
     const e = this.edges
     s.jump = on && e.has('jump')
@@ -319,7 +356,9 @@ export class Input {
     this.edges.clear()
     this.keys.clear()
     this.virtualHeld.clear()
-    this.mouseDX = this.mouseDY = this.wheel = 0
+    this.mouseDX = this.mouseDY = this.wheel = this.wheelCycle = 0
+    this.slot = -1
+    this.mouseHeld = false
     Object.assign(this.state, emptyState())
   }
 

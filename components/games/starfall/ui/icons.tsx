@@ -250,3 +250,86 @@ export function SignalIcon({ level, ...p }: IconProps & { level: number }) {
     </svg>
   )
 }
+
+/* ── weapons (hotbar) ───────────────────────────────────────────── */
+
+export function FistIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path
+        d="M7 10.2V8.6a1.6 1.6 0 0 1 3.2 0v1M10.2 9.6V7.8a1.6 1.6 0 0 1 3.2 0v1.8M13.4 9.6V8.4a1.6 1.6 0 0 1 3.2 0v2.2M16.6 10.6a1.6 1.6 0 0 1 3.2 0v3.2a6.4 6.4 0 0 1-6.4 6.4h-1.6A5.8 5.8 0 0 1 6 14.4v-2.6a1.6 1.6 0 0 1 1.6-1.6h3.6a1.6 1.6 0 0 1 0 3.2H9.4"
+        fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function SwordIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M19.8 4.2 9.6 14.4l-1.4-.6.4-1.6L18.6 3.6l1.6-.2Z" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+      <path d="m6.4 12.2 5.4 5.4M7.6 16.4l-3.4 3.4" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" />
+      <circle cx="3.9" cy="20.1" r="1.1" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function HammerIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12.6 11.4 4.4 19.6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
+      <path d="m10.4 6.4 4.2-4.2 7.2 7.2-4.2 4.2Z" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+      <path d="m12.5 4.3 7.2 7.2" fill="none" stroke="currentColor" strokeWidth={1.2} strokeOpacity={0.6} />
+    </svg>
+  )
+}
+
+export function BowIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M6 3.2c7.6 1.4 13.4 7.2 14.8 14.8" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" />
+      <path d="M6 3.2 20.8 18" fill="none" stroke="currentColor" strokeWidth={1} strokeOpacity={0.65} />
+      <path d="M3.4 20.6 15 9M15 9h-3.2M15 9v3.2M5.6 18.4l-2.4.2.2-2.4" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/* ── devices (first-run setup) ──────────────────────────────────── */
+
+export function LaptopIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="4.5" y="5" width="15" height="10" rx="1.4" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M2.5 18.5h19" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function DesktopIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="2.8" y="4" width="13.4" height="10" rx="1.4" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M9.5 14v3.5M6.5 18.5h6" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+      <rect x="18" y="4" width="3.4" height="15" rx="1" fill="none" stroke="currentColor" strokeWidth={1.5} />
+      <path d="M19.7 7.2v.1M19.7 9.4v.1" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function PhoneIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="7" y="2.8" width="10" height="18.4" rx="2" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M11 18h2" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function SchoolLaptopIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="4.5" y="6.5" width="15" height="9" rx="1.4" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M2.5 19h19M9.5 3.6 12 2.4l2.5 1.2L12 4.8Z" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}

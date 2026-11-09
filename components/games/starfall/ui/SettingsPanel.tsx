@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { DEFAULT_SETTINGS, type QualityLevel, type Settings } from '../engine/settings'
 import { useGameUi, useUi } from './context'
 import { Button, PanelHeader, Segmented, SettingRow, Slider, Tabs, Toggle } from './controls'
+import { DevicePicker } from './DevicePicker'
 import { BackHint } from './Panel'
 
 type Tab = 'graphics' | 'audio' | 'controls' | 'gameplay'
@@ -66,6 +67,7 @@ export function SettingsPanel({ onBack }: { onBack: () => void }) {
   const { store } = useGameUi()
   const settings = useUi(s => s.settings)
   const [tab, setTab] = useState<Tab>('graphics')
+  const [devicePicker, setDevicePicker] = useState(false)
   const [draft, setDraft] = useState<Partial<Settings>>({})
   const [queue] = useState(
     () =>
@@ -87,6 +89,8 @@ export function SettingsPanel({ onBack }: { onBack: () => void }) {
     onCommit: (v: number) => queue.push({ [key]: v }),
   })
   const apply = (patch: Partial<Settings>) => store.updateSettings(patch)
+
+  if (devicePicker) return <DevicePicker onDone={() => setDevicePicker(false)} aside={<BackHint onBack={() => setDevicePicker(false)} />} />
 
   return (
     <div>
@@ -110,6 +114,11 @@ export function SettingsPanel({ onBack }: { onBack: () => void }) {
             </SettingRow>
             <SettingRow label="Show FPS">
               <Toggle label="Show FPS" checked={settings.showFps} onChange={showFps => apply({ showFps })} />
+            </SettingRow>
+            <SettingRow label="Device" hint="Pick your kind of computer again to reset the graphics preset.">
+              <Button size="sm" onClick={() => setDevicePicker(true)}>
+                Run device setup again
+              </Button>
             </SettingRow>
           </>
         )}

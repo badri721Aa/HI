@@ -2,7 +2,7 @@
 /**
  * In-play multiplayer UI: the connection chip (lives in the HUD's left column),
  * the chat log + input (bottom-left), the player list (hold Tab) and the
- * keyboard shortcuts — Enter/T chat, Tab players, 1–4 emotes.
+ * keyboard shortcuts — Enter/T chat, Tab players, G cycles the emotes.
  */
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import type { GestureName } from '../engine/types'
@@ -15,15 +15,14 @@ import { linkTone, nameColor, Occupancy, PlayerRows, roomKind, StatusDot, TONE_C
 import { cx, LABEL } from './theme'
 import styles from './ui.module.css'
 
-export const EMOTES: Array<{ name: GestureName; label: string; key: string }> = [
-  { name: 'wave', label: 'Wave', key: '1' },
-  { name: 'cheer', label: 'Cheer', key: '2' },
-  { name: 'point', label: 'Point', key: '3' },
-  { name: 'shrug', label: 'Shrug', key: '4' },
+export const EMOTES: Array<{ name: GestureName; label: string }> = [
+  { name: 'wave', label: 'Wave' },
+  { name: 'cheer', label: 'Cheer' },
+  { name: 'point', label: 'Point' },
+  { name: 'shrug', label: 'Shrug' },
 ]
-const EMOTE_BY_CODE: Record<string, GestureName> = Object.fromEntries(
-  EMOTES.flatMap(e => [[`Digit${e.key}`, e.name], [`Numpad${e.key}`, e.name]]),
-)
+/** G plays the next emote in turn (1–4 select weapons). */
+const EMOTE_KEY = 'KeyG'
 
 /* ── connection chip ────────────────────────────────────────────── */
 
@@ -195,6 +194,7 @@ export function OnlineLayer() {
   const chatOpen = useNet(s => s.chatOpen)
   const listOpen = useNet(s => s.listOpen)
   const playing = phase === 'playing'
+  const nextEmote = useRef(0)
 
   const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (isTextField(e.target as Element | null) || phase !== 'playing') return
@@ -211,8 +211,10 @@ export function OnlineLayer() {
       net.setPlayerList(true)
       return
     }
-    const emote = EMOTE_BY_CODE[e.code]
-    if (emote && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) net.emote(emote)
+    if (e.code === EMOTE_KEY && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      net.emote(EMOTES[nextEmote.current].name)
+      nextEmote.current = (nextEmote.current + 1) % EMOTES.length
+    }
   })
 
   useEffect(() => {
@@ -401,13 +403,10 @@ function PlayerListOverlay() {
         </div>
         {!touch && (
           <footer className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[#F3EEE6]/10 px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-[#F3EEE6]/45">
-            <span className="text-[#F3EEE6]/35">Emotes</span>
-            {EMOTES.map(e => (
-              <span key={e.name} className="flex items-center gap-1.5">
-                <KeyCap>{e.key}</KeyCap>
-                {e.label}
-              </span>
-            ))}
+            <span className="flex items-center gap-1.5">
+              <KeyCap>G</KeyCap>
+              Emote · {EMOTES.map(e => e.label.toLowerCase()).join(', ')}
+            </span>
           </footer>
         )}
       </section>

@@ -89,3 +89,36 @@ export function detectQuality(): QualityLevel {
   if (cores <= 4 || mem <= 4) return 'medium'
   return 'high'
 }
+
+/** The choices on the first-launch "Choose your device" screen. */
+export type DeviceKind = 'chromebook' | 'laptop' | 'gaming' | 'phone'
+
+export const DEVICE_QUALITY: Record<DeviceKind, QualityLevel> = {
+  chromebook: 'low',
+  laptop: 'medium',
+  gaming: 'high',
+  phone: 'low',
+}
+
+const GPU_GAMING = /NVIDIA|GeForce|RTX|GTX|Radeon RX|Radeon Pro|Apple M\d/i
+const GPU_WEAK = /SwiftShader|llvmpipe|Software|Mali|Adreno|PowerVR|UHD Graphics|HD Graphics/i
+
+/** Best guess at the device from the user agent and the GPU's name (WEBGL_debug_renderer_info). */
+export function recommendDevice(gl: WebGLRenderingContext | WebGL2RenderingContext | null): { kind: DeviceKind; gpu: string } {
+  if (typeof navigator === 'undefined') return { kind: 'laptop', gpu: '' }
+  const ua = navigator.userAgent
+  let gpu = ''
+  try {
+    const ext = gl?.getExtension('WEBGL_debug_renderer_info')
+    gpu = String((ext && gl?.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || gl?.getParameter(gl.RENDERER) || '')
+  } catch {
+    /* the GPU name is only a hint */
+  }
+  const touch = navigator.maxTouchPoints > 0
+  // iPadOS reports a Mac user agent, but Macs have no touch screen.
+  if (touch && (/Mobi|Android|iPhone|iPad|Tablet/i.test(ua) || /Macintosh/.test(ua))) return { kind: 'phone', gpu }
+  if (/CrOS/.test(ua)) return { kind: 'chromebook', gpu }
+  if (GPU_GAMING.test(gpu)) return { kind: 'gaming', gpu }
+  if (GPU_WEAK.test(gpu)) return { kind: 'chromebook', gpu }
+  return { kind: 'laptop', gpu }
+}

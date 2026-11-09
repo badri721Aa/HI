@@ -9,7 +9,7 @@
  */
 import type * as THREE from 'three'
 import type { CollisionWorld, Collider } from './collision'
-import type { CutsceneName, EventBus, GamePhase, MusicMood, V3 } from './events'
+import type { CutsceneName, EventBus, GamePhase, MusicMood, V3, WeaponId } from './events'
 import type { Input } from './input'
 import type { SaveGame } from './save'
 import type { QualityProfile, Settings } from './settings'
@@ -50,6 +50,7 @@ export interface Ctx {
   post: IPostFX
   audio: IAudio
   net: INetwork
+  weapons: IWeapons
 }
 
 /** Base lifecycle. */
@@ -74,6 +75,8 @@ export interface GameApi {
   collectSpark(index: number): void
   collectHeart(index: number): void
   defeatEnemy(index: number): void
+  /** Record the weapons picked up (fists excluded) and the one in hand. */
+  setWeapons(owned: readonly WeaponId[], equipped: WeaponId): void
   reachCheckpoint(id: string): void
   /** Called by the player controller when the player falls in the sea / off the world / runs out of HP. */
   playerDied(cause: 'water' | 'fall' | 'enemy'): void
@@ -84,6 +87,8 @@ export interface GameApi {
   setMusic(mood: MusicMood): void
   /** Short screen shake via the camera rig (respects the setting). */
   shake(intensity: number, duration: number): void
+  /** Scale game time by `scale` for `seconds` of real time (hit-stop, slow motion). The strongest request wins. */
+  timeWarp(scale: number, seconds: number): void
   /**
    * The UI is capturing text (chat): gameplay input is ignored and losing pointer lock doesn't pause.
    * Call with false when typing ends (then call requestPointerLock from a user gesture if needed).
@@ -168,6 +173,12 @@ export interface ICharacter extends System {
   getHandPosition(out: THREE.Vector3): THREE.Vector3
   /** Head bone world position (camera focus / look-at). */
   getHeadPosition(out: THREE.Vector3): THREE.Vector3
+  /**
+   * Parent `obj` to a hand's grip so it follows the animation and the ragdoll. The object's own
+   * frame is the grip (metres): +Y runs out of the fist on the thumb side, +Z points where the
+   * knuckles face.
+   */
+  holdInHand(side: 'left' | 'right', obj: THREE.Object3D): void
   /** Feed the motion every frame (Game calls this right after the controller). */
   setMotion(m: MotionState): void
   /** Play a gesture; resolves when it ends (looping gestures resolve on stopGesture). */
@@ -268,6 +279,53 @@ export interface IEnemies extends System {
   aliveNear(p: V3, radius: number): number
   /** Freeze AI (cutscenes). */
   frozen: boolean
+  /** A weapon blow: every gloomling the sphere touches takes it. Returns how many were hit. */
+  hit(h: WeaponHit): number
+  /** The closest live gloomling within `radius` (written to `out`); false if none. */
+  nearest(p: V3, radius: number, out: THREE.Vector3): boolean
+}
+
+/** A weapon blow against the gloomlings. */
+export interface WeaponHit {
+  weapon: WeaponId
+  center: V3
+  radius: number
+  damage: number
+  /** Horizontal knockback (m/s) away from `from`, and upward launch (m/s). */
+  knock: number
+  lift: number
+  from: V3
+  /** Stop after this many gloomlings (an arrow hits one). */
+  max?: number
+}
+
+/** Arm moves the animator layers over the body for the held weapon. */
+export type WeaponMove = 'none' | 'slash1' | 'slash2' | 'slash3' | 'slam' | 'draw' | 'release'
+
+export interface WeaponPose {
+  weapon: WeaponId
+  move: WeaponMove
+  /** Seconds into `move`. */
+  t: number
+  /** Bow draw, 0..1. */
+  charge: number
+}
+
+/** gameplay/Weapons.ts — pickups, the weapon in hand, swings, arrows and the hotbar. */
+export interface IWeapons extends System {
+  /** Hotbar order, fists first. */
+  readonly owned: readonly WeaponId[]
+  readonly equipped: WeaponId
+  /** A weapon is in hand: the attack button swings it instead of the fists' spin. */
+  readonly armed: boolean
+  /** Movement speed factor while swinging or drawing (1 = free). */
+  readonly moveScale: number
+  /** Heading the hero should turn to (aiming, a locked-on swing), or null. */
+  readonly aimYaw: number | null
+  readonly pose: WeaponPose
+  equip(id: WeaponId): void
+  /** Re-sync owned weapons and pickups with ctx.game.save (new game / continue). */
+  syncWithSave(): void
 }
 
 /** gameplay/Checkpoints.ts — lantern posts that light up and become respawn points. */
@@ -392,4 +450,4 @@ export interface INetwork extends System {
   sendEmote(name: GestureName): void
 }
 
-export type { Collider }
+export type { Collider, WeaponId }

@@ -5,16 +5,16 @@
  * (progress, saving, death/respawn, victory). Every other system is built
  * here in a fixed order and updated in a fixed order:
  *
- *   input.poll → zones (moving platforms) → player → character → enemies →
+ *   input.poll → zones (moving platforms) → player → weapons → character → enemies →
  *   collectibles → checkpoints → signs → cutscenes → cameraRig → env →
  *   vegetation → fx → ambient → audio → HUD → post.render
  */
 import * as THREE from 'three'
 import { CollisionWorld } from './collision'
-import { EventBus, v3, type GamePhase, type MusicMood } from './events'
+import { EventBus, v3, type GamePhase, type MusicMood, type WeaponId } from './events'
 import { Input } from './input'
 import { clearSave, loadProfile, loadSave, newSave, storeProfile, storeSave, type Profile, type SaveGame } from './save'
-import { QUALITY, type Settings } from './settings'
+import { QUALITY, recommendDevice, type DeviceKind, type Settings } from './settings'
 import { HudStore } from './store'
 import { TextureLib } from './textures'
 import type { Ctx, GameApi } from './types'
@@ -37,6 +37,7 @@ import { Ambient } from './fx/Ambient'
 import { PostFX } from './fx/PostFX'
 import { AudioEngine } from './audio/AudioEngine'
 import { Network } from './net/Network'
+import { Weapons } from './gameplay/Weapons'
 
 interface Timer {
   at: number
@@ -80,6 +81,9 @@ export class Game implements GameApi {
   private mapImage: string | null = null
   private enemiesDefeatedRun = 0
   private textEntry = false
+  /** Game-time scale for hit-stop / slow motion, until the real clock reaches warpUntil. */
+  private warpScale = 1
+  private warpUntil = 0
   private onVisibility = () => {
     if (document.hidden) {
       if (this.phase === 'playing') this.pause()
@@ -163,6 +167,7 @@ export class Game implements GameApi {
     ctx.post = new PostFX(ctx)
     ctx.audio = new AudioEngine(ctx)
     ctx.net = new Network(ctx)
+    ctx.weapons = new Weapons(ctx)
 
     this.resize()
     this.resizeObs = new ResizeObserver(() => this.resize())
@@ -185,6 +190,7 @@ export class Game implements GameApi {
       ['Placing the camera', 0.5, () => ctx.cameraRig.init()],
       ['Scattering star shards', 1, () => ctx.collectibles.init()],
       ['Summoning gloomlings', 1, () => ctx.enemies.init()],
+      ['Forging weapons', 0.5, () => ctx.weapons.init()],
       ['Lighting lanterns', 0.5, () => ctx.checkpoints.init()],
       ['Painting signposts', 0.5, () => ctx.signs.init()],
       ['Writing the story', 0.5, () => ctx.cutscenes.init()],
@@ -242,6 +248,22 @@ export class Game implements GameApi {
 
   get bestTime(): number | null {
     return this.profile.bestTime
+  }
+
+  /** First launch: the title asks which device this is before showing its menu. */
+  get needsDeviceSetup(): boolean {
+    return !this.profile.deviceSetup
+  }
+
+  /** The device the "Choose your device" screen pre-selects. */
+  recommendDevice(): { kind: DeviceKind; gpu: string } {
+    return recommendDevice(this.renderer.getContext())
+  }
+
+  /** Remembers that the device question was answered (the UI applies the preset via updateSettings). */
+  completeDeviceSetup(): void {
+    this.profile.deviceSetup = true
+    storeProfile(this.profile)
   }
 
   /** Must be called from a click/tap so audio and pointer lock can start. */
@@ -417,7 +439,7 @@ export class Game implements GameApi {
     this.resizeObs?.disconnect()
     document.removeEventListener('visibilitychange', this.onVisibility)
     const ctx = this.ctx
-    for (const s of [ctx.net, ctx.audio, ctx.post, ctx.ambient, ctx.fx, ctx.cutscenes, ctx.signs, ctx.checkpoints, ctx.enemies, ctx.collectibles, ctx.cameraRig, ctx.player, ctx.character, ctx.zones, ctx.vegetation, ctx.env]) {
+    for (const s of [ctx.net, ctx.audio, ctx.post, ctx.ambient, ctx.fx, ctx.cutscenes, ctx.signs, ctx.checkpoints, ctx.weapons, ctx.enemies, ctx.collectibles, ctx.cameraRig, ctx.player, ctx.character, ctx.zones, ctx.vegetation, ctx.env]) {
       try {
         s?.dispose()
       } catch (err) {
@@ -486,6 +508,12 @@ export class Game implements GameApi {
     if (this.save.enemies.includes(index)) return
     this.save.enemies.push(index)
     this.enemiesDefeatedRun++
+    this.saveDirty = true
+  }
+
+  setWeapons(owned: readonly WeaponId[], equipped: WeaponId): void {
+    this.save.weapons = owned.filter(w => w !== 'fists')
+    this.save.weapon = equipped
     this.saveDirty = true
   }
 
@@ -572,12 +600,21 @@ export class Game implements GameApi {
     this.ctx.cameraRig.shake(intensity, duration)
   }
 
+  timeWarp(scale: number, seconds: number): void {
+    const now = this.ctx.clock.real
+    const running = now < this.warpUntil
+    if (running && this.warpScale < scale) return
+    this.warpUntil = running && this.warpScale === scale ? Math.max(this.warpUntil, now + seconds) : now + seconds
+    this.warpScale = Math.max(0, Math.min(1, scale))
+  }
+
   /* ── internals ───────────────────────────────────────────── */
 
   /** Drop anything queued for the previous run (respawn fades, death state, ragdolls). */
   private resetTransient(): void {
     this.timers = []
     this.dying = false
+    this.warpUntil = 0
     this.ctx.character.cancelRagdoll()
     this.bus.emit('ui:fade', { to: 0, duration: 0.2 })
   }
@@ -674,6 +711,7 @@ export class Game implements GameApi {
     ctx.collectibles.syncWithSave()
     ctx.enemies.syncWithSave()
     ctx.checkpoints.syncWithSave()
+    ctx.weapons.syncWithSave()
     this.hud.set({
       shards: this.save.shards.slice(),
       sparks: this.save.sparks.length,
@@ -795,9 +833,11 @@ export class Game implements GameApi {
     this.raf = requestAnimationFrame(this.frame)
     const realDt = Math.min(0.1, Math.max(0, (now - this.last) / 1000))
     this.last = now
-    const dt = Math.min(1 / 20, realDt)
     const ctx = this.ctx
     ctx.clock.real += realDt
+    const frameDt = Math.min(1 / 20, realDt)
+    // Hit-stop / slow motion bend game time only; the network and audio keep real time.
+    const dt = ctx.clock.real < this.warpUntil ? frameDt * this.warpScale : frameDt
 
     // timers (real time)
     if (this.timers.length) {
@@ -820,9 +860,10 @@ export class Game implements GameApi {
         if (phase === 'playing') this.save.playTime += dt
         ctx.zones.update(dt)
         ctx.player.update(dt)
+        ctx.weapons.update(dt)
         ctx.character.setMotion(ctx.player.motion)
         ctx.character.update(dt)
-        ctx.net.update(dt)
+        ctx.net.update(frameDt)
         ctx.enemies.update(dt)
         ctx.collectibles.update(dt)
         ctx.checkpoints.update(dt)
@@ -834,7 +875,7 @@ export class Game implements GameApi {
         ctx.vegetation.update(dt)
         ctx.fx.update(dt)
         ctx.ambient.update(dt)
-        ctx.audio.update(dt)
+        ctx.audio.update(frameDt)
         this.sparkChainT -= dt
         this.updateHud(dt)
         this.saveFlushT -= dt
@@ -848,6 +889,7 @@ export class Game implements GameApi {
       } else if (phase === 'title') {
         ctx.clock.t += dt
         ctx.zones.update(dt)
+        ctx.weapons.update(dt)
         ctx.character.setMotion(ctx.player.motion)
         ctx.character.update(dt)
         ctx.net.update(dt)

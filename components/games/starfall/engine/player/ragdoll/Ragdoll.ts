@@ -160,6 +160,14 @@ export class Ragdoll {
     this.calm = 0
   }
 
+  /** Adds velocity (m/s) to one particle — a flailing limb. */
+  nudge(i: number, vx: number, vy: number, vz: number): void {
+    const k = i * 3
+    this.prev[k] -= vx * H
+    this.prev[k + 1] -= vy * H
+    this.prev[k + 2] -= vz * H
+  }
+
   stop(): void {
     this.active = false
   }

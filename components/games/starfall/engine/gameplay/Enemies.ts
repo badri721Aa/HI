@@ -6,13 +6,16 @@
  * player (alert hop) → chase → give up and return home. A damped spring on top
  * of the hop gives the jelly its squash & stretch wobble.
  *
+ * Weapon kills launch the body instead: a cheap rigid tumble (spin, bounce, squash on each
+ * impact) before it pops.
+ *
  * Rendering: one InstancedMesh for every body (eyes, horns and grin are part of
  * the merged geometry; per-instance eye glow / hurt flash via an instanced
  * attribute), one batch of eye glows and one of soft blob shadows.
  */
 import * as THREE from 'three'
 import type { MusicMood, V3 } from '../events'
-import type { Ctx, IEnemies } from '../types'
+import type { Ctx, IEnemies, WeaponHit } from '../types'
 import { ENEMIES } from '../world/level'
 import { heightAt, waterLevelAt } from '../world/heightfield'
 import { Billboards } from './parts/Billboards'
@@ -27,6 +30,8 @@ const RETURN = 4
 const STUN = 5
 const DYING = 6
 const DEAD = 7
+/** Launched by a weapon: tumbling through the air, then pops. */
+const TUMBLE = 8
 
 const REST = 0
 const CROUCH = 1
@@ -42,6 +47,16 @@ const RETURN_SPEED = 2.2
 const MAX_WADE = 0.3
 const CONTACT_COOLDOWN = 1
 const DEATH_TIME = 0.34
+/** Hit points; a stomp or a spin takes STOMP_DAMAGE (small ones pop, big ones survive the first). */
+const HP_SMALL = 30
+const HP_BIG = 60
+const STOMP_DAMAGE = 30
+/** Body radius for weapon hits (m, scale 1). */
+const BODY_RADIUS = 0.45
+const TUMBLE_GRAVITY = 20
+const TUMBLE_BOUNCE = 0.45
+/** A launched gloomling pops after this long, or once it has bounced itself out. */
+const TUMBLE_TIME = 2.4
 const CALM_DELAY = 4
 /** Beyond this distance from the player gloomlings doze (no AI, no ground queries). */
 const SLEEP_RANGE = 90
@@ -95,6 +110,15 @@ interface Gloom {
   deathT: number
   /** The alert hop has started (landing from it begins the chase). */
   alertHop: boolean
+  /** Tumble: velocity (m/s), body pitch/roll (rad) and their spin rates, bounces so far. */
+  vx: number
+  vy: number
+  vz: number
+  rx: number
+  rz: number
+  wx: number
+  wz: number
+  bounces: number
 }
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
@@ -134,7 +158,7 @@ export class Enemies implements IEnemies {
       const y = supportHeight(ctx, sp.x, sp.z, heightAt(sp.x, sp.z) + 0.3, 0.5 * scale)
       const yaw = this.random() * Math.PI * 2
       return {
-        index, big: !!sp.big, scale, hp: sp.big ? 2 : 1, maxHp: sp.big ? 2 : 1,
+        index, big: !!sp.big, scale, hp: sp.big ? HP_BIG : HP_SMALL, maxHp: sp.big ? HP_BIG : HP_SMALL,
         homeX: sp.x, homeZ: sp.z, patrol: sp.patrol,
         x: sp.x, y, z: sp.z, yaw, targetYaw: yaw,
         state: IDLE, stateT: 0, idleFor: 0.5 + this.random() * 2, tx: sp.x, tz: sp.z,
@@ -142,6 +166,7 @@ export class Enemies implements IEnemies {
         sx: sp.x, sy: y, sz: sp.z, lx: sp.x, ly: y, lz: sp.z,
         sq: 0, sqv: 0, hitCd: 0, invuln: 0, flash: 0, eye: 1, anger: 0,
         blinkIn: 1 + this.random() * 4, blinkT: 0, ignoreT: 0, deathT: 0, alertHop: false,
+        vx: 0, vy: 0, vz: 0, rx: 0, rz: 0, wx: 0, wz: 0, bounces: 0,
       }
     })
 
@@ -212,13 +237,46 @@ export class Enemies implements IEnemies {
     let n = 0
     const r2 = radius * radius
     for (const g of this.list) {
-      if (g.state === DYING || g.state === DEAD) continue
+      if (!this.alive(g)) continue
       const dx = g.x - p.x
       const dy = g.y - p.y
       const dz = g.z - p.z
       if (dx * dx + dy * dy + dz * dz < r2) n++
     }
     return n
+  }
+
+  hit(h: WeaponHit): number {
+    const max = h.max ?? Infinity
+    const c = h.center
+    let n = 0
+    for (const g of this.list) {
+      if (n >= max) break
+      if (!this.alive(g) || g.invuln > 0) continue
+      const r = h.radius + BODY_RADIUS * g.scale
+      const dx = g.x - c.x
+      const dy = g.y + 0.5 * GLOOM_HEIGHT * g.scale - c.y
+      const dz = g.z - c.z
+      if (dx * dx + dy * dy + dz * dz > r * r) continue
+      n++
+      this.weaponHit(g, h)
+    }
+    return n
+  }
+
+  nearest(p: V3, radius: number, out: THREE.Vector3): boolean {
+    let best = radius * radius
+    let found: Gloom | null = null
+    for (const g of this.list) {
+      if (!this.alive(g) || Math.abs(g.y - p.y) > 2.5) continue
+      const d = (g.x - p.x) ** 2 + (g.z - p.z) ** 2
+      if (d < best) {
+        best = d
+        found = g
+      }
+    }
+    if (found) out.set(found.x, found.y, found.z)
+    return !!found
   }
 
   /* ── frame ───────────────────────────────────────────────── */
@@ -247,6 +305,10 @@ export class Enemies implements IEnemies {
       if (g.state === DYING) {
         g.deathT += dt
         if (g.deathT >= DEATH_TIME) this.setState(g, DEAD)
+        continue
+      }
+      if (g.state === TUMBLE) {
+        this.tumble(g, dt)
         continue
       }
 
@@ -322,10 +384,10 @@ export class Enemies implements IEnemies {
       player.launch(11)
       this.ctx.bus.emit('enemy:stomp', { pos: { x: g.x, y: top, z: g.z } })
       g.sqv -= 9
-      return this.damage(g, pp.x, pp.z, false)
+      return this.damage(g, STOMP_DAMAGE, pp.x, pp.z, false)
     }
     if (player.attacking && pd < 1.9 + (sc - 1) * 0.5 && Math.abs(pp.y - g.y) < 1.6 && g.invuln <= 0) {
-      return this.damage(g, pp.x, pp.z, true)
+      return this.damage(g, STOMP_DAMAGE, pp.x, pp.z, true)
     }
     const dashing = player.state === 'dash'
     if (pd < 0.9 * sc && pp.y < top - 0.25 && pp.y + player.height > g.y && g.hitCd <= 0 && !player.invulnerable && !player.attacking && !dashing) {
@@ -341,9 +403,9 @@ export class Enemies implements IEnemies {
     return false
   }
 
-  /** Apply one hit. Big gloomlings survive the first. Returns true when defeated. */
-  private damage(g: Gloom, fromX: number, fromZ: number, knock: boolean): boolean {
-    g.hp--
+  /** Apply a stomp or spin hit: flattens and pops when defeated. Returns true when defeated. */
+  private damage(g: Gloom, amount: number, fromX: number, fromZ: number, knock: boolean): boolean {
+    g.hp -= amount
     g.flash = 1
     if (g.hp <= 0) {
       this.setState(g, DYING)
@@ -367,6 +429,86 @@ export class Enemies implements IEnemies {
       this.startHop(g, g.x + kx * 2.2, g.z + kz * 2.2, 0.36, 0.5, true)
     }
     return false
+  }
+
+  /** A weapon blow: damage numbers, then either a knockback hop or a launch into a tumble. */
+  private weaponHit(g: Gloom, h: WeaponHit): void {
+    const dmg = Math.max(1, Math.round(h.damage * (0.9 + this.random() * 0.2)))
+    g.hp -= dmg
+    g.flash = 1
+    let kx = g.x - h.from.x
+    let kz = g.z - h.from.z
+    const l = Math.hypot(kx, kz)
+    if (l > 1e-3) {
+      kx /= l
+      kz /= l
+    } else {
+      kx = Math.sin(g.yaw)
+      kz = Math.cos(g.yaw)
+    }
+    const killed = g.hp <= 0
+    const pos = { x: g.x, y: g.y + 0.7 * GLOOM_HEIGHT * g.scale, z: g.z }
+    this.ctx.bus.emit('enemy:hit', { pos, damage: dmg, killed, big: g.big, weapon: h.weapon })
+    if (!killed) {
+      g.invuln = 0.3
+      this.setState(g, STUN)
+      // A short shove, so a sword combo can keep connecting.
+      const push = Math.min(3, h.knock * 0.15)
+      this.startHop(g, g.x + kx * push, g.z + kz * push, 0.36, 0.5, true)
+      return
+    }
+    this.ctx.game.defeatEnemy(g.index)
+    // Heavier bodies fly less far.
+    const k = 1 / Math.sqrt(g.scale)
+    g.vx = kx * h.knock * k
+    g.vz = kz * h.knock * k
+    g.vy = h.lift * k
+    const spin = 5 + h.knock * 0.6
+    g.wx = spin * (0.6 + this.random() * 0.6)
+    g.wz = spin * (this.random() - 0.5) * 1.4
+    g.rx = g.rz = 0
+    g.bounces = 0
+    g.deathT = 0
+    g.hop = REST
+    g.sqv += 6
+    this.setState(g, TUMBLE)
+  }
+
+  /** Ballistic tumble: spins, bounces with a squash on each landing, then pops. */
+  private tumble(g: Gloom, dt: number): void {
+    g.deathT += dt
+    g.vy -= TUMBLE_GRAVITY * dt
+    g.x += g.vx * dt
+    g.y += g.vy * dt
+    g.z += g.vz * dt
+    g.rx += g.wx * dt
+    g.rz += g.wz * dt
+    g.sqv += (-g.sq * 200 - g.sqv * 9) * dt
+    g.sq = THREE.MathUtils.clamp(g.sq + g.sqv * dt, -0.6, 0.6)
+    const ground = supportHeight(this.ctx, g.x, g.z, g.y + 0.5, 0.3 * g.scale)
+    if (g.y < ground && g.vy < 0) {
+      const impact = -g.vy
+      g.y = ground
+      g.vy = impact * TUMBLE_BOUNCE
+      g.vx *= 0.62
+      g.vz *= 0.62
+      g.wx *= 0.55
+      g.wz *= 0.55
+      g.sq = -Math.min(0.55, 0.12 + impact * 0.04)
+      g.sqv = 0
+      g.bounces++
+      if (impact > 4) this.ctx.fx.burst('dust', { x: g.x, y: ground, z: g.z }, { count: 4, scale: 0.8 * g.scale })
+    }
+    const wet = g.y < waterLevelAt(g.x, g.z) - 0.2
+    const spent = g.bounces >= 4 || (g.bounces >= 2 && g.vy < 1.2)
+    if (wet || spent || g.deathT >= TUMBLE_TIME) {
+      this.ctx.bus.emit('enemy:defeat', { pos: { x: g.x, y: g.y + 0.45 * g.scale, z: g.z }, big: g.big })
+      this.setState(g, DEAD)
+    }
+  }
+
+  private alive(g: Gloom): boolean {
+    return g.state !== DYING && g.state !== DEAD && g.state !== TUMBLE
   }
 
   /** Advance the hop cycle and pick new hops when resting. */
@@ -584,7 +726,13 @@ export class Enemies implements IEnemies {
       let sy: number
       let sxz: number
       let lean = 0
-      if (g.state === DYING) {
+      let roll = 0
+      if (g.state === TUMBLE) {
+        sy = 1 + g.sq
+        sxz = 1 - g.sq * 0.55
+        lean = g.rx
+        roll = g.rz
+      } else if (g.state === DYING) {
         // Flatten into a puddle, then pop.
         const u = g.deathT / DEATH_TIME
         if (u < 0.55) {
@@ -604,7 +752,7 @@ export class Enemies implements IEnemies {
         if (g.state === STUN) lean = -0.25
       }
       const sc = g.scale
-      this.e.set(lean, g.yaw, 0)
+      this.e.set(lean, g.yaw, roll)
       this.q.setFromEuler(this.e)
       this.m.compose(this.p.set(g.x, g.y, g.z), this.q, this.s.set(sxz * sc, sy * sc, sxz * sc))
       body.setMatrixAt(i, this.m)
@@ -626,7 +774,8 @@ export class Enemies implements IEnemies {
       }
 
       // blob shadow on the ground under the body
-      const ground = g.hop === AIR ? Math.min(g.y, g.sy + (g.ly - g.sy) * Math.min(1, g.hopT / g.hopDur)) : g.y
+      const ground =
+        g.state === TUMBLE ? heightAt(g.x, g.z) : g.hop === AIR ? Math.min(g.y, g.sy + (g.ly - g.sy) * Math.min(1, g.hopT / g.hopDur)) : g.y
       const above = Math.max(0, g.y - ground)
       const k = Math.max(0.35, 1 - above * 0.6) * sxz * sc * 1.15
       this.m.compose(this.p.set(g.x, ground + 0.06, g.z), this.q.identity(), this.s.set(k, 1, k))

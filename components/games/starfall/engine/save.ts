@@ -1,3 +1,4 @@
+import type { WeaponId } from './events'
 import { DEFAULT_SETTINGS, detectQuality, type Settings } from './settings'
 import { TOTAL_SHARDS } from './world/level'
 
@@ -20,6 +21,9 @@ export interface SaveGame {
   deaths: number
   introSeen: boolean
   completed: boolean
+  /** Weapons picked up (fists are always owned) and the one in hand. */
+  weapons: WeaponId[]
+  weapon: WeaponId
 }
 
 /** Survives across playthroughs. */
@@ -28,7 +32,12 @@ export interface Profile {
   settings: Settings
   bestTime: number | null
   completions: number
+  /** The first-launch "Choose your device" screen has been answered. */
+  deviceSetup: boolean
 }
+
+const WEAPON_IDS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow']
+const isWeapon = (w: unknown): w is WeaponId => WEAPON_IDS.includes(w as WeaponId)
 
 export function newSave(): SaveGame {
   return {
@@ -43,6 +52,8 @@ export function newSave(): SaveGame {
     deaths: 0,
     introSeen: false,
     completed: false,
+    weapons: [],
+    weapon: 'fists',
   }
 }
 
@@ -77,6 +88,8 @@ export function loadSave(): SaveGame | null {
     hearts: Array.isArray(data.hearts) ? data.hearts : [],
     enemies: Array.isArray(data.enemies) ? data.enemies : [],
     checkpoints: Array.isArray(data.checkpoints) ? data.checkpoints : base.checkpoints,
+    weapons: Array.isArray(data.weapons) ? data.weapons.filter(isWeapon) : [],
+    weapon: isWeapon(data.weapon) ? data.weapon : 'fists',
   }
 }
 
@@ -100,6 +113,8 @@ export function loadProfile(): Profile {
     settings,
     bestTime: typeof data?.bestTime === 'number' ? data.bestTime : null,
     completions: typeof data?.completions === 'number' ? data.completions : 0,
+    // Returning players (a profile saved before the device screen existed) skip it.
+    deviceSetup: data ? data.deviceSetup !== false : false,
   }
 }
 

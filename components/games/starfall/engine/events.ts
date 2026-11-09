@@ -21,6 +21,9 @@ export type CutsceneName = 'intro' | 'shard' | 'beacon'
 
 export type MusicMood = 'title' | 'explore' | 'danger' | 'cutscene' | 'victory'
 
+/** Hotbar order: fists are always owned; the rest are found in the world. */
+export type WeaponId = 'fists' | 'sword' | 'hammer' | 'bow'
+
 export interface VictoryStats {
   time: number
   bestTime: number | null
@@ -66,6 +69,8 @@ export interface GameEventMap {
   'player:splash': { pos: V3; big: boolean }
   'player:bounce': { pos: V3 }
   'player:wade': { pos: V3 }
+  /** The limp body slammed into something hard enough for a cartoon "boing" / "oof". */
+  'player:flop': { pos: V3; impact: number }
 
   // ── world & gameplay ───────────────────────────────────
   'collect:spark': { pos: V3; total: number; chain: number }
@@ -74,11 +79,26 @@ export interface GameEventMap {
   'enemy:alert': { pos: V3 }
   'enemy:stomp': { pos: V3 }
   'enemy:defeat': { pos: V3; big: boolean }
+  /** A weapon blow landed (damage numbers, impact sound and sparks). */
+  'enemy:hit': { pos: V3; damage: number; killed: boolean; big: boolean; weapon: WeaponId }
   'checkpoint': { id: string; pos: V3; first: boolean }
   'beacon:activate': { pos: V3 }
   'cutscene:start': { name: CutsceneName }
   'cutscene:end': { name: CutsceneName; skipped: boolean }
   'audio:music': { mood: MusicMood }
+
+  // ── weapons ────────────────────────────────────────────
+  'weapon:pickup': { weapon: WeaponId; pos: V3 }
+  'weapon:equip': { weapon: WeaponId }
+  /** A sword slash (combo 0..2) or the hammer's wind-up. */
+  'weapon:swing': { weapon: WeaponId; pos: V3; combo: number }
+  /** The hammer hits the ground: shockwave. */
+  'weapon:slam': { pos: V3 }
+  'weapon:draw': { pos: V3 }
+  /** An arrow leaves the bow; charge 0..1. */
+  'weapon:fire': { pos: V3; charge: number }
+  /** An arrow stuck in the ground or a prop. */
+  'arrow:stick': { pos: V3 }
 
   // ── multiplayer ────────────────────────────────────────
   'net:status': { status: 'offline' | 'connecting' | 'online' | 'error'; message?: string }

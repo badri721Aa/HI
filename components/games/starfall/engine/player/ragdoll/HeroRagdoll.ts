@@ -45,6 +45,10 @@ const IMPACT_GAP = 0.25
 const IMPACT_GRACE = 0.15
 /** The stand-up spot may be at most this far above / below the ground under the pelvis (m). */
 const STAND_DROP = 0.7
+/** Airborne, a random hand or foot gets a flailing kick (m/s) every FLAIL_GAP seconds or so. */
+const FLAIL_SPEED = 3.2
+const FLAIL_GAP = 0.11
+const FLAIL_LIMBS = [P.handL, P.handR, P.ankleL, P.ankleR, P.elbowL, P.elbowR]
 
 export type RagdollEvent = 'none' | 'rise' | 'done' | 'failed'
 export type RagdollPhase = 'off' | 'limp' | 'getup'
@@ -85,6 +89,7 @@ export class HeroRagdoll {
   private hipsY: number
   private t = 0
   private impactCd = 0
+  private flailT = 0
   private wet = false
   private from = new Pose()
   private sample = new Pose()
@@ -204,6 +209,7 @@ export class HeroRagdoll {
     this.rootPos.copy(this.anchor)
     this.poser.pose(sim.render, this.rootPos, this.rootYaw, 1 - smooth(this.t / OFFSET_FADE), this.pose)
 
+    this.flail(dt)
     this.impactCd -= dt
     if (sim.impact >= IMPACT_EVENT && this.impactCd <= 0) {
       this.impactCd = IMPACT_GAP
@@ -217,6 +223,18 @@ export class HeroRagdoll {
       return 'rise'
     }
     return 'none'
+  }
+
+  /** Flying through the air, the limbs windmill: small random kicks to the hands and feet. */
+  private flail(dt: number): void {
+    this.flailT -= dt
+    if (this.flailT > 0 || this.t < 0.08 || this.wet || this.sim.touching(0.12)) return
+    this.flailT = FLAIL_GAP * (0.6 + Math.random() * 0.8)
+    const i = FLAIL_LIMBS[Math.floor(Math.random() * FLAIL_LIMBS.length)]
+    const a = Math.random() * Math.PI * 2
+    const up = Math.random() * 2 - 0.6
+    const s = FLAIL_SPEED * (0.7 + Math.random() * 0.6)
+    this.sim.nudge(i, Math.cos(a) * s, up * s, Math.sin(a) * s)
   }
 
   /** Resting on something (or floating) and calm for a moment — or simply down for long enough. */

@@ -5,6 +5,7 @@
  *   ground layer   idle (breathing, weight shift, glances) ↔ walk/run/sprint gait by speed
  *   air layer      jump / somersault / fall / bounce, cross-faded on change
  *   actions        dash, spin attack, death (blended) · hurt, landing (additive)
+ *   weapon         carrying arm + keyed sword / hammer / bow moves over the upper body
  *   gestures       keyframed overlays for gameplay & cutscenes
  *   override       a pose from outside (ragdoll, getting up) replaces all of the above
  *   solve         feet planted by IK on the real ground, hips height limiter,
@@ -16,13 +17,14 @@
  */
 import * as THREE from 'three'
 import type { V3 } from '../events'
-import type { GestureName, MotionState, PlayerState } from '../types'
+import type { GestureName, MotionState, PlayerState, WeaponMove, WeaponPose } from '../types'
 import { applyWade, footAt, gaitFor, swingSignal, WALK, type FootSample, type GaitParams } from './anim/Gait'
 import { GESTURES, type GestureDef } from './anim/gestures'
 import { DEG, TAU, clamp, clamp01, damp, easeOut, envelope, lerp, noise1, ramp, smooth, wrap01, wrapAngle } from './anim/math'
 import { J, Pose, PoseBuilder } from './anim/Pose'
 import * as POSES from './anim/poses'
 import type { Rig } from './anim/Rig'
+import { CARRY, WEAPON_CLIPS } from './anim/weaponPoses'
 
 export interface GroundSample {
   y: number
@@ -40,6 +42,10 @@ const AIR_STATES = new Set<PlayerState>(['jump', 'doubleJump', 'fall', 'bounce']
 const UPPER = [J.spine, J.chest, J.neck, J.head, J.shoulderL, J.upperArmL, J.forearmL, J.handL, J.shoulderR, J.upperArmR, J.forearmR, J.handR]
 const SPINE_CHAIN = [J.hips, J.spine, J.chest, J.neck, J.head]
 const NECK_HEAD = [J.neck, J.head]
+const ARM_L = [J.shoulderL, J.upperArmL, J.forearmL, J.handL]
+const ARM_R = [J.shoulderR, J.upperArmR, J.forearmR, J.handR]
+/** How much of the gait's arm swing the carrying arm gives up. */
+const CARRY_W = 0.78
 const HEAD_ONLY = [J.head]
 const LEG_JOINTS = [
   [J.thighL, J.shinL, J.footL, J.toeL],
@@ -128,6 +134,14 @@ export class Animator {
   private pLand: Pose
   private pDead: Pose
   private gestureKeys = new Map<GestureName, { keys: Pose[]; times: number[] }>()
+  private carry = new Map<string, Pose>()
+  private clips = new Map<WeaponMove, { keys: Pose[]; times: number[] }>()
+  private weapon: WeaponPose = { weapon: 'fists', move: 'none', t: 0, charge: 0 }
+  private carryW = 0
+  private carrySide = 1
+  private lastCarry: Pose | null = null
+  private swingW = 0
+  private wpose = new Pose()
 
   // working poses (re-filled every frame)
   private out = new Pose()
@@ -239,6 +253,10 @@ export class Animator {
       const def = GESTURES[name]
       this.gestureKeys.set(name, { keys: def.keys.map(([, s]) => b.compile(s)), times: def.keys.map(([t]) => t) })
     }
+    for (const [name, spec] of Object.entries(CARRY)) this.carry.set(name, b.compile(spec))
+    for (const [name, clip] of Object.entries(WEAPON_CLIPS)) {
+      this.clips.set(name as WeaponMove, { keys: clip.keys.map(([, s]) => b.compile(s)), times: clip.keys.map(([t]) => t) })
+    }
     this.out.copy(this.pIdle)
     this.airPrev.copy(this.pFall)
   }
@@ -247,6 +265,11 @@ export class Animator {
 
   setMotion(m: MotionState): void {
     Object.assign(this.m, m)
+  }
+
+  /** The held weapon and the move in progress (copied). */
+  setWeapon(w: WeaponPose): void {
+    Object.assign(this.weapon, w)
   }
 
   lookAt(target: V3 | null): void {
@@ -361,6 +384,7 @@ export class Animator {
       this.buildAir(dt)
       out.blend(this.air, 1 - this.groundW)
       this.applyActions(dt, out)
+      this.applyWeapon(dt, out)
       this.applyGesture(dt, out)
       this.breathe(out)
       if (this.snapT < 1) {
@@ -680,11 +704,40 @@ export class Animator {
     }
   }
 
+  /* ── weapon ──────────────────────────────────────────────── */
+
+  /** The weapon arm holds its weapon; a move in progress takes over the upper body. */
+  private applyWeapon(dt: number, out: Pose): void {
+    const w = this.weapon
+    const carry = this.carry.get(w.weapon)
+    // Put away: the last carry pose fades out.
+    if (carry) {
+      this.lastCarry = carry
+      this.carrySide = w.weapon === 'bow' ? 0 : 1
+    }
+    this.carryW = damp(this.carryW, carry ? 1 : 0, 8, dt)
+    if (this.carryW > 0.002 && this.lastCarry) {
+      const side = this.carrySide
+      out.blendJoints(this.lastCarry, CARRY_W * this.carryW, side ? ARM_R : ARM_L)
+      out.curl[side] = lerp(out.curl[side], 1, this.carryW)
+    }
+
+    const clip = w.move !== 'none' ? this.clips.get(w.move) : undefined
+    this.swingW = damp(this.swingW, clip ? 1 : 0, clip ? 28 : 9, dt)
+    if (clip) sampleKeys(this.wpose, clip.keys, clip.times, clamp01(w.move === 'draw' ? w.charge : w.t))
+    if (this.swingW < 0.002) return
+    const p = this.wpose
+    out.blendJoints(p, this.swingW, UPPER)
+    out.curl[0] = lerp(out.curl[0], p.curl[0], this.swingW)
+    out.curl[1] = lerp(out.curl[1], p.curl[1], this.swingW)
+    out.pos.y += p.pos.y * this.swingW * this.groundW
+  }
+
   /** Overridden: whatever the body was in the middle of (flips, spins, gestures, looks) is dropped. */
   private dropActions(): void {
     this.flipT = this.spinT = this.hurtT = this.landT = -1
     this.spin = 0
-    this.dashW = this.deadW = this.lookW = 0
+    this.dashW = this.deadW = this.lookW = this.swingW = 0
     if (this.gesture) this.finishGesture()
     this.snapT = 1
   }
@@ -733,15 +786,7 @@ export class Animator {
       g.t = def.loop[0] + ((g.t - def.loop[1]) % len)
     }
     const p = this.gpose
-    const times = g.times
-    const n = times.length
-    if (g.t <= times[0]) p.copy(g.keys[0])
-    else if (g.t >= times[n - 1]) p.copy(g.keys[n - 1])
-    else {
-      let i = 0
-      while (i < n - 2 && g.t >= times[i + 1]) i++
-      p.copy(g.keys[i]).blend(g.keys[i + 1], smooth((g.t - times[i]) / (times[i + 1] - times[i])))
-    }
+    sampleKeys(p, g.keys, g.times, g.t)
     def.extra?.(g.t, p, this.b)
 
     const fadeIn = def.fadeIn > 0 ? smooth(g.t / def.fadeIn) : 1
@@ -1014,5 +1059,17 @@ export class Animator {
     rig.setWorld(out, J.neck, _q4)
     rig.accumulate(out, HEAD_ONLY)
     rig.setWorld(out, J.head, target)
+  }
+}
+
+/** out ← the keyed pose at time t (smoothly eased between keys). */
+function sampleKeys(out: Pose, keys: Pose[], times: number[], t: number): void {
+  const n = times.length
+  if (t <= times[0]) out.copy(keys[0])
+  else if (t >= times[n - 1]) out.copy(keys[n - 1])
+  else {
+    let i = 0
+    while (i < n - 2 && t >= times[i + 1]) i++
+    out.copy(keys[i]).blend(keys[i + 1], smooth((t - times[i]) / (times[i + 1] - times[i])))
   }
 }

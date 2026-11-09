@@ -1,3 +1,4 @@
+import type { WeaponId } from './events'
 import { TOTAL_SHARDS } from './world/level'
 
 export interface CompassMarker {
@@ -24,6 +25,11 @@ export interface HudState {
   /** Camera yaw in radians, for the compass strip. */
   heading: number
   touch: boolean
+  /** Hotbar: owned weapons (fists first) and the one in hand. */
+  weapons: WeaponId[]
+  weapon: WeaponId
+  /** Drawing the bow: crosshair + draw meter (0..1), or -1 when not aiming. */
+  aim: number
 }
 
 export function initialHud(): HudState {
@@ -41,6 +47,9 @@ export function initialHud(): HudState {
     compass: [],
     heading: 0,
     touch: false,
+    weapons: ['fists'],
+    weapon: 'fists',
+    aim: -1,
   }
 }
 

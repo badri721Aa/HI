@@ -12,6 +12,7 @@ import type { Ctx, GestureName, ICharacter, MotionState, PlayerState } from '../
 import type { V3 } from '../events'
 import type { GroundHit } from '../collision'
 import { Animator, type GroundSample } from './Animator'
+import { createGrip } from './anim/grip'
 import { Rig } from './anim/Rig'
 import { dampAngle, wrapAngle } from './anim/math'
 import { HeroRagdoll } from './ragdoll/HeroRagdoll'
@@ -26,6 +27,10 @@ const YAW_RATE = 30
 const MAX_YAW_LAG = 0.6
 /** Ragdoll impacts this hard (m/s) shake the camera a little. */
 const RAGDOLL_SHAKE = 9
+/** Limp impacts this hard (m/s) get a cartoon "boing" / "oof". */
+const FLOP_IMPACT = 10
+/** Going limp this fast (m/s) is a big launch: a beat of slow motion. */
+const BIG_LAUNCH = 12
 const ACTIVE_STATES: ReadonlySet<PlayerState> = new Set<PlayerState>(['jump', 'doubleJump', 'fall', 'bounce', 'dash', 'attack', 'hurt'])
 
 /** Is the hero doing something a gesture can't be layered over (moving, airborne, attacking…)? */
@@ -58,6 +63,8 @@ export class Character implements ICharacter {
   private animator: Animator | null = null
   private ragdoll: HeroRagdoll | null = null
   private blob: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null
+  /** Where held props attach: [left, right] grips under the hand bones (or the root without a rig). */
+  private grips: [THREE.Object3D | null, THREE.Object3D | null] = [null, null]
   private owned: Array<{ dispose(): void }> = []
   private yaw = 0
   private placed = false
@@ -128,6 +135,7 @@ export class Character implements ICharacter {
     else this.headLocal.set(0, 0.09 / scale, 0.02 / scale)
     this.model.scale.setScalar(scale)
     this.model.add(scene)
+    this.grips = [createGrip(scene, 'L', scale), createGrip(scene, 'R', scale)]
     this.rig = new Rig(scene, scale)
     this.animator = new Animator(this.rig, this.probe)
     this.ragdoll = new HeroRagdoll(this.rig, this.ctx.collision, { radius: this.ctx.player.radius, height: this.ctx.player.height })
@@ -213,6 +221,7 @@ export class Character implements ICharacter {
       // of a skipped cutscene) gives way at once instead of sliding along in a frozen pose.
       const setOff = this.ctx.game.phase === 'playing' && p.controlEnabled && busy(p.motion)
       if (setOff && this.animator.gesturing) this.animator.interruptGesture()
+      if (this.ctx.weapons) this.animator.setWeapon(this.ctx.weapons.pose)
       this.animator.update(dt, this.root.position, this.yaw)
       this.pivot.rotation.y = this.animator.spin
     }
@@ -243,6 +252,7 @@ export class Character implements ICharacter {
   private ragdollImpact(rd: HeroRagdoll): void {
     const p = rd.impactPos
     this.ctx.bus.emit('player:land', { pos: { x: p.x, y: p.y, z: p.z }, impact: rd.impact, surface: rd.impactSurface })
+    if (rd.impact > FLOP_IMPACT) this.ctx.bus.emit('player:flop', { pos: { x: p.x, y: p.y, z: p.z }, impact: rd.impact })
     if (rd.impact > RAGDOLL_SHAKE) this.ctx.game.shake(Math.min(0.45, rd.impact / 40), 0.25)
   }
 
@@ -264,6 +274,18 @@ export class Character implements ICharacter {
   getHandPosition(out: THREE.Vector3): THREE.Vector3 {
     if (this.rig) return this.rig.palmR.getWorldPosition(out)
     return out.copy(this.root.position).setY(this.root.position.y + 1.0)
+  }
+
+  holdInHand(side: 'left' | 'right', obj: THREE.Object3D): void {
+    const grip = this.grips[side === 'left' ? 0 : 1]
+    if (grip) {
+      grip.add(obj)
+      return
+    }
+    // Placeholder hero: carry it at hip height on that side.
+    obj.position.set(side === 'left' ? 0.3 : -0.3, 0.85, 0.15)
+    obj.rotation.set(Math.PI / 2, 0, 0)
+    this.root.add(obj)
   }
 
   getHeadPosition(out: THREE.Vector3): THREE.Vector3 {
@@ -297,8 +319,11 @@ export class Character implements ICharacter {
       this.root.rotation.y = this.yaw = p.yaw
       this.root.updateMatrixWorld(true)
     }
+    const v = p.velocity
+    const launch = Math.hypot(v.x + impulse.x, v.y + impulse.y, v.z + impulse.z)
+    if (!rd.active && launch > BIG_LAUNCH) this.ctx.game.timeWarp(0.4, 0.35)
     // The bones show the pose posed for the root's heading plus the spin-attack twist.
-    rd.start(this.root.rotation.y + this.pivot.rotation.y, p.velocity, impulse)
+    rd.start(this.root.rotation.y + this.pivot.rotation.y, v, impulse)
     this.animator.setOverride(rd.pose)
   }
 
@@ -349,5 +374,6 @@ export class Character implements ICharacter {
     this.animator = null
     this.rig = null
     this.blob = null
+    this.grips = [null, null]
   }
 }

@@ -80,6 +80,15 @@ export class AudioEngine implements IAudio {
         this.music?.duck(0.15, 6.5)
         this.amb?.igniteBeacon(this.ctx.zones.beaconLantern)
       }),
+      bus.on('player:flop', e => this.sfx?.flop(e.impact)),
+      bus.on('weapon:swing', e => this.sfx?.swing(e.weapon, e.combo)),
+      bus.on('weapon:slam', e => this.sfx?.slam(e.pos)),
+      bus.on('weapon:draw', () => this.sfx?.bowDraw()),
+      bus.on('weapon:fire', e => this.sfx?.bowFire(e.charge)),
+      bus.on('weapon:equip', e => this.sfx?.equip(e.weapon)),
+      bus.on('weapon:pickup', () => this.sfx?.pickup()),
+      bus.on('arrow:stick', e => this.sfx?.arrowStick(e.pos)),
+      bus.on('enemy:hit', e => this.sfx?.weaponHit(e.pos, e.weapon, e.killed)),
       bus.on('cutscene:start', () => this.sfx?.cutscene(true)),
       bus.on('cutscene:end', e => this.sfx?.cutscene(false, e.skipped)),
     )

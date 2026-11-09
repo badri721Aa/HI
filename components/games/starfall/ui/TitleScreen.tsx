@@ -1,11 +1,15 @@
 'use client'
-/** Title screen over the live 3D scene: wordmark, menu (bottom-left), sub-panels on the right. */
+/**
+ * Title screen over the live 3D scene: wordmark, menu (bottom-left), sub-panels on the right.
+ * The very first launch asks for the device (graphics preset) before showing the menu.
+ */
 import Link from 'next/link'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { playUi, useGameUi, useNet, usePresence, useUi } from './context'
 import { Button, KeyCap, MenuList, PanelHeader, type MenuEntry } from './controls'
 import { ControlsPanel } from './ControlsPanel'
 import { CreditsPanel } from './CreditsPanel'
+import { DevicePicker } from './DevicePicker'
 import { BackIcon } from './icons'
 import { focusFirst, useMenuNav } from './nav'
 import { OnlinePanel } from './OnlinePanel'
@@ -41,6 +45,7 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
   const menuRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const [opener, setOpener] = useState('')
+  const [deviceSetup, setDeviceSetup] = useState(() => game.needsDeviceSetup)
   const room = useNet(s => s.room)
   const roomPlayers = useNet(s => s.players.length)
 
@@ -66,10 +71,10 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
 
   // Focus: first item on arrival, the panel when one opens, the opener when it closes.
   useEffect(() => {
-    if (state !== 'open') return
+    if (state !== 'open' || deviceSetup) return
     if (panel) focusFirst(panelRef.current, '[data-autofocus]')
     else focusFirst(menuRef.current, opener ? `[data-id="${opener}"]` : undefined)
-  }, [panel, opener, state])
+  }, [panel, opener, state, deviceSetup])
 
   const open = (p: TitlePanel, from: string) => {
     setOpener(from)
@@ -82,10 +87,24 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
   }
 
   useMenuNav({
-    scope: panel ? panelRef : menuRef,
+    scope: panel || deviceSetup ? panelRef : menuRef,
     enabled: state === 'open',
-    onBack: panel ? back : undefined,
+    onBack: panel && !deviceSetup ? back : undefined,
   })
+
+  if (deviceSetup) {
+    return (
+      <div data-state={state} className={cx(styles.presence, 'absolute inset-0 z-50')}>
+        <div aria-hidden className={cx(styles.titleScrim, 'absolute inset-0')} />
+        <div aria-hidden className={cx(styles.panelScrim, 'absolute inset-0')} />
+        <div className="absolute inset-0 flex items-center justify-center px-[clamp(16px,3vw,48px)] py-[clamp(16px,6vh,64px)]">
+          <Panel panelRef={panelRef} label="Choose your device">
+            <DevicePicker onDone={() => setDeviceSetup(false)} />
+          </Panel>
+        </div>
+      </div>
+    )
+  }
 
   const start = () => game.newGame()
   const startHint = summary

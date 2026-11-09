@@ -340,6 +340,12 @@ export class Particles implements IParticles {
       bus.on('collect:shard', e => this.burst('shard', e.pos)),
       bus.on('enemy:stomp', e => this.burst('stomp', e.pos)),
       bus.on('enemy:defeat', e => this.burst('poof', e.pos, { scale: e.big ? 1.5 : 1 })),
+      bus.on('enemy:hit', e => this.burst('hit', e.pos, { color: '#e2c6ff', scale: e.weapon === 'hammer' ? 1.5 : 1 })),
+      bus.on('weapon:slam', e => {
+        this.burst('land', e.pos, { scale: 2.2, color: dustAt(e.pos) })
+        this.burst('stomp', e.pos, { scale: 1.4 })
+      }),
+      bus.on('arrow:stick', e => this.burst('dust', e.pos, { count: 3, scale: 0.45, color: dustAt(e.pos) })),
       bus.on('checkpoint', e => this.burst('checkpoint', e.pos, { scale: e.first ? 1.2 : 0.8 })),
     )
   }

@@ -1,10 +1,13 @@
 'use client'
-/** In-play HUD: hearts, dash, online chip, objective, compass, shards & sparks, zone card, prompt, pointer-lock hint. */
-import { useEffect, useState, type CSSProperties } from 'react'
+/** In-play HUD: hearts, dash, online chip, objective, compass, shards & sparks, zone card, prompt, weapon hotbar, bow crosshair, pointer-lock hint. */
+import { useEffect, useState, type ComponentType, type CSSProperties, type SVGProps } from 'react'
+import type { WeaponId } from '../engine/events'
+import { HOTBAR, WEAPON_NAMES } from '../engine/gameplay/weapons/defs'
 import { Compass } from './Compass'
 import { playUi, useGameUi, useHud, useNet, useUi } from './context'
 import { KeyCap } from './controls'
-import { DashIcon, HeartIcon, InteractIcon, MouseIcon, PauseIcon, SparkIcon, StarIcon } from './icons'
+import { DamageNumbers } from './DamageNumbers'
+import { BowIcon, DashIcon, FistIcon, HammerIcon, HeartIcon, InteractIcon, MouseIcon, PauseIcon, SparkIcon, StarIcon, SwordIcon } from './icons'
 import { NetChip } from './OnlineHud'
 import { cx, LABEL } from './theme'
 import styles from './ui.module.css'
@@ -45,7 +48,10 @@ export function Hud() {
       </div>
 
       <ZoneCard visible={visible} />
+      <DamageNumbers />
+      {playing && <Crosshair />}
       {playing && <Prompt />}
+      <Hotbar />
       {playing && !touch && <LookHint />}
     </div>
   )
@@ -251,12 +257,80 @@ function Prompt() {
   )
 }
 
+/* ── weapons ────────────────────────────────────────────────────── */
+
+const WEAPON_ICON: Record<WeaponId, ComponentType<SVGProps<SVGSVGElement>>> = { fists: FistIcon, sword: SwordIcon, hammer: HammerIcon, bow: BowIcon }
+
+/** Owned weapons, bottom centre; the one in hand is lit. On touch the slots are the way to switch. */
+function Hotbar() {
+  const { game, touch } = useGameUi()
+  const owned = useHud(h => h.weapons)
+  const current = useHud(h => h.weapon)
+  if (owned.length < 2) return null
+  return (
+    <div
+      className={cx(
+        'absolute inset-x-0 flex flex-col items-center gap-1.5',
+        touch ? 'bottom-[calc(env(safe-area-inset-bottom)+14px)] max-sm:bottom-[calc(env(safe-area-inset-bottom)+238px)]' : 'bottom-[clamp(14px,2.6vh,24px)]',
+      )}
+    >
+      <span key={current} className={cx(LABEL, styles.hudText, styles.pop, 'text-[10px] text-[#F3EEE6]/75')}>{WEAPON_NAMES[current]}</span>
+      <div role="toolbar" aria-label="Weapons" className="flex gap-1.5 rounded-[6px] border border-[#F3EEE6]/10 bg-[#0B0F14]/40 p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
+        {owned.map(w => {
+          const on = w === current
+          const Icon = WEAPON_ICON[w]
+          return (
+            <button
+              key={w}
+              type="button"
+              tabIndex={-1}
+              aria-label={WEAPON_NAMES[w]}
+              aria-pressed={on}
+              onPointerDown={e => {
+                e.preventDefault()
+                game.ctx.weapons.equip(w)
+              }}
+              className={cx(
+                'relative grid h-11 w-11 place-items-center rounded-[4px] border max-sm:h-10 max-sm:w-10',
+                touch && 'pointer-events-auto touch-none',
+                on ? 'border-[#F5B455]/80 bg-[#F5B455]/15 text-[#F5B455]' : 'border-[#F3EEE6]/15 bg-[#0B0F14]/30 text-[#F3EEE6]/65',
+              )}
+            >
+              <Icon className={cx(styles.hudIcon, 'h-6 w-6')} />
+              {!touch && <span className="absolute left-1 top-0.5 text-[9px] font-semibold tabular-nums text-[#F3EEE6]/45">{HOTBAR.indexOf(w) + 1}</span>}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Bow drawn: a dot where the arrow goes and a ring that fills with the draw. */
+function Crosshair() {
+  const aim = useHud(h => h.aim)
+  if (aim < 0) return null
+  const r = 13
+  const c = 2 * Math.PI * r
+  return (
+    <svg aria-hidden width="40" height="40" viewBox="0 0 40 40" className={cx(styles.hudIcon, 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2')}>
+      <circle cx="20" cy="20" r="2" fill="#F3EEE6" />
+      <circle cx="20" cy="20" r={r} fill="none" stroke="#F3EEE6" strokeOpacity={0.22} strokeWidth="2" />
+      <circle
+        cx="20" cy="20" r={r} fill="none" strokeWidth="2" strokeLinecap="round" transform="rotate(-90 20 20)"
+        stroke={aim >= 1 ? '#F5B455' : '#F3EEE6'} strokeDasharray={c} strokeDashoffset={c * (1 - aim)}
+      />
+    </svg>
+  )
+}
+
 function LookHint() {
   const locked = useUi(s => s.pointerLocked)
   const typing = useNet(s => s.chatOpen)
+  const armed = useHud(h => h.weapons.length > 1)
   if (locked || typing) return null
   return (
-    <div className="absolute inset-x-0 bottom-[clamp(28px,6vh,56px)] flex justify-center">
+    <div className={cx('absolute inset-x-0 flex justify-center', armed ? 'bottom-[clamp(100px,14vh,112px)]' : 'bottom-[clamp(28px,6vh,56px)]')}>
       <div className={cx(styles.presence, 'flex items-center gap-2 text-[12px] uppercase tracking-[0.18em] text-[#F3EEE6]/75')} data-state="open" style={{ animationDelay: '700ms' }}>
         <MouseIcon className={cx(styles.hudIcon, styles.hintBreath, 'h-4 w-4')} />
         <span className={styles.hudText}>Click to look around</span>
