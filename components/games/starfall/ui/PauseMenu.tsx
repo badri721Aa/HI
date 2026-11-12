@@ -6,7 +6,7 @@ import { Button, KeyCap, MenuList, PanelHeader, type MenuEntry } from './control
 import { ControlsPanel } from './ControlsPanel'
 import { StarIcon } from './icons'
 import { MapPanel } from './MapPanel'
-import { focusEl, focusFirst, isTextField, useMenuNav } from './nav'
+import { focusEl, focusFirst, goBack, isTextField, keepFocus, useMenuNav } from './nav'
 import { OnlinePanel } from './OnlinePanel'
 import { BackHint, Panel } from './Panel'
 import { SettingsPanel } from './SettingsPanel'
@@ -61,7 +61,8 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
       const isEsc = e.key === 'Escape'
       if (isEsc || e.code === 'KeyP') {
         if (e.repeat || performance.now() - store.get().pausedAt < REOPEN_GUARD_MS) return true
-        if (panel !== 'root') go('root')
+        // One level up: a nested view first (device setup), then the panel, then out of the menu.
+        if (panel !== 'root') goBack(() => go('root'))
         else resume()
         return true
       }
@@ -89,6 +90,7 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
           id: 'enemies',
           label: 'Enemies',
           meta: enemies ? 'On' : 'Off',
+          sound: 'ui-toggle' as const,
           onSelect: () => {
             game.setCreativeEnemies(!enemies)
             setEnemies(game.creativeEnemies)
@@ -101,7 +103,7 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
   const open = panel !== 'root'
 
   return (
-    <div data-state={state} className={cx(styles.presence, 'absolute inset-0 z-50')}>
+    <div data-state={state} onMouseDown={keepFocus} className={cx(styles.presence, 'absolute inset-0 z-50')}>
       <div aria-hidden className={cx(styles.pauseScrim, 'absolute inset-0')} />
 
       <div className="absolute inset-0 flex">
@@ -119,7 +121,7 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
           </div>
           <RunLine className="mt-4 md:hidden" />
 
-          <div ref={menuRef} className="mt-auto pt-8">
+          <div ref={menuRef} className="-mx-[18px] mt-auto pt-6">
             <MenuList items={items} current={open ? panel : null} size="md" />
           </div>
 
@@ -132,7 +134,7 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
         </aside>
 
         {open && (
-          <div className="flex min-w-0 flex-1 items-start px-[clamp(16px,3vw,48px)] py-[clamp(16px,9vh,88px)] md:pl-0">
+          <div className="flex min-w-0 flex-1 items-start px-[clamp(16px,3vw,48px)] py-[clamp(16px,6vh,72px)] md:pl-0">
             <Panel panelRef={panelRef} label={panel} wide={panel === 'map'}>
               {panel === 'map' && <MapPanel onBack={() => go('root')} />}
               {panel === 'online' && <OnlinePanel onBack={() => go('root')} primary={{ label: 'Resume', onClick: resume }} />}

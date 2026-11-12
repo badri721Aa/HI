@@ -230,6 +230,7 @@ export class Hazards {
     w.mesh.scale.setScalar(r)
     w.mat.uniforms.uFill.value = 0
     w.mesh.visible = true
+    this.ctx.bus.emit('boss:telegraph', { pos: { x, y, z }, delay })
   }
 
   /** An orb (falls, purple blast) or a boulder (thrown on an arc) landing at `to` after `dur` s. */
@@ -267,6 +268,7 @@ export class Hazards {
     this.lane.position.set(x, y + 0.05, z)
     this.lane.rotation.y = yaw
     this.lane.scale.set(width, 1, length)
+    if (!this.lane.visible) this.ctx.bus.emit('boss:telegraph', { pos: { x, y, z }, delay: 0 })
     this.lane.visible = true
   }
 

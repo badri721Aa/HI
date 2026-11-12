@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import type { Game } from './engine/Game'
 import { Announcements } from './ui/Announcements'
 import { GameContext, type GameUi } from './ui/context'
+import { Button } from './ui/controls'
 import { CutsceneOverlay } from './ui/CutsceneOverlay'
 import { DialogBox } from './ui/DialogBox'
 import { Hud } from './ui/Hud'
@@ -137,6 +138,8 @@ export default function StarfallGame() {
 
   return (
     <div
+      // Touch layout: the shared controls grow to 44 px targets (see ui.module.css).
+      data-touch={value?.touch ?? false}
       className={`${styles.root} fixed inset-0 z-[60] isolate touch-none select-none overflow-hidden bg-[#0B0F14] font-inter text-[#F3EEE6]`}
     >
       <div
@@ -184,15 +187,11 @@ function LoadingGate({ loading, progress, label, error }: { loading: boolean; pr
 function RuntimeError({ message }: { message: string }) {
   return (
     <div className="absolute inset-x-0 bottom-6 z-[90] flex justify-center px-4">
-      <div className="flex max-w-[560px] items-center gap-4 rounded-[4px] border border-[#E8664F]/40 bg-[#0B0F14]/95 px-4 py-3 text-[13px] text-[#F3EEE6]/80">
+      <div className="flex max-w-[560px] items-center gap-4 rounded-[6px] border border-[#E8664F]/40 bg-[#0B0F14]/95 px-4 py-3 text-[13px] text-[#F3EEE6]/80">
         <span className="min-w-0 truncate">Something went wrong: {message}</span>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="shrink-0 rounded-[3px] bg-[#F5B455] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0B0F14]"
-        >
+        <Button variant="primary" size="sm" onClick={() => window.location.reload()}>
           Reload
-        </button>
+        </Button>
       </div>
     </div>
   )

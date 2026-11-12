@@ -25,7 +25,8 @@ function VictoryContent({ state }: { state: 'open' | 'closed' }) {
   useEffect(() => {
     if (state === 'open') focusFirst(rootRef.current, '[data-autofocus]')
   }, [state])
-  useMenuNav({ scope: rootRef, enabled: state === 'open' })
+  // Esc leaves this screen the way it leaves the pause menu: back into the game.
+  useMenuNav({ scope: rootRef, enabled: state === 'open', onBack: () => game.resume() })
 
   const rows: Array<{ label: string; value: string; sub?: string; badge?: boolean }> = [
     { label: 'Time', value: formatTime(s.time), badge: s.newBest },

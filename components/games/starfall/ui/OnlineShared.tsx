@@ -2,8 +2,7 @@
 /** Pieces shared by the Online screen, the pause menu and the in-game overlays. */
 import { useEffect, useState } from 'react'
 import type { NetStatus, RoomInfo } from '../engine/types'
-import { playUi, useGameUi } from './context'
-import { isQuietFocus } from './nav'
+import { Chip } from './controls'
 import { CheckIcon, CopyIcon, SignalIcon } from './icons'
 import type { PlayerView } from './netStore'
 import { AMBER, cx, GOOD, HEART, LABEL } from './theme'
@@ -143,7 +142,6 @@ export async function copyText(text: string): Promise<boolean> {
 
 /** Copy button with a short "Copied" confirmation. */
 export function CopyButton({ text, label = 'Copy', autofocus }: { text: string; label?: string; autofocus?: boolean }) {
-  const { game } = useGameUi()
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
   useEffect(() => {
     if (state === 'idle') return
@@ -151,26 +149,10 @@ export function CopyButton({ text, label = 'Copy', autofocus }: { text: string; 
     return () => clearTimeout(t)
   }, [state])
   return (
-    <button
-      type="button"
-      data-nav
-      data-autofocus={autofocus || undefined}
-      onMouseEnter={e => e.currentTarget.focus({ preventScroll: true })}
-      onFocus={() => isQuietFocus() || playUi(game, 'ui-hover')}
-      onClick={() => {
-        playUi(game, 'ui-click')
-        void copyText(text).then(ok => setState(ok ? 'copied' : 'failed'))
-      }}
-      className={cx(
-        'inline-flex h-9 items-center gap-2 rounded-[4px] border px-3.5 text-[11px] font-semibold uppercase tracking-[0.16em] outline-none transition-colors duration-150',
-        state === 'copied'
-          ? 'border-[#8FCB7E]/60 text-[#BFE3B4]'
-          : 'border-[#F3EEE6]/20 text-[#F3EEE6]/85 hover:border-[#F3EEE6]/45 hover:text-[#F3EEE6] focus:border-[#F5B455]/70 focus:text-[#F3EEE6]',
-      )}
-    >
+    <Chip nav autofocus={autofocus} tone={state === 'copied' ? 'good' : undefined} onClick={() => void copyText(text).then(ok => setState(ok ? 'copied' : 'failed'))}>
       {state === 'copied' ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
       <span aria-live="polite">{state === 'copied' ? 'Copied' : state === 'failed' ? 'Select and copy' : label}</span>
-    </button>
+    </Chip>
   )
 }
 

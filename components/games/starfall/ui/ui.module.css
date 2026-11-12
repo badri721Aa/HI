@@ -82,48 +82,455 @@
     radial-gradient(48% 42% at 100% 100%, rgba(11, 15, 20, 0.62) 0%, rgba(11, 15, 20, 0) 100%),
     linear-gradient(90deg, rgba(11, 15, 20, 0.92) 0%, rgba(11, 15, 20, 0.74) 32%, rgba(11, 15, 20, 0.5) 70%, rgba(11, 15, 20, 0.42) 100%);
 }
-.loadingBg {
-  background:
-    radial-gradient(120% 70% at 72% 118%, rgba(245, 180, 85, 0.2) 0%, rgba(214, 120, 70, 0.08) 38%, rgba(11, 15, 20, 0) 70%),
-    radial-gradient(90% 60% at 10% -10%, rgba(80, 110, 150, 0.12) 0%, rgba(11, 15, 20, 0) 60%),
-    #0b0f14;
-}
 .topShade {
   background: linear-gradient(180deg, rgba(8, 10, 14, 0.38) 0%, rgba(8, 10, 14, 0) 100%);
 }
 
 /* ── loading ────────────────────────────────────────────────────────── */
 
-@keyframes shootingStar {
-  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--a)); }
-  6% { opacity: 1; }
-  22% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--a)); }
-  100% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--a)); }
+/* Dusk on the horizon (--hz) fading up into night. Everything animated here is opacity / transform
+   only, so it keeps moving on the compositor while the main thread is busy building the island. */
+.loading {
+  --hz: 66%;
+  --iw: clamp(320px, 50vw, 1000px);
+  background: #070a11;
 }
-.shootingStar {
+.loadSky {
   position: absolute;
-  width: 140px;
+  inset: 0 0 calc(100% - var(--hz)) 0;
+  background:
+    radial-gradient(64% 60% at 72% 100%, rgba(244, 164, 96, 0.52) 0%, rgba(206, 106, 92, 0.26) 34%, rgba(92, 70, 128, 0.12) 62%, rgba(11, 15, 20, 0) 80%),
+    linear-gradient(180deg, #070a11 0%, #0b1120 34%, #151c36 62%, #2a2646 82%, #4d3350 94%, #7a4650 100%);
+}
+.loadSea {
+  position: absolute;
+  inset: var(--hz) 0 0 0;
+  background:
+    radial-gradient(40% 90% at 72% 0%, rgba(244, 164, 96, 0.24) 0%, rgba(11, 15, 20, 0) 70%),
+    linear-gradient(180deg, #33283c 0%, #151827 20%, #0a0d14 68%, #070a11 100%);
+}
+.loadSea::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
   height: 1px;
-  background: linear-gradient(90deg, rgba(245, 180, 85, 0) 0%, rgba(245, 180, 85, 0.55) 70%, rgba(255, 236, 200, 0.95) 100%);
-  transform-origin: 100% 50%;
-  animation: shootingStar 7s ease-out infinite;
-  animation-delay: 1.4s;
-  opacity: 0;
+  background: linear-gradient(90deg, rgba(255, 214, 170, 0) 20%, rgba(255, 214, 170, 0.4) 60%, rgba(255, 214, 170, 0.55) 72%, rgba(255, 214, 170, 0) 100%);
+}
+/* Keeps the text column readable where it crosses the horizon glow on narrow screens. */
+.loadShade {
+  background: linear-gradient(90deg, rgba(7, 10, 17, 0.55) 0%, rgba(7, 10, 17, 0.28) 34%, rgba(7, 10, 17, 0) 62%);
+}
+
+/* The far star field is one element (a box-shadow per star); only the bright few twinkle. */
+.starField {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  border-radius: 50%;
 }
 @keyframes twinkle {
-  0%, 100% { opacity: var(--o, 0.5); }
-  50% { opacity: calc(var(--o, 0.5) * 0.35); }
+  0%, 100% { opacity: var(--o, 0.5); transform: scale(1); }
+  50% { opacity: calc(var(--o, 0.5) * 0.25); transform: scale(0.7); }
 }
 .twinkle {
   animation: twinkle var(--t, 5s) ease-in-out infinite;
   animation-delay: var(--d, 0s);
 }
-@keyframes tipIn {
-  from { opacity: 0; transform: translateY(4px); }
+@keyframes shootingStar {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--a)) scaleX(0.3); }
+  4% { opacity: 1; }
+  14% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--a)) scaleX(1); }
+  100% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--a)) scaleX(1); }
+}
+.shootingStar {
+  position: absolute;
+  width: 150px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(245, 180, 85, 0) 0%, rgba(245, 180, 85, 0.55) 70%, rgba(255, 240, 214, 0.98) 100%);
+  transform-origin: 100% 50%;
+  animation: shootingStar var(--t, 9s) ease-out infinite;
+  animation-delay: var(--d, 1.2s);
+  opacity: 0;
+}
+
+/* Island + its reflection share one box: the SVG's horizon (y = 260 of 400) sits on --hz. */
+.isle {
+  position: absolute;
+  right: clamp(-60px, 4vw, 120px);
+  top: calc(var(--hz) - var(--iw) * 0.3421);
+  width: var(--iw);
+  aspect-ratio: 760 / 400;
+}
+.beacon {
+  position: absolute;
+  left: 63.16%;
+  top: 5.25%;
+  opacity: var(--lit, 0.3);
+  transition: opacity 900ms ease-out;
+}
+@keyframes beaconPulse {
+  0%, 100% { opacity: 0.72; transform: translate(-50%, -50%) scale(0.92); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+}
+.beaconHalo {
+  position: absolute;
+  width: calc(var(--iw) * 0.36);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 236, 200, 0.95) 0%, rgba(245, 180, 85, 0.5) 9%, rgba(245, 180, 85, 0.14) 34%, rgba(245, 180, 85, 0) 66%);
+  transform: translate(-50%, -50%);
+  animation: beaconPulse 3.4s ease-in-out infinite;
+}
+.beaconFlare {
+  position: absolute;
+  width: calc(var(--iw) * 0.42);
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 226, 176, 0), rgba(255, 226, 176, 0.85) 50%, rgba(255, 226, 176, 0));
+  transform: translate(-50%, -50%);
+}
+.reflect {
+  position: absolute;
+  left: 63.16%;
+  top: 65.4%;
+  width: 9%;
+  height: 34%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(245, 180, 85, 0.55) 0%, rgba(245, 180, 85, 0.12) 60%, rgba(245, 180, 85, 0) 100%);
+  filter: blur(7px);
+  opacity: var(--lit, 0.3);
+  transition: opacity 900ms ease-out;
+}
+@keyframes shimmer {
+  0%, 100% { opacity: 0.12; transform: translateX(-50%) scaleX(0.55); }
+  50% { opacity: var(--o, 0.7); transform: translateX(-50%) scaleX(1); }
+}
+.shimmer {
+  position: absolute;
+  height: 1.5px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255, 222, 170, 0), rgba(255, 222, 170, 0.9) 50%, rgba(255, 222, 170, 0));
+  animation: shimmer var(--t, 3s) ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+  transform: translateX(-50%);
+  opacity: 0.12;
+}
+
+/* Wordmark entrance: letters rise one by one, the rule draws, the star lands last. */
+@keyframes letterIn {
+  from { opacity: 0; transform: translateY(0.22em); }
   to { opacity: 1; transform: none; }
 }
+.letter {
+  display: inline-block;
+}
+.wordIn .letter {
+  animation: letterIn 700ms var(--sf-ease) both;
+  animation-delay: calc(120ms + var(--i) * 55ms);
+}
+@keyframes starLand {
+  0% { opacity: 0; transform: translate(0.5em, -0.5em) scale(0.2) rotate(-90deg); }
+  70% { opacity: 1; transform: scale(1.35) rotate(8deg); }
+  100% { opacity: 1; transform: none; }
+}
+.wordIn .wordStar {
+  animation: starLand 760ms var(--sf-ease) 700ms both;
+}
+@keyframes ruleDraw {
+  from { transform: scaleX(0); }
+  to { transform: none; }
+}
+.wordIn .wordRule {
+  transform-origin: 0 50%;
+  animation: ruleDraw 620ms var(--sf-ease) 520ms both;
+}
+.wordIn .wordSub {
+  animation: fadeIn 700ms ease-out 640ms both;
+}
+
+.shard {
+  color: rgba(243, 238, 230, 0.22);
+  transition: color 300ms ease-out;
+}
+.shard[data-lit='true'] {
+  color: var(--sf-amber);
+  filter: drop-shadow(0 0 5px rgba(245, 180, 85, 0.8));
+  animation: starFill 620ms var(--sf-ease) both;
+}
+.loadFill,
+.loadHead {
+  transition: transform 420ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.loadFill {
+  transform-origin: 0 50%;
+}
+@keyframes sheen {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(420%); }
+}
+.loadSheen {
+  animation: sheen 1.8s ease-in-out infinite;
+}
+@keyframes tipCycle {
+  0% { opacity: 0; transform: translateY(6px); }
+  8%, 92% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
 .tip {
-  animation: tipIn 500ms var(--sf-ease) both;
+  animation: tipCycle var(--t, 6000ms) var(--sf-ease) both;
+}
+
+/* ── buttons ────────────────────────────────────────────────────────── */
+
+/*
+ * One family: .btn (primary · secondary · danger), .menuRow, .card (large choice) and .chip (small
+ * utility). "Selected" is :focus — hovering a control focuses it (nav.ts hoverFocus), so the mouse
+ * and the keyboard share a single highlight and two controls never look selected at once.
+ */
+.btn,
+.chip,
+.menuRow,
+.card {
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
+    box-shadow 150ms ease-out,
+    opacity 150ms ease-out,
+    transform 130ms var(--sf-ease);
+}
+.btn:focus-visible,
+.chip:focus-visible,
+.card:focus-visible,
+.ring:focus-visible {
+  outline: 2px solid var(--sf-amber);
+  outline-offset: 2px;
+}
+.btn:active,
+.chip:active,
+.card:active {
+  transform: translateY(1px) scale(0.97);
+  transition-duration: 60ms;
+}
+
+.btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.btn[data-size='sm'] {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 11px;
+}
+.btn[data-variant='primary'] {
+  background: var(--sf-amber);
+  color: var(--sf-ink);
+  box-shadow: inset 0 -2px 0 rgba(11, 15, 20, 0.2), 0 10px 24px -14px rgba(245, 180, 85, 0.9);
+}
+.btn[data-variant='primary']:focus {
+  background: #fad08a;
+  box-shadow: inset 0 -2px 0 rgba(11, 15, 20, 0.2), 0 12px 28px -12px rgba(245, 180, 85, 1);
+}
+.btn[data-variant='primary']:active {
+  background: #e6a23f;
+  box-shadow: inset 0 2px 0 rgba(11, 15, 20, 0.22);
+}
+.btn[data-variant='secondary'] {
+  border-color: rgba(243, 238, 230, 0.28);
+  background: rgba(243, 238, 230, 0.04);
+  color: rgba(243, 238, 230, 0.88);
+}
+.btn[data-variant='secondary']:focus {
+  border-color: rgba(243, 238, 230, 0.75);
+  background: rgba(243, 238, 230, 0.12);
+  color: var(--sf-text);
+}
+.btn[data-variant='secondary']:active {
+  background: rgba(243, 238, 230, 0.2);
+}
+.btn[data-variant='danger'] {
+  border-color: rgba(232, 102, 79, 0.55);
+  background: rgba(232, 102, 79, 0.06);
+  color: #f3b3a6;
+}
+.btn[data-variant='danger']:focus {
+  border-color: var(--sf-heart);
+  background: rgba(232, 102, 79, 0.2);
+  color: #ffd9d0;
+}
+.btn[data-variant='danger']:active {
+  background: rgba(232, 102, 79, 0.3);
+}
+.btn[aria-disabled='true'] {
+  opacity: 0.38;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn[aria-disabled='true']:active {
+  transform: none;
+}
+.btn[data-loading='true'] {
+  cursor: progress;
+}
+@keyframes nope {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  60% { transform: translateX(3px); }
+  85% { transform: translateX(-1px); }
+}
+.nope {
+  animation: nope 260ms ease-out;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+/* Small utility button: Back, Refresh, Copy, the Arcade link. Not part of the arrow-key list, so it has a plain hover. */
+.chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px 0 8px;
+  border: 1px solid rgba(243, 238, 230, 0.16);
+  border-radius: 6px;
+  background: rgba(243, 238, 230, 0.03);
+  color: rgba(243, 238, 230, 0.62);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.chip:hover,
+.chip:focus {
+  border-color: rgba(243, 238, 230, 0.5);
+  background: rgba(243, 238, 230, 0.1);
+  color: var(--sf-text);
+}
+.chip[data-tone='good'] {
+  border-color: rgba(143, 203, 126, 0.6);
+  color: #bfe3b4;
+}
+
+/* Large choice (device picker). */
+.card {
+  border: 1px solid rgba(243, 238, 230, 0.14);
+  border-radius: 8px;
+  background: rgba(243, 238, 230, 0.03);
+}
+.card:focus {
+  border-color: rgba(243, 238, 230, 0.55);
+  background: rgba(243, 238, 230, 0.08);
+}
+.card[aria-checked='true'] {
+  border-color: var(--sf-amber);
+  background: rgba(245, 180, 85, 0.12);
+  box-shadow: inset 0 0 0 1px var(--sf-amber);
+}
+
+/* Touch: every control gets a 44 px target. */
+[data-touch='true'] .btn[data-size='sm'],
+[data-touch='true'] .chip {
+  height: 44px;
+  padding: 0 16px;
+}
+
+/* ── menus ──────────────────────────────────────────────────────────── */
+
+.menuRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: var(--row-h, 44px);
+  padding: 0 14px 0 18px;
+  border-radius: 6px;
+  color: rgba(243, 238, 230, 0.66);
+  text-align: left;
+}
+/* Marker: an amber bar that grows in on the selected row. */
+.menuRow::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 58%;
+  border-radius: 2px;
+  background: var(--sf-amber);
+  transform: translateY(-50%) scaleY(0);
+  transition: transform 160ms var(--sf-ease);
+}
+.menuRow:focus,
+.menuRow[data-current='true'] {
+  background: rgba(245, 180, 85, 0.17);
+  color: var(--sf-text);
+}
+.menuRow:focus::before,
+.menuRow[data-current='true']::before {
+  transform: translateY(-50%) scaleY(1);
+}
+.menuRow:focus-visible {
+  box-shadow: inset 0 0 0 1px rgba(245, 180, 85, 0.6);
+}
+.menuRow:active {
+  background: rgba(245, 180, 85, 0.3);
+  transform: scale(0.985);
+  transition-duration: 60ms;
+}
+.menuRow .rowLabel {
+  transition: transform 160ms var(--sf-ease);
+}
+.menuRow:focus .rowLabel,
+.menuRow[data-current='true'] .rowLabel {
+  transform: translateX(4px);
+}
+.menuRow .rowChevron {
+  margin-left: auto;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 150ms ease-out, transform 160ms var(--sf-ease);
+}
+.menuRow:focus .rowChevron,
+.menuRow[data-current='true'] .rowChevron {
+  opacity: 0.9;
+  transform: none;
+}
+/* A panel is open: its row stays selected; the others only brighten under the mouse. */
+.menuList[data-locked='true'] .menuRow:not([data-current='true']):hover {
+  color: var(--sf-text);
+}
+[data-touch='true'] .menuRow {
+  min-height: max(var(--row-h, 44px), 46px);
 }
 
 /* ── menus ──────────────────────────────────────────────────────────── */
@@ -329,15 +736,24 @@
 
 /* ── settings controls ──────────────────────────────────────────────── */
 
+/* The row holding the selected control lights up, for mouse and keyboard alike. */
+.settingRow {
+  transition: background-color 150ms ease-out;
+}
+.settingRow:focus-within {
+  background: rgba(243, 238, 230, 0.045);
+}
 .sliderThumb {
-  transition: box-shadow 160ms ease-out, transform 160ms ease-out;
+  transition: box-shadow 150ms ease-out, transform 130ms var(--sf-ease);
 }
-.slider:focus-visible .sliderThumb,
-.slider:hover .sliderThumb {
-  box-shadow: 0 0 0 4px rgba(245, 180, 85, 0.22);
+.slider:focus .sliderThumb {
+  box-shadow: 0 0 0 5px rgba(245, 180, 85, 0.24);
 }
-.slider:focus-visible {
-  outline: none;
+.slider:focus-visible .sliderThumb {
+  box-shadow: 0 0 0 2px var(--sf-ink), 0 0 0 4px var(--sf-amber);
+}
+.slider:active .sliderThumb {
+  transform: scale(1.18);
 }
 
 /* ── map ────────────────────────────────────────────────────────────── */
@@ -430,6 +846,15 @@
   .slide,
   .shootingStar,
   .twinkle,
+  .shimmer,
+  .beaconHalo,
+  .loadSheen,
+  .wordIn .letter,
+  .wordIn .wordStar,
+  .wordIn .wordRule,
+  .wordIn .wordSub,
+  .shard[data-lit='true'],
+  .nope,
   .heartLow,
   .hintBreath,
   .caret,
@@ -437,8 +862,31 @@
   .lowHp {
     animation: none !important;
   }
+  /* Tips still change, with a plain fade. */
+  .tip {
+    animation-name: fadeIn;
+    animation-duration: 400ms;
+  }
+  .shimmer {
+    opacity: 0.4;
+  }
   .letterbox,
-  .menuItem {
+  .btn,
+  .chip,
+  .card,
+  .menuRow,
+  .menuRow::before,
+  .menuRow .rowLabel,
+  .menuRow .rowChevron,
+  .sliderThumb,
+  .loadFill,
+  .loadHead {
     transition: none !important;
+  }
+  .btn:active,
+  .chip:active,
+  .card:active,
+  .menuRow:active {
+    transform: none;
   }
 }

@@ -195,6 +195,26 @@ export class Worlds implements IWorlds {
     }
   }
 
+  nearestPortal(p: V3, out: V3): boolean {
+    const v = this.visit()
+    let best: Arch | null = v ? v.exit : null
+    if (!v) {
+      let bestD = Infinity
+      for (const a of this.arches.values()) {
+        const d = (a.x - p.x) ** 2 + (a.z - p.z) ** 2
+        if (a.isOpen && d < bestD) {
+          bestD = d
+          best = a
+        }
+      }
+    }
+    if (!best) return false
+    out.x = best.x
+    out.y = best.y + 1.4
+    out.z = best.z
+    return true
+  }
+
   compass(p: V3, cameraYaw: number, out: CompassMarker[]): void {
     const save = this.ctx.game.save
     const mark = (x: number, z: number, kind: CompassMarker['kind']) => {

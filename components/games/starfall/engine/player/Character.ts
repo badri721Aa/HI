@@ -1,8 +1,9 @@
 /**
  * The hero: loads /games/starfall/hero.glb (one skinned mesh, baked albedo),
  * places it on the player every frame and drives it with the procedural
- * Animator. Also owns the soft blob shadow under the feet and the ragdoll: while it is limp or
- * getting up, the root sits where the ragdoll says and its pose overrides the animation.
+ * Animator. Also owns the soft blob shadow under the feet, the face's expressions and the
+ * ragdoll: while it is limp or getting up, the root sits where the ragdoll says and its pose
+ * overrides the animation.
  *
  *   root (player position, smoothed yaw) → pivot (spin attack) → model (unit scale) → glTF armature
  */
@@ -13,6 +14,7 @@ import type { V3 } from '../events'
 import type { GroundHit } from '../collision'
 import { Animator, type GroundSample } from './Animator'
 import { createGrip } from './anim/grip'
+import { Face, faceCentre } from './Face'
 import { Rig } from './anim/Rig'
 import { dampAngle, wrapAngle } from './anim/math'
 import { HeroRagdoll } from './ragdoll/HeroRagdoll'
@@ -41,6 +43,10 @@ const RAGDOLL_SHAKE = 9
 const FLOP_IMPACT = 10
 /** Going limp this fast (m/s) is a big launch: a beat of slow motion. */
 const BIG_LAUNCH = 12
+/** Landings harder than this (m/s — more than a double jump's worth of fall) make him wince. */
+const HARD_LANDING = 17
+/** How long a smile lasts after something good (s). */
+const HAPPY_TIME = 1.5
 const ACTIVE_STATES: ReadonlySet<PlayerState> = new Set<PlayerState>(['jump', 'doubleJump', 'fall', 'bounce', 'dash', 'attack', 'hurt'])
 
 /** Is the hero doing something a gesture can't be layered over (moving, airborne, attacking…)? */
@@ -72,10 +78,12 @@ export class Character implements ICharacter {
   private rig: Rig | null = null
   private animator: Animator | null = null
   private ragdoll: HeroRagdoll | null = null
+  private face: Face | null = null
   private blob: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null
   /** Where held props attach: [left, right] grips under the hand bones (or the root without a rig). */
   private grips: [THREE.Object3D | null, THREE.Object3D | null] = [null, null]
   private owned: Array<{ dispose(): void }> = []
+  private off: Array<() => void> = []
   private yaw = 0
   private placed = false
   private blink = false
@@ -99,6 +107,7 @@ export class Character implements ICharacter {
     const ctx = this.ctx
     ctx.scene.add(this.root)
     this.makeBlob()
+    this.watchMood()
     try {
       const bytes = await this.heroBytes
       if (bytes instanceof Error) throw bytes
@@ -113,7 +122,7 @@ export class Character implements ICharacter {
 
   private setupModel(scene: THREE.Object3D): void {
     let height = 0
-    const eyes = new THREE.Box3()
+    let faceFound = false
     const anisotropy = Math.min(8, this.ctx.renderer.capabilities.getMaxAnisotropy())
     scene.updateMatrixWorld(true)
     scene.traverse(o => {
@@ -128,22 +137,25 @@ export class Character implements ICharacter {
       this.owned.push(mesh.geometry)
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       for (const mat of mats as THREE.MeshStandardMaterial[]) {
-        const eye = mat.name === 'HeroEye'
-        if (eye && mats.length === 1) eyes.union(bb.clone().applyMatrix4(mesh.matrixWorld))
         mat.metalness = 0
-        mat.roughness = eye ? 0.14 : 0.8
-        mat.envMapIntensity = eye ? 1 : 0.6
+        mat.roughness = 0.8
+        mat.envMapIntensity = 0.6
         if (mat.map) {
           mat.map.anisotropy = anisotropy
           this.owned.push(mat.map)
+          if (mat.name === 'HeroFace' && !this.face) {
+            this.face = new Face(mat.map)
+            mat.map = this.face.texture
+            faceFound = faceCentre(mesh, this.headLocal)
+          }
         }
         this.owned.push(mat)
       }
     })
     const scale = HERO_HEIGHT / (height || 6.24)
-    // Head focus point (between the eyes), carried by the head bone; measured in the rest pose.
+    // Head focus point (the eye line of the painted face), carried by the head bone; measured in the rest pose.
     const head = scene.getObjectByName('head')
-    if (head && !eyes.isEmpty()) head.worldToLocal(eyes.getCenter(this.headLocal))
+    if (head && faceFound) head.worldToLocal(this.headLocal)
     else this.headLocal.set(0, 0.09 / scale, 0.02 / scale)
     this.model.scale.setScalar(scale)
     this.model.add(scene)
@@ -186,6 +198,33 @@ export class Character implements ICharacter {
     this.owned.push(geo, mat)
   }
 
+  /** Good things make him smile for a moment; a hard landing makes him wince. */
+  private watchMood(): void {
+    const bus = this.ctx.bus
+    const smile = () => this.face?.show('happy', HAPPY_TIME)
+    this.off.push(
+      bus.on('collect:shard', smile),
+      bus.on('collect:heart', smile),
+      bus.on('weapon:pickup', smile),
+      bus.on('chest:open', smile),
+      bus.on('boss:defeat', smile),
+      bus.on('ui:victory', () => this.face?.show('happy', 8)),
+      bus.on('player:land', e => {
+        if (e.impact > HARD_LANDING) this.face?.show('hurt', 0.7)
+      }),
+    )
+  }
+
+  /** Hurt, limp or dead: the pained face stays on for as long as it lasts. */
+  private updateFace(dt: number): void {
+    const face = this.face
+    if (!face) return
+    const p = this.ctx.player
+    const s = p.motion.state
+    face.hold(s === 'hurt' || s === 'dead' || p.hp <= 0 || this.ragdolling ? 'hurt' : 'neutral')
+    face.update(dt)
+  }
+
   /** Ground probe handed to the animator (feet planting). */
   private probe = (x: number, z: number, nearY: number, out: GroundSample): boolean => {
     const h = this.ctx.collision.groundAt(x, z, nearY + 0.2, 0.05, 0.45, this.hit)
@@ -200,6 +239,7 @@ export class Character implements ICharacter {
   update(dt: number): void {
     const p = this.ctx.player
     if (!p) return
+    this.updateFace(dt)
     const rd = this.ragdoll
     // Cutscenes never show the ragdoll (e.g. tumbling into a shard): they cut straight to him standing.
     if (rd?.active && this.ctx.game.phase === 'cutscene') this.cancelRagdoll()
@@ -236,6 +276,7 @@ export class Character implements ICharacter {
       if (this.ctx.weapons) this.animator.setWeapon(this.ctx.weapons.pose)
       this.animator.update(dt, this.root.position, this.yaw)
       this.pivot.rotation.y = this.animator.spin
+      this.applyStretch(this.animator.stretch)
     }
     this.finishFrame(pos)
     rd?.track(this.root.position, dt, jumped)
@@ -247,11 +288,18 @@ export class Character implements ICharacter {
     this.root.position.copy(rd.rootPos)
     this.root.rotation.y = this.yaw = rd.rootYaw
     this.pivot.rotation.y = 0
+    this.applyStretch(1)
     if (rose) animator.resetFeet()
     animator.setOverride(rd.pose)
     animator.update(dt, this.root.position, this.yaw)
     this.finishFrame(this.root.position)
     if (rd.phase === 'getup') rd.track(this.root.position, dt, rose)
+  }
+
+  /** Squash and stretch about the feet: taller means thinner, so the volume stays put. */
+  private applyStretch(y: number): void {
+    const side = 1 / Math.sqrt(y)
+    this.pivot.scale.set(side, y, side)
   }
 
   private finishFrame(pos: THREE.Vector3): void {
@@ -313,6 +361,7 @@ export class Character implements ICharacter {
   }
 
   playGesture(name: GestureName, opts?: { loop?: boolean; speed?: number }): Promise<void> {
+    if (name === 'cheer' || name === 'wave') this.face?.show('happy', HAPPY_TIME)
     return this.animator ? this.animator.playGesture(name, opts) : Promise.resolve()
   }
 
@@ -379,8 +428,12 @@ export class Character implements ICharacter {
     this.ragdoll?.cancel()
     this.ragdoll = null
     this.animator?.stopGesture()
+    for (const off of this.off) off()
+    this.off = []
     this.root.removeFromParent()
     this.blob?.removeFromParent()
+    this.face?.dispose()
+    this.face = null
     for (const d of this.owned) d.dispose()
     this.owned = []
     this.animator = null

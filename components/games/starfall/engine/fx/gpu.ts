@@ -9,7 +9,7 @@
 import * as THREE from 'three'
 
 /** Fragment shapes (analytic sprites, no texture lookups except smoke noise). */
-export const SHAPE = { glow: 0, ring: 1, star: 2, smoke: 3, heart: 4, drop: 5 } as const
+export const SHAPE = { glow: 0, ring: 1, star: 2, smoke: 3, heart: 4, drop: 5, halo: 6 } as const
 /** Orientation: billboard, stretched along the screen-space velocity, or lying flat on the XZ plane. */
 export const MODE = { billboard: 0, stretch: 1, flat: 2 } as const
 
@@ -137,7 +137,8 @@ void main() {
     vec2 sv = (viewMatrix * vec4(v, 0.0)).xy;
     float sl = length(sv);
     vec2 ax = sl > 1e-4 ? sv / sl : vec2(0.0, 1.0);
-    vec2 px = vec2(-ax.y, ax.x);
+    // (px, ax) must stay right-handed, or the quad turns its back to the camera and is culled.
+    vec2 px = vec2(ax.y, -ax.x);
     mv.xy += px * position.x * size + ax * position.y * (size + sl * 0.045);
   } else {
     mv.xy += q * size;
@@ -194,9 +195,12 @@ void main() {
     float d = dot(p, p) - 1.0;
     float f = d * d * d - p.x * p.x * p.y * p.y * p.y; // pow() of a negative base is undefined in GLSL
     a = max(1.0 - smoothstep(-0.03, 0.03, f), exp(-r * r * 3.0) * 0.3);
-  } else {
+  } else if (vShape < 5.5) {
     // droplet
     a = 1.0 - smoothstep(0.35, 1.0, r);
+  } else {
+    // thin ring: a crisp shockwave when it faces the camera
+    a = smoothstep(0.74, 0.88, r) * (1.0 - smoothstep(0.9, 1.0, r));
   }
   a *= vColor.a;
   if (a < 0.004) discard;

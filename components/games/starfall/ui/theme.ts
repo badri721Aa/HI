@@ -23,6 +23,9 @@ export function formatTime(seconds: number): string {
 /** Small tracked uppercase label. */
 export const LABEL = 'text-[11px] font-medium uppercase tracking-[0.24em]'
 
+/** Top offset of the wordmark — identical on the loading and title screens, so the cross-fade never moves it. */
+export const WORDMARK_TOP = 'mt-[clamp(36px,13vh,170px)] [@media(max-height:640px)]:mt-[4vh]'
+
 /** Healthy connection. */
 export const GOOD = '#8FCB7E'
 

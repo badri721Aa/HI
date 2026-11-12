@@ -381,6 +381,8 @@ export interface IWorlds extends System {
   spawnPoint(): { x: number; y: number; z: number; yaw: number } | null
   /** Fade out, build the map on its first visit, move the player there and fade back in. */
   travel(to: MapId): void
+  /** The nearest open portal arch in the current map (its middle) → out; false when there is none. */
+  nearestPortal(p: V3, out: V3): boolean
   /** Compass markers: awake portals on the island; the boss and the way home elsewhere. */
   compass(p: V3, cameraYaw: number, out: CompassMarker[]): void
   /** What the 'boss' cutscene frames, or null when no fight is waiting. */
@@ -442,10 +444,20 @@ export interface ICutscenes extends System {
 export type BurstKind =
   | 'dust' | 'land' | 'jump' | 'doubleJump' | 'dash' | 'splash' | 'ripple'
   | 'spark' | 'shard' | 'heart' | 'poof' | 'stomp' | 'hit' | 'checkpoint' | 'bounce' | 'beacon'
+  /** A swirl drawn into a portal · chips flying off something broken or struck. */
+  | 'portal' | 'debris'
+
+/** Things that leave a trail: an arrow in flight, a blade or hammer head mid-swing, a spark drawn to the player. */
+export type TrailKind = 'arrow' | 'slash' | 'spark'
 
 /** fx/Particles.ts — pooled GPU particles for one-shot bursts and trails. */
 export interface IParticles extends System {
   burst(kind: BurstKind, pos: V3, opts?: { dir?: V3; count?: number; color?: string; scale?: number }): void
+  /**
+   * Fills the path a moving thing covered this frame (from → to) with fading glow. Call it every
+   * frame while the thing moves; allocation-free. `color` is a hex number (default: per kind).
+   */
+  trail(kind: TrailKind, from: V3, to: V3, color?: number): void
   /** A shooting-star style streak from a to b over `duration` seconds (intro/final cutscenes). */
   streak(from: V3, to: V3, duration: number, color?: string): void
 }

@@ -53,10 +53,10 @@ export function useBus<K extends keyof GameEventMap>(type: K, handler: (payload:
   useEffect(() => game.bus.on(type, p => onEvent(p)), [game, type])
 }
 
-/** UI sound helper — never throws (audio may still be a stub or locked). */
-export function playUi(game: Game, name: SfxName): void {
+/** UI sound helper — never throws (audio may still be a stub or locked, or the game not built yet). */
+export function playUi(game: Game | null | undefined, name: SfxName): void {
   try {
-    game.ctx.audio?.ui(name)
+    game?.ctx.audio?.ui(name)
   } catch {
     /* sound is decoration */
   }

@@ -4,13 +4,15 @@
  * recommendation pre-selected. Shown before the title menu on the very first launch, and again
  * from Settings › Graphics.
  */
-import { useEffect, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import { DEVICE_QUALITY, type DeviceKind } from '../engine/settings'
 import { playUi, useGameUi } from './context'
 import { Button, PanelHeader } from './controls'
 import { DesktopIcon, LaptopIcon, PhoneIcon, SchoolLaptopIcon } from './icons'
-import { focusFirst, isQuietFocus } from './nav'
+import { focusFirst, hoverFocus, isQuietFocus, useBackHandler } from './nav'
+import { BackHint } from './Panel'
 import { cx, LABEL } from './theme'
+import styles from './ui.module.css'
 
 const DEVICES: Array<{ kind: DeviceKind; label: string; hint: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }> = [
   { kind: 'chromebook', label: 'Chromebook or school laptop', hint: 'Light graphics that keep it smooth', Icon: SchoolLaptopIcon },
@@ -21,13 +23,22 @@ const DEVICES: Array<{ kind: DeviceKind; label: string; hint: string; Icon: Comp
 
 const QUALITY_LABEL = { low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' } as const
 
-export function DevicePicker({ onDone, aside }: { onDone: () => void; aside?: ReactNode }) {
+/** `onCancel` (when opened from Settings) adds a Back button and makes Esc return there without changing anything. */
+export function DevicePicker({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void }) {
   const { game, store } = useGameUi()
   const [recommended] = useState(() => game.recommendDevice().kind)
   const [pick, setPick] = useState<DeviceKind>(recommended)
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => focusFirst(rootRef.current, '[data-autofocus]'), [])
+
+  const cancel = onCancel
+    ? () => {
+        playUi(game, 'ui-back')
+        onCancel()
+      }
+    : undefined
+  useBackHandler(cancel)
 
   const confirm = () => {
     store.updateSettings({ quality: DEVICE_QUALITY[pick] })
@@ -37,7 +48,7 @@ export function DevicePicker({ onDone, aside }: { onDone: () => void; aside?: Re
 
   return (
     <div ref={rootRef}>
-      <PanelHeader eyebrow="Setup" title="Choose your device" aside={aside} />
+      <PanelHeader eyebrow="Setup" title="Choose your device" aside={cancel && <BackHint onBack={cancel} />} />
       <p className="mb-5 max-w-[480px] text-[14px] leading-relaxed text-[#F3EEE6]/65">
         Starfall picks graphics to match, so it runs smoothly. You can change this any time in Settings.
       </p>
@@ -53,16 +64,12 @@ export function DevicePicker({ onDone, aside }: { onDone: () => void; aside?: Re
               data-nav
               data-autofocus={kind === recommended || undefined}
               onClick={() => {
-                playUi(game, 'ui-click')
+                if (!on) playUi(game, 'ui-toggle')
                 setPick(kind)
               }}
-              onMouseEnter={e => e.currentTarget.focus({ preventScroll: true })}
+              {...hoverFocus}
               onFocus={() => isQuietFocus() || playUi(game, 'ui-hover')}
-              className={cx(
-                'flex min-h-[72px] items-center gap-4 rounded-[4px] border px-4 py-3 text-left outline-none transition-colors duration-150',
-                'focus-visible:ring-1 focus-visible:ring-[#F5B455]/80',
-                on ? 'border-[#F5B455]/70 bg-[#F5B455]/10' : 'border-[#F3EEE6]/12 bg-[#F3EEE6]/[0.03] hover:border-[#F3EEE6]/30 focus:border-[#F3EEE6]/35',
-              )}
+              className={cx(styles.card, 'flex min-h-[72px] items-center gap-4 px-4 py-3 text-left')}
             >
               <Icon className={cx('h-7 w-7 shrink-0 transition-colors', on ? 'text-[#F5B455]' : 'text-[#F3EEE6]/65')} />
               <span className="min-w-0">

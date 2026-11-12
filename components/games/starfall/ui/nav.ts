@@ -2,12 +2,12 @@
 /**
  * Console-style menu navigation shared by every menu screen.
  *
- * Arrow keys move focus between the `[data-nav]` elements of the active scope,
- * Enter/Space activate, Esc/Backspace go back. Gamepads are translated into the
+ * Arrow keys and Tab move focus between the `[data-nav]` elements of the active scope,
+ * the mouse moves it by hovering, Enter/Space activate, Esc/Backspace go back one level. Gamepads are translated into the
  * same key events (dispatched on the focused element), so sliders and tabs only
  * ever need keyboard handlers.
  */
-import { useEffect, useEffectEvent, type RefObject } from 'react'
+import { useEffect, useEffectEvent, type MouseEvent, type PointerEvent, type RefObject } from 'react'
 
 const NAV_SELECTOR = '[data-nav]:not([disabled]):not([aria-disabled="true"])'
 
@@ -38,6 +38,55 @@ export function focusFirst(scope: HTMLElement | null, selector?: string): void {
   focusEl(preferred ?? navTargets(scope)[0] ?? scope, true)
 }
 
+/**
+ * Mouse hover selects, exactly like the arrow keys: spread onto a `[data-nav]` control. Moving the
+ * mouse (not just entering) re-selects, so the pointer wins again after keyboard navigation —
+ * and because the highlight is drawn from focus alone, two controls can never look selected at once.
+ */
+export const hoverFocus = {
+  onPointerMove(e: PointerEvent<HTMLElement>): void {
+    const el = e.currentTarget
+    if (e.pointerType === 'mouse' && document.activeElement !== el && !el.matches('[aria-disabled="true"]')) el.focus({ preventScroll: true })
+  },
+}
+
+/** Things a mouse press is meant for: controls, and text the player may select (a room code). */
+const INTERACTIVE = 'button, a[href], input, textarea, select, [tabindex]:not([tabindex="-1"]), .select-text'
+
+/** onMouseDown for a menu layer: a click on empty space must not drop the keyboard selection. */
+export function keepFocus(e: MouseEvent<HTMLElement>): void {
+  if (!(e.target as HTMLElement).closest(INTERACTIVE)) e.preventDefault()
+}
+
+/* ── back ────────────────────────────────────────────────────────── */
+
+const backStack: Array<() => void> = []
+
+/**
+ * A view nested inside a panel (e.g. device setup inside Settings) takes over Esc / Back while it
+ * is mounted, so "back" always means one level up — the same as its on-screen Back button.
+ */
+export function useBackHandler(handler: (() => void) | undefined): void {
+  const run = useEffectEvent(() => handler?.())
+  const active = !!handler
+  useEffect(() => {
+    if (!active) return
+    const entry = () => run()
+    backStack.push(entry)
+    return () => {
+      const i = backStack.indexOf(entry)
+      if (i >= 0) backStack.splice(i, 1)
+    }
+  }, [active])
+}
+
+/** Runs the innermost back handler, else `fallback`. Returns false when there is nowhere to go back to. */
+export function goBack(fallback?: () => void): boolean {
+  const back = backStack[backStack.length - 1] ?? fallback
+  back?.()
+  return !!back
+}
+
 interface NavOptions {
   scope: RefObject<HTMLElement | null>
   enabled: boolean
@@ -59,14 +108,22 @@ export function useMenuNav({ scope, enabled, onBack, onKey }: NavOptions): void 
     // Text fields keep Enter, Space and Backspace for themselves; arrows still move between items.
     const typing = inside && isTextField(active!)
 
-    switch (e.key) {
+    // Buttons side by side (Quit / Keep playing, the device cards): ←/→ step like ↑/↓. Controls that
+    // use the arrows themselves (sliders, toggles, segmented, tabs) have already claimed the event.
+    const sideways = (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.defaultPrevented && inside && active!.matches('button:not([role]), button[role="radio"][data-nav]')
+
+    switch (sideways ? (e.key === 'ArrowLeft' ? 'ArrowUp' : 'ArrowDown') : e.key) {
+      // Tab walks the same list as the arrows, so focus can't wander onto a layer behind the menu.
+      case 'Tab':
       case 'ArrowDown':
       case 'ArrowUp': {
         const list = navTargets(root)
         if (!list.length) return
         e.preventDefault()
-        const i = inside ? list.indexOf(active!) : -1
-        const down = e.key === 'ArrowDown'
+        // Focus may sit on a child (one segment of a segmented control): step from its nav owner.
+        const owner = inside ? active!.closest<HTMLElement>('[data-nav]') : null
+        const i = owner ? list.indexOf(owner) : -1
+        const down = e.key === 'Tab' ? !e.shiftKey : e.key === 'ArrowDown' || e.key === 'ArrowRight'
         const next = i < 0 ? (down ? 0 : list.length - 1) : (i + (down ? 1 : -1) + list.length) % list.length
         focusEl(list[next])
         return
@@ -78,7 +135,7 @@ export function useMenuNav({ scope, enabled, onBack, onKey }: NavOptions): void 
           e.preventDefault()
           return
         }
-        if (!inside || !active!.matches('button, [role="switch"]')) {
+        if (!inside || !active!.matches('button, a[href], [role="switch"]')) {
           // Nothing focused yet: Enter focuses the first item instead of doing nothing.
           if (!inside && e.key === 'Enter') {
             e.preventDefault()
@@ -92,9 +149,8 @@ export function useMenuNav({ scope, enabled, onBack, onKey }: NavOptions): void 
       }
       case 'Escape':
       case 'Backspace':
-        if (e.repeat || !onBack || (typing && e.key === 'Backspace')) return
-        e.preventDefault()
-        onBack()
+        if (e.repeat || (typing && e.key === 'Backspace')) return
+        if (goBack(onBack)) e.preventDefault()
         return
     }
   })
@@ -102,10 +158,16 @@ export function useMenuNav({ scope, enabled, onBack, onKey }: NavOptions): void 
   useEffect(() => {
     if (!enabled) return
     const onKeyDown = (e: KeyboardEvent) => handle(e)
+    // Space already activated on keydown; some browsers click buttons again on keyup.
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ' && !isTextField(document.activeElement)) e.preventDefault()
+    }
     window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
     const stopPad = pollGamepadNav()
     return () => {
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
       stopPad()
     }
   }, [enabled])

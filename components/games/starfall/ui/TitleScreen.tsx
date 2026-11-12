@@ -11,11 +11,11 @@ import { ControlsPanel } from './ControlsPanel'
 import { CreditsPanel } from './CreditsPanel'
 import { DevicePicker } from './DevicePicker'
 import { BackIcon } from './icons'
-import { focusFirst, useMenuNav } from './nav'
+import { focusFirst, keepFocus, useMenuNav } from './nav'
 import { OnlinePanel } from './OnlinePanel'
 import { BackHint, Panel } from './Panel'
 import { SettingsPanel } from './SettingsPanel'
-import { cx, formatTime, LABEL, STANDALONE } from './theme'
+import { cx, formatTime, LABEL, STANDALONE, WORDMARK_TOP } from './theme'
 import styles from './ui.module.css'
 import { Wordmark } from './Wordmark'
 
@@ -94,7 +94,7 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
 
   if (deviceSetup) {
     return (
-      <div data-state={state} className={cx(styles.presence, 'absolute inset-0 z-50')}>
+      <div data-state={state} onMouseDown={keepFocus} className={cx(styles.presence, 'absolute inset-0 z-50')}>
         <div aria-hidden className={cx(styles.titleScrim, 'absolute inset-0')} />
         <div aria-hidden className={cx(styles.panelScrim, 'absolute inset-0')} />
         <div className="absolute inset-0 flex items-center justify-center px-[clamp(16px,3vw,48px)] py-[clamp(16px,6vh,64px)]">
@@ -135,7 +135,7 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
   ]
 
   return (
-    <div data-state={state} className={cx(styles.presence, 'absolute inset-0 z-50')}>
+    <div data-state={state} onMouseDown={keepFocus} className={cx(styles.presence, 'absolute inset-0 z-50')}>
       <div aria-hidden className={cx(styles.titleScrim, 'absolute inset-0')} />
       <div aria-hidden className="absolute inset-0 bg-[#0B0F14]/25 md:hidden" />
       <div aria-hidden className={cx(styles.panelScrim, 'absolute inset-0 transition-opacity duration-300', panel ? 'opacity-100' : 'opacity-0')} />
@@ -150,24 +150,24 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
           {!STANDALONE && (
             <Link
               href="/games"
-              className="absolute left-[clamp(20px,6vw,88px)] top-[clamp(18px,4vh,36px)] inline-flex items-center gap-2 text-[12px] uppercase tracking-[0.18em] text-[#F3EEE6]/50 transition-colors duration-150 hover:text-[#F3EEE6]"
+              className={cx(styles.chip, 'absolute left-[clamp(20px,6vw,88px)] top-[clamp(14px,3vh,32px)]')}
             >
               <BackIcon className="h-4 w-4" /> Arcade
             </Link>
           )}
 
-          <div className={cx('mt-[18vh] transition-opacity duration-300 [@media(max-height:640px)]:mt-[9vh]', panel && 'opacity-30')}>
+          <div className={cx(WORDMARK_TOP, 'transition-opacity duration-300', panel && 'opacity-30')}>
             <Wordmark />
-            <p className={cx(styles.rise, 'mt-6 max-w-[380px] text-[15px] leading-relaxed text-[#F3EEE6]/65')} style={{ '--d': '80ms' } as CSSProperties}>
+            <p className={cx(styles.rise, 'mt-5 max-w-[380px] text-[15px] leading-relaxed text-[#F3EEE6]/65')} style={{ '--d': '80ms' } as CSSProperties}>
               Seven stars fell on the island. Bring them home and light the Beacon.
             </p>
           </div>
 
-          <div ref={menuRef} className="mt-auto pt-8">
+          <div ref={menuRef} className="-mx-[18px] mt-auto pt-6">
             <MenuList items={items} current={panel ? opener : null} />
           </div>
 
-          <footer className={cx(styles.rise, 'mt-7 flex items-center gap-5 text-[12px] text-[#F3EEE6]/40')} style={{ '--d': '420ms' } as CSSProperties}>
+          <footer className={cx(styles.rise, 'mt-5 flex items-center gap-5 text-[12px] text-[#F3EEE6]/40')} style={{ '--d': '420ms' } as CSSProperties}>
             {best !== null ? (
               <span>
                 <span className={cx(LABEL, 'mr-2 text-[10px] text-[#F5B455]/80')}>Best time</span>
@@ -180,7 +180,7 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
         </aside>
 
         {panel && (
-          <div className="flex min-w-0 flex-1 items-start px-[clamp(16px,3vw,48px)] py-[clamp(16px,9vh,88px)] md:pl-0">
+          <div className="flex min-w-0 flex-1 items-start px-[clamp(16px,3vw,48px)] py-[clamp(16px,6vh,72px)] md:pl-0">
             <Panel panelRef={panelRef} label={panel}>
               {panel === 'online' && (
                 <OnlinePanel onBack={back} primary={{ label: 'Start', hint: startHint, onClick: () => (hasSave ? game.continueGame() : start()) }} />

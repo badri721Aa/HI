@@ -2,7 +2,7 @@
 /** Frame for the right-hand sub-panels of the title and pause menus. */
 import type { ReactNode, RefObject } from 'react'
 import { useGameUi } from './context'
-import { KeyCap } from './controls'
+import { Chip, KeyCap } from './controls'
 import { BackIcon } from './icons'
 import { cx } from './theme'
 import styles from './ui.module.css'
@@ -42,13 +42,10 @@ export function Panel({
 export function BackHint({ onBack }: { onBack: () => void }) {
   const { touch } = useGameUi()
   return (
-    <button
-      type="button"
-      onClick={onBack}
-      className="group inline-flex shrink-0 items-center gap-2 text-[12px] uppercase tracking-[0.16em] text-[#F3EEE6]/45 transition-colors hover:text-[#F3EEE6]"
-    >
+    // The handler plays the back sound itself (the same one Esc triggers).
+    <Chip onClick={onBack} sound={null}>
       {touch ? <BackIcon className="h-4 w-4" /> : <KeyCap>Esc</KeyCap>}
       Back
-    </button>
+    </Chip>
   )
 }

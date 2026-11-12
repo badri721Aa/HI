@@ -87,7 +87,7 @@ function SkipControl() {
           playUi(game, 'ui-click')
           game.skipCutscene()
         }}
-        className="pointer-events-auto absolute right-[clamp(16px,3vw,40px)] top-1/2 flex -translate-y-1/2 touch-none items-center gap-2 rounded-full border border-[#F3EEE6]/25 px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-[#F3EEE6]/85 active:bg-[#F5B455] active:text-[#0B0F14]"
+        className="pointer-events-auto absolute right-[clamp(16px,3vw,40px)] top-1/2 flex h-11 -translate-y-1/2 touch-none items-center gap-2 rounded-full border border-[#F3EEE6]/35 bg-[#0B0F14]/40 px-5 text-[12px] font-semibold uppercase tracking-[0.18em] text-[#F3EEE6]/90 transition-transform duration-100 active:scale-95 active:border-[#F5B455] active:bg-[#F5B455] active:text-[#0B0F14]"
       >
         Skip <SkipIcon className="h-3.5 w-3.5" />
       </button>

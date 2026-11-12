@@ -9,13 +9,14 @@
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
 import type { RoomInfo } from '../engine/types'
 import { playUi, useGameUi, useNet } from './context'
-import { Button, PanelHeader } from './controls'
+import { Button, Chip, PanelHeader } from './controls'
 import { RefreshIcon, UsersIcon } from './icons'
-import { focusFirst, isQuietFocus } from './nav'
+import { focusFirst, hoverFocus } from './nav'
 import { SHIRT_COLORS } from './netStore'
 import { BigCode, CopyButton, linkTone, Occupancy, PlayerRows, roomKind, StatusDot } from './OnlineShared'
 import { BackHint } from './Panel'
 import { cx, LABEL } from './theme'
+import styles from './ui.module.css'
 
 const NAME_MAX = 16
 const CODE_LEN = 5
@@ -61,7 +62,7 @@ function RoomBrowser() {
     fn()
       .then(() => playUi(game, 'ui-open'))
       .catch((err: unknown) => {
-        playUi(game, 'ui-back')
+        playUi(game, 'ui-error')
         setError({ source, message: (err as Error)?.message || 'Could not join. Please try again.' })
       })
       .finally(() => setBusy(null))
@@ -70,6 +71,7 @@ function RoomBrowser() {
   const submitCode = () => {
     const c = code.trim()
     if (c.length !== CODE_LEN) {
+      playUi(game, 'ui-error')
       setError({ source: 'code', message: c ? `Room codes have ${CODE_LEN} characters — this one has ${c.length}.` : 'Type the code your friend shared.' })
       return
     }
@@ -88,10 +90,10 @@ function RoomBrowser() {
       </Section>
 
       <div className="mt-7 flex flex-wrap gap-3">
-        <Button variant="primary" autofocus disabled={!!busy} onClick={() => run('quick', 'top', () => net.quickJoin())}>
+        <Button variant="primary" autofocus disabled={!!busy} loading={busy === 'quick'} onClick={() => run('quick', 'top', () => net.quickJoin())}>
           {busy === 'quick' ? 'Joining…' : 'Quick join'}
         </Button>
-        <Button disabled={!!busy} onClick={() => run('create', 'top', () => net.createPrivate())}>
+        <Button disabled={!!busy} loading={busy === 'create'} onClick={() => run('create', 'top', () => net.createPrivate())}>
           {busy === 'create' ? 'Creating…' : 'Create private room'}
         </Button>
       </div>
@@ -130,7 +132,7 @@ function RoomBrowser() {
               error?.source === 'code' ? 'border-[#E8664F]/70 focus:border-[#E8664F]/70 focus:ring-0' : 'border-[#F3EEE6]/20 focus:border-[#F5B455]/80 focus:shadow-[0_0_0_3px_rgba(245,180,85,0.15)] focus:ring-0',
             )}
           />
-          <Button disabled={!!busy} onClick={submitCode}>
+          <Button disabled={!!busy} loading={busy === 'code'} onClick={submitCode}>
             {busy === 'code' ? 'Joining…' : 'Join'}
           </Button>
         </form>
@@ -143,7 +145,7 @@ function RoomBrowser() {
 }
 
 function PublicRooms({ busy, onJoin, error }: { busy: Busy; onJoin: (r: RoomInfo) => void; error: string | null }) {
-  const { net, game } = useGameUi()
+  const { net } = useGameUi()
   const [rooms, setRooms] = useState<RoomInfo[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
@@ -182,20 +184,10 @@ function PublicRooms({ busy, onJoin, error }: { busy: Busy; onJoin: (r: RoomInfo
     <Section
       label="Public rooms"
       aside={
-        <button
-          type="button"
-          data-nav
-          onMouseEnter={e => e.currentTarget.focus({ preventScroll: true })}
-          onFocus={() => isQuietFocus() || playUi(game, 'ui-hover')}
-          onClick={() => {
-            playUi(game, 'ui-click')
-            load()
-          }}
-          className="-my-1 inline-flex items-center gap-1.5 rounded-[3px] px-1.5 py-1 text-[11px] uppercase tracking-[0.16em] text-[#F3EEE6]/45 outline-none transition-colors hover:text-[#F3EEE6] focus:text-[#F5B455]"
-        >
+        <Chip nav onClick={load} className="-my-2">
           <RefreshIcon className={cx('h-3.5 w-3.5', loading && 'animate-spin [animation-duration:900ms]')} />
           Refresh
-        </button>
+        </Chip>
       }
     >
       {rooms === null && !listError ? (
@@ -223,7 +215,7 @@ function PublicRooms({ busy, onJoin, error }: { busy: Busy; onJoin: (r: RoomInfo
                   <div className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-[#F3EEE6]/35">{r.code}</div>
                 </div>
                 <Occupancy className="ml-auto" players={r.players} max={r.max} />
-                <Button size="sm" className="w-[84px]" disabled={full || !!busy} onClick={() => onJoin(r)}>
+                <Button size="sm" className="w-[92px]" disabled={full || !!busy} loading={joining} onClick={() => onJoin(r)}>
                   {full ? 'Full' : joining ? 'Joining…' : 'Join'}
                 </Button>
               </li>
@@ -272,7 +264,7 @@ function ProfileEditor() {
   const pick = (i: number) => {
     const c = SHIRT_COLORS[(i + SHIRT_COLORS.length) % SHIRT_COLORS.length]
     if (c === stored.color) return
-    playUi(game, 'ui-hover')
+    playUi(game, 'ui-toggle')
     net.setProfile({ color: c })
   }
 
@@ -314,7 +306,9 @@ function ProfileEditor() {
           else return
           e.preventDefault()
         }}
-        className="group/sw flex items-center gap-2 rounded-full p-1 outline-none focus-visible:shadow-[0_0_0_1px_rgba(245,180,85,0.7)]"
+        {...hoverFocus}
+        // Touch: two rows of four, spaced so each swatch owns a 44 px target.
+        className={cx(styles.ring, 'flex flex-wrap items-center gap-2 rounded-full p-1 outline-none [[data-touch=true]_&]:max-w-[194px] [[data-touch=true]_&]:gap-[18px] [[data-touch=true]_&]:rounded-[22px] [[data-touch=true]_&]:p-[9px]')}
       >
         {SHIRT_COLORS.map((c, i) => (
           <button
@@ -326,8 +320,9 @@ function ProfileEditor() {
             tabIndex={-1}
             onClick={() => pick(i)}
             className={cx(
-              'h-[26px] w-[26px] rounded-full transition-[transform,box-shadow] duration-150 ease-out hover:scale-110',
-              i === colorIdx ? 'scale-110 shadow-[0_0_0_2px_#0B0F14,0_0_0_3.5px_#F3EEE6]' : 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]',
+              // The ::before widens the target to 44 px on touch without growing the swatch.
+              "relative h-[26px] w-[26px] cursor-pointer rounded-full transition-[transform,box-shadow] duration-150 ease-out before:absolute before:-inset-[9px] before:content-[''] hover:scale-110 active:scale-95",
+              i === colorIdx ? 'scale-110 shadow-[0_0_0_2px_#0B0F14,0_0_0_3.5px_#F3EEE6] [[data-touch=true]_&]:scale-100' : 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]',
             )}
             style={{ background: `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${c} 75%, white), ${c} 60%)` }}
           />

@@ -4,11 +4,12 @@
  * once; sliders preview locally and commit when released (or shortly after the
  * last arrow-key step), because each commit re-applies renderer settings.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_SETTINGS, type QualityLevel, type Settings } from '../engine/settings'
 import { useGameUi, useUi } from './context'
 import { Button, PanelHeader, Segmented, SettingRow, Slider, Tabs, Toggle } from './controls'
 import { DevicePicker } from './DevicePicker'
+import { focusFirst } from './nav'
 import { BackHint } from './Panel'
 
 type Tab = 'graphics' | 'audio' | 'controls' | 'gameplay'
@@ -67,7 +68,12 @@ export function SettingsPanel({ onBack }: { onBack: () => void }) {
   const { store } = useGameUi()
   const settings = useUi(s => s.settings)
   const [tab, setTab] = useState<Tab>('graphics')
-  const [devicePicker, setDevicePicker] = useState(false)
+  // 'closed' again after a visit: the button that opened the picker takes the focus back.
+  const [devicePicker, setDevicePicker] = useState<'no' | 'open' | 'closed'>('no')
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (devicePicker === 'closed') focusFirst(rootRef.current, '[data-autofocus]')
+  }, [devicePicker])
   const [draft, setDraft] = useState<Partial<Settings>>({})
   const [queue] = useState(
     () =>
@@ -90,14 +96,14 @@ export function SettingsPanel({ onBack }: { onBack: () => void }) {
   })
   const apply = (patch: Partial<Settings>) => store.updateSettings(patch)
 
-  if (devicePicker) return <DevicePicker onDone={() => setDevicePicker(false)} aside={<BackHint onBack={() => setDevicePicker(false)} />} />
+  if (devicePicker === 'open') return <DevicePicker onDone={() => setDevicePicker('closed')} onCancel={() => setDevicePicker('closed')} />
 
   return (
-    <div>
+    <div ref={rootRef}>
       <PanelHeader eyebrow="Options" title="Settings" aside={<BackHint onBack={onBack} />} />
       <Tabs label="Settings section" value={tab} options={TABS} onChange={setTab} />
 
-      <div className="min-h-[300px]" role="tabpanel">
+      <div className="min-h-[280px]" role="tabpanel">
         {tab === 'graphics' && (
           <>
             <SettingRow label="Quality" hint={QUALITY_HINT[settings.quality]}>
@@ -116,7 +122,7 @@ export function SettingsPanel({ onBack }: { onBack: () => void }) {
               <Toggle label="Show FPS" checked={settings.showFps} onChange={showFps => apply({ showFps })} />
             </SettingRow>
             <SettingRow label="Device" hint="Pick your kind of computer again to reset the graphics preset.">
-              <Button size="sm" onClick={() => setDevicePicker(true)}>
+              <Button size="sm" autofocus={devicePicker === 'closed'} onClick={() => setDevicePicker('open')}>
                 Run device setup again
               </Button>
             </SettingRow>
@@ -160,7 +166,7 @@ export function SettingsPanel({ onBack }: { onBack: () => void }) {
         )}
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-4 border-t border-[#F3EEE6]/10 pt-5">
+      <div className="mt-4 flex items-center justify-between gap-4 border-t border-[#F3EEE6]/10 pt-4">
         <span className="text-[12px] text-[#F3EEE6]/35">Changes are saved automatically.</span>
         <Button
           onClick={() => {
@@ -168,7 +174,7 @@ export function SettingsPanel({ onBack }: { onBack: () => void }) {
             setDraft({})
             apply({ ...DEFAULT_SETTINGS, quality: settings.quality })
           }}
-          className="h-9 px-4 text-[11px]"
+          size="sm"
         >
           Restore defaults
         </Button>

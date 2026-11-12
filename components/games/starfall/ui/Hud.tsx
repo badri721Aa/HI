@@ -18,6 +18,9 @@ import { NetChip } from './OnlineHud'
 import { cx, LABEL } from './theme'
 import styles from './ui.module.css'
 
+/** Hotbar slot (weapons, blocks): clickable whenever the mouse is free, a 44 px target on touch. */
+const SLOT = 'pointer-events-auto relative grid h-11 w-11 cursor-pointer touch-none place-items-center rounded-[6px] border transition-[background-color,border-color,transform] duration-100 active:scale-90'
+
 const GUTTER = 'left-[clamp(16px,2.4vw,32px)] top-[clamp(14px,2.4vw,28px)]'
 const GUTTER_R = 'right-[clamp(16px,2.4vw,32px)] top-[clamp(14px,2.4vw,28px)]'
 
@@ -31,6 +34,8 @@ export function Hud() {
   return (
     <div
       aria-hidden={!visible}
+      // Faded out is also switched off: invisible hotbar slots must not catch taps meant for a cutscene or menu.
+      inert={!visible}
       className={cx('pointer-events-none absolute inset-0 z-30 transition-opacity duration-300 ease-out', visible ? 'opacity-100' : 'opacity-0')}
     >
       <div className={cx(styles.topShade, 'absolute inset-x-0 top-0 h-32')} />
@@ -168,7 +173,7 @@ function TouchPause({ enabled }: { enabled: boolean }) {
         playUi(game, 'ui-click')
         game.pause()
       }}
-      className="pointer-events-auto grid h-10 w-10 touch-none place-items-center rounded-full border border-[#F3EEE6]/25 bg-[#0B0F14]/45 text-[#F3EEE6]/90 active:bg-[#F5B455] active:text-[#0B0F14]"
+      className="pointer-events-auto grid h-11 w-11 touch-none place-items-center rounded-full border border-[#F3EEE6]/30 bg-[#0B0F14]/50 text-[#F3EEE6]/90 transition-transform duration-100 active:scale-95 active:border-[#F5B455] active:bg-[#F5B455] active:text-[#0B0F14]"
     >
       <PauseIcon className="h-4 w-4" />
     </button>
@@ -355,8 +360,8 @@ function Hotbar() {
                 game.ctx.weapons.equip(w)
               }}
               className={cx(
-                'relative grid h-11 w-11 place-items-center rounded-[4px] border max-sm:h-10 max-sm:w-10',
-                touch && 'pointer-events-auto touch-none',
+                SLOT,
+                !touch && 'hover:border-[#F3EEE6]/45',
                 on ? 'border-[#F5B455]/80 bg-[#F5B455]/15 text-[#F5B455]' : 'border-[#F3EEE6]/15 bg-[#0B0F14]/30 text-[#F3EEE6]/65',
               )}
             >
@@ -452,7 +457,8 @@ function BuildBar() {
           {build.count} / {build.max}
         </span>
       </div>
-      <div role="toolbar" aria-label="Blocks" className="flex gap-1 rounded-[6px] border border-[#F3EEE6]/10 bg-[#0B0F14]/40 p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.3)] max-sm:gap-0.5 max-sm:p-1">
+      {/* Phones: two rows of six, so every block keeps a 44 px target. */}
+      <div role="toolbar" aria-label="Blocks" className={cx('gap-1 rounded-[6px] border border-[#F3EEE6]/10 bg-[#0B0F14]/40 p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.3)]', touch ? 'flex max-sm:grid max-sm:grid-cols-6' : 'flex')}>
         {BLOCKS.map((def, i) => {
           const on = i === build.slot
           return (
@@ -467,8 +473,8 @@ function BuildBar() {
                 game.ctx.build.select(i)
               }}
               className={cx(
-                'relative grid h-11 w-11 place-items-center rounded-[4px] border max-sm:h-8 max-sm:w-8',
-                touch && 'pointer-events-auto touch-none',
+                SLOT,
+                !touch && 'hover:border-[#F3EEE6]/45',
                 on ? 'border-[#F5B455]/80 bg-[#F5B455]/15' : 'border-[#F3EEE6]/15 bg-[#0B0F14]/30',
               )}
             >

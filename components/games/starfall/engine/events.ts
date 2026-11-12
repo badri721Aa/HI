@@ -107,6 +107,8 @@ export interface GameEventMap {
   'boss:slam': { pos: V3; boss: BossId }
   /** A telegraphed hazard went off (orb, boulder, ice spike). */
   'boss:impact': { pos: V3; kind: 'orb' | 'boulder' | 'spike' }
+  /** A hazard's warning circle or lane appeared; it goes off in `delay` seconds (0 = when the boss commits). */
+  'boss:telegraph': { pos: V3; delay: number }
   'boss:defeat': { pos: V3; boss: BossId }
   'chest:open': { pos: V3 }
 

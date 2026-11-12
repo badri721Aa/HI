@@ -135,6 +135,9 @@ export class Collectibles implements ICollectibles {
   private readonly e = new THREE.Euler()
   private readonly p = new THREE.Vector3()
   private readonly s = new THREE.Vector3()
+  /** Where a spark being drawn to the player was and is this frame (its trail). */
+  private readonly trailFrom = new THREE.Vector3()
+  private readonly trailTo = new THREE.Vector3()
   private readonly c = new THREE.Color()
   private readonly white = new THREE.Color(1, 0.97, 0.9)
 
@@ -381,9 +384,11 @@ export class Collectibles implements ICollectibles {
           }
           sp.pull += dt
           const step = Math.min(d, (4 + sp.pull * 34) * dt)
+          this.trailFrom.set(sp.x, sp.y, sp.z)
           sp.x += (dx / d) * step
           sp.y += (dy / d) * step
           sp.z += (dz / d) * step
+          this.ctx.fx.trail('spark', this.trailFrom, this.trailTo.set(sp.x, sp.y, sp.z))
           this.sparkDirty = true
         }
       }

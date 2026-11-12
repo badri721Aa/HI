@@ -58,12 +58,16 @@ export class Ambience {
   private crickets: GainNode
   private falls: GainNode
   private beaconHum: GainNode | null = null
+  private portalHum: GainNode | null = null
+  private portalPan: PannerNode | null = null
   private sources: AudioScheduledSourceNode[] = []
   private coastT = 0
   private seaFrac = 0
   private seaPan = 0
   private waveT = 3
   private birdT = 2
+  private gullT = 6
+  private gustT = 5
 
   constructor(
     private s: Synth,
@@ -176,6 +180,48 @@ export class Ambience {
       this.birdT = rand(1.4, 4.5) / (0.4 + L.birds)
       if (L.birds > 0.08 && Math.random() < 0.4 + L.birds) this.bird(L.birds)
     }
+
+    // Gulls over the shore by day.
+    this.gullT -= i.dt
+    if (this.gullT <= 0) {
+      this.gullT = rand(7, 16)
+      if (L.ocean > 0.45 && i.daylight > 0.3 && Math.random() < L.ocean) this.gull(L.ocean)
+    }
+
+    // Gusts tearing across high, open ground.
+    this.gustT -= i.dt
+    if (this.gustT <= 0) {
+      this.gustT = rand(6, 13)
+      if (L.wind > 0.5) this.gust(L.wind)
+    }
+  }
+
+  /** The hum of an open portal arch at `pos` (positional); null when none is in earshot. */
+  portal(pos: V3 | null): void {
+    const s = this.s
+    const t = s.now
+    if (!pos) {
+      this.portalHum?.gain.setTargetAtTime(0, t, 0.5)
+      return
+    }
+    if (!this.portalHum || !this.portalPan) {
+      this.portalPan = s.panner(pos, this.bus.input, 3, 1.4, 60)
+      this.portalHum = s.gain(0, this.portalPan)
+      const hum = s.gain(0.07, this.portalHum)
+      this.lfo(0.7, 0.03, hum.gain)
+      for (const f of [73.4, 110.4, 147]) this.track(s.osc('sine', f, hum, t, t + 1e6))
+      // A glassy shimmer on top, slowly beating.
+      const air = s.gain(0.012, this.portalHum)
+      this.lfo(3.1, 0.008, air.gain)
+      for (const f of [880, 883.5, 1318]) this.track(s.osc('sine', f, air, t, t + 1e6))
+    }
+    const pan = this.portalPan
+    if (pan.positionX) {
+      pan.positionX.value = pos.x
+      pan.positionY.value = pos.y
+      pan.positionZ.value = pos.z
+    } else pan.setPosition(pos.x, pos.y, pos.z)
+    this.portalHum.gain.setTargetAtTime(0.6, t, 0.8)
   }
 
   /** Warm hum and crackle from the lit Beacon (positional). */
@@ -249,6 +295,41 @@ export class Ambience {
     lp.frequency.linearRampToValueAtTime(500, t + dur)
     const end = s.ahr(env.gain, t, 0.16 * level, dur * 0.38, dur * 0.06, dur * 0.56)
     s.noise(lp, t, end, s.pink)
+  }
+
+  /** A gull somewhere along the shore: a few mewing cries that rise and fall away. */
+  private gull(level: number): void {
+    const s = this.s
+    const v = s.gain(rand(0.5, 1) * level * 0.035, s.stereo(rand(-0.9, 0.9), this.bus.input))
+    v.connect(s.gain(0.6, this.bus.wet))
+    const mouth = s.filter('bandpass', 2400, 1.5, v)
+    const base = rand(0.85, 1.15)
+    const cries = 2 + Math.floor(Math.random() * 3)
+    let t = s.now + 0.02
+    for (let k = 0; k < cries; k++) {
+      const len = rand(0.22, 0.4)
+      const env = s.gain(0, mouth)
+      const end = s.ahr(env.gain, t, 1 - k * 0.15, 0.03, len * 0.3, len * 0.7)
+      const o = s.osc('sawtooth', 1500 * base, env, t, end)
+      o.frequency.setValueAtTime(1500 * base, t)
+      o.frequency.linearRampToValueAtTime(2300 * base, t + len * 0.25)
+      o.frequency.linearRampToValueAtTime(1300 * base, t + len)
+      t += len + rand(0.05, 0.16)
+    }
+  }
+
+  /** A gust: wind that swells and rises in pitch for a few seconds, then dies away. */
+  private gust(level: number): void {
+    const s = this.s
+    const t = s.now + 0.02
+    const dur = rand(2.5, 4.5)
+    const env = s.gain(0, s.stereo(rand(-0.5, 0.5), this.bus.input))
+    const bp = s.filter('bandpass', 420, 1.1, env)
+    bp.frequency.setValueAtTime(380, t)
+    bp.frequency.linearRampToValueAtTime(rand(800, 1200), t + dur * 0.45)
+    bp.frequency.linearRampToValueAtTime(450, t + dur)
+    const end = s.ahr(env.gain, t, 0.11 * level, dur * 0.4, dur * 0.1, dur * 0.5)
+    s.noise(bp, t, end, s.pink)
   }
 
   private bird(level: number): void {

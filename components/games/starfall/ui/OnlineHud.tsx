@@ -122,7 +122,8 @@ function ChipBody({
         playUi(game, 'ui-click')
         net.setPlayerList(!listOpen)
       }}
-      className={cx(cls, 'pointer-events-auto touch-none', listOpen && 'border-[#F5B455]/60')}
+      // The ::before stretches the 28 px chip to a 44 px touch target.
+      className={cx(cls, "pointer-events-auto relative touch-none transition-transform duration-100 before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] active:scale-95", listOpen && 'border-[#F5B455]/60')}
     >
       {body}
     </button>
@@ -133,7 +134,7 @@ function ChipBody({
 function TouchOnlineButtons() {
   const { net, game } = useGameUi()
   const [emotesOpen, setEmotesOpen] = useState(false)
-  const btn = 'pointer-events-auto grid h-8 w-8 touch-none place-items-center rounded-full border border-[#F3EEE6]/20 bg-[#0B0F14]/55 text-[#F3EEE6]/85 active:bg-[#F5B455] active:text-[#0B0F14]'
+  const btn = 'pointer-events-auto grid h-11 w-11 touch-none place-items-center rounded-full border border-[#F3EEE6]/30 bg-[#0B0F14]/55 text-[#F3EEE6]/85 transition-transform duration-100 active:scale-95 active:border-[#F5B455] active:bg-[#F5B455] active:text-[#0B0F14]'
   return (
     <div className="relative flex items-center gap-2">
       <button
@@ -164,12 +165,12 @@ function TouchOnlineButtons() {
       </button>
       {emotesOpen && (
         // A narrow solid column: stays in the left half, clear of the toasts, and cleanly covers the objective while open.
-        <div className={cx(styles.prompt, 'absolute left-0 top-10 z-10 flex w-[112px] flex-col gap-0.5 rounded-[6px] border border-[#F3EEE6]/12 bg-[#0B0F14]/90 p-1 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)]')}>
+        <div className={cx(styles.prompt, 'absolute left-0 top-[52px] z-10 flex w-[128px] flex-col gap-0.5 rounded-[6px] border border-[#F3EEE6]/12 bg-[#0B0F14]/90 p-1 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)]')}>
           {EMOTES.map(e => (
             <button
               key={e.name}
               type="button"
-              className="pointer-events-auto h-9 touch-none rounded-[4px] px-3 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F3EEE6]/90 active:bg-[#F5B455] active:text-[#0B0F14]"
+              className="pointer-events-auto h-11 touch-none rounded-[4px] px-3 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F3EEE6]/90 active:bg-[#F5B455] active:text-[#0B0F14]"
               onPointerDown={ev => {
                 ev.preventDefault()
                 net.emote(e.name)
@@ -356,7 +357,8 @@ function ChatInput() {
             type="button"
             onPointerDown={e => e.preventDefault()}
             onClick={send}
-            className="h-8 shrink-0 rounded-[3px] bg-[#F5B455] px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0B0F14]"
+            className={cx(styles.btn, '-mr-2')}
+            data-variant="primary"
           >
             Send
           </button>

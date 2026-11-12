@@ -40,6 +40,9 @@ export class Arrows {
   private readonly q = new THREE.Quaternion()
   private readonly p = new THREE.Vector3()
   private readonly s = new THREE.Vector3()
+  /** Where a flying arrow was and is this frame (its trail). */
+  private readonly from = new THREE.Vector3()
+  private readonly to = new THREE.Vector3()
 
   constructor(private ctx: Ctx, geometry: THREE.BufferGeometry, material: THREE.Material) {
     this.mesh = new THREE.InstancedMesh(geometry, material, ARROW.max)
@@ -82,8 +85,11 @@ export class Arrows {
       if (!a.live) continue
       a.age += dt
       this.dirty = true
-      if (a.flying) this.fly(a, dt)
-      else if (a.age > ARROW.stuckLife + SHRINK) a.live = false
+      if (a.flying) {
+        this.from.set(a.x, a.y, a.z)
+        this.fly(a, dt)
+        if (a.live) this.ctx.fx.trail('arrow', this.from, this.to.set(a.x, a.y, a.z))
+      } else if (a.age > ARROW.stuckLife + SHRINK) a.live = false
     }
     if (this.dirty) this.render()
   }

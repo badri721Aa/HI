@@ -2,7 +2,7 @@
  * Renders the other players: a clone of the hero per peer (shared geometry and
  * texture, own skeleton), animated by the same procedural Animator as the local
  * hero from a MotionState rebuilt out of the network stream, with a tinted
- * shirt, a soft blob shadow, a name tag and chat bubbles.
+ * shirt, its own blinking face, a soft blob shadow, a name tag and chat bubbles.
  *
  *   root (smoothed position, yaw) → pivot (spin attack) → model (unit scale) → cloned glTF scene
  *
@@ -17,6 +17,7 @@ import { KIND } from '../gameplay/weapons/defs'
 import { WeaponKit, type HeldWeapon } from '../gameplay/weapons/models'
 import { Animator, type GroundSample } from '../player/Animator'
 import { createGrip } from '../player/anim/grip'
+import { Face } from '../player/Face'
 import { Rig } from '../player/anim/Rig'
 import { BUBBLE_TIME, TAG_FADE_START, TAG_HIDE } from './config'
 import { BUBBLE_H, BUBBLE_W, CanvasSprite, TAG_H, TAG_W, drawBubble, drawNameTag } from './labels'
@@ -58,6 +59,7 @@ interface Template {
   scene: THREE.Object3D
   scale: number
   hero: THREE.MeshStandardMaterial | null
+  face: THREE.MeshStandardMaterial | null
 }
 
 const _sphere = new THREE.Sphere()
@@ -75,6 +77,9 @@ class Avatar {
   animator: Animator | null = null
   rig: Rig | null = null
   shirt: ShirtMaterial | null = null
+  /** This player's face: a copy of the shared face material with its own expression. */
+  face: Face | null = null
+  private faceMat: THREE.MeshStandardMaterial | null = null
   placeholder: THREE.Mesh<THREE.CapsuleGeometry, THREE.MeshStandardMaterial> | null = null
   bubbleT = 0
   drawn = { name: '', color: '', away: false }
@@ -87,6 +92,8 @@ class Avatar {
   private readonly weaponPose: WeaponPose = { weapon: 'fists', move: 'none', t: 0, charge: 0 }
   prevYaw = 0
   turnRate = 0
+  /** Uniform model scale; the animator's squash and stretch is applied on top of it. */
+  private scale = 1
   /** 0..1 how far the body has gone limp onto the ground. */
   limp = 0
   readonly hit = {} as GroundHit
@@ -143,8 +150,14 @@ class Avatar {
       if (t.hero && mesh.material === t.hero) {
         this.shirt = new ShirtMaterial(t.hero, this.peer.color)
         mesh.material = this.shirt.material
+      } else if (t.face?.map && mesh.material === t.face) {
+        this.face = new Face(t.face.map)
+        this.faceMat = t.face.clone()
+        this.faceMat.map = this.face.texture
+        mesh.material = this.faceMat
       }
     })
+    this.scale = t.scale
     this.model.scale.setScalar(t.scale)
     this.model.add(scene)
     try {
@@ -251,9 +264,15 @@ class Avatar {
       if (++this.frame % every === 0 || !this.wasVisible) {
         a.update(this.animAcc, root.position, p.yaw)
         this.pivot.rotation.y = a.spin
+        const side = this.scale / Math.sqrt(a.stretch)
+        this.model.scale.set(side, this.scale * a.stretch, side)
         this.animAcc = 0
       }
       this.updateLimp(dt, p.ragdoll)
+    }
+    if (this.face) {
+      this.face.hold(p.ragdoll || p.state === 'hurt' || p.state === 'dead' ? 'hurt' : 'neutral')
+      this.face.update(dt)
     }
     this.wasVisible = true
 
@@ -326,6 +345,8 @@ class Avatar {
     this.tag.dispose()
     this.bubble.dispose()
     this.shirt?.dispose()
+    this.face?.dispose()
+    this.faceMat?.dispose()
     if (this.placeholder) {
       this.placeholder.geometry.dispose()
       this.placeholder.material.dispose()
@@ -390,6 +411,7 @@ export class RemotePlayers {
   private makeTemplate(scene: THREE.Object3D): Template {
     let height = 0
     let hero: THREE.MeshStandardMaterial | null = null
+    let face: THREE.MeshStandardMaterial | null = null
     const anisotropy = Math.min(8, this.ctx.renderer.capabilities.getMaxAnisotropy())
     scene.traverse(o => {
       const mesh = o as THREE.SkinnedMesh
@@ -400,19 +422,19 @@ export class RemotePlayers {
       this.owned.push(mesh.geometry)
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       for (const mat of mats as THREE.MeshStandardMaterial[]) {
-        const eye = mat.name === 'HeroEye'
         mat.metalness = 0
-        mat.roughness = eye ? 0.14 : 0.8
-        mat.envMapIntensity = eye ? 1 : 0.6
+        mat.roughness = 0.8
+        mat.envMapIntensity = 0.6
         if (mat.map) {
           mat.map.anisotropy = anisotropy
           this.owned.push(mat.map)
         }
         if (mat.name === 'Hero') hero = mat
+        else if (mat.name === 'HeroFace') face = mat
         this.owned.push(mat)
       }
     })
-    return { scene, scale: HERO_HEIGHT / (height || 6.24), hero }
+    return { scene, scale: HERO_HEIGHT / (height || 6.24), hero, face }
   }
 
   /** Creates avatars for peers that have a position, updates and animates all of them. */
@@ -444,7 +466,9 @@ export class RemotePlayers {
   }
 
   gesture(id: string, name: GestureName): void {
-    void this.avatars.get(id)?.animator?.playGesture(name)
+    const av = this.avatars.get(id)
+    if (name === 'cheer' || name === 'wave') av?.face?.show('happy')
+    void av?.animator?.playGesture(name)
   }
 
   /** A player went limp: a puff of dust where they fall (the limp pose itself comes from the state stream). */

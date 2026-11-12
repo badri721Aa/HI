@@ -18,6 +18,10 @@ import { Synth } from './synth'
 const DEV = process.env.NODE_ENV !== 'production'
 /** How often the ambience is re-steered (s). */
 const AMBIENCE_TICK = 0.25
+/** Seconds between heartbeats while the player is on the last heart. */
+const HEARTBEAT = 0.95
+/** An open portal arch can be heard humming within this distance (m). */
+const PORTAL_EARSHOT = 40
 
 /** Music / ambience duck per game phase. */
 const DUCK: Record<GamePhase, [music: number, ambience: number]> = {
@@ -43,6 +47,8 @@ export class AudioEngine implements IAudio {
   private disposed = false
   private phase: GamePhase | null = null
   private ambT = 0
+  private heartT = 0
+  private portalPos = { x: 0, y: 0, z: 0 }
   private unsubs: Array<() => void> = []
   private ambIn: AmbienceInput = { x: 0, y: 0, z: 0, rx: 1, rz: 0, daylight: 1, dt: 0, away: false }
 
@@ -99,9 +105,10 @@ export class AudioEngine implements IAudio {
         this.music?.duck(0.2, 3)
       }),
       bus.on('chest:open', () => this.sfx?.chest()),
-      // Blocks: a soft thud of their material going down, a heavier one breaking.
-      bus.on('block:place', e => this.sfx?.land(3.5, e.surface)),
-      bus.on('block:break', e => this.sfx?.land(7, e.surface)),
+      bus.on('world:travel', () => this.sfx?.travel()),
+      bus.on('boss:telegraph', e => this.sfx?.telegraph(e.pos, e.delay)),
+      bus.on('block:place', e => this.sfx?.blockPlace(e.pos, e.surface)),
+      bus.on('block:break', e => this.sfx?.blockBreak(e.pos, e.surface)),
       bus.on('cutscene:start', () => this.sfx?.cutscene(true)),
       bus.on('cutscene:end', e => this.sfx?.cutscene(false, e.skipped)),
     )
@@ -164,6 +171,14 @@ export class AudioEngine implements IAudio {
         mix.music.setDuck(m, t, phase === 'paused' ? 0.15 : 0.4)
         mix.ambience.setDuck(a, t, 0.5)
       }
+      const p = this.ctx.player
+      if (phase === 'playing' && p && p.hp === 1 && p.maxHp > 1) {
+        this.heartT -= dt
+        if (this.heartT <= 0) {
+          this.sfx?.heartbeat()
+          this.heartT = HEARTBEAT
+        }
+      } else this.heartT = 0.5
       this.ambT -= dt
       if (this.ambT <= 0) {
         this.steerAmbience(AMBIENCE_TICK - this.ambT)
@@ -268,5 +283,8 @@ export class AudioEngine implements IAudio {
     i.daylight = Math.max(0, Math.min(1, (lum - 0.05) / 0.25))
     i.dt = dt
     amb.tick(i)
+    const pp = this.portalPos
+    const near = !!p && !!ctx.worlds?.nearestPortal(p, pp) && Math.hypot(pp.x - p.x, pp.z - p.z) < PORTAL_EARSHOT
+    amb.portal(near ? pp : null)
   }
 }

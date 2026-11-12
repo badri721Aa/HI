@@ -62,6 +62,13 @@ const SPIN_TIME = 0.42
 const STEP_TIME = 0.26
 const KNEE_OUT = 7 * DEG
 
+/** Stretch spring: stiffness and damping (≈ 3.5 Hz, lightly damped so it overshoots once). */
+const STRETCH_K = 480
+const STRETCH_C = 20
+const STRETCH_STEP = 1 / 240
+/** Downward kick (1/s) a full-strength landing gives the stretch spring: about 9 % squash. */
+const LAND_SQUASH = 3.4
+
 const UP = new THREE.Vector3(0, 1, 0)
 const AX_X = new THREE.Vector3(1, 0, 0)
 
@@ -115,6 +122,8 @@ const _e = new THREE.Euler()
 export class Animator {
   /** Extra yaw of the whole body for the spin attack (the Character applies it). */
   spin = 0
+  /** Squash (< 1) and stretch (> 1) of the whole body along its height (the Character applies it). */
+  stretch = 1
 
   private b: PoseBuilder
   private m: MotionState = {
@@ -176,6 +185,10 @@ export class Animator {
   private bank = 0
   private wadeW = 0
   private slope = 0
+  /** 1 while sprinting (lingers a moment after), and how hard he is braking out of it. */
+  private fastW = 0
+  private skidW = 0
+  private stretchV = 0
   private phase = 0
   private g: GaitParams = { ...WALK }
   private foot: FootSample = { x: 0, y: 0, z: 0, pitch: 0, swing: 0 }
@@ -374,6 +387,8 @@ export class Animator {
     this.updateState(dt)
     this.updateSignals(dt, teleported)
 
+    this.updateStretch(dt)
+
     const out = this.out
     if (this.ovr) {
       this.dropActions()
@@ -382,6 +397,7 @@ export class Animator {
       this.buildIdle(dt)
       this.buildLoco()
       out.copy(this.idle).blend(this.loco, smooth(this.moveW))
+      this.applySkid(out)
       this.buildAir(dt)
       out.blend(this.air, 1 - this.groundW)
       this.applyActions(dt, out)
@@ -441,9 +457,11 @@ export class Animator {
       case 'jump':
       case 'bounce':
         this.airT = 0
+        this.kickStretch(0.92, 2.4)
         break
       case 'doubleJump':
         this.flipT = 0
+        this.kickStretch(0.96, 1.6)
         break
       case 'land':
         this.triggerLand(this.m.landImpact)
@@ -461,6 +479,35 @@ export class Animator {
     if (this.landT >= 0 && this.landT < 0.2) return
     this.landT = 0
     this.landAmp = clamp((impact - 1.5) / 11, 0.12, 1)
+    this.stretchV -= LAND_SQUASH * this.landAmp
+  }
+
+  /** Take-off: a frame of squash that springs into a stretch. */
+  private kickStretch(squash: number, speed: number): void {
+    this.stretch = Math.min(this.stretch, squash)
+    this.stretchV = speed
+  }
+
+  /**
+   * Squash and stretch: a soft spring around 1 that leans tall while rising or falling fast,
+   * and gets kicked by take-offs and landings.
+   */
+  private updateStretch(dt: number): void {
+    if (this.ovr || this.fresh) {
+      this.stretch = 1
+      this.stretchV = 0
+      return
+    }
+    const vy = this.m.vy
+    const air = 1 - this.groundW
+    const target = 1 + air * (0.06 * clamp01(vy / 9) + 0.05 * clamp01((-vy - 7) / 12))
+    // Small fixed steps: the spring is stiff, and must feel the same at any frame rate.
+    const steps = Math.ceil(dt / STRETCH_STEP)
+    const h = dt / steps
+    for (let i = 0; i < steps; i++) {
+      this.stretchV += (STRETCH_K * (target - this.stretch) - STRETCH_C * this.stretchV) * h
+      this.stretch = clamp(this.stretch + this.stretchV * h, 0.84, 1.14)
+    }
   }
 
   private updateSignals(dt: number, teleported: boolean): void {
@@ -488,6 +535,12 @@ export class Animator {
     const groundTarget = m.grounded && !AIR_STATES.has(m.state) ? 1 : 0
     this.groundW = damp(this.groundW, groundTarget, groundTarget > this.groundW ? 18 : 24, dt)
     if (teleported) this.groundW = groundTarget
+
+    // Braking hard out of a sprint: a short skid.
+    const sprinting = this.speed > (m.runSpeed || 5.6) * 1.1
+    this.fastW = damp(this.fastW, sprinting ? 1 : 0, sprinting ? 20 : 3.5, dt)
+    const skidTarget = this.groundW * this.fastW * clamp01((-this.accel - 7) / 7)
+    this.skidW = damp(this.skidW, skidTarget, skidTarget > this.skidW ? 18 : 5.5, dt)
 
     this.wadeW = damp(this.wadeW, Math.max(clamp01(m.wading * 1.4), m.state === 'wade' ? 0.8 : 0), 4, dt)
     this.slope = damp(this.slope, clamp(m.slope || 0, -1, 1), 5, dt)
@@ -600,6 +653,22 @@ export class Animator {
     p.curl[0] = p.curl[1] = g.fist
     p.stab = 0.75
     if (this.wadeW > 0.01) this.wadeArms(p, this.wadeW * 0.6)
+  }
+
+  /** Skidding to a stop: weight thrown back over bent knees, arms flung out for balance. */
+  private applySkid(out: Pose): void {
+    const w = this.skidW
+    if (w < 0.004) return
+    const b = this.b
+    out.pos.y -= 0.05 * w
+    out.pos.z -= 0.035 * w
+    b.add(out, J.hips, -7 * w, 0, 0)
+    b.add(out, J.spine, -6 * w, 0, 0)
+    b.add(out, J.chest, -4 * w, 0, 0)
+    b.add(out, J.upperArmL, 12 * w, 0, 26 * w)
+    b.add(out, J.upperArmR, 6 * w, 0, 30 * w)
+    b.addElbow(out, 0, 22 * w)
+    b.addElbow(out, 1, 14 * w)
   }
 
   /* ── air layer ───────────────────────────────────────────── */

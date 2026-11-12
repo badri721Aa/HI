@@ -46,8 +46,8 @@ const KEYS: Array<keyof GaitParams> = [
 /** Step lengths match the controller's footstep events (walk 0.75, run 1.25, sprint 1.6 m). */
 export const WALK: GaitParams = {
   step: 0.75, stance: 0.6, reach: 0.0, lift: 0.075, kick: 0.03, width: 0.095,
-  drop: -0.022, bob: 0.018, lean: 3, arm: 20, armOut: 4, elbow: 16, elbowSwing: 14,
-  pelvisYaw: 6, chestYaw: 7, pelvisRoll: 3.5, heel: -16, toeOff: 32, footYaw: -10, fist: 0.42,
+  drop: -0.022, bob: 0.018, lean: 3, arm: 24, armOut: 4, elbow: 20, elbowSwing: 16,
+  pelvisYaw: 6, chestYaw: 8, pelvisRoll: 3.5, heel: -16, toeOff: 32, footYaw: -10, fist: 0.42,
 }
 
 export const RUN: GaitParams = {

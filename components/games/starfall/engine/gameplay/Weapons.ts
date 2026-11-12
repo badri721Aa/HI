@@ -46,6 +46,18 @@ interface Stand {
   taken: boolean
 }
 
+/** Swing arcs: how far up the grip the blade tip / hammer head is (m), and the arc's colour. */
+const SWING_ARC: Record<HeldWeapon, { length: number; color: number } | null> = {
+  sword: { length: 0.8, color: 0xeaf4ff },
+  starblade: { length: 0.96, color: 0xffe9a8 },
+  hammer: { length: 0.6, color: 0xffd9a0 },
+  frostHammer: { length: 0.6, color: 0xbfeaff },
+  bow: null,
+}
+/** The part of a melee move (0..1) during which the weapon is really moving. */
+const ARC_FROM = 0.12
+const ARC_TO = 0.72
+
 export class Weapons implements IWeapons {
   readonly pose: WeaponPose = { weapon: 'fists', move: 'none', t: 0, charge: 0 }
 
@@ -62,6 +74,13 @@ export class Weapons implements IWeapons {
   private colliders: Array<{ dispose(): void }> = []
   private owned3D: Array<{ dispose(): void }> = []
   private prompted: Stand | null = null
+
+  // swing arc: the blade tip (or hammer head) and a point further down, this frame and the last
+  private arcLive = false
+  private readonly arcTip = new THREE.Vector3()
+  private readonly arcMid = new THREE.Vector3()
+  private readonly arcTip0 = new THREE.Vector3()
+  private readonly arcMid0 = new THREE.Vector3()
 
   // move state
   private move: WeaponMove = 'none'
@@ -247,6 +266,7 @@ export class Weapons implements IWeapons {
     pose.move = this.move
     pose.t = this.moveT
     pose.charge = this.charge
+    this.trailSwing()
     const bow = this.held.get('bow')!
     const drawing = this.move === 'draw'
     bow.setDraw?.(drawing ? this.charge * this.charge * (3 - 2 * this.charge) : 0)
@@ -370,6 +390,27 @@ export class Weapons implements IWeapons {
       this.cancelMove()
       this.rest = kind === 'sword' ? SWORD.rest : HAMMER.rest
     }
+  }
+
+  /** While a blade or hammer head sweeps through its swing, hand the path it covers to the particles. */
+  private trailSwing(): void {
+    const id = this._equipped
+    const arc = id === 'fists' ? null : SWING_ARC[id]
+    const model = arc && this.held.get(id as HeldWeapon)
+    if (!arc || !model || this.move === 'none' || this.moveT < ARC_FROM || this.moveT > ARC_TO) {
+      this.arcLive = false
+      return
+    }
+    model.group.updateWorldMatrix(true, false)
+    const tip = this.arcTip.set(0, arc.length, 0).applyMatrix4(model.group.matrixWorld)
+    const mid = this.arcMid.set(0, arc.length * 0.6, 0).applyMatrix4(model.group.matrixWorld)
+    if (this.arcLive) {
+      this.ctx.fx.trail('slash', this.arcTip0, tip, arc.color)
+      this.ctx.fx.trail('slash', this.arcMid0, mid, arc.color)
+    }
+    this.arcTip0.copy(tip)
+    this.arcMid0.copy(mid)
+    this.arcLive = true
   }
 
   private startMelee(move: WeaponMove): void {

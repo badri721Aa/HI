@@ -90,7 +90,7 @@ export function MapPanel({ onBack }: { onBack: () => void }) {
               key={s.name}
               type="button"
               aria-label={`${s.name}: ${s.collected ? 'found' : s.hint}`}
-              className="absolute grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center outline-none"
+              className="absolute grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center outline-none [[data-touch=true]_&]:h-11 [[data-touch=true]_&]:w-11"
               style={at(s.u, s.v)}
               tabIndex={-1}
               onPointerEnter={e => e.pointerType === 'mouse' && setSelected(i)}
@@ -145,8 +145,8 @@ export function MapPanel({ onBack }: { onBack: () => void }) {
                   onMouseEnter={() => setSelected(i)}
                   onClick={() => setSelected(i)}
                   className={cx(
-                    'flex w-full items-start gap-3 rounded-[3px] px-2.5 py-2 text-left outline-none transition-colors duration-150',
-                    selected === i ? 'bg-[#F3EEE6]/[0.07]' : 'hover:bg-[#F3EEE6]/[0.04]',
+                    'flex min-h-11 w-full cursor-pointer items-start gap-3 rounded-[6px] px-2.5 py-2 text-left outline-none transition-[background-color,transform] duration-150 active:scale-[0.985]',
+                    selected === i ? 'bg-[#F5B455]/[0.17]' : 'hover:bg-[#F3EEE6]/[0.05]',
                   )}
                 >
                   <StarIcon filled={s.collected} className={cx('mt-[3px] h-3.5 w-3.5 shrink-0', s.collected ? 'text-[#F5B455]' : 'text-[#F3EEE6]/45')} />
