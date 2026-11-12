@@ -1,7 +1,7 @@
 """
 Turns the bare 'low poly boy' .blend into a game-ready, textured GLB:
   * removes scene clutter, IK helper bones and constraints
-  * skins the eyes to the head bone and joins them into the body
+  * removes the eyeballs, closes the eye openings and softens the face (painted face, see step 9)
   * applies one level of subdivision for a cleaner silhouette
   * builds a 3D hair shell with a fringe
   * paints clothing regions (tee + stripe, shorts, belt, socks, sneakers)
@@ -16,6 +16,8 @@ from mathutils import Vector, Matrix
 SRC, OUT, PREVIEW = sys.argv[1], sys.argv[2], sys.argv[3]
 SUBSURF = '--no-subsurf' not in sys.argv
 TEX = 1024
+# Laplacian smoothing passes on the front of the head.
+FACE_SMOOTH = 24
 
 bpy.ops.wm.open_mainfile(filepath=SRC)
 scene = bpy.context.scene
@@ -201,37 +203,34 @@ ramp.color_ramp.elements[1].color = lin('#4a2e1c')
 nt.links.new(wave.outputs['Fac'], ramp.inputs['Fac'])
 nt.links.new(ramp.outputs['Color'], b.inputs['Base Color']); MATS['hair'] = m
 
-m, nt, b = new_mat('eye')
-b.inputs['Base Color'].default_value = lin('#15100c')
-MATS['eye'] = m
-
-ORDER = ['head', 'body', 'arm', 'hair', 'eye']
+ORDER = ['head', 'body', 'arm', 'hair']
 IDX = {n: i for i, n in enumerate(ORDER)}
 body.data.materials.clear()
 for n in ORDER:
     body.data.materials.append(MATS[n])
 
-# ── 3. eyes → bigger, skinned to head, joined into body ─────────────
+# ── 3. eyeballs out, eye openings closed ───────────────────────────
+# The source face is a realistic sculpt with open sockets and eyeballs behind them, which
+# reads as uncanny. The eyes are painted on instead (step 9), so remember where they were,
+# drop the eyeballs and close the two openings.
+eye_world = []
 for e in eyes:
     pts = [e.matrix_world @ v.co for v in e.data.vertices]
-    c = sum(pts, Vector()) / len(pts)
-    e.matrix_world = (Matrix.Translation(c + Vector((0, -0.012, 0.0)))
-                      @ Matrix.Scale(1.05, 4)
-                      @ Matrix.Translation(-c) @ e.matrix_world)
-    e.data.materials.clear()
-    for n in ORDER:
-        e.data.materials.append(MATS[n])
-    for p in e.data.polygons:
-        p.material_index = IDX['eye']
-        p.use_smooth = True
-    vg = e.vertex_groups.new(name='head')
-    vg.add([v.index for v in e.data.vertices], 1.0, 'REPLACE')
-bpy.ops.object.select_all(action='DESELECT')
+    eye_world.append(sum(pts, Vector()) / len(pts))
 for e in eyes:
-    e.select_set(True)
+    bpy.data.objects.remove(e, do_unlink=True)
+EYE_X = sum(abs(c.x) for c in eye_world) / len(eye_world)
+EYE_Z = sum(c.z for c in eye_world) / len(eye_world)
+bm = bmesh.new()
+bm.from_mesh(body.data)
+holes = [e for e in bm.edges if len(e.link_faces) == 1]
+bmesh.ops.holes_fill(bm, edges=holes, sides=0)
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+bm.to_mesh(body.data)
+bm.free()
+bpy.ops.object.select_all(action='DESELECT')
 body.select_set(True)
 bpy.context.view_layer.objects.active = body
-bpy.ops.object.join()
 
 # ── 4. subdivision (applied under the armature) ─────────────────────
 for md in list(body.modifiers):
@@ -251,6 +250,19 @@ bm.from_mesh(body.data)
 bm.verts.ensure_lookup_table()
 dl = bm.verts.layers.deform.active
 names = {g.index: g.name for g in body.vertex_groups}
+
+# Soften the realistic nose, lips and eye sockets into a simple, friendly face shape.
+gi_head_bm = body.vertex_groups['head'].index
+def head_weight(v):
+    return v[dl].get(gi_head_bm, 0.0)
+face_verts = []
+for v in bm.verts:
+    pw = mw @ v.co
+    if head_weight(v) > 0.6 and pw.y < -0.40 and 5.20 < pw.z < 5.93:
+        face_verts.append(v)
+for _ in range(FACE_SMOOTH):
+    bmesh.ops.smooth_vert(bm, verts=face_verts, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+bm.normal_update()
 
 def dominant(face):
     acc = defaultdict(float)
@@ -280,8 +292,6 @@ PART = {
 }
 
 for f in bm.faces:
-    if f.material_index == IDX['eye']:
-        continue
     g = dominant(f) or 'hips'
     base = g.split('.')[0]
     part = PART.get(base, 'body')
@@ -334,7 +344,7 @@ body.data.update()
 for p in body.data.polygons:
     p.use_smooth = True
 
-# ── 6b. friendlier proportions + face paint ─────────────────────────
+# ── 6b. friendlier proportions ──────────────────────────────────────
 # A slightly bigger head reads younger and friendlier. Scale every vertex by its
 # 'head' weight around the top of the neck so the neck blends smoothly.
 HEAD_SCALE = 1.16
@@ -351,145 +361,9 @@ for v in body.data.vertices:
         v.co = pivot + (v.co - pivot) * k
 body.data.update()
 
-# Eye centres and radius, measured after scaling (object-local coordinates).
-eye_pts = {1: [], -1: []}
-for poly in body.data.polygons:
-    if poly.material_index != IDX['eye']:
-        continue
-    for vi in poly.vertices:
-        co = body.data.vertices[vi].co
-        eye_pts[1 if co.x > 0 else -1].append(co.copy())
-eye_c = {k: sum(v, Vector()) / len(v) for k, v in eye_pts.items()}
-eye_r = max((co - eye_c[1]).length for co in eye_pts[1])
-ecx, ecy, ecz = abs(eye_c[1].x), (eye_c[1].y + eye_c[-1].y) / 2, (eye_c[1].z + eye_c[-1].z) / 2
-print('eye centres (local)', tuple(round(x, 3) for x in eye_c[1]), tuple(round(x, 3) for x in eye_c[-1]), 'radius', round(eye_r, 3))
-
-def vmath(nt, op, a, b=None):
-    n = nt.nodes.new('ShaderNodeVectorMath')
-    n.operation = op
-    nt.links.new(a, n.inputs[0])
-    if b is not None:
-        if isinstance(b, tuple):
-            n.inputs[1].default_value = b
-        else:
-            nt.links.new(b, n.inputs[1])
-    return n.outputs['Value'] if op in ('DOT_PRODUCT', 'DISTANCE', 'LENGTH') else n.outputs['Vector']
-
-def smath(nt, op, a, b=None, c=None):
-    n = nt.nodes.new('ShaderNodeMath')
-    n.operation = op
-    for i, x in enumerate((a, b, c)):
-        if x is None:
-            continue
-        if isinstance(x, (int, float)):
-            n.inputs[i].default_value = x
-        else:
-            nt.links.new(x, n.inputs[i])
-    return n.outputs[0]
-
-def mirrored_obj(nt):
-    """Object coords with |x| so one formula paints both sides of the face."""
-    tc = nt.nodes.new('ShaderNodeTexCoord')
-    sep = nt.nodes.new('ShaderNodeSeparateXYZ')
-    nt.links.new(tc.outputs['Object'], sep.inputs['Vector'])
-    comb = nt.nodes.new('ShaderNodeCombineXYZ')
-    nt.links.new(smath(nt, 'ABSOLUTE', sep.outputs['X']), comb.inputs['X'])
-    nt.links.new(sep.outputs['Y'], comb.inputs['Y'])
-    nt.links.new(sep.outputs['Z'], comb.inputs['Z'])
-    return comb.outputs['Vector'], sep
-
-def soft_mask(nt, dist, inner, outer):
-    mr = nt.nodes.new('ShaderNodeMapRange')
-    mr.interpolation_type = 'SMOOTHSTEP'
-    nt.links.new(dist, mr.inputs['Value'])
-    mr.inputs['From Min'].default_value = inner
-    mr.inputs['From Max'].default_value = outer
-    mr.inputs['To Min'].default_value = 1.0
-    mr.inputs['To Max'].default_value = 0.0
-    return mr.outputs['Result']
-
-# Eyes: warm white sclera, brown iris with a lighter inner ring, pupil and a catchlight.
-nt = MATS['eye'].node_tree
-b = nt.nodes['Principled BSDF']
-tc_e = nt.nodes.new('ShaderNodeTexCoord')
-sep_e = nt.nodes.new('ShaderNodeSeparateXYZ')
-nt.links.new(tc_e.outputs['Object'], sep_e.inputs['Vector'])
-sx = smath(nt, 'SIGN', sep_e.outputs['X'])
-def comb(xs, y, z):
-    n = nt.nodes.new('ShaderNodeCombineXYZ')
-    nt.links.new(xs, n.inputs['X'])
-    n.inputs['Y'].default_value = y
-    n.inputs['Z'].default_value = z
-    return n.outputs['Vector']
-# The two eye meshes aren't exact mirror images, so each eye uses its own measured centre.
-mixc = nt.nodes.new('ShaderNodeMix')
-mixc.data_type = 'VECTOR'
-nt.links.new(smath(nt, 'GREATER_THAN', sep_e.outputs['X'], 0.0), mixc.inputs['Factor'])
-mixc.inputs[4].default_value = tuple(eye_c[-1])
-mixc.inputs[5].default_value = tuple(eye_c[1])
-centre = mixc.outputs[1]
-d = vmath(nt, 'NORMALIZE', vmath(nt, 'SUBTRACT', tc_e.outputs['Object'], centre))
-# The source model's eye sockets sit slightly to one side of the eyeballs, so a uniform
-# sideways correction centres both irises in their openings; a touch downward reads relaxed.
-gaze = vmath(nt, 'NORMALIZE', comb(smath(nt, 'MULTIPLY', sx, 0.0), -1.0, -0.07))
-gx = nt.nodes.new('ShaderNodeVectorMath')
-gx.operation = 'ADD'
-nt.links.new(gaze, gx.inputs[0])
-gx.inputs[1].default_value = (-0.26, 0.0, 0.0)
-gaze = vmath(nt, 'NORMALIZE', gx.outputs['Vector'])
-t = vmath(nt, 'DOT_PRODUCT', d, gaze)
-hl_dir = Vector((-0.34, -1.0, 0.3)).normalized()
-th = vmath(nt, 'DOT_PRODUCT', d, tuple(hl_dir))
-def step_at(x, edge, soft=0.004):
-    mr = nt.nodes.new('ShaderNodeMapRange')
-    mr.interpolation_type = 'SMOOTHSTEP'
-    nt.links.new(x, mr.inputs['Value'])
-    mr.inputs['From Min'].default_value = edge - soft
-    mr.inputs['From Max'].default_value = edge + soft
-    return mr.outputs['Result']
-col = lin('#f3eee6')
-mix_iris = nt.nodes.new('ShaderNodeMix'); mix_iris.data_type = 'RGBA'
-nt.links.new(step_at(t, math.cos(math.radians(42))), mix_iris.inputs['Factor'])
-mix_iris.inputs[6].default_value = col
-mix_iris.inputs[7].default_value = lin('#3a2416')
-mix_inner = nt.nodes.new('ShaderNodeMix'); mix_inner.data_type = 'RGBA'
-nt.links.new(step_at(t, math.cos(math.radians(34)), 0.012), mix_inner.inputs['Factor'])
-nt.links.new(mix_iris.outputs[2], mix_inner.inputs[6])
-mix_inner.inputs[7].default_value = lin('#7a4c2a')
-mix_pupil = nt.nodes.new('ShaderNodeMix'); mix_pupil.data_type = 'RGBA'
-nt.links.new(step_at(t, math.cos(math.radians(18))), mix_pupil.inputs['Factor'])
-nt.links.new(mix_inner.outputs[2], mix_pupil.inputs[6])
-mix_pupil.inputs[7].default_value = lin('#0d0907')
-mix_hl = nt.nodes.new('ShaderNodeMix'); mix_hl.data_type = 'RGBA'
-nt.links.new(step_at(th, math.cos(math.radians(6)), 0.002), mix_hl.inputs['Factor'])
-nt.links.new(mix_pupil.outputs[2], mix_hl.inputs[6])
-mix_hl.inputs[7].default_value = (1, 1, 1, 1)
-nt.links.new(mix_hl.outputs[2], b.inputs['Base Color'])
-
-# Face: eyebrows (hair colour, gentle arch) and a hint of warmth on the cheeks.
-nt = MATS['head'].node_tree
-b = nt.nodes['Principled BSDF']
-base = b.inputs['Base Color'].links[0].from_socket
-pm, sep = mirrored_obj(nt)
-# brow arch just above the eye socket, gently curved: z = ecz + 1.12 r - 0.3 (dx^2 / r)
-dx = smath(nt, 'SUBTRACT', smath(nt, 'ABSOLUTE', sep.outputs['X']), ecx)
-arch = smath(nt, 'SUBTRACT', ecz + 1.12 * eye_r, smath(nt, 'MULTIPLY', smath(nt, 'POWER', dx, 2.0), 0.3 / eye_r))
-brow_d = smath(nt, 'ABSOLUTE', smath(nt, 'SUBTRACT', sep.outputs['Z'], arch))
-brow_band = soft_mask(nt, brow_d, 0.09 * eye_r, 0.16 * eye_r)
-brow_len = soft_mask(nt, smath(nt, 'ABSOLUTE', smath(nt, 'SUBTRACT', dx, 0.1 * eye_r)), 0.85 * eye_r, 1.05 * eye_r)
-brow_front = soft_mask(nt, sep.outputs['Y'], ecy + 0.6 * eye_r, ecy + 1.2 * eye_r)
-brow = smath(nt, 'MULTIPLY', smath(nt, 'MULTIPLY', brow_band, brow_len), brow_front)
-mix_b = nt.nodes.new('ShaderNodeMix'); mix_b.data_type = 'RGBA'
-nt.links.new(brow, mix_b.inputs['Factor'])
-nt.links.new(base, mix_b.inputs[6])
-mix_b.inputs[7].default_value = lin('#3a2214')
-cheek = vmath(nt, 'DISTANCE', pm, (ecx + 0.25 * eye_r, ecy - 0.15 * eye_r, ecz - 1.55 * eye_r))
-blush = smath(nt, 'MULTIPLY', soft_mask(nt, cheek, 0.25 * eye_r, 1.15 * eye_r), 0.32)
-mix_c = nt.nodes.new('ShaderNodeMix'); mix_c.data_type = 'RGBA'
-nt.links.new(blush, mix_c.inputs['Factor'])
-nt.links.new(mix_b.outputs[2], mix_c.inputs[6])
-mix_c.inputs[7].default_value = lin('#e2847a')
-nt.links.new(mix_c.outputs[2], b.inputs['Base Color'])
+# Where the painted eyes go, in world space after the head scale.
+EYE_X *= HEAD_SCALE
+EYE_Z = pivot_w.z + (EYE_Z - pivot_w.z) * HEAD_SCALE
 
 # ── 7. UV unwrap ────────────────────────────────────────────────────
 bpy.ops.object.select_all(action='DESELECT')
@@ -542,18 +416,7 @@ import numpy as np
 a = np.array(alb.pixels[:], dtype=np.float32).reshape(TEX, TEX, 4)
 o = np.array(ao.pixels[:], dtype=np.float32).reshape(TEX, TEX, 4)
 occl = o[..., :1]
-# Mask of eye texels (rasterise the eye faces' UVs) so AO only lightly shades them.
-eye_mask = np.zeros((TEX, TEX), dtype=bool)
-uvl = body.data.uv_layers.active.data
-for poly in body.data.polygons:
-    if poly.material_index != IDX['eye']:
-        continue
-    pts = [(uvl[l].uv.x * TEX, uvl[l].uv.y * TEX) for l in poly.loop_indices]
-    xs = [q[0] for q in pts]; ys = [q[1] for q in pts]
-    x0, x1 = max(0, int(min(xs)) - 2), min(TEX - 1, int(max(xs)) + 2)
-    y0, y1 = max(0, int(min(ys)) - 2), min(TEX - 1, int(max(ys)) + 2)
-    eye_mask[y0:y1 + 1, x0:x1 + 1] = True
-ao_w = np.where(eye_mask[..., None], 0.2, 0.58).astype(np.float32)
+ao_w = 0.58
 final = a.copy()
 final[..., :3] = a[..., :3] * ((1 - ao_w) + ao_w * occl)
 final[..., 3] = 1.0
@@ -572,64 +435,133 @@ b.inputs['Roughness'].default_value = 0.72
 tn = nt.nodes.new('ShaderNodeTexImage')
 tn.image = out_img
 nt.links.new(tn.outputs['Color'], b.inputs['Base Color'])
-em = bpy.data.materials.new('HeroEye')
+
+# ── 9b. painted face with expressions ───────────────────────────────
+# All head skin uses a second material, 'HeroFace'. Its texture is a 2×2 atlas of the same
+# face with four expressions; the game switches expression by offsetting the texture:
+#   three.js texture.offset  (0, 0) neutral · (0.5, 0) blink · (0, 0.5) happy · (0.5, 0.5) hurt
+# Front-facing polygons are projected straight from the front into the atlas cell; every
+# other head-skin polygon samples one plain-skin texel, so there is no seam.
+FACE_X0, FACE_X1, FACE_Z0, FACE_Z1 = -0.47, 0.47, 5.10, 6.04
+CELL, SS, MARGIN = 512, 2, 0.04
+SKIN = '#e5ad8a'
+srgb = lambda h: np.array([int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)], dtype=np.float32)
+
+n = CELL * SS
+jj, ii = np.mgrid[0:n, 0:n].astype(np.float32)
+cu = ((ii + 0.5) / n - MARGIN) / (1 - 2 * MARGIN)
+cv = ((jj + 0.5) / n - MARGIN) / (1 - 2 * MARGIN)
+WX = FACE_X0 + cu * (FACE_X1 - FACE_X0)
+WZ = FACE_Z0 + cv * (FACE_Z1 - FACE_Z0)
+AA = (FACE_X1 - FACE_X0) / (n * (1 - 2 * MARGIN)) * 1.5
+
+def over(img, color, mask):
+    img[:] = img * (1 - mask[..., None]) + srgb(color) * mask[..., None]
+
+def ellipse(cx, cz, rx, rz):
+    d = np.sqrt(((WX - cx) / rx) ** 2 + ((WZ - cz) / rz) ** 2)
+    return np.clip((1 - d) * min(rx, rz) / AA + 0.5, 0, 1)
+
+def soft(cx, cz, rx, rz):
+    return np.exp(-(((WX - cx) / rx) ** 2 + ((WZ - cz) / rz) ** 2) * 2.2)
+
+def stroke(points, width):
+    """Round-capped polyline."""
+    best = np.full(WX.shape, 1e9, dtype=np.float32)
+    for (ax, az), (bx, bz) in zip(points[:-1], points[1:]):
+        dx, dz = bx - ax, bz - az
+        t = np.clip(((WX - ax) * dx + (WZ - az) * dz) / (dx * dx + dz * dz + 1e-12), 0, 1)
+        best = np.minimum(best, np.hypot(WX - (ax + dx * t), WZ - (az + dz * t)))
+    return np.clip((width / 2 - best) / AA + 0.5, 0, 1)
+
+def arc(cx, cz, half, sag, k=24):
+    """Parabolic arc through (cx ± half, cz) whose middle sits `sag` above the ends."""
+    xs = np.linspace(-half, half, k)
+    return [(cx + x, cz + sag * (1 - (x / half) ** 2)) for x in xs]
+
+MOUTH_Z = EYE_Z - 0.30
+BROW, DARK, LIP = '#3d2517', '#24160f', '#8a4636'
+
+def paint(expr):
+    img = np.empty((n, n, 3), dtype=np.float32)
+    img[:] = srgb(SKIN)
+    blush = 0.5 if expr == 'happy' else 0.34
+    for s in (-1, 1):
+        over(img, '#e9837a', soft(s * 0.245, EYE_Z - 0.165, 0.085, 0.06) * blush)
+    for s in (-1, 1):
+        cx = s * EYE_X
+        if expr == 'neutral':
+            over(img, DARK, ellipse(cx, EYE_Z, 0.056, 0.08))
+            over(img, '#6b4126', ellipse(cx, EYE_Z - 0.03, 0.04, 0.04) * 0.75)
+            over(img, DARK, ellipse(cx, EYE_Z + 0.004, 0.03, 0.042))
+            over(img, '#ffffff', ellipse(cx - 0.02, EYE_Z + 0.036, 0.021, 0.024))
+            over(img, '#ffffff', ellipse(cx + 0.021, EYE_Z - 0.036, 0.009, 0.009) * 0.9)
+        elif expr == 'blink':
+            over(img, DARK, stroke(arc(cx, EYE_Z + 0.004, 0.056, -0.026), 0.02))
+        elif expr == 'happy':
+            over(img, DARK, stroke(arc(cx, EYE_Z - 0.02, 0.058, 0.05), 0.022))
+        else:  # hurt: > <
+            over(img, DARK, stroke([(cx + s * 0.055, EYE_Z + 0.05), (cx - s * 0.04, EYE_Z), (cx + s * 0.055, EYE_Z - 0.05)], 0.022))
+        # eyebrows
+        lift = 0.02 if expr == 'happy' else 0.0
+        if expr == 'hurt':
+            over(img, BROW, stroke([(cx - s * 0.06, EYE_Z + 0.165), (cx + s * 0.065, EYE_Z + 0.125)], 0.02))
+        else:
+            over(img, BROW, stroke(arc(cx + s * 0.006, EYE_Z + 0.128 + lift, 0.066, 0.02), 0.019))
+    if expr == 'happy':
+        m = ellipse(0, MOUTH_Z + 0.022, 0.066, 0.06) * (WZ < MOUTH_Z + 0.022)
+        over(img, '#6e2b2b', m)
+        over(img, '#e58a85', ellipse(0, MOUTH_Z - 0.03, 0.04, 0.03) * m)
+    elif expr == 'hurt':
+        xs = np.linspace(-0.075, 0.075, 40)
+        over(img, LIP, stroke([(x, MOUTH_Z + 0.012 * np.sin(x * 105)) for x in xs], 0.017))
+    else:
+        over(img, LIP, stroke(arc(0, MOUTH_Z + 0.02, 0.076, -0.034), 0.018))
+    # supersample down
+    return img.reshape(CELL, SS, CELL, SS, 3).mean(axis=(1, 3))
+
+atlas = np.ones((CELL * 2, CELL * 2, 4), dtype=np.float32)
+cells = {'neutral': (0, 1), 'blink': (1, 1), 'happy': (0, 0), 'hurt': (1, 0)}  # (column, row from bottom)
+for name, (col, row) in cells.items():
+    atlas[row * CELL:(row + 1) * CELL, col * CELL:(col + 1) * CELL, :3] = paint(name)
+face_img = bpy.data.images.new('hero_face', CELL * 2, CELL * 2, alpha=False)
+face_img.pixels[:] = atlas.ravel()
+face_img.filepath_raw = os.path.join(PREVIEW, 'hero_face.png')
+face_img.file_format = 'PNG'
+face_img.save()
+face_img.pack()
+
+em = bpy.data.materials.new('HeroFace')
 em.use_nodes = True
 eb = em.node_tree.nodes['Principled BSDF']
-eb.inputs['Roughness'].default_value = 0.12
-
-# Eyes get their own crisp painted texture, projected straight onto each eyeball from the
-# front, so the iris is sharp and sits exactly where we want it in the eye opening.
-ET = 256
-yy, xx = np.mgrid[0:ET, 0:ET].astype(np.float32)
-eu = (xx + 0.5) / ET - 0.5
-ev = (yy + 0.5) / ET - 0.5
-rr = np.hypot(eu, ev)
-ang = np.arctan2(ev, eu)
-srgb = lambda h: np.array([int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)], dtype=np.float32)
-img = np.empty((ET, ET, 3), dtype=np.float32)
-img[:] = srgb('#f4efe8')
-IR, PR = 0.25, 0.105
-t = np.clip((rr - PR) / (IR - PR), 0, 1)[..., None]
-streak = (0.5 + 0.5 * np.sin(ang * 23.0) * np.sin(ang * 7.0 + 1.3))[..., None]
-iris = srgb('#9a6a3c') * (1 - t) + srgb('#4a2c18') * t
-iris = iris * (0.86 + 0.14 * streak)
-ring = np.clip((rr - (IR - 0.03)) / 0.03, 0, 1)[..., None]
-iris = iris * (1 - 0.55 * ring)
-edge = np.clip((IR + 0.006 - rr) / 0.012, 0, 1)[..., None]
-img = img * (1 - edge) + iris * edge
-pup = np.clip((PR + 0.006 - rr) / 0.012, 0, 1)[..., None]
-img = img * (1 - pup) + srgb('#0c0806') * pup
-for hx, hy, hr in ((-0.075, 0.085, 0.05), (0.07, -0.06, 0.022)):
-    hd = np.hypot(eu - hx, ev - hy)
-    hm = np.clip((hr - hd) / 0.01, 0, 1)[..., None]
-    img = img * (1 - hm) + np.float32(1.0) * hm
-eye_img = bpy.data.images.new('hero_eye', ET, ET, alpha=False)
-eye_px = np.ones((ET, ET, 4), dtype=np.float32)
-eye_px[..., :3] = img
-eye_img.pixels[:] = eye_px.ravel()
-eye_img.pack()
+eb.inputs['Roughness'].default_value = 0.78
 etn = em.node_tree.nodes.new('ShaderNodeTexImage')
-etn.image = eye_img
+etn.image = face_img
 em.node_tree.links.new(etn.outputs['Color'], eb.inputs['Base Color'])
 
-# Front projection per eye. The source sockets sit slightly off-centre on the eyeballs, so
-# the iris is nudged to sit in the middle of each opening (and a touch low: relaxed look).
-IRIS_SHIFT_U, IRIS_SHIFT_V = 0.025, 0.03
 uvl = body.data.uv_layers.active.data
+nrm = mw.to_3x3()
+face_flags = []
 for poly in body.data.polygons:
-    if poly.material_index != IDX['eye']:
+    is_skin = poly.material_index == IDX['head']
+    face_flags.append(is_skin)
+    if not is_skin:
         continue
-    side = 1 if poly.center.x > 0 else -1
-    c = eye_c[side]
+    c = mw @ poly.center
+    front = (nrm @ poly.normal).normalized().y < -0.35 and c.y < -0.3 and FACE_X0 < c.x < FACE_X1 and FACE_Z0 < c.z < FACE_Z1
     for li in poly.loop_indices:
-        co = body.data.vertices[body.data.loops[li].vertex_index].co
-        uvl[li].uv = (0.5 + (co.x - c.x) / (2 * eye_r) + IRIS_SHIFT_U, 0.5 + (co.z - c.z) / (2 * eye_r) + IRIS_SHIFT_V)
-eye_flags = [p.material_index == IDX['eye'] for p in body.data.polygons]
+        if front:
+            w = mw @ body.data.vertices[body.data.loops[li].vertex_index].co
+            u = MARGIN + (w.x - FACE_X0) / (FACE_X1 - FACE_X0) * (1 - 2 * MARGIN)
+            v = MARGIN + (w.z - FACE_Z0) / (FACE_Z1 - FACE_Z0) * (1 - 2 * MARGIN)
+        else:
+            u = v = 0.02
+        uvl[li].uv = (min(max(u, 0.0), 1.0) * 0.5, 0.5 + min(max(v, 0.0), 1.0) * 0.5)
 body.data.materials.clear()
 body.data.materials.append(fm)
 body.data.materials.append(em)
-for p, is_eye in zip(body.data.polygons, eye_flags):
-    p.material_index = 1 if is_eye else 0
+for p, is_face in zip(body.data.polygons, face_flags):
+    p.material_index = 1 if is_face else 0
 body.data.validate()
 # Drop legacy vertex colours (three.js would multiply them into the texture) and render single-sided.
 for attr in [a.name for a in body.data.color_attributes]:

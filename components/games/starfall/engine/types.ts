@@ -463,6 +463,8 @@ export interface IPostFX extends System {
 
 export type SfxName =
   | 'ui-hover' | 'ui-click' | 'ui-back' | 'ui-open' | 'pause' | 'resume'
+  /** A toggle or segmented control changed · one notch of a slider · an action that isn't available. */
+  | 'ui-toggle' | 'ui-tick' | 'ui-error'
 
 /** audio/AudioEngine.ts — synthesised SFX, procedural music & ambience, all WebAudio. */
 export interface IAudio extends System {
