@@ -1,7 +1,7 @@
 /**
  * One joined room: the Supabase channel `starfall:room:<code>` with presence
- * (who is here), broadcast events (chat, emotes, ragdolls, block edits, signalling and the
- * movement relay) and one WebRTC link per other player.
+ * (who is here), broadcast events (chat, emotes, ragdolls, block edits, signalling, the
+ * movement relay and relayed binary packets) and one WebRTC link per other player.
  *
  * Joining waits briefly for the first presence snapshot so a full room can be
  * refused before we show up in it. Presence is eventually consistent (that
@@ -14,8 +14,10 @@ import type { GestureName } from '../types'
 import { DIRECT_GRACE, LINK_RETRY, LINK_TIMEOUT, MAX_PLAYERS, PING_INTERVAL, ROOM_CHANNEL_PREFIX } from './config'
 import { PeerLink, rtcSupported } from './p2p'
 import {
-  KIND_PING, KIND_PONG, KIND_STATE, PING_BYTES, decodeState, fromRelay, isEmote, isPeerId, makeSnapshot,
-  parseMember, parseSignal, parseVec, sanitizeChat, type MemberInfo, type RelayPacket, type SignalMsg, type Snapshot,
+  KIND_ACTION, KIND_HIT, KIND_PING, KIND_PONG, KIND_RAGDOLL, KIND_STATE, PING_BYTES, decodeAction, decodeHit,
+  decodeRagdoll, decodeState, fromBase64, fromRelay, isEmote, isPeerId, makeAction, makeRagdollFrame, makeSnapshot,
+  parseMember, parseSignal, parseVec, sanitizeChat, toBase64, type ActionMsg, type HitMsg, type MemberInfo,
+  type RagdollFrame, type RelayPacket, type SignalMsg, type Snapshot,
 } from './protocol'
 import { RemotePeer } from './RemotePeer'
 
@@ -31,6 +33,12 @@ export interface RoomHost {
   chat(peer: RemotePeer, text: string): void
   emote(peer: RemotePeer, name: GestureName): void
   ragdoll(peer: RemotePeer, v: [number, number, number]): void
+  /** A frame of their ragdolling body (validated, rate-limited). */
+  ragdollFrame(peer: RemotePeer, f: RagdollFrame): void
+  /** They started a move (validated, rate-limited, de-duplicated). */
+  action(peer: RemotePeer, a: ActionMsg): void
+  /** Their blow reached us (validated as a packet; the host judges whether it counts). */
+  hit(peer: RemotePeer, h: HitMsg): void
   blocks(peer: RemotePeer, msg: BlockMsg): void
   count(players: number): void
   /** Connection to the server changed after the join completed. */
@@ -101,6 +109,9 @@ export class Room {
   private rtc = rtcSupported()
   private ping = new DataView(new ArrayBuffer(PING_BYTES))
   private scratch: Snapshot = makeSnapshot()
+  private frame: RagdollFrame = makeRagdollFrame()
+  private act: ActionMsg = makeAction()
+  private hitMsg: HitMsg = { seq: 0, weapon: 'fists', power: 0, x: 0, y: 0, z: 0 }
   /** Join only if somebody is already here (see connect). */
   private mustExist = false
   /** performance.now() of the first SUBSCRIBED, and whether a re-check for occupants is scheduled. */
@@ -122,6 +133,7 @@ export class Room {
     ch.on('broadcast', { event: 'emote' }, ({ payload }) => this.onEmote(payload))
     ch.on('broadcast', { event: 'rag' }, ({ payload }) => this.onRag(payload))
     ch.on('broadcast', { event: 'blk' }, ({ payload }) => this.onBlocks(payload))
+    ch.on('broadcast', { event: 'bin' }, ({ payload }) => this.onBinary(payload))
   }
 
   get online(): boolean {
@@ -172,7 +184,7 @@ export class Room {
   }
 
   /** Broadcasts an event; false if the channel isn't up. */
-  send(event: 'pos' | 'chat' | 'emote' | 'rag' | 'sig' | 'blk', payload: object): boolean {
+  send(event: 'pos' | 'chat' | 'emote' | 'rag' | 'sig' | 'blk' | 'bin', payload: object): boolean {
     if (!this.subscribed || this.closed) return false
     this.channel.send({ type: 'broadcast', event, payload }).catch(() => {})
     return true
@@ -191,9 +203,15 @@ export class Room {
     return false
   }
 
-  /** Sends a state packet to every peer with an open data channel. */
+  /** Sends a packet to every peer with an open data channel. */
   sendDirect(data: ArrayBuffer): void {
     for (let i = 0; i < this.list.length; i++) this.list[i].link?.send(data)
+  }
+
+  /** Sends a binary packet to one player: on their data channel if it is open, and (`backup`) once over the relay. */
+  sendTo(id: string, data: ArrayBuffer, backup: boolean): void {
+    const direct = this.peers.get(id)?.link?.send(data) ?? false
+    if (backup || !direct) this.send('bin', { from: this.host.selfId, to: id, d: toBase64(data) })
   }
 
   /** Link upkeep: create / retry / time out links, pings. */
@@ -437,11 +455,28 @@ export class Room {
     void link.handle(msg)
   }
 
-  private onData(peer: RemotePeer, data: ArrayBuffer): void {
+  private onData(peer: RemotePeer, data: ArrayBuffer, relayed = false): void {
+    if (data.byteLength < 1) return
     const view = new DataView(data)
     const kind = view.getUint8(0)
+    const now = this.host.now()
     if (kind === KIND_STATE) {
-      if (decodeState(view, this.scratch)) peer.push(this.scratch, this.host.now())
+      if (!relayed && decodeState(view, this.scratch)) peer.push(this.scratch, now)
+    } else if (kind === KIND_RAGDOLL) {
+      // A direct link carries their body already; the relay copy is redundant.
+      if (relayed && peer.link?.open) return
+      if (decodeRagdoll(view, this.frame) && peer.frames.take(now)) {
+        peer.observe(this.frame.t, now)
+        this.host.ragdollFrame(peer, this.frame)
+      }
+    } else if (kind === KIND_ACTION) {
+      const a = this.act
+      if (decodeAction(view, a) && peer.actionSeqs.fresh(a.seq) && peer.actions.take(now)) this.host.action(peer, a)
+    } else if (kind === KIND_HIT) {
+      const h = this.hitMsg
+      if (decodeHit(view, h) && peer.hitSeqs.fresh(h.seq)) this.host.hit(peer, h)
+    } else if (relayed) {
+      return
     } else if (kind === KIND_PING && data.byteLength === PING_BYTES) {
       view.setUint8(0, KIND_PONG)
       peer.link?.send(data)
@@ -457,6 +492,15 @@ export class Room {
     const o = raw as Record<string, unknown>
     const peer = isPeerId(o.from) ? this.peers.get(o.from) : undefined
     return peer ? { peer, o } : null
+  }
+
+  /** A binary packet over the relay (`to`: meant for one player only). */
+  private onBinary(raw: unknown): void {
+    const s = this.sender(raw)
+    if (!s || (s.o.to !== undefined && s.o.to !== this.host.selfId)) return
+    const data = fromBase64(s.o.d)
+    // Hits must be addressed to us.
+    if (data && (s.o.to === this.host.selfId || new Uint8Array(data)[0] !== KIND_HIT)) this.onData(s.peer, data, true)
   }
 
   private onRelay(raw: unknown): void {

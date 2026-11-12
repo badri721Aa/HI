@@ -267,6 +267,25 @@ export class PlayerController implements IPlayerController {
     this.writeMotion()
   }
 
+  knock(impulse: V3, ragdoll: boolean): void {
+    if (this.dead || !this.controlEnabled || !Number.isFinite(impulse.x + impulse.y + impulse.z)) return
+    const ch = this.ctx.character
+    if (ragdoll || ch.ragdolling) {
+      ch.startRagdoll(impulse)
+      if (ch.ragdolling && !this.limp) this.enterRagdoll()
+      return
+    }
+    const v = this.velocity
+    v.x += impulse.x
+    v.z += impulse.z
+    v.y = Math.max(v.y, impulse.y)
+    this.leaveGround(false)
+    this.dashT = 0
+    this.attackT = 0
+    this.jumpCut = false
+    this.writeMotion()
+  }
+
   heal(amount: number): void {
     if (!(amount > 0) || this.dead) return
     this._hp = Math.min(this.maxHp, this._hp + amount)

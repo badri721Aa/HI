@@ -7,7 +7,7 @@
  * listener follows the camera every frame, and the ambience is re-steered a
  * few times per second.
  */
-import type { GamePhase, MusicMood } from '../events'
+import type { GameEventMap, GamePhase, MusicMood } from '../events'
 import type { Ctx, IAudio, SfxName } from '../types'
 import { Ambience, type AmbienceInput } from './ambience'
 import { Mixer, OUTPUT_FADE } from './mixer'
@@ -91,6 +91,7 @@ export class AudioEngine implements IAudio {
       bus.on('weapon:slam', e => this.sfx?.slam(e.pos)),
       bus.on('weapon:draw', () => this.sfx?.bowDraw()),
       bus.on('weapon:fire', e => this.sfx?.bowFire(e.charge)),
+      bus.on('net:action', e => this.remoteAction(e)),
       bus.on('weapon:equip', e => this.sfx?.equip(e.weapon)),
       bus.on('weapon:pickup', () => this.sfx?.pickup()),
       bus.on('arrow:stick', e => this.sfx?.arrowStick(e.pos)),
@@ -238,6 +239,38 @@ export class AudioEngine implements IAudio {
   }
 
   /** Listener = camera; reads the world matrix directly so nothing is allocated. */
+  /** Another player's move (or a player-vs-player hit), heard where it happens. */
+  private remoteAction(e: GameEventMap['net:action']): void {
+    const sfx = this.sfx
+    if (!sfx) return
+    switch (e.action) {
+      case 'swing':
+        sfx.swing(e.weapon, e.combo ?? 0, e.pos)
+        break
+      case 'slam':
+        sfx.slam(e.pos)
+        break
+      case 'draw':
+        sfx.bowDraw(e.pos)
+        break
+      case 'fire':
+        sfx.bowFire(e.charge ?? 0, e.pos)
+        break
+      case 'spin':
+        sfx.attack(e.pos)
+        break
+      case 'dash':
+        sfx.dash(e.pos)
+        break
+      case 'flop':
+        sfx.flop(e.charge ?? 0, e.pos)
+        break
+      case 'hit':
+        sfx.weaponHit(e.pos, e.weapon, false)
+        break
+    }
+  }
+
   private syncListener(ac: AudioContext): void {
     const m = this.ctx.camera.matrixWorld.elements
     const L = ac.listener

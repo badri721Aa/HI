@@ -16,9 +16,10 @@ import { heightAt } from '../world/heightfield'
 import { EXTRAPOLATE_DIRECT, EXTRAPOLATE_RELAY, INTERP_DELAY, TELEPORT_DIST } from './config'
 import type { PeerLink } from './p2p'
 import {
-  Bucket, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, copySnapshot, makeSnapshot, stateFromCode, weaponFromCode,
+  Bucket, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, SeqWindow, copySnapshot, makeSnapshot, stateFromCode, weaponFromCode,
   type MemberInfo, type Snapshot,
 } from './protocol'
+import { RagdollBuffer } from './ragdollSync'
 
 const BUFFER = 24
 /** Gravity used when extrapolating an airborne peer (between the controller's up/down values). */
@@ -50,6 +51,8 @@ export class RemotePeer implements NetPeer {
   slope = 0
   weapon: WeaponId = 'fists'
   map: MapId = 'isle'
+  /** Bow draw 0..1, or -1 when not drawing. */
+  draw = -1
   /** Seconds since `state` changed. */
   stateTime = 0
   /** Downward speed at the last touchdown (m/s). */
@@ -71,6 +74,14 @@ export class RemotePeer implements NetPeer {
   readonly rags = new Bucket(2, 0.5)
   /** Block edits and list parts (senders pace themselves at 4 a second). */
   readonly blocks = new Bucket(24, 6)
+  /** Ragdoll frames (20 Hz direct plus 6 Hz relayed at most), move starts and hits on us. */
+  readonly frames = new Bucket(30, 28)
+  readonly actions = new Bucket(12, 8)
+  readonly hits = new Bucket(3, 1.5)
+  readonly actionSeqs = new SeqWindow()
+  readonly hitSeqs = new SeqWindow()
+  /** Their ragdolling body, while it lasts. */
+  readonly body = new RagdollBuffer()
 
   private buf: Snapshot[] = Array.from({ length: BUFFER }, makeSnapshot)
   private head = 0
@@ -94,6 +105,25 @@ export class RemotePeer implements NetPeer {
   /** Seconds since any state packet arrived (Infinity if none). */
   silence(now: number): number {
     return now - this.lastRecv
+  }
+
+  /** Their clock (s) at local time `now`, less the fastest delivery seen; -1 until anything arrived. */
+  clock(now: number): number {
+    return this.hasOffset ? now - this.offset : -1
+  }
+
+  /** How long ago (s) something happened at their time `t`: the measured delay plus the one-way latency. */
+  age(t: number, now: number): number {
+    const latency = this.ping > 0 ? this.ping / 2000 : 0.05
+    return this.hasOffset ? Math.max(0, now - this.offset - t) + latency : latency
+  }
+
+  /** A packet stamped `t` by them arrived at `now`: refines the clock offset (the fastest packet wins; drifts up slowly). */
+  observe(t: number, now: number): void {
+    const sample = now - t
+    if (!this.hasOffset || sample < this.offset) this.offset = sample
+    else this.offset += (sample - this.offset) * 0.004
+    this.hasOffset = true
   }
 
   setPing(rttMs: number): void {
@@ -121,11 +151,7 @@ export class RemotePeer implements NetPeer {
     copySnapshot(this.buf[this.head], s)
     this.count = Math.min(this.count + 1, BUFFER)
     this.lastRecv = now
-    // Clock offset: the fastest packet wins; drift upward slowly so a latency spike doesn't stick.
-    const sample = now - s.t
-    if (!this.hasOffset || sample < this.offset) this.offset = sample
-    else this.offset += (sample - this.offset) * 0.004
-    this.hasOffset = true
+    this.observe(s.t, now)
   }
 
   /** Advances the rendered state to local time `now`. */
@@ -194,6 +220,7 @@ export class RemotePeer implements NetPeer {
     this.slope = a.slope
     this.weapon = weaponFromCode(a.weapon)
     this.map = mapFromCode(a.map)
+    this.draw = a.draw
 
     const pos = this.position
     if (!this.ready || pos.distanceToSquared(tgt) > TELEPORT_DIST * TELEPORT_DIST) {

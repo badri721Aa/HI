@@ -215,6 +215,12 @@ export interface ICharacter extends System {
    * or a point that rises with the body while it is airborne (so the camera follows a thrown body).
    */
   getRagdollAnchor(out: THREE.Vector3): THREE.Vector3
+  /**
+   * The body while ragdolling (limp or getting up), for replication: world particle positions
+   * (player/ragdoll/skeleton P order, xyz interleaved) into `out` and the pose root into `root`.
+   * Returns the root yaw, or null when not ragdolling.
+   */
+  getRagdollBody(out: Float64Array, root: THREE.Vector3): number | null
   /** End any ragdoll immediately and snap back to the animated pose (respawns, teleports, cutscenes). */
   cancelRagdoll(): void
   /** Head/eyes look toward a world point (null = natural). */
@@ -250,6 +256,8 @@ export interface IPlayerController extends System {
   teleport(x: number, y: number, z: number, yaw: number): void
   /** Damage from `from` (knockback away from it). Ignored while invulnerable. */
   hurt(amount: number, from: V3): void
+  /** A shove without damage (m/s added; another player's blow); `ragdoll` throws him into a real ragdoll. */
+  knock(impulse: V3, ragdoll: boolean): void
   heal(amount: number): void
   /** Restore full HP (respawn / new game). */
   resetHealth(): void
@@ -447,8 +455,8 @@ export type BurstKind =
   /** A swirl drawn into a portal · chips flying off something broken or struck. */
   | 'portal' | 'debris'
 
-/** Things that leave a trail: an arrow in flight, a blade or hammer head mid-swing, a spark drawn to the player. */
-export type TrailKind = 'arrow' | 'slash' | 'spark'
+/** Things that leave a trail: an arrow in flight, a blade or hammer head mid-swing, a spark drawn to the player, a dash's afterimage. */
+export type TrailKind = 'arrow' | 'slash' | 'spark' | 'ghost'
 
 /** fx/Particles.ts — pooled GPU particles for one-shot bursts and trails. */
 export interface IParticles extends System {
@@ -554,6 +562,14 @@ export interface INetwork extends System {
   sendEmote(name: GestureName): void
   /** Broadcast block edits to the room (`to`: only that player acts on it). False when not connected. */
   sendBlocks(msg: BlockMsg, to?: string): boolean
+  /** Player-vs-player hits are applied (a room setting: off in free roam; game modes turn it on). Reset on leaving. */
+  readonly pvp: boolean
+  setPvp(on: boolean): void
+  /**
+   * A local blow (swing, slam, arrow, spin) with `power` 0..1: with pvp on, every other player
+   * whose body it overlaps is sent a hit (they validate and apply it). Returns how many were hit.
+   */
+  strike(blow: WeaponHit, power: number): number
 }
 
 export type { BossId, Collider, MapId, WeaponId }

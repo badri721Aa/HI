@@ -7,8 +7,12 @@
  *   link (see Room.ts).
  * - Movement goes peer-to-peer at 20 Hz (2 Hz idle) over unreliable WebRTC
  *   data channels (p2p.ts), as compact 40-byte binary packets (protocol.ts).
+ * - A ragdolling body streams its pose while it lasts (ragdollSync.ts); every
+ *   move (swing, slam, bow draw and release, fist spin, dash) is announced as it
+ *   starts, on the data channels and once over the relay.
  * - Other players are smoothed (RemotePeer.ts) and drawn as tinted, animated
- *   copies of the hero with name tags (RemotePlayers.ts).
+ *   copies of the hero with name tags, playing the same moves and effects
+ *   (RemotePlayers.ts, remoteMoves.ts). With pvp on, blows shove them (pvp.ts).
  *
  * Progress stays per player; only the world is shared. Nothing here throws
  * from update(); failures surface as `net:status` events.
@@ -16,16 +20,20 @@
 import * as THREE from 'three'
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js'
 import type { BlockMsg } from '../build/blocks'
-import type { Ctx, GestureName, ICharacter, INetwork, NetPeer, NetStatus, RoomInfo } from '../types'
+import type { V3, WeaponId } from '../events'
+import { KIND } from '../gameplay/weapons/defs'
+import type { Ctx, GestureName, ICharacter, INetwork, NetPeer, NetStatus, RoomInfo, WeaponHit } from '../types'
 import {
   CHAT_BURST, CHAT_REFILL, CODE_ALPHABET, CODE_LENGTH, LOBBY_CHANNEL, MAX_PLAYERS, P2P_RATE_ACTIVE, P2P_RATE_IDLE,
   PROFILE_KEY, PUBLIC_ROOMS, RELAY_DELIVERIES, RELAY_RATE_ACTIVE, RELAY_RATE_IDLE, SUPABASE_KEY, SUPABASE_URL,
 } from './config'
 import {
-  Bucket, FLAG_ACTIVE, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, STATE_BYTES, defaultColor, defaultName,
-  encodeState, isEmote, makeSnapshot, normalizeRoomCode, randomId, sanitizeChat, sanitizeColor, sanitizeName,
-  stateCode, toRelay, weaponCode, type MemberInfo,
+  ACTION_BYTES, Bucket, FLAG_ACTIVE, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, STATE_BYTES, defaultColor, defaultName,
+  encodeAction, encodeState, isEmote, makeAction, makeSnapshot, normalizeRoomCode, randomId, sanitizeChat,
+  sanitizeColor, sanitizeName, stateCode, toBase64, toRelay, weaponCode, type ActionName, type MemberInfo,
 } from './protocol'
+import { Pvp } from './pvp'
+import { RagdollSender } from './ragdollSync'
 import { RemotePlayers } from './RemotePlayers'
 import { JoinError, Room, type RoomHost } from './Room'
 import { mapCode } from '../worlds/defs'
@@ -123,6 +131,12 @@ export class Network implements INetwork {
   private wasActive = false
   private wasRagdoll = false
   private lastRagSent = -10
+  private ragdoll: RagdollSender
+  private action = makeAction()
+  private actionPacket = new DataView(new ArrayBuffer(ACTION_BYTES))
+  private actionSeq = 0
+  private pvpRules: Pvp
+  private unsubs: Array<() => void> = []
   private chatBucket = new Bucket(CHAT_BURST, CHAT_REFILL)
   private emoteBucket = new Bucket(3, 2)
   private retrackTimer: ReturnType<typeof setTimeout> | null = null
@@ -162,9 +176,22 @@ export class Network implements INetwork {
   constructor(private ctx: Ctx) {
     this.profile = loadProfile()
     this.remotes = new RemotePlayers(ctx)
+    this.ragdoll = new RagdollSender(this.selfId)
+    this.pvpRules = new Pvp(ctx)
   }
 
   init(): void {
+    // Our moves, announced to the others as they start.
+    const bus = this.ctx.bus
+    const held = (): WeaponId => this.ctx.weapons?.equipped ?? 'fists'
+    this.unsubs.push(
+      bus.on('weapon:swing', e => this.sendAction(KIND[e.weapon] === 'hammer' ? 'slam' : 'slash', e.weapon, e.pos, e.combo)),
+      bus.on('weapon:draw', e => this.sendAction('draw', held(), e.pos)),
+      bus.on('weapon:fire', e => this.sendAction('release', held(), e.pos, 0, e.charge, e.vel)),
+      bus.on('player:attack', e => this.sendAction('spin', held(), e.pos)),
+      bus.on('player:dash', e => this.sendAction('dash', held(), e.pos, 0, 0, e.dir)),
+      bus.on('player:land', e => this.ragdoll.noteImpact(e.impact)),
+    )
     window.addEventListener('offline', this.onOffline)
     window.addEventListener('pagehide', this.onPageHide)
     window.addEventListener('pageshow', this.onPageShow)
@@ -305,6 +332,7 @@ export class Network implements INetwork {
     this.session = null
     const wasIn = this.room !== null
     this.room = null
+    this.pvpRules.on = false
     this.clearPeers()
     this.untrackLobby()
     this.setStatus('offline')
@@ -342,6 +370,19 @@ export class Network implements INetwork {
     return room.send('blk', to ? { from: this.selfId, op: msg.op, b: msg.cells, to } : { from: this.selfId, op: msg.op, b: msg.cells })
   }
 
+  get pvp(): boolean {
+    return this.pvpRules.on
+  }
+
+  setPvp(on: boolean): void {
+    this.pvpRules.on = on
+  }
+
+  strike(blow: WeaponHit, power: number): number {
+    const room = this.session
+    return room ? this.pvpRules.strike(room, blow, power, this.now()) : 0
+  }
+
   /* ── frame ───────────────────────────────────────────────── */
 
   update(dt: number): void {
@@ -369,6 +410,8 @@ export class Network implements INetwork {
 
   dispose(): void {
     this.disposed = true
+    for (const off of this.unsubs) off()
+    this.unsubs = []
     window.removeEventListener('offline', this.onOffline)
     window.removeEventListener('pagehide', this.onPageHide)
     window.removeEventListener('pageshow', this.onPageShow)
@@ -417,6 +460,15 @@ export class Network implements INetwork {
       },
       ragdoll: (peer, v) => {
         if (isCurrent()) this.remotes.flop(peer.id, v)
+      },
+      ragdollFrame: (peer, f) => {
+        if (isCurrent()) peer.body.push(f)
+      },
+      action: (peer, a) => {
+        if (isCurrent()) this.remotes.action(peer.id, a, peer.age(a.t, this.now()))
+      },
+      hit: (peer, h) => {
+        if (isCurrent()) this.pvpRules.receive(peer, h, this.now())
       },
       blocks: (peer, msg) => {
         if (isCurrent()) this.ctx.bus.emit('net:blocks', { id: peer.id, ...msg })
@@ -516,6 +568,8 @@ export class Network implements INetwork {
     s.slope = p.motion?.slope ?? 0
     s.weapon = weaponCode(ctx.weapons?.equipped ?? 'fists')
     s.map = mapCode(ctx.worlds?.current ?? 'isle')
+    const wp = ctx.weapons?.pose
+    s.draw = wp?.move === 'draw' ? wp.charge : -1
 
     // Moving platforms carry the player with zero velocity, so position changes count too.
     const dx = pos.x - this.lastX
@@ -527,7 +581,7 @@ export class Network implements INetwork {
     const moving = v.x * v.x + v.z * v.z > 0.01 || Math.abs(v.y) > 0.05 || !p.grounded || dx * dx + dy * dy + dz * dz > 1e-6
     const baseFlags = (p.grounded || ragdoll ? FLAG_GROUNDED : 0) | (ragdoll ? FLAG_RAGDOLL : 0) | (away ? FLAG_AWAY : 0)
     const turned = Math.abs(Math.atan2(Math.sin(s.yaw - this.lastYaw), Math.cos(s.yaw - this.lastYaw))) > 0.02
-    if (moving || turned || s.state !== this.lastState || baseFlags !== this.lastFlags || s.weapon !== this.lastWeapon || s.map !== this.lastMap) this.lastChange = now
+    if (moving || turned || s.draw >= 0 || s.state !== this.lastState || baseFlags !== this.lastFlags || s.weapon !== this.lastWeapon || s.map !== this.lastMap) this.lastChange = now
     this.lastWeapon = s.weapon
     this.lastMap = s.map
     this.lastState = s.state
@@ -559,6 +613,33 @@ export class Network implements INetwork {
       room.send('rag', { from: this.selfId, v: [r2(m.x), r2(m.y), r2(m.z)] })
     }
     this.wasRagdoll = ragdoll
+    if (ch?.getRagdollBody) this.ragdoll.update(ch as ICharacter, room, now, s.t)
+    this.pvpRules.updateSpin(room, now)
+  }
+
+  /** Announces a move we just started: on the data channels, and once over the relay as a backup. */
+  private sendAction(action: ActionName, weapon: WeaponId, pos: V3, combo = 0, charge = 0, v?: V3): void {
+    const room = this.session
+    if (!room?.online || !room.list.length) return
+    const a = this.action
+    a.seq = this.actionSeq = (this.actionSeq + 1) & 0xffff
+    a.t = this.now() - this.t0
+    a.action = action
+    a.weapon = weapon
+    a.combo = combo
+    a.charge = charge
+    a.x = pos.x
+    a.y = pos.y
+    a.z = pos.z
+    a.vx = v?.x ?? 0
+    a.vy = v?.y ?? 0
+    a.vz = v?.z ?? 0
+    a.yaw = this.ctx.player?.yaw ?? 0
+    if (!Number.isFinite(a.x + a.y + a.z + a.vx + a.vy + a.vz + a.yaw)) return
+    encodeAction(this.actionPacket, a)
+    const data = this.actionPacket.buffer as ArrayBuffer
+    room.sendDirect(data)
+    room.send('bin', { from: this.selfId, d: toBase64(data) })
   }
 
   /* ── lobby (public room counts) ─────────────────────────── */

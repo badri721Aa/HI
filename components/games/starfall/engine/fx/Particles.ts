@@ -125,6 +125,7 @@ const TRAILS: Record<TrailKind, { spec: SpecName; spacing: number; scatter: numb
   arrow: { spec: 'arrowTrail', spacing: 0.3, scatter: 0.01 },
   slash: { spec: 'slashArc', spacing: 0.055, scatter: 0.015 },
   spark: { spec: 'sparkTrail', spacing: 0.09, scatter: 0.03 },
+  ghost: { spec: 'ghost', spacing: 0.24, scatter: 0 },
 }
 /** Most motes one trail() call may lay down, and the longest step it still treats as movement (m). */
 const TRAIL_MAX = 24
@@ -445,6 +446,13 @@ export class Particles implements IParticles {
         else this.burst('jump', e.pos, { color: dustAt(e.pos) })
       }),
       bus.on('player:dash', e => this.burst('dash', e.pos, { dir: e.dir })),
+      // Other players' moves (their afterimages and swing arcs come from their avatars).
+      bus.on('net:action', e => {
+        if (e.action === 'slam') this.slam(e.pos, e.weapon === 'frostHammer')
+        else if (e.action === 'dash') this.burst('dash', e.pos, { dir: e.dir })
+        else if (e.action === 'hit') this.burst('hit', e.pos, { color: '#ffe2b0', scale: KIND[e.weapon] === 'hammer' ? 1.4 : 1 })
+        else if (e.action === 'flop') this.burst('land', e.pos, { scale: THREE.MathUtils.clamp(0.55 + ((e.charge ?? 0) - 3) / 10, 0.55, 1.6), color: dustAt(e.pos) })
+      }),
       bus.on('player:splash', e => this.burst('splash', e.pos, { scale: e.big ? 1.6 : 1 })),
       bus.on('player:wade', e => this.burst('ripple', e.pos, { scale: 0.7 })),
       bus.on('player:bounce', e => this.burst('bounce', e.pos)),
@@ -465,12 +473,7 @@ export class Particles implements IParticles {
         this.burst('poof', e.pos, { color, scale: 4 })
         this.emit('bossRing', e.pos, 1.6, undefined, color)
       }),
-      bus.on('weapon:slam', e => {
-        const dust = dustAt(e.pos)
-        this.burst('land', e.pos, { scale: 2.2, color: dust })
-        this.burst('stomp', e.pos, { scale: 1.4 })
-        this.burst('debris', e.pos, { scale: 1.3, color: dust })
-      }),
+      bus.on('weapon:slam', e => this.slam(e.pos, false)),
       bus.on('arrow:stick', e => {
         const dust = dustAt(e.pos)
         this.burst('dust', e.pos, { count: 3, scale: 0.45, color: dust })
@@ -480,6 +483,15 @@ export class Particles implements IParticles {
       bus.on('block:place', e => this.emit('stepPuff', e.pos, 2.2, 5, SURFACE_DUST[e.surface] ?? DEFAULT_DUST)),
       bus.on('checkpoint', e => this.burst('checkpoint', e.pos, { scale: e.first ? 1.2 : 0.8 })),
     )
+  }
+
+  /** The hammer meets the ground: a dust ring, the shockwave and flying chips (`frost`: the ice burst too). */
+  private slam(pos: V3, frost: boolean): void {
+    const dust = dustAt(pos)
+    this.burst('land', pos, { scale: 2.2, color: dust })
+    this.burst('stomp', pos, { scale: 1.4 })
+    this.burst('debris', pos, { scale: 1.3, color: dust })
+    if (frost) this.burst('stomp', { x: pos.x, y: pos.y + 0.2, z: pos.z }, { color: '#bfeaff', scale: 1.6 })
   }
 
   /** Water surface under/around `p` (falls back to p.y away from water). */

@@ -22,6 +22,7 @@ import { Arrows } from './weapons/Arrows'
 import { ARROW, BOW, FROST_HAMMER, HAMMER, HOTBAR, KIND, STARBLADE, SWORD, WEAPON_NAMES } from './weapons/defs'
 import { WeaponKit, type HeldWeapon, type WeaponModel } from './weapons/models'
 import { standMaterials, standShape } from './weapons/stands'
+import { ARC_FROM, ARC_TO, SWING_ARC, SwingTrail } from './weapons/swing'
 import { glowTexture } from './parts/util'
 
 /** Take a weapon by walking into its stand, or with E from this close (m). */
@@ -46,18 +47,6 @@ interface Stand {
   taken: boolean
 }
 
-/** Swing arcs: how far up the grip the blade tip / hammer head is (m), and the arc's colour. */
-const SWING_ARC: Record<HeldWeapon, { length: number; color: number } | null> = {
-  sword: { length: 0.8, color: 0xeaf4ff },
-  starblade: { length: 0.96, color: 0xffe9a8 },
-  hammer: { length: 0.6, color: 0xffd9a0 },
-  frostHammer: { length: 0.6, color: 0xbfeaff },
-  bow: null,
-}
-/** The part of a melee move (0..1) during which the weapon is really moving. */
-const ARC_FROM = 0.12
-const ARC_TO = 0.72
-
 export class Weapons implements IWeapons {
   readonly pose: WeaponPose = { weapon: 'fists', move: 'none', t: 0, charge: 0 }
 
@@ -75,12 +64,7 @@ export class Weapons implements IWeapons {
   private owned3D: Array<{ dispose(): void }> = []
   private prompted: Stand | null = null
 
-  // swing arc: the blade tip (or hammer head) and a point further down, this frame and the last
-  private arcLive = false
-  private readonly arcTip = new THREE.Vector3()
-  private readonly arcMid = new THREE.Vector3()
-  private readonly arcTip0 = new THREE.Vector3()
-  private readonly arcMid0 = new THREE.Vector3()
+  private swing: SwingTrail | null = null
 
   // move state
   private move: WeaponMove = 'none'
@@ -181,6 +165,7 @@ export class Weapons implements IWeapons {
 
     this.arrows = new Arrows(ctx, kit.arrowGeometry, kit.arrowMaterial)
     ctx.scene.add(this.arrows.mesh)
+    this.swing = new SwingTrail(ctx.fx)
     this.syncWithSave()
   }
 
@@ -397,20 +382,8 @@ export class Weapons implements IWeapons {
     const id = this._equipped
     const arc = id === 'fists' ? null : SWING_ARC[id]
     const model = arc && this.held.get(id as HeldWeapon)
-    if (!arc || !model || this.move === 'none' || this.moveT < ARC_FROM || this.moveT > ARC_TO) {
-      this.arcLive = false
-      return
-    }
-    model.group.updateWorldMatrix(true, false)
-    const tip = this.arcTip.set(0, arc.length, 0).applyMatrix4(model.group.matrixWorld)
-    const mid = this.arcMid.set(0, arc.length * 0.6, 0).applyMatrix4(model.group.matrixWorld)
-    if (this.arcLive) {
-      this.ctx.fx.trail('slash', this.arcTip0, tip, arc.color)
-      this.ctx.fx.trail('slash', this.arcMid0, mid, arc.color)
-    }
-    this.arcTip0.copy(tip)
-    this.arcMid0.copy(mid)
-    this.arcLive = true
+    if (!arc || !model || this.move === 'none' || this.moveT < ARC_FROM || this.moveT > ARC_TO) this.swing?.stop()
+    else this.swing?.weapon(model.group, arc)
   }
 
   private startMelee(move: WeaponMove): void {
@@ -442,7 +415,8 @@ export class Weapons implements IWeapons {
     b.max = undefined
     b.freeze = undefined
     this.setFrom(p.position)
-    this.landed(this.ctx.enemies.hit(b), i === 2 ? 0.3 : 0.18)
+    const players = this.ctx.net.strike(b, i / 2)
+    this.landed(this.ctx.enemies.hit(b) + players, i === 2 ? 0.3 : 0.18)
   }
 
   private slam(): void {
@@ -475,7 +449,7 @@ export class Weapons implements IWeapons {
     b.damage = def.wave.damage
     b.knock = def.wave.knock
     b.lift = def.wave.lift
-    n += ctx.enemies.hit(b)
+    n += ctx.enemies.hit(b) + ctx.net.strike(b, 1)
     this.landed(n, 0)
   }
 
@@ -528,8 +502,8 @@ export class Weapons implements IWeapons {
     const tz = hit ? hit.z : o.z + dir.z * 120
     const speed = BOW.speed[0] + (BOW.speed[1] - BOW.speed[0]) * c
     aimArc(from, tx, ty, tz, speed, ARROW.gravity, this.w)
-    this.arrows?.fire(from, this.w, BOW.damage[0] + (BOW.damage[1] - BOW.damage[0]) * c)
-    ctx.bus.emit('weapon:fire', { pos: v3(from), charge: c })
+    this.arrows?.fire(from, this.w, BOW.damage[0] + (BOW.damage[1] - BOW.damage[0]) * c, c)
+    ctx.bus.emit('weapon:fire', { pos: v3(from), charge: c, vel: v3(this.w) })
     this.move = 'release'
     this.moveT = 0
     this.charge = 0

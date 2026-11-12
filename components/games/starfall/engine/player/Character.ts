@@ -401,6 +401,11 @@ export class Character implements ICharacter {
     return out.copy(rd?.active ? rd.anchor : this.ctx.player.position)
   }
 
+  getRagdollBody(out: Float64Array, root: THREE.Vector3): number | null {
+    const rd = this.ragdoll
+    return rd?.active ? rd.body(out, root) : null
+  }
+
   cancelRagdoll(): void {
     const rd = this.ragdoll
     if (!rd?.active) return

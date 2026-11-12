@@ -130,23 +130,28 @@ export class Sfx extends SfxKit {
     this.tone(v, t + 0.17, 'sine', 66, 40, 0.14, 0.008, 0.15)
   }
 
-  dash(): void {
+  /** `pos`: another player's dash, heard where it happens (ours sweeps across the stereo field). */
+  dash(pos?: V3): void {
     if (!this.gate('dash', 0.1)) return
     const t = this.t
     const s = this.s
-    const pan = s.ac.createStereoPanner()
-    pan.connect(this.mix.sfx.input)
-    pan.pan.setValueAtTime(-0.45, t)
-    pan.pan.linearRampToValueAtTime(0.45, t + 0.3)
-    const v = s.gain(1.5, pan)
+    let v: GainNode
+    if (pos) v = this.voice(this.mix.sfx, 1.5, { pos, ref: 6 })
+    else {
+      const pan = s.ac.createStereoPanner()
+      pan.connect(this.mix.sfx.input)
+      pan.pan.setValueAtTime(-0.45, t)
+      pan.pan.linearRampToValueAtTime(0.45, t + 0.3)
+      v = s.gain(1.5, pan)
+    }
     this.whoosh(v, t, 2600, 420, 0.32, 0.3, 0.9)
     this.tone(v, t, 'sine', 190, 85, 0.1, 0.01, 0.16)
   }
 
-  attack(): void {
+  attack(pos?: V3): void {
     if (!this.gate('attack', 0.1)) return
     const t = this.t
-    const v = this.voice(this.mix.sfx, 2, { wet: 0.4 })
+    const v = this.voice(this.mix.sfx, 2, { pos, ref: 6, wet: 0.4 })
     this.whoosh(v, t, 700, 2400, 0.16, 0.2, 1.3)
     this.whoosh(v, t + 0.12, 2400, 800, 0.22, 0.16, 1.3)
     this.chime(v, t + 0.02, mtof(93), 0.035, 0.45, 2, 0.8)
@@ -309,10 +314,10 @@ export class Sfx extends SfxKit {
   /* ── weapons ─────────────────────────────────────────────── */
 
   /** Blade through the air (pitch rises along the combo), or the hammer's heavy lift. */
-  swing(weapon: WeaponId, combo: number): void {
+  swing(weapon: WeaponId, combo: number, pos?: V3): void {
     if (!this.gate('swing', 0.06)) return
     const t = this.t
-    const v = this.voice(this.mix.sfx, 1.6, { wet: 0.25 })
+    const v = this.voice(this.mix.sfx, 1.6, { pos, ref: 6, wet: 0.25 })
     if (KIND[weapon] === 'hammer') {
       this.whoosh(v, t + 0.1, 260 * rand(0.92, 1.08), 820, 0.42, 0.22, 0.8)
       // The ice head sings faintly as it comes round.
@@ -337,11 +342,11 @@ export class Sfx extends SfxKit {
   }
 
   /** The bow limbs creak as the string comes back. */
-  bowDraw(): void {
+  bowDraw(pos?: V3): void {
     if (!this.gate('draw', 0.2)) return
     const t = this.t
     const s = this.s
-    const v = this.voice(this.mix.sfx, 0.9)
+    const v = this.voice(this.mix.sfx, 0.9, { pos, ref: 5 })
     const env = s.gain(0, v)
     const bp = s.filter('bandpass', 500, 7, env)
     s.glide(bp.frequency, t, 480, 1250, 0.6)
@@ -349,9 +354,9 @@ export class Sfx extends SfxKit {
   }
 
   /** String twang and the arrow's whip; a fuller draw sounds stronger. */
-  bowFire(charge: number): void {
+  bowFire(charge: number, pos?: V3): void {
     const t = this.t
-    const v = this.voice(this.mix.sfx, 1.2, { wet: 0.2 })
+    const v = this.voice(this.mix.sfx, 1.2, { pos, ref: 6, wet: 0.2 })
     this.tone(v, t, 'triangle', 230 + 90 * charge, 150, 0.3, 0.002, 0.24)
     this.tone(v, t, 'sine', 110, 68, 0.22, 0.002, 0.16)
     this.whoosh(v, t + 0.01, 2400, 6200, 0.14, 0.1 + 0.14 * charge, 2)
@@ -412,11 +417,11 @@ export class Sfx extends SfxKit {
   }
 
   /** A hard limp landing: a springy cartoon "boing" or a little "oof". */
-  flop(impact: number): void {
+  flop(impact: number, pos?: V3): void {
     if (!this.gate('flop', 0.35)) return
     const t = this.t
     const s = this.s
-    const v = this.voice(this.mix.sfx, 1.2, { wet: 0.2 })
+    const v = this.voice(this.mix.sfx, 1.2, { pos, ref: 6, wet: 0.2 })
     if (Math.random() < 0.5) {
       const env = s.gain(0, v)
       const end = s.perc(env.gain, t, 0.2, 0.005, 0.6)

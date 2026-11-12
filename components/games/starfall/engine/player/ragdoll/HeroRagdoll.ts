@@ -177,6 +177,18 @@ export class HeroRagdoll {
     this.poser.pose(src, this.rootPos, yaw, 1, this.pose)
   }
 
+  /**
+   * Where the body's particles are now (world) and the root it is posed relative to — the
+   * simulation while limp, the posed skeleton while getting up (bone world matrices must be
+   * current). Returns the root yaw.
+   */
+  body(out: Float64Array, root: THREE.Vector3): number {
+    if (this.phase === 'limp') out.set(this.sim.render)
+    else this.readBones(out)
+    root.copy(this.rootPos)
+    return this.rootYaw
+  }
+
   /** Ends it on the spot (the caller snaps the body back to the animation). */
   cancel(): void {
     this.phase = 'off'

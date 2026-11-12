@@ -124,8 +124,8 @@ export interface GameEventMap {
   /** The hammer hits the ground: shockwave. */
   'weapon:slam': { pos: V3 }
   'weapon:draw': { pos: V3 }
-  /** An arrow leaves the bow; charge 0..1. */
-  'weapon:fire': { pos: V3; charge: number }
+  /** An arrow leaves the bow; charge 0..1, launch velocity (m/s). */
+  'weapon:fire': { pos: V3; charge: number; vel?: V3 }
   /** An arrow stuck in the ground or a prop. */
   'arrow:stick': { pos: V3 }
 
@@ -137,7 +137,14 @@ export interface GameEventMap {
   'net:peer': { id: string; name: string; joined: boolean }
   /** Block edits from another player (validated). */
   'net:blocks': { id: string } & BlockMsg
+  /**
+   * Another player's action reached its audible moment at `pos` (their copy plays the clip and
+   * effects), or a player-vs-player hit landed ('hit'). Audio and particles react.
+   */
+  'net:action': { action: NetFxAction; weapon: WeaponId; pos: V3; dir?: V3; combo?: number; charge?: number }
 }
+
+export type NetFxAction = 'swing' | 'slam' | 'draw' | 'fire' | 'spin' | 'dash' | 'flop' | 'hit'
 
 type Handler<T> = (payload: T) => void
 
