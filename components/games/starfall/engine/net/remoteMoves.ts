@@ -17,7 +17,10 @@ import type { Ctx, WeaponId, WeaponMove, WeaponPose } from '../types'
 import type { ActionMsg } from './protocol'
 import type { RemotePeer } from './RemotePeer'
 
-/** News older than this (s) is dropped; younger news plays from where the move is by now (at most MAX_SKIP in). */
+/**
+ * A swing, slam, spin or dash heard of this late (s) is over: dropped (a draw or a shot still shows).
+ * Younger news plays from where the move is by now, at most MAX_SKIP in.
+ */
 const STALE = 1.2
 const MAX_SKIP = 0.3
 /** A draw the state stream hasn't confirmed for this long (s) was called off. */
@@ -34,7 +37,7 @@ export interface MoveBody {
   /** Right palm (the spin's trail), if rigged. */
   readonly palm: THREE.Object3D | null
   /** The copy of `id` in hand, if one was made. */
-  model(id: WeaponId): WeaponModel | null
+  heldModel(id: WeaponId): WeaponModel | null
 }
 
 export class RemoteMoves {
@@ -65,7 +68,7 @@ export class RemoteMoves {
 
   /** A move started `age` seconds ago on their screen. */
   start(m: ActionMsg, age: number, body: MoveBody): void {
-    if (age > STALE) return
+    if (age > STALE && m.action !== 'draw' && m.action !== 'release') return
     const skip = Math.min(age, MAX_SKIP)
     const pose = this.pose
     const pos = body.root.position
@@ -138,12 +141,12 @@ export class RemoteMoves {
     // Swing arc.
     const arc = pose.weapon === 'fists' ? null : SWING_ARC[pose.weapon as HeldWeapon]
     const melee = pose.move !== 'none' && pose.move !== 'draw' && pose.move !== 'release'
-    const model = arc && melee && pose.t >= ARC_FROM && pose.t <= ARC_TO ? body.model(pose.weapon) : null
+    const model = arc && melee && pose.t >= ARC_FROM && pose.t <= ARC_TO ? body.heldModel(pose.weapon) : null
     if (arc && model) this.swing.weapon(model.group, arc)
     else this.swing.stop()
 
     // The bow string follows the draw.
-    const bow = KIND[pose.weapon] === 'bow' ? body.model(pose.weapon) : null
+    const bow = KIND[pose.weapon] === 'bow' ? body.heldModel(pose.weapon) : null
     if (bow) {
       const drawing = pose.move === 'draw'
       const c = pose.charge

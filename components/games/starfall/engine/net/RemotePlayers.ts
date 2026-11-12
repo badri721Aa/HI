@@ -3,6 +3,9 @@
  * texture, own skeleton), animated by the same procedural Animator as the local
  * hero from a MotionState rebuilt out of the network stream, with a tinted
  * shirt, its own blinking face, a soft blob shadow, a name tag and chat bubbles.
+ * Their moves play the same clips and effects (remoteMoves.ts); a ragdolling
+ * player's streamed body drives the skeleton (ragdollSync.ts), with a canned
+ * lie-down only if no body frames arrive.
  *
  *   root (smoothed position, yaw) → pivot (spin attack) → model (unit scale) → cloned glTF scene
  *
@@ -12,16 +15,20 @@ import * as THREE from 'three'
 import { GLTFLoader, type GLTFParser } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { GroundHit } from '../collision'
-import type { Ctx, GestureName, MotionState, WeaponId, WeaponPose } from '../types'
+import type { Ctx, GestureName, MotionState, WeaponId } from '../types'
+import { Arrows } from '../gameplay/weapons/Arrows'
 import { KIND } from '../gameplay/weapons/defs'
-import { WeaponKit, type HeldWeapon } from '../gameplay/weapons/models'
+import { WeaponKit, type HeldWeapon, type WeaponModel } from '../gameplay/weapons/models'
 import { Animator, type GroundSample } from '../player/Animator'
 import { createGrip } from '../player/anim/grip'
 import { Face } from '../player/Face'
 import { Rig } from '../player/anim/Rig'
 import { BUBBLE_TIME, TAG_FADE_START, TAG_HIDE } from './config'
 import { BUBBLE_H, BUBBLE_W, CanvasSprite, TAG_H, TAG_W, drawBubble, drawNameTag } from './labels'
+import type { ActionMsg } from './protocol'
+import { RagdollPuppet } from './ragdollSync'
 import type { RemotePeer } from './RemotePeer'
+import { RemoteMoves, type MoveBody } from './remoteMoves'
 import { ShirtMaterial } from './shirt'
 
 const HERO_URL = '/games/starfall/hero.glb'
@@ -40,6 +47,8 @@ const LIE_ANGLE = Math.PI / 2 - 0.1
 const LIE_PELVIS = 0.16
 /** How far back (m) the labels move to sit over the torso of a lying body. */
 const LIE_TAG_BACK = 0.45
+/** Ragdoll impacts at least this hard (m/s) throw up dust (the hero's own threshold). */
+const IMPACT_PUFF = 4
 
 /** Same CSP-safe embedded image decoding as the local hero (see player/Character.ts). */
 function embeddedImagesViaImg(parser: GLTFParser) {
@@ -67,7 +76,7 @@ const _m = new THREE.Matrix4()
 const _n = new THREE.Vector3()
 const UP = new THREE.Vector3(0, 1, 0)
 
-class Avatar {
+class Avatar implements MoveBody {
   readonly root = new THREE.Group()
   readonly pivot = new THREE.Group()
   readonly model = new THREE.Group()
@@ -88,8 +97,13 @@ class Avatar {
   frame = 0
   /** Hand grips [left, right] and the weapon copies made so far (shown: the one in the peer's hand). */
   private grips: [THREE.Object3D | null, THREE.Object3D | null] = [null, null]
-  private weapons = new Map<HeldWeapon, THREE.Object3D>()
-  private readonly weaponPose: WeaponPose = { weapon: 'fists', move: 'none', t: 0, charge: 0 }
+  private weapons = new Map<HeldWeapon, WeaponModel>()
+  private shown: WeaponId = 'fists'
+  readonly moves: RemoteMoves
+  palm: THREE.Object3D | null = null
+  /** Their streamed ragdoll body (made the first time one arrives), and whether it drives the skeleton. */
+  private puppet: RagdollPuppet | null = null
+  private puppeting = false
   prevYaw = 0
   turnRate = 0
   /** Uniform model scale; the animator's squash and stretch is applied on top of it. */
@@ -107,7 +121,9 @@ class Avatar {
     blobGeo: THREE.BufferGeometry,
     blobMat: THREE.Material,
     private weaponKit: () => WeaponKit,
+    arrows: () => Arrows,
   ) {
+    this.moves = new RemoteMoves(ctx, arrows)
     const anisotropy = Math.min(4, ctx.renderer.capabilities.getMaxAnisotropy())
     this.root.name = `remote-${peer.id}`
     this.root.add(this.pivot)
@@ -163,6 +179,7 @@ class Avatar {
     try {
       this.grips = [createGrip(scene, 'L', t.scale), createGrip(scene, 'R', t.scale)]
       this.rig = new Rig(scene, t.scale)
+      this.palm = this.rig.palmR
       this.animator = new Animator(this.rig, this.probe)
     } catch (err) {
       console.warn('[starfall] remote hero rig failed', err)
@@ -181,14 +198,34 @@ class Avatar {
 
   /** Puts the peer's weapon in the right hand grip (the bow in the left); copies are made on first use. */
   private showWeapon(id: WeaponId): void {
-    this.weaponPose.weapon = id
-    for (const [w, o] of this.weapons) o.visible = w === id
+    this.shown = id
+    for (const [w, m] of this.weapons) m.group.visible = w === id
     if (id === 'fists' || this.weapons.has(id)) return
     const grip = this.grips[KIND[id] === 'bow' ? 0 : 1]
     if (!grip) return
     const m = this.weaponKit().make(id)
+    if (m.arrow) m.arrow.visible = false
     grip.add(m.group)
-    this.weapons.set(id, m.group)
+    this.weapons.set(id, m)
+  }
+
+  heldModel(id: WeaponId): WeaponModel | null {
+    return id === 'fists' ? null : (this.weapons.get(id) ?? null)
+  }
+
+  /** They started a move `age` seconds ago. */
+  play(m: ActionMsg, age: number): void {
+    if (!this.root.visible) return
+    if (m.weapon !== this.shown) this.showWeapon(m.weapon)
+    this.moves.start(m, age, this)
+  }
+
+  /** Follows their ragdoll stream; true while it drives the body. */
+  private updatePuppet(now: number): boolean {
+    const p = this.peer
+    if (!this.rig || (!this.puppet && !p.body.count)) return false
+    this.puppet ??= new RagdollPuppet(this.rig)
+    return this.puppet.update(p, now)
   }
 
   /** Ground probe for the animator's foot planting (same as the local hero's). */
@@ -218,11 +255,12 @@ class Avatar {
     this.bubbleT = BUBBLE_TIME
   }
 
-  update(dt: number, camera: THREE.PerspectiveCamera, frustum: THREE.Frustum): void {
+  update(dt: number, now: number, camera: THREE.PerspectiveCamera, frustum: THREE.Frustum): void {
     const p = this.peer
     const root = this.root
-    root.position.copy(p.position)
-    root.rotation.y = p.yaw
+    const puppet = this.updatePuppet(now) ? this.puppet : null
+    root.position.copy(puppet ? puppet.root : p.position)
+    root.rotation.y = puppet ? puppet.yaw : p.yaw
     const raw = Math.atan2(Math.sin(p.yaw - this.prevYaw), Math.cos(p.yaw - this.prevYaw)) / Math.max(dt, 1e-3)
     this.prevYaw = p.yaw
     this.turnRate += (THREE.MathUtils.clamp(raw, -12, 12) - this.turnRate) * (1 - Math.exp(-10 * dt))
@@ -238,16 +276,26 @@ class Avatar {
     root.visible = visible
     this.updateBlob(visible && dist < 60)
     if (!visible) {
+      if (this.wasVisible) this.moves.reset()
       this.wasVisible = false
       return
     }
 
     const a = this.animator
-    if (a) {
+    if (a && puppet) this.animatePuppet(a, puppet, dt)
+    else if (a) {
+      if (this.puppeting) {
+        // Up again: hand the body back to the animation.
+        this.puppeting = false
+        a.releaseOverride(0.3)
+        a.resetFeet()
+      }
+      const moves = this.moves
       const m = this.motion
-      // Remote copies don't run the ragdoll physics: they go limp (death pose, lying down) at the replicated anchor.
-      m.state = p.ragdoll ? 'dead' : p.state
-      m.stateTime = p.stateTime
+      // No body frames (an older client): a canned limp (death pose, lying down) at the replicated anchor.
+      const limp = p.ragdoll && !p.body.count
+      m.state = limp ? 'dead' : moves.spinT >= 0 ? 'attack' : p.state
+      m.stateTime = moves.spinT >= 0 ? moves.spinT : p.stateTime
       m.speed = Math.hypot(p.velocity.x, p.velocity.z)
       m.vy = p.velocity.y
       m.grounded = p.grounded
@@ -256,8 +304,12 @@ class Avatar {
       m.wading = p.wading
       m.slope = p.slope
       a.setMotion(m)
-      if (p.weapon !== this.weaponPose.weapon) this.showWeapon(p.weapon)
-      a.setWeapon(this.weaponPose)
+      // A move in progress keeps its weapon in hand until it is over.
+      const held = moves.pose.move !== 'none' ? moves.pose.weapon : p.weapon
+      if (held !== this.shown) this.showWeapon(held)
+      moves.pose.weapon = held
+      moves.update(dt, p, this)
+      a.setWeapon(moves.pose)
       if (p.snapped || !this.wasVisible) a.resetFeet()
       this.animAcc += dt
       const every = dist > LOD2 ? 4 : dist > LOD1 ? 2 : 1
@@ -268,10 +320,10 @@ class Avatar {
         this.model.scale.set(side, this.scale * a.stretch, side)
         this.animAcc = 0
       }
-      this.updateLimp(dt, p.ragdoll)
+      this.updateLimp(dt, limp)
     }
     if (this.face) {
-      this.face.hold(p.ragdoll || p.state === 'hurt' || p.state === 'dead' ? 'hurt' : 'neutral')
+      this.face.hold(p.ragdoll || puppet || p.state === 'hurt' || p.state === 'dead' ? 'hurt' : 'neutral')
       this.face.update(dt)
     }
     this.wasVisible = true
@@ -281,10 +333,19 @@ class Avatar {
     const s = Math.max(TAG_SIZE, TAG_SCREEN * viewK * dist)
     const fade = 1 - THREE.MathUtils.smoothstep(dist, TAG_FADE_START, TAG_HIDE)
     const tag = this.tag.sprite
-    // Lying down, the labels drop and move back over the torso.
-    const lie = this.limp * this.limp * (3 - 2 * this.limp)
-    const tagY = TAG_Y - lie * 1.3
-    tag.position.set(0, tagY, -LIE_TAG_BACK * lie)
+    let tagY: number
+    if (puppet) {
+      // Over the streamed body's pelvis.
+      _n.copy(puppet.pelvis).sub(root.position).applyAxisAngle(UP, -root.rotation.y)
+      tagY = Math.max(0.9, _n.y + TAG_Y - (this.rig?.hipsRest.y ?? 0.9))
+      tag.position.set(_n.x, tagY, _n.z)
+    } else {
+      // Lying down, the labels drop and move back over the torso.
+      const lie = this.limp * this.limp * (3 - 2 * this.limp)
+      tagY = TAG_Y - lie * 1.3
+      tag.position.set(0, tagY, -LIE_TAG_BACK * lie)
+    }
+    this.bubble.sprite.position.x = tag.position.x
     this.bubble.sprite.position.z = tag.position.z
     tag.visible = fade > 0.01
     tag.scale.set(s * this.tag.aspect, s, 1)
@@ -297,6 +358,27 @@ class Avatar {
       bubble.scale.set(bs * this.bubble.aspect, bs, 1)
       this.bubble.material.opacity = fade * Math.min(1, this.bubbleT / 0.6, (BUBBLE_TIME - this.bubbleT) / 0.15)
     } else bubble.visible = false
+  }
+
+  /** Their streamed ragdoll drives the skeleton (every frame, whatever the distance). */
+  private animatePuppet(a: Animator, puppet: RagdollPuppet, dt: number): void {
+    if (!this.puppeting) {
+      this.puppeting = true
+      this.moves.reset()
+      a.setOverride(puppet.pose)
+    }
+    this.limp = 0
+    this.pivot.rotation.set(0, 0, 0)
+    this.pivot.position.set(0, 0, 0)
+    this.model.scale.setScalar(this.scale)
+    a.update(dt, this.root.position, puppet.yaw)
+    this.animAcc = 0
+    const body = this.peer.body
+    if (body.impact >= IMPACT_PUFF) {
+      const q = body.impactPos
+      this.ctx.bus.emit('net:action', { action: 'flop', weapon: this.shown, pos: { x: q.x, y: q.y, z: q.z }, charge: body.impact })
+    }
+    body.impact = 0
   }
 
   /** Tilts the body onto its back about the pelvis while ragdolling, and back up after. */
@@ -368,6 +450,16 @@ export class RemotePlayers {
   /** Shared weapon models for every avatar, made when the first one holds something. */
   private kit: WeaponKit | null = null
   private weaponKit = (): WeaponKit => (this.kit ??= new WeaponKit(this.ctx.textures))
+  /** Everyone's arrows: they fly and stick but hit no one (each player's own copy does the hitting). */
+  private arrows: Arrows | null = null
+  private cosmeticArrows = (): Arrows => {
+    if (!this.arrows) {
+      const kit = this.weaponKit()
+      this.arrows = new Arrows(this.ctx, kit.arrowGeometry, kit.arrowMaterial, true)
+      this.ctx.scene.add(this.arrows.mesh)
+    }
+    return this.arrows
+  }
 
   constructor(private ctx: Ctx) {}
 
@@ -437,8 +529,8 @@ export class RemotePlayers {
     return { scene, scale: HERO_HEIGHT / (height || 6.24), hero, face }
   }
 
-  /** Creates avatars for peers that have a position, updates and animates all of them. */
-  update(dt: number, peers: readonly RemotePeer[]): void {
+  /** Creates avatars for peers that have a position, updates and animates all of them (`now`: local clock, s). */
+  update(dt: number, peers: readonly RemotePeer[], now: number): void {
     if (peers.length && !this.loading) this.preload()
     const camera = this.ctx.camera
     _m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
@@ -449,11 +541,17 @@ export class RemotePlayers {
       if (!av) {
         if (!peer.ready || !this.settled) continue
         const blob = this.blobParts()
-        av = new Avatar(this.ctx, peer, this.template, blob.geo, blob.mat, this.weaponKit)
+        av = new Avatar(this.ctx, peer, this.template, blob.geo, blob.mat, this.weaponKit, this.cosmeticArrows)
         this.avatars.set(peer.id, av)
       }
-      av.update(dt, camera, this.frustum)
+      av.update(dt, now, camera, this.frustum)
     }
+    this.arrows?.update(dt)
+  }
+
+  /** A player started a move `age` seconds ago. */
+  action(id: string, m: ActionMsg, age: number): void {
+    this.avatars.get(id)?.play(m, age)
   }
 
   /** Name / colour / away changed. */
@@ -489,6 +587,7 @@ export class RemotePlayers {
   clear(): void {
     for (const av of this.avatars.values()) av.dispose()
     this.avatars.clear()
+    this.arrows?.clear()
   }
 
   dispose(): void {
@@ -497,6 +596,8 @@ export class RemotePlayers {
     for (const d of this.owned) d.dispose()
     this.owned = []
     this.template = null
+    this.arrows?.dispose()
+    this.arrows = null
     this.kit?.dispose()
     this.kit = null
     this.blob?.geo.dispose()

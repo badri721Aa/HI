@@ -399,7 +399,7 @@ export class Network implements INetwork {
       }
       if (room) {
         for (let i = 0; i < room.list.length; i++) room.list[i].update(realDt, now)
-        this.remotes.update(realDt, room.list)
+        this.remotes.update(realDt, room.list, now)
       }
       if (this.lobby && !this.lobbyRoom && now > this.lobbyUntil) this.closeLobby()
     } catch (err) {

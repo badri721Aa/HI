@@ -25,8 +25,6 @@ const DELAY_DIRECT = 0.09
 const DELAY_RELAY = 0.26
 /** A gap this long (s) between frames starts a new ragdoll. */
 const NEW_GAP = 0.8
-/** Out of frames while the state stream still says ragdoll: hold the last one this long (s). */
-const HOLD = 1
 const BUFFER = 8
 
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t
@@ -181,25 +179,21 @@ export class RagdollPuppet {
 
   /**
    * Follows the peer's frames at local time `now`: starts once the render time reaches the first
-   * frame, ends when it has passed the last one and the state stream says they are up again.
+   * frame, ends when it has passed the last one and the state stream says they are up again (out
+   * of frames while they are still down, the last one holds).
    */
   update(peer: RemotePeer, now: number): boolean {
     const buf = peer.body
     const clock = peer.clock(now)
     const renderT = clock - (peer.direct ? DELAY_DIRECT : DELAY_RELAY)
-    const live = buf.count > 0 && clock >= 0 && renderT >= buf.oldestT && renderT <= buf.newestT + (peer.ragdoll ? HOLD : 0)
-    if (!live) {
-      if (this.on || (buf.count && renderT > buf.newestT + HOLD)) buf.clear()
+    const ended = renderT > buf.newestT && !peer.ragdoll
+    if (!buf.count || clock < 0 || ended || !(this.on || renderT >= buf.oldestT)) {
+      if (ended) buf.clear()
       return (this.on = false)
     }
     this.yaw = buf.sample(renderT, this.body, this.root)
     this.pelvis.set(this.body[0], this.body[1], this.body[2])
     this.poser.pose(this.body, this.root, this.yaw, 0, this.pose)
     return (this.on = true)
-  }
-
-  /** True while frames are on their way (the canned limp would only be in the way). */
-  static pending(peer: RemotePeer, now: number): boolean {
-    return peer.body.count > 0 && peer.clock(now) - peer.body.newestT < HOLD
   }
 }

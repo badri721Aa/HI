@@ -36,6 +36,9 @@ const DUCK: Record<GamePhase, [music: number, ambience: number]> = {
 
 type WebkitWindow = Window & { webkitAudioContext?: typeof AudioContext }
 
+/** Another player's ragdoll knocks this hard (m/s) are heard. */
+const REMOTE_FLOP = 10
+
 export class AudioEngine implements IAudio {
   private ac: AudioContext | null = null
   private mix: Mixer | null = null
@@ -263,7 +266,8 @@ export class AudioEngine implements IAudio {
         sfx.dash(e.pos)
         break
       case 'flop':
-        sfx.flop(e.charge ?? 0, e.pos)
+        // As loud as the hero's own: only the hard knocks (Character's FLOP_IMPACT).
+        if ((e.charge ?? 0) > REMOTE_FLOP) sfx.flop(e.charge ?? 0, e.pos)
         break
       case 'hit':
         sfx.weaponHit(e.pos, e.weapon, false)

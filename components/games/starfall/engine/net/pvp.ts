@@ -32,6 +32,8 @@ const SPIN_RADIUS = 1.3
 
 const _c = new THREE.Vector3()
 
+const dist2 = (a: V3, b: V3) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2
+
 /** Closest point of a body standing at `feet` to `p` (into out). */
 function bodyPoint(feet: THREE.Vector3, p: V3, out: THREE.Vector3): THREE.Vector3 {
   return out.set(feet.x, THREE.MathUtils.clamp(p.y, feet.y + BODY_LO, feet.y + BODY_HI), feet.z)
@@ -64,14 +66,15 @@ export class Pvp {
       if (!peer.ready || peer.away || peer.map !== map || skip?.has(peer.id)) continue
       const b = bodyPoint(peer.position, c, _c)
       const r = blow.radius + BODY_R
-      if (b.distanceToSquared(c as THREE.Vector3) > r * r || !this.sendBucket.take(now)) continue
+      if (dist2(b, c) > r * r || !this.sendBucket.take(now)) continue
       const h = this.msg
       h.seq = this.seq = (this.seq + 1) & 0xffff
       h.weapon = blow.weapon
       h.power = power
-      h.x = c.x
-      h.y = c.y
-      h.z = c.z
+      // Where it reached their body (as we see them).
+      h.x = b.x
+      h.y = b.y
+      h.z = b.z
       encodeHit(this.packet, h)
       room.sendTo(peer.id, this.packet.buffer as ArrayBuffer, true)
       skip?.add(peer.id)
@@ -106,7 +109,7 @@ export class Pvp {
     const from = peer.position
     if (from.distanceToSquared(me) > REACH[kind] * REACH[kind]) return
     const contact = bodyPoint(me, h, _c)
-    if (contact.distanceToSquared(h as unknown as THREE.Vector3) > CONTACT_SLACK * CONTACT_SLACK) return
+    if (dist2(contact, h) > CONTACT_SLACK * CONTACT_SLACK) return
 
     let dx = me.x - from.x
     let dz = me.z - from.z

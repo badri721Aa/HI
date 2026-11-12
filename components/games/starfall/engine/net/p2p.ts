@@ -20,8 +20,8 @@ export interface LinkHost {
   change(): void
 }
 
-/** Max bytes accepted per data-channel message (state packets are 40). */
-const MAX_MESSAGE = 64
+/** Max bytes accepted per data-channel message (the largest, a ragdoll frame, is 144). */
+const MAX_MESSAGE = 192
 /** Candidates gathered within this window travel in one message (ms). */
 const ICE_BATCH_MS = 300
 const ICE_PER_MESSAGE = 20
