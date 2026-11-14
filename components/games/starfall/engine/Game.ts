@@ -82,6 +82,8 @@ export class Game implements GameApi {
   private fpsT = 0
   private fps = 60
   private dynScale = 1
+  /** The largest canvas side (in device pixels) this GPU can render; bigger ones come out black. */
+  private maxCanvas = 4096
   private slowT = 0
   private fastT = 0
   private pausedFrame = 0
@@ -125,6 +127,14 @@ export class Game implements GameApi {
     this.renderer.toneMappingExposure = 1.0
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
+    const gl = this.renderer.getContext()
+    const viewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array
+    this.maxCanvas = Math.min(
+      this.renderer.capabilities.maxTextureSize,
+      gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number,
+      viewport[0],
+      viewport[1],
+    )
 
     const settings = this.profile.settings
     const scene = new THREE.Scene()
@@ -190,6 +200,7 @@ export class Game implements GameApi {
     this.hud.set({ touch: this.isTouch })
     this.bus.on('world:travel', e => {
       if (e.to === 'isle') this.islandObjective()
+      this.ctx.post.watch()
     })
     // Maintenance: the run ends (progress is saved) and the title waits behind the notice.
     this.bus.on('net:maintenance', e => {
@@ -725,6 +736,7 @@ export class Game implements GameApi {
     this.ctx.input.capture = p !== 'title' && p !== 'loading'
     if (p === 'playing') this.ctx.player.controlEnabled = true
     this.ctx.enemies.frozen = p !== 'playing'
+    if (p === 'title' || p === 'playing') this.ctx.post.watch()
     this.bus.emit('ui:phase', { phase: p })
   }
 
@@ -869,7 +881,10 @@ export class Game implements GameApi {
     const w = Math.max(1, this.container.clientWidth)
     const h = Math.max(1, this.container.clientHeight)
     const ctx = this.ctx
-    const pr = Math.min(window.devicePixelRatio || 1, ctx.quality.pixelRatio) * ctx.settings.renderScale * this.dynScale
+    const wanted = Math.min(window.devicePixelRatio || 1, ctx.quality.pixelRatio) * ctx.settings.renderScale * this.dynScale
+    // Huge or very sharp screens can ask for a canvas past the GPU's limit, which renders black.
+    // Only the render resolution gives way there; the canvas always fills the screen.
+    const pr = Math.min(wanted, this.maxCanvas / w, this.maxCanvas / h)
     this.renderer.setPixelRatio(pr)
     this.renderer.setSize(w, h, false)
     ctx.camera.aspect = w / h

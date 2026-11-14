@@ -103,17 +103,22 @@ export const DEVICE_QUALITY: Record<DeviceKind, QualityLevel> = {
 const GPU_GAMING = /NVIDIA|GeForce|RTX|GTX|Radeon RX|Radeon Pro|Apple M\d/i
 const GPU_WEAK = /SwiftShader|llvmpipe|Software|Mali|Adreno|PowerVR|UHD Graphics|HD Graphics/i
 
-/** Best guess at the device from the user agent and the GPU's name (WEBGL_debug_renderer_info). */
+/** The GPU's name (WEBGL_debug_renderer_info when the browser shares it), or '' if unknown. */
+export function gpuName(gl: WebGLRenderingContext | WebGL2RenderingContext | null): string {
+  if (!gl) return ''
+  try {
+    const ext = gl.getExtension('WEBGL_debug_renderer_info')
+    return String((ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '')
+  } catch {
+    return ''
+  }
+}
+
+/** Best guess at the device from the user agent and the GPU's name. */
 export function recommendDevice(gl: WebGLRenderingContext | WebGL2RenderingContext | null): { kind: DeviceKind; gpu: string } {
   if (typeof navigator === 'undefined') return { kind: 'laptop', gpu: '' }
   const ua = navigator.userAgent
-  let gpu = ''
-  try {
-    const ext = gl?.getExtension('WEBGL_debug_renderer_info')
-    gpu = String((ext && gl?.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || gl?.getParameter(gl.RENDERER) || '')
-  } catch {
-    /* the GPU name is only a hint */
-  }
+  const gpu = gpuName(gl)
   const touch = navigator.maxTouchPoints > 0
   // iPadOS reports a Mac user agent, but Macs have no touch screen.
   if (touch && (/Mobi|Android|iPhone|iPad|Tablet/i.test(ua) || /Macintosh/.test(ua))) return { kind: 'phone', gpu }

@@ -483,6 +483,8 @@ export interface IPostFX extends System {
   setSize(width: number, height: number, pixelRatio: number): void
   /** Re-read ctx.quality / ctx.settings. */
   applyQuality(): void
+  /** Check the next frames for a black picture (the GPU failing the post chain) and step down if so. */
+  watch(): void
 }
 
 export type SfxName =

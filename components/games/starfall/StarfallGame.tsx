@@ -22,6 +22,7 @@ import { NetStore } from './ui/netStore'
 import { OnlineLayer } from './ui/OnlineHud'
 import { PauseMenu } from './ui/PauseMenu'
 import { ScreenFx } from './ui/ScreenFx'
+import { Splash } from './ui/Splash'
 import { TitleScreen } from './ui/TitleScreen'
 import { TouchControls } from './ui/TouchControls'
 import styles from './ui/ui.module.css'
@@ -172,6 +173,7 @@ export default function StarfallGame() {
 
       <LoadingGate loading={loading} progress={load.progress} label={phase === 'loading' ? load.label : 'Charting the island'} error={error} />
       {runtimeError && <RuntimeError message={runtimeError} />}
+      <Splash />
     </div>
   )
 }

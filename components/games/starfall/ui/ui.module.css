@@ -857,7 +857,42 @@
   }
 }
 
+/* ── boot ident ───────────────────────────────────────────────────── */
+
+.splash[data-stage='out'],
+.splash[data-stage='skip'] {
+  animation: fadeOut 650ms ease-in forwards;
+  pointer-events: none;
+}
+.splashCard {
+  animation: splashIn 900ms var(--sf-ease) 150ms both;
+}
+@keyframes splashIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.splashStar {
+  animation: starLand 760ms var(--sf-ease) 520ms both;
+}
+.splashLabel {
+  animation: fadeIn 700ms ease-out 380ms both;
+}
+.splashRule {
+  transform-origin: 50% 50%;
+  animation: ruleDraw 700ms var(--sf-ease) 700ms both;
+}
+.splashHint {
+  animation: fadeIn 600ms ease-out 900ms both;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .splashCard,
+  .splashStar,
+  .splashLabel,
+  .splashRule,
+  .splashHint {
+    animation: fadeIn 400ms ease-out both !important;
+  }
   .ripple,
   .rise,
   .slide,
