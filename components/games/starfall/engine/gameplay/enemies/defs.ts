@@ -416,8 +416,9 @@ export interface BossDef<K extends FactoryBossKind = FactoryBossKind> {
   /** Hazard colours: shockwave rings and warning circles. */
   ring: string
   warn: string
-  /** Aura gradient (inner → outer) per phase. */
+  /** Aura gradient (inner → outer) per phase, and how strongly it burns (1 = default). */
   aura: readonly (readonly [string, string])[]
+  auraStrength?: number
   drops: { hearts: number; motes: number }
 }
 
@@ -432,7 +433,7 @@ export const BOSSES: { readonly [K in FactoryBossKind]: BossDef<K> } = {
     model: {
       id: 'iron-titan', scale: 1.42 * BOSS_SCALE,
       look: {
-        glow: '#ffb15a', glowIntensity: 4, rim: '#ff6a1a', rimStrength: 0.35,
+        glow: '#ffb15a', glowIntensity: 4, rim: '#ff6a1a', rimStrength: 0.14,
         materials: {
           Main: { color: '#2c3036', metalness: 0.72, roughness: 0.44 },
           Grey: { color: '#7c828c', metalness: 0.85, roughness: 0.3 },
@@ -449,6 +450,8 @@ export const BOSSES: { readonly [K in FactoryBossKind]: BossDef<K> } = {
     ring: '#ffb35a',
     warn: '#ff5a1f',
     aura: [['#ff7a1a', '#ffcf6a'], ['#ff5a14', '#ffd27a'], ['#fff1d6', '#ff8a2a']],
+    // Big flat iron panels catch the rim flames: keep them to a heat shimmer.
+    auraStrength: 0.55,
     drops: { hearts: 3, motes: 40 },
   },
   vortexWeaver: {

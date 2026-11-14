@@ -256,7 +256,8 @@ export abstract class ScriptedBoss extends Boss implements LiveEnemy {
     u.uB.value.set(colors[1])
     u.uTime.value = t
     const base = this.mode === 'sleep' ? 0.25 : this.mode === 'dying' ? 1.4 : 0.5 + (this.phase - 1) * 0.22
-    u.uIntensity.value = (base + this.flare) * (this.vulnerable ? 0.55 + 0.45 * Math.abs(Math.sin(t * 9)) : 1) * (1 - sk.uDissolve.value)
+    const strength = this.def.auraStrength ?? 1
+    u.uIntensity.value = (base + this.flare) * strength * (this.vulnerable ? 0.55 + 0.45 * Math.abs(Math.sin(t * 9)) : 1) * (1 - sk.uDissolve.value)
     u.uFlow.value = 0.45 + this.phase * 0.2 + this.flare * 0.3
     // Sigil under the boss.
     const sm = this.sigil.material as THREE.ShaderMaterial

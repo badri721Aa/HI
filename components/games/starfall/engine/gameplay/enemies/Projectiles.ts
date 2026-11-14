@@ -74,10 +74,10 @@ void main() {
   vec2 p = vec2(q.x * (1.0 + vStretch) / max(1.0 + vStretch * 0.92, 1e-3), q.y);
   float r = length(p);
   if (style > 3.5) {
-    // Wind blade: a crescent opening backwards.
-    float outer = length(q - vec2(0.18, 0.0));
-    float inner = length(q - vec2(-0.12, 0.0));
-    r = max(outer, 1.0 - inner * 1.25);
+    // Wind blade: a crescent, inside one circle and outside another set behind it.
+    float outer = length(q - vec2(0.1, 0.0)) / 0.9;
+    float inner = length(q - vec2(-0.38, 0.0)) / 0.78;
+    r = max(outer, 2.0 - inner);
   }
   if (r > 1.0) discard;
   float core = 1.0 - smoothstep(0.0, 0.42, r);

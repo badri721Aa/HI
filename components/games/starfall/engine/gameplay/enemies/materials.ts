@@ -212,7 +212,9 @@ varying vec2 vUv;
 void main() {
   vec2 p = vUv * 2.0 - 1.0;
   float d = length(p);
-  float ang = atan(p.y, p.x);
+  // atan(0, 0) is undefined (NaN on some GPUs): never ask it at the very centre.
+  vec2 q = d > 1e-4 ? p : vec2(1.0, 0.0);
+  float ang = atan(q.y, q.x);
   float outer = smoothstep(0.86, 0.9, d) * (1.0 - smoothstep(0.95, 0.99, d));
   float inner = smoothstep(0.6, 0.63, d) * (1.0 - smoothstep(0.66, 0.69, d));
   float ticks = step(0.7, d) * (1.0 - step(0.84, d)) * step(0.82, fract(ang * 3.8197 + uTime * uSpin));

@@ -22,11 +22,12 @@ import { BOSS_NAMES } from '../../worlds/defs'
 import { createBoss } from '../../worlds/bosses/factoryBosses'
 import { supportHeight } from '../parts/util'
 import { SummonCircle } from './arena'
-import { Beams } from './Beams'
+import { BEAM, Beams } from './Beams'
 import { BOSSES, isBossKind, MOBS, type MobDef, type MobLikeKind, type ModelId } from './defs'
 import type { Mob, MobHost } from './Mob'
 import { MOB_CLASSES } from './mobs'
-import { ModelLib } from './models'
+import { ModelLib, type EnemyModel } from './models'
+import { sigilMaterial } from './materials'
 import { BlobShadows, Drops, HpBars } from './overlays'
 import { Projectiles } from './Projectiles'
 import { mixSeed } from './rng'
@@ -109,6 +110,12 @@ export class EnemyFactory implements IEnemyFactory {
   private untarget: (() => void) | null = null
   private prefetchTimer: ReturnType<typeof setTimeout> | null = null
   private host: MobHost | null = null
+  /**
+   * One of each enemy shader, parked out of sight so the loading screen's compile covers them.
+   * Kept (hidden) afterwards: three.js frees a program once nothing uses it.
+   */
+  private warm: { group: THREE.Group; models: EnemyModel[]; owned: Array<{ dispose(): void }> } | null = null
+  private warmed = false
 
   constructor(private ctx: Ctx) {
     this.lib = new ModelLib(Math.min(8, ctx.renderer.capabilities.getMaxAnisotropy()))
@@ -152,6 +159,7 @@ export class EnemyFactory implements IEnemyFactory {
     clearInterval(progress)
     if (capTimer) clearTimeout(capTimer)
     this._ready = true
+    this.warmUp()
     ctx.progress(1)
     // Boss models come down in the background once the game is up.
     this.prefetchTimer = setTimeout(() => this.lib.prefetch(BOSS_MODELS), 5000)
@@ -214,6 +222,10 @@ export class EnemyFactory implements IEnemyFactory {
   update(dt: number): void {
     const ctx = this.ctx
     if (!this.projectiles) return
+    if (this.warm && !this.warmed) {
+      this.warmed = true
+      this.warm.group.visible = false
+    }
     const playing = ctx.game.phase === 'playing'
     const live = playing && !ctx.enemies.frozen
     if (playing) this.hazards!.update(dt)
@@ -246,8 +258,54 @@ export class EnemyFactory implements IEnemyFactory {
     this.bars?.dispose()
     this.shadows?.dispose()
     this.drops?.dispose()
+    this.releaseWarmUp()
     this.projectiles = this.beams = this.hazards = this.bars = this.shadows = this.drops = null
     this.lib.dispose()
+  }
+
+  /* ── shader warm-up ─────────────────────────────────────── */
+
+  /**
+   * The game compiles every visible shader at the end of the loading screen. Enemies only appear
+   * later, so a dressed legion body with gear, a turret, a beam, a telegraph and a sigil stand
+   * far below the world until the first frame: their programs are ready before the first spawn
+   * (no hitch when the first Bomber lights its fuse on a Chromebook).
+   */
+  private warmUp(): void {
+    const ctx = this.ctx
+    const group = new THREE.Group()
+    group.name = 'enemy-warmup'
+    group.position.set(0, -400, 0)
+    const models = [this.lib.create(MOBS.shieldBearer.model, MOBS.shieldBearer.color), this.lib.create(MOBS.bomber.model, MOBS.bomber.color), this.lib.create(MOBS.turret.model, MOBS.turret.color)]
+    for (const m of models) group.add(m.root)
+    const owned: Array<{ dispose(): void }> = []
+    const sigilGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)
+    const sigil = sigilMaterial('#ffffff', 0)
+    owned.push(sigilGeo, sigil)
+    group.add(new THREE.Mesh(sigilGeo, sigil))
+    ctx.scene.add(group)
+    this.beams!.draw({ x: 0, y: -400, z: 0 }, { x: 0, y: -399, z: 0 }, 0.1, new THREE.Color(), 0, BEAM.laser)
+    this.hazards!.warn(0, -400, 0, 1, 0.05, null)
+    this.warm = { group, models, owned }
+  }
+
+  private releaseWarmUp(): void {
+    const w = this.warm
+    if (!w) return
+    this.warm = null
+    w.group.removeFromParent()
+    for (const m of w.models) m.dispose()
+    for (const o of w.owned) o.dispose()
+  }
+
+  /** Compile a new boss's shaders off the main thread where the browser can (it is still burning in). */
+  private prewarm(obj: THREE.Object3D): void {
+    const r = this.ctx.renderer as THREE.WebGLRenderer & { compileAsync?: (o: THREE.Object3D, c: THREE.Camera, s?: THREE.Scene) => Promise<unknown> }
+    try {
+      r.compileAsync?.(obj, this.ctx.camera, this.ctx.scene).catch(() => {})
+    } catch {
+      /* only an optimisation */
+    }
   }
 
   /* ── mobs ────────────────────────────────────────────────── */
@@ -357,6 +415,7 @@ export class EnemyFactory implements IEnemyFactory {
     h.stage = 'enter'
     h.t = 0
     b.enter()
+    this.prewarm(b.root)
     ctx.fx.burst('beacon', { x: h.arena.x, y: h.arena.y + 1.5, z: h.arena.z }, { color: BOSSES[h.kind].color, scale: 1.2 })
     ctx.game.shake(0.5, 0.6)
   }
