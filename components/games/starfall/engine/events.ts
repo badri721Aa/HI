@@ -1,4 +1,5 @@
 import type { BlockMsg } from './build/blocks'
+import type { ModeCue, ModeView } from './net/modes/Modes'
 import type { Surface } from './world/heightfield'
 
 export interface V3 {
@@ -142,6 +143,17 @@ export interface GameEventMap {
    * effects), or a player-vs-player hit landed ('hit'). Audio and particles react.
    */
   'net:action': { action: NetFxAction; weapon: WeaponId; pos: V3; dir?: V3; combo?: number; charge?: number }
+  /**
+   * The server is being updated: everyone leaves their room and waits (`waiting` = players waiting,
+   * live). Turned off, the page reloads into the new version.
+   */
+  'net:maintenance': { on: boolean; message: string; waiting: number }
+
+  // ── game modes (online rooms) ──────────────────────────
+  /** The round as the UI shows it: phase, timer, scores, results. */
+  'mode:view': ModeView
+  /** A moment that deserves a sound (countdown tick, go, a tag, a KO, a ring, a point…). */
+  'mode:cue': { cue: ModeCue }
 }
 
 export type NetFxAction = 'swing' | 'slam' | 'draw' | 'fire' | 'spin' | 'dash' | 'flop' | 'hit'

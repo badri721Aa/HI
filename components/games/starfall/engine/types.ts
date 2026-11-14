@@ -12,6 +12,8 @@ import type { CollisionWorld, Collider } from './collision'
 import type { BlockMsg } from './build/blocks'
 import type { BossId, CutsceneName, EventBus, GamePhase, MapId, MusicMood, V3, WeaponId } from './events'
 import type { Input } from './input'
+import type { ModeId, Spot } from './net/modes/defs'
+import type { ModeView } from './net/modes/Modes'
 import type { SaveGame } from './save'
 import type { QualityProfile, Settings } from './settings'
 import type { CompassMarker, HudStore } from './store'
@@ -367,6 +369,8 @@ export interface IWeapons extends System {
   readonly aimYaw: number | null
   readonly pose: WeaponPose
   equip(id: WeaponId): void
+  /** Game modes: put `id` in hand as the only weapon, without saving (null gives the saved loadout back). */
+  lend(id: WeaponId | null): void
   /** A reward: own `id` (saved), put it in hand and announce it. */
   grant(id: WeaponId): void
   /** Re-sync owned weapons and pickups with ctx.game.save (new game / continue). */
@@ -570,6 +574,23 @@ export interface INetwork extends System {
    * whose body it overlaps is sent a hit (they validate and apply it). Returns how many were hit.
    */
   strike(blow: WeaponHit, power: number): number
+  /** Game modes in the current room. */
+  readonly modes: IModes
+}
+
+/** net/modes/Modes.ts — rounds of Tag, Knockout, Race, King of the Hill and Hide and Seek, refereed by the room host. */
+export interface IModes {
+  readonly view: ModeView
+  /** We are playing in a round (its countdown or live part). */
+  readonly active: boolean
+  /** Host only: start a round (false when not the host, a round is running or too few players). */
+  start(mode: ModeId): boolean
+  /** Host only: end the running round now. */
+  stop(): void
+  /** Not the host: ask the host for a mode (shows them a toast); false when rate-limited. */
+  suggest(mode: ModeId): boolean
+  /** Respawn point while a round needs one (arena, last ring), else null. */
+  spawnPoint(): Spot | null
 }
 
 export type { BossId, Collider, MapId, WeaponId }

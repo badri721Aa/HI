@@ -69,6 +69,8 @@ export class Game implements GameApi {
   private last = 0
   private timers: Timer[] = []
   private dying = false
+  /** The server is being updated (maintenance): no new runs start. */
+  private halted = false
   private saveDirty = false
   private saveFlushT = 0
   private hudT = 0
@@ -189,6 +191,11 @@ export class Game implements GameApi {
     this.bus.on('world:travel', e => {
       if (e.to === 'isle') this.islandObjective()
     })
+    // Maintenance: the run ends (progress is saved) and the title waits behind the notice.
+    this.bus.on('net:maintenance', e => {
+      this.halted = e.on
+      if (e.on && this.phase !== 'title' && this.phase !== 'loading') this.quitToTitle()
+    })
   }
 
   /* ── loading ─────────────────────────────────────────────── */
@@ -290,7 +297,7 @@ export class Game implements GameApi {
 
   /** Must be called from a click/tap so audio and pointer lock can start. Title screen only (a double click must not start twice). */
   newGame(): void {
-    if (this.phase !== 'title') return
+    if (this.phase !== 'title' || this.halted) return
     this.resetTransient()
     this.ctx.audio.unlock()
     clearSave('story')
@@ -311,7 +318,7 @@ export class Game implements GameApi {
   }
 
   continueGame(): void {
-    if (this.phase !== 'title') return
+    if (this.phase !== 'title' || this.halted) return
     const s = loadSave('story')
     if (!s) return this.newGame()
     this.begin(s)
@@ -319,7 +326,7 @@ export class Game implements GameApi {
 
   /** The Creative sandbox (its own save slot): everything unlocked, no damage, flying, building from the start. */
   startCreative(): void {
-    if (this.phase !== 'title') return
+    if (this.phase !== 'title' || this.halted) return
     this.begin(loadSave('creative') ?? this.newCreativeSave())
     this.ctx.build.setActive(true)
     const device = this.ctx.input.device
@@ -591,10 +598,13 @@ export class Game implements GameApi {
   playerDied(cause: 'water' | 'fall' | 'enemy'): void {
     if (this.dying || this.phase !== 'playing') return
     this.dying = true
-    this.save.deaths++
-    this.saveDirty = true
+    // Falls in a game-mode round are part of the game, not the story's death count.
+    if (!this.ctx.net.modes.active) {
+      this.save.deaths++
+      this.saveDirty = true
+      this.hud.set({ deaths: this.save.deaths })
+    }
     this.bus.emit('player:died', { pos: v3(this.ctx.player.position), cause })
-    this.hud.set({ deaths: this.save.deaths })
     if (cause === 'water') {
       this.respawn()
       return
@@ -776,7 +786,7 @@ export class Game implements GameApi {
     ctx.player.controlEnabled = false
     this.bus.emit('ui:fade', { to: 1, duration: 0.45 })
     this.after(0.55, () => {
-      const sp = ctx.worlds.spawnPoint() ?? ctx.checkpoints.spawnPoint(this.save.checkpoint)
+      const sp = ctx.net.modes.spawnPoint() ?? ctx.worlds.spawnPoint() ?? ctx.checkpoints.spawnPoint(this.save.checkpoint)
       ctx.player.resetHealth()
       ctx.player.teleport(sp.x, sp.y, sp.z, sp.yaw)
       ctx.cameraRig.snapBehind()

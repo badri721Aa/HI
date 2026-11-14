@@ -841,7 +841,24 @@
   animation-delay: 900ms;
 }
 
+/* Maintenance notice: slow ripples spreading from a resting star. */
+.ripple {
+  animation: ripple 4.8s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes ripple {
+  from {
+    transform: scale(0.3);
+    opacity: 0.75;
+  }
+  to {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .ripple,
   .rise,
   .slide,
   .shootingStar,

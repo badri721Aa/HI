@@ -13,6 +13,7 @@ import { Button, Chip, PanelHeader } from './controls'
 import { RefreshIcon, UsersIcon } from './icons'
 import { focusFirst, hoverFocus } from './nav'
 import { SHIRT_COLORS } from './netStore'
+import { ModesSection } from './ModesPanel'
 import { BigCode, CopyButton, linkTone, Occupancy, PlayerRows, roomKind, StatusDot } from './OnlineShared'
 import { BackHint } from './Panel'
 import { cx, LABEL } from './theme'
@@ -378,6 +379,8 @@ function RoomLobby({ room, primary }: { room: RoomInfo; primary: PrimaryAction }
           </div>
         </div>
       )}
+
+      <ModesSection />
 
       <Section label="Players" aside={<Occupancy players={Math.max(room.players, players.length)} max={room.max} />}>
         {players.length ? (

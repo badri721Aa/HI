@@ -78,6 +78,8 @@ export class RemotePeer implements NetPeer {
   readonly frames = new Bucket(30, 28)
   readonly actions = new Bucket(12, 8)
   readonly hits = new Bucket(3, 1.5)
+  /** Game-mode messages: the host sends on change plus a 1 Hz heartbeat. */
+  readonly modeMsgs = new Bucket(8, 4)
   readonly actionSeqs = new SeqWindow()
   readonly hitSeqs = new SeqWindow()
   /** Their ragdolling body, while it lasts. */

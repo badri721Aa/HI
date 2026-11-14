@@ -16,6 +16,8 @@ import { CutsceneOverlay } from './ui/CutsceneOverlay'
 import { DialogBox } from './ui/DialogBox'
 import { Hud } from './ui/Hud'
 import { LoadingScreen } from './ui/LoadingScreen'
+import { MaintenanceOverlay } from './ui/MaintenanceOverlay'
+import { ModeLayer } from './ui/ModeHud'
 import { NetStore } from './ui/netStore'
 import { OnlineLayer } from './ui/OnlineHud'
 import { PauseMenu } from './ui/PauseMenu'
@@ -158,11 +160,13 @@ export default function StarfallGame() {
           <Hud />
           <TouchControls />
           <OnlineLayer />
+          <ModeLayer />
           <Announcements />
           <DialogBox />
           <TitleScreen />
           <PauseMenu />
           <VictoryScreen />
+          <MaintenanceOverlay />
         </GameContext.Provider>
       )}
 

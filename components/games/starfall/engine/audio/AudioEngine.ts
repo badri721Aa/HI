@@ -115,6 +115,7 @@ export class AudioEngine implements IAudio {
       bus.on('block:break', e => this.sfx?.blockBreak(e.pos, e.surface)),
       bus.on('cutscene:start', () => this.sfx?.cutscene(true)),
       bus.on('cutscene:end', e => this.sfx?.cutscene(false, e.skipped)),
+      bus.on('mode:cue', e => this.sfx?.mode(e.cue)),
     )
   }
 

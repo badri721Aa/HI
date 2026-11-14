@@ -6,6 +6,7 @@
  */
 import type { BossId, V3, WeaponId } from '../events'
 import { KIND } from '../gameplay/weapons/defs'
+import type { ModeCue } from '../net/modes/Modes'
 import type { SfxName } from '../types'
 import type { Surface } from '../world/heightfield'
 import { SfxKit } from './sfxKit'
@@ -557,6 +558,57 @@ export class Sfx extends SfxKit {
         this.tone(v, t, 'triangle', 880, 880, 0.05, 0.006, 0.14)
         this.tone(v, t + 0.06, 'triangle', 1175, 1175, 0.05, 0.006, 0.14)
         this.tone(v, t + 0.12, 'sine', 1760, 1760, 0.04, 0.006, 0.2)
+        break
+    }
+  }
+
+  /* ── game modes ──────────────────────────────────────────── */
+
+  /** Round moments: countdown ticks, the start and end, tags, knockouts, rings and points. */
+  mode(cue: ModeCue): void {
+    if (!this.gate(`mode-${cue}`, cue === 'count' ? 0.5 : 0.12)) return
+    const t = this.t
+    const v = this.voice(this.mix.sfx, 1, { wet: cue === 'win' || cue === 'end' ? 0.7 : 0.3 })
+    switch (cue) {
+      case 'count':
+        // A wooden-block tick with a soft bell over it.
+        this.tone(v, t, 'triangle', 660, 640, 0.08, 0.003, 0.12)
+        this.chime(v, t, mtof(81), 0.035, 0.5)
+        break
+      case 'go':
+        this.whoosh(v, t, 500, 2600, 0.5, 0.06, 1.4)
+        for (const [k, n] of [74, 78, 81, 86].entries()) this.chime(v, t + k * 0.05, mtof(n), 0.05, 0.9)
+        break
+      case 'tag':
+        // A bright "gotcha" slap.
+        this.noiseHit(v, t, 'bandpass', 2400, 1.4, 0.22, 0.002, 0.05)
+        this.tone(v, t, 'square', 520, 1040, 0.05, 0.004, 0.12)
+        break
+      case 'ko':
+        this.tone(v, t, 'sine', 190, 60, 0.3, 0.004, 0.4)
+        this.noiseHit(v, t, 'lowpass', 900, 0.8, 0.3, 0.004, 0.25)
+        this.chime(v, t + 0.08, mtof(69), 0.04, 0.6)
+        break
+      case 'ring':
+        for (const [k, n] of [86, 90, 93].entries()) this.chime(v, t + k * 0.06, mtof(n), 0.05, 0.7)
+        break
+      case 'point':
+        this.chime(v, t, mtof(HIGH_PENTA[Math.floor(Math.random() * 3)]), 0.03, 0.4)
+        break
+      case 'move':
+        this.whoosh(v, t, 1600, 500, 0.6, 0.04, 1.2)
+        this.chime(v, t + 0.1, mtof(76), 0.04, 0.8)
+        break
+      case 'suggest':
+        this.tone(v, t, 'sine', 880, 880, 0.04, 0.005, 0.12)
+        this.tone(v, t + 0.09, 'sine', 1175, 1175, 0.04, 0.005, 0.16)
+        break
+      case 'win':
+        for (const [k, n] of [74, 78, 81, 86, 90].entries()) this.chime(v, t + k * 0.09, mtof(n), 0.06, 1.6)
+        this.whoosh(v, t, 600, 2400, 1.2, 0.03, 1)
+        break
+      case 'end':
+        for (const [k, n] of [81, 78, 74].entries()) this.chime(v, t + k * 0.12, mtof(n), 0.05, 1.2)
         break
     }
   }

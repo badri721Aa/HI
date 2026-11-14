@@ -35,8 +35,11 @@ import {
 import { Pvp } from './pvp'
 import { RagdollSender } from './ragdollSync'
 import { RemotePlayers } from './RemotePlayers'
+import type { RemotePeer } from './RemotePeer'
 import { JoinError, Room, type RoomHost } from './Room'
 import { mapCode } from '../worlds/defs'
+import { Modes } from './modes/Modes'
+import { ServiceWatch } from './service'
 
 /** Keep a lobby subscription opened for listing alive this long after the last request (s). */
 const LOBBY_LINGER = 30
@@ -47,6 +50,7 @@ const LOBBY_SYNC_WAIT = 3000
 type Profile = { name: string; color: string }
 
 const PUBLIC_BY_CODE = new Map(PUBLIC_ROOMS.map(r => [r.code, r]))
+const NO_PEERS: readonly RemotePeer[] = []
 
 function loadProfile(): Profile {
   let name = ''
@@ -92,6 +96,7 @@ export class Network implements INetwork {
   readonly selfId = randomId(12)
   readonly peers = new Map<string, NetPeer>()
   profile: Profile
+  readonly modes: Modes
 
   private client: SupabaseClient | null = null
   private session: Room | null = null
@@ -136,6 +141,7 @@ export class Network implements INetwork {
   private actionPacket = new DataView(new ArrayBuffer(ACTION_BYTES))
   private actionSeq = 0
   private pvpRules: Pvp
+  private service: ServiceWatch
   private unsubs: Array<() => void> = []
   private chatBucket = new Bucket(CHAT_BURST, CHAT_REFILL)
   private emoteBucket = new Bucket(3, 2)
@@ -178,6 +184,16 @@ export class Network implements INetwork {
     this.remotes = new RemotePlayers(ctx)
     this.ragdoll = new RagdollSender(this.selfId)
     this.pvpRules = new Pvp(ctx)
+    this.modes = new Modes(ctx, {
+      selfId: this.selfId,
+      online: () => this.room !== null && !!this.session?.online,
+      peers: () => this.session?.list ?? NO_PEERS,
+      joinedAt: () => this.joinedAt,
+      selfName: () => this.profile.name,
+      send: payload => void this.session?.send('mode', { from: this.selfId, ...payload }),
+      setPvp: on => this.setPvp(on),
+    })
+    this.service = new ServiceWatch(ctx, () => this.getClient(), () => this.leave())
   }
 
   init(): void {
@@ -196,6 +212,7 @@ export class Network implements INetwork {
     window.addEventListener('pagehide', this.onPageHide)
     window.addEventListener('pageshow', this.onPageShow)
     document.addEventListener('visibilitychange', this.onVisibility)
+    this.service.start()
   }
 
   /* ── public API ──────────────────────────────────────────── */
@@ -257,6 +274,7 @@ export class Network implements INetwork {
     await this.draining
     if (epoch !== this.epoch) throw new Error('Join cancelled')
     if (this.disposed) throw new Error('Online play has shut down')
+    if (this.service.maintenance) throw new Error('The game is being updated — please wait')
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       this.setStatus('offline', 'You appear to be offline')
       throw new Error('You appear to be offline')
@@ -334,6 +352,7 @@ export class Network implements INetwork {
     this.room = null
     this.pvpRules.on = false
     this.clearPeers()
+    this.modes.reset()
     this.untrackLobby()
     this.setStatus('offline')
     if (wasIn) this.ctx.bus.emit('net:room', null)
@@ -401,6 +420,7 @@ export class Network implements INetwork {
         for (let i = 0; i < room.list.length; i++) room.list[i].update(realDt, now)
         this.remotes.update(realDt, room.list, now)
       }
+      this.modes.update(realDt)
       if (this.lobby && !this.lobbyRoom && now > this.lobbyUntil) this.closeLobby()
     } catch (err) {
       if (!this.failedUpdate) console.error('[starfall] network update failed', err)
@@ -418,6 +438,8 @@ export class Network implements INetwork {
     document.removeEventListener('visibilitychange', this.onVisibility)
     void this.leave()
     this.closeLobby()
+    this.service.dispose()
+    this.modes.dispose()
     this.remotes.dispose()
     const client = this.client
     this.client = null
@@ -469,6 +491,9 @@ export class Network implements INetwork {
       },
       hit: (peer, h) => {
         if (isCurrent()) this.pvpRules.receive(peer, h, this.now())
+      },
+      mode: (peer, payload) => {
+        if (isCurrent()) this.modes.receive(peer, payload)
       },
       blocks: (peer, msg) => {
         if (isCurrent()) this.ctx.bus.emit('net:blocks', { id: peer.id, ...msg })

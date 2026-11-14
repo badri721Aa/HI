@@ -192,6 +192,19 @@ export class Weapons implements IWeapons {
     this.ctx.bus.emit('weapon:equip', { weapon: id })
   }
 
+  lend(id: WeaponId | null): void {
+    if (id === null) {
+      this.syncWithSave()
+      return
+    }
+    this._owned = [id]
+    this.ctx.input.wheelCycles = false
+    this.ctx.hud.set({ weapons: [id] })
+    this.cancelMove()
+    this.setEquipped(id)
+    this.ctx.bus.emit('weapon:equip', { weapon: id })
+  }
+
   grant(id: WeaponId): void {
     const ctx = this.ctx
     if (id === 'fists') return

@@ -11,6 +11,7 @@ import { KeyCap } from './controls'
 import { ChatIcon, UsersIcon, WaveIcon } from './icons'
 import { isTextField } from './nav'
 import { CHAT_MAX, type ChatLine } from './netStore'
+import { ModesChip } from './ModeHud'
 import { linkTone, nameColor, Occupancy, PlayerRows, roomKind, StatusDot, TONE_COLOR } from './OnlineShared'
 import { cx, LABEL } from './theme'
 import styles from './ui.module.css'
@@ -56,6 +57,7 @@ export function NetChip() {
         interactive={touch && !!room}
       />
       {touch && room && <TouchOnlineButtons />}
+      {room && <ModesChip />}
     </div>
   )
 }

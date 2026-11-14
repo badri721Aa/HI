@@ -39,6 +39,8 @@ export interface RoomHost {
   action(peer: RemotePeer, a: ActionMsg): void
   /** Their blow reached us (validated as a packet; the host judges whether it counts). */
   hit(peer: RemotePeer, h: HitMsg): void
+  /** A game-mode message (round state from the host, or a suggestion); rate-limited, parsed by Modes. */
+  mode(peer: RemotePeer, payload: Record<string, unknown>): void
   blocks(peer: RemotePeer, msg: BlockMsg): void
   count(players: number): void
   /** Connection to the server changed after the join completed. */
@@ -134,6 +136,7 @@ export class Room {
     ch.on('broadcast', { event: 'rag' }, ({ payload }) => this.onRag(payload))
     ch.on('broadcast', { event: 'blk' }, ({ payload }) => this.onBlocks(payload))
     ch.on('broadcast', { event: 'bin' }, ({ payload }) => this.onBinary(payload))
+    ch.on('broadcast', { event: 'mode' }, ({ payload }) => this.onMode(payload))
   }
 
   get online(): boolean {
@@ -184,7 +187,7 @@ export class Room {
   }
 
   /** Broadcasts an event; false if the channel isn't up. */
-  send(event: 'pos' | 'chat' | 'emote' | 'rag' | 'sig' | 'blk' | 'bin', payload: object): boolean {
+  send(event: 'pos' | 'chat' | 'emote' | 'rag' | 'sig' | 'blk' | 'bin' | 'mode', payload: object): boolean {
     if (!this.subscribed || this.closed) return false
     this.channel.send({ type: 'broadcast', event, payload }).catch(() => {})
     return true
@@ -545,6 +548,11 @@ export class Room {
     if (!mine.length) return
     this.heldBlocks = this.heldBlocks.filter(h => h.from !== peer.id)
     for (const h of mine) this.takeBlocks(peer, h.msg)
+  }
+
+  private onMode(raw: unknown): void {
+    const s = this.sender(raw)
+    if (s && s.peer.modeMsgs.take(this.host.now())) this.host.mode(s.peer, s.o)
   }
 
   private onRag(raw: unknown): void {
