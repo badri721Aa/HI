@@ -10,7 +10,7 @@
 import * as THREE from 'three'
 import { KIND } from '../gameplay/weapons/defs'
 import { waterLevelAt } from '../world/heightfield'
-import type { MapId, V3 } from '../events'
+import type { BossId, MapId, V3 } from '../events'
 import { QUALITY } from '../settings'
 import type { BurstKind, Ctx, IParticles, TrailKind } from '../types'
 import { DEFAULT_DUST, SURFACE_DUST, dustAt } from './dust'
@@ -132,6 +132,11 @@ const TRAIL_MAX = 24
 const TRAIL_REACH = 6
 /** Portals tint their entry swirl by where they lead. */
 const PORTAL_TINT: Record<MapId, string> = { isle: '#ffd98a', rift: '#c79bff', frost: '#bfeaff' }
+
+/** Each boss bursts in its own colour when defeated. */
+const BOSS_TINT: Record<BossId, string> = {
+  gloomKing: '#c79bff', frostGolem: '#bfeaff', ironTitan: '#ffb35a', vortexWeaver: '#a8fbff', plasmaOverlord: '#ff7ae6', voidStalker: '#b26bff',
+}
 
 const MAX_STREAKS = 12
 /** Ripple rings float this far above the still-water level so wave crests don't hide them. */
@@ -468,7 +473,7 @@ export class Particles implements IParticles {
       }),
       bus.on('portal:enter', e => this.burst('portal', e.pos, { color: PORTAL_TINT[e.to] })),
       bus.on('boss:defeat', e => {
-        const color = e.boss === 'frostGolem' ? '#bfeaff' : '#c79bff'
+        const color = BOSS_TINT[e.boss]
         this.burst('beacon', e.pos, { color, scale: 1.6 })
         this.burst('poof', e.pos, { color, scale: 4 })
         this.emit('bossRing', e.pos, 1.6, undefined, color)

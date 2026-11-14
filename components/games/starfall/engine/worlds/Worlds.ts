@@ -38,6 +38,8 @@ const PORTAL_COOLDOWN = 1.2
 const SEALED_TOAST_GAP = 5
 const CHECKPOINT_RADIUS = 2.2
 const HOME_COLORS: [string, string] = ['#fff1c8', '#d0862a']
+/** Factory spawn group of a map's guards (cleared when leaving). */
+const MAP_GROUP = 'map'
 
 const REWARD = { rift: 'starblade', frost: 'frostHammer' } as const
 const HAZARD_COLORS = { rift: { ring: '#b46bff', warn: '#ff5ad1' }, frost: { ring: '#bfeaff', warn: '#6fd0ff' } }
@@ -306,11 +308,26 @@ export class Worlds implements IWorlds {
     ctx.enemies.clearMinions()
     ctx.game.setMusic('explore')
     ctx.bus.emit('world:travel', { from, to })
-    if (to !== 'isle') ctx.bus.emit('ui:objective', { text: this.objective(this.visit()!) })
+    if (to !== 'isle') {
+      ctx.bus.emit('ui:objective', { text: this.objective(this.visit()!) })
+      this.placeGuards(MAPS[to])
+    }
+  }
+
+  /** The map's factory mobs, fresh on every visit (Creative: only with its enemies switched on). */
+  private placeGuards(def: MapDef): void {
+    const ctx = this.ctx
+    if (!def.mobs || !ctx.game.creativeEnemies) return
+    for (const m of def.mobs) {
+      const x = def.center.x + m.dx
+      const z = def.center.z + m.dz
+      ctx.factory.spawn(m.kind, { x, y: def.center.y + (m.dy ?? 0), z }, { aggressive: false, patrol: m.patrol, leash: m.leash, yaw: m.yaw, instant: true, group: MAP_GROUP })
+    }
   }
 
   /** Leaving a map: its fight resets and it goes dark. */
   private leave(id: MapId): void {
+    this.ctx.factory.clear(MAP_GROUP)
     const v = this.visits.get(id as PortalMap)
     if (!v) return
     v.boss.reset()

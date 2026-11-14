@@ -116,6 +116,7 @@ export class AudioEngine implements IAudio {
       bus.on('cutscene:start', () => this.sfx?.cutscene(true)),
       bus.on('cutscene:end', e => this.sfx?.cutscene(false, e.skipped)),
       bus.on('mode:cue', e => this.sfx?.mode(e.cue)),
+      bus.on('enemy:cue', e => this.sfx?.enemyCue(e.cue, e.pos)),
     )
   }
 

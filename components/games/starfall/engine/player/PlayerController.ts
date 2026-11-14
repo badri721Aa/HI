@@ -58,6 +58,9 @@ export class PlayerController implements IPlayerController {
   private supY = 0
   private supZ = 0
   private supYaw = 0
+  /** External push for this frame (m/s), from drift(); consumed by the next tick. */
+  private driftX = 0
+  private driftZ = 0
   /** Measured velocity of the support (inherited when leaving it). */
   private platVX = 0
   private platVY = 0
@@ -302,6 +305,12 @@ export class PlayerController implements IPlayerController {
     this.writeMotion()
   }
 
+  drift(x: number, z: number): void {
+    if (!Number.isFinite(x + z)) return
+    this.driftX += x
+    this.driftZ += z
+  }
+
   /* ── frame ───────────────────────────────────────────────── */
 
   private tick(dt: number): void {
@@ -326,6 +335,7 @@ export class PlayerController implements IPlayerController {
 
     if (this._flying && (ctx.character.ragdolling || !ctx.game.creative)) this._flying = false
     if (ctx.character.ragdolling) {
+      this.driftX = this.driftZ = 0
       this.ragdollTick(dt)
       this.writeMotion()
       return
@@ -374,6 +384,7 @@ export class PlayerController implements IPlayerController {
     const n = Math.min(24, Math.max(1, Math.ceil(travel / M.maxSubstep)))
     const h = dt / n
     for (let i = 0; i < n && !this.limp; i++) this.subStep(h)
+    this.applyDrift(dt)
     if (this.limp) {
       // Knocked flat by the landing: the ragdoll has taken over.
       this.writeMotion()
@@ -393,6 +404,18 @@ export class PlayerController implements IPlayerController {
     this._stompSpeed = !this._grounded && !this.sliding && v.y < 0 ? -v.y : 0
     if (this._grounded) this.support?.onStand?.(dt)
     this.writeMotion()
+  }
+
+  /** Wind and pulls (drift()): moved along the ground and out of walls, velocity untouched. */
+  private applyDrift(dt: number): void {
+    const dx = this.driftX * dt
+    const dz = this.driftZ * dt
+    this.driftX = this.driftZ = 0
+    if (this.limp || this._flying || (dx === 0 && dz === 0)) return
+    const p = this.position
+    p.x += dx
+    p.z += dz
+    this.ctx.collision.pushOut(p, M.radius, M.height, this._grounded ? M.stepUp : M.airStepUp, this.push)
   }
 
   /** Converts the stick into a world-space direction (camera relative) and a target speed. */

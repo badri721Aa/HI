@@ -8,7 +8,8 @@
  *   root (player position, smoothed yaw) → pivot (spin attack) → model (unit scale) → glTF armature
  */
 import * as THREE from 'three'
-import { GLTFLoader, type GLTFParser } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { embeddedImagesViaImg, loadBytes } from '../gltf'
 import type { Ctx, GestureName, ICharacter, MotionState, PlayerState } from '../types'
 import type { V3 } from '../events'
 import type { GroundHit } from '../collision'
@@ -20,16 +21,6 @@ import { dampAngle, wrapAngle } from './anim/math'
 import { HeroRagdoll } from './ragdoll/HeroRagdoll'
 
 const HERO_URL = '/games/starfall/hero.glb'
-
-/** A file's bytes; a failure comes back as an Error rather than a rejection nobody is listening to yet. */
-async function loadBytes(url: string): Promise<ArrayBuffer | Error> {
-  try {
-    const r = await fetch(url)
-    return r.ok ? await r.arrayBuffer() : new Error(`HTTP ${r.status} for ${url}`)
-  } catch (err) {
-    return err instanceof Error ? err : new Error(String(err))
-  }
-}
 const HERO_HEIGHT = 1.62
 /**
  * Visual yaw follows physics this fast (1/s), and never trails it by more than this (rad).
@@ -52,23 +43,6 @@ const ACTIVE_STATES: ReadonlySet<PlayerState> = new Set<PlayerState>(['jump', 'd
 /** Is the hero doing something a gesture can't be layered over (moving, airborne, attacking…)? */
 function busy(m: MotionState): boolean {
   return m.speed > 0.8 || !m.grounded || ACTIVE_STATES.has(m.state)
-}
-
-/**
- * GLTFLoader decodes embedded images by fetch()-ing a blob: URL, which the site's CSP
- * (connect-src) forbids. Images may come from blob: though, so decode them through <img>.
- */
-function embeddedImagesViaImg(parser: GLTFParser) {
-  const imgLoader = new THREE.TextureLoader(parser.options.manager)
-  return {
-    name: 'starfall_embedded_images',
-    loadTexture(index: number) {
-      const def = parser.json.textures?.[index]
-      const src = def && parser.json.images?.[def.source]
-      if (!src || src.bufferView === undefined) return null
-      return parser.loadTextureImage(index, def.source, imgLoader)
-    },
-  }
 }
 
 export class Character implements ICharacter {

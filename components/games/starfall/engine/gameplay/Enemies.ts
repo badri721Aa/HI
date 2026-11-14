@@ -415,6 +415,8 @@ export class Enemies implements IEnemies {
       g.eye += (eyeTarget - g.eye) * Math.min(1, dt * 6)
     }
 
+    // Factory enemies (and anything else registered) that are hunting keep the danger music on too.
+    for (const t of this.targets) if (t.engaged?.()) chasing++
     this.updateMusic(dt, chasing, playing)
     this.prevFeet = pp.y
     this.render()

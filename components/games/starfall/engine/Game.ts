@@ -13,14 +13,14 @@
  */
 import * as THREE from 'three'
 import { CollisionWorld } from './collision'
-import { EventBus, v3, type BossId, type CutsceneName, type GamePhase, type MapId, type MusicMood, type WeaponId } from './events'
+import { EventBus, v3, type BossId, type CutsceneName, type EnemyKind, type GamePhase, type MapId, type MusicMood, type WeaponId } from './events'
 import { Input } from './input'
 import { clearSave, loadProfile, loadSave, newSave, storeProfile, storeSave, type Profile, type SaveGame } from './save'
 import { QUALITY, recommendDevice, type DeviceKind, type Settings } from './settings'
 import { HudStore } from './store'
 import { TextureLib } from './textures'
 import type { CompassMarker } from './store'
-import type { Ctx, GameApi } from './types'
+import type { Ctx, GameApi, LiveEnemy } from './types'
 import { heightAt, zoneAt, WORLD_HALF, waterLevelAt } from './world/heightfield'
 import { BEACON, CHECKPOINTS, ENEMIES, SHARDS, SPAWN, TOTAL_SHARDS } from './world/level'
 
@@ -32,6 +32,8 @@ import { PlayerController } from './player/PlayerController'
 import { CameraRig } from './player/CameraRig'
 import { Collectibles } from './gameplay/Collectibles'
 import { Enemies } from './gameplay/Enemies'
+import { EnemyFactory } from './gameplay/enemies/Factory'
+import { BOSS_KINDS, isBossKind, MOB_KINDS } from './gameplay/enemies/defs'
 import { Checkpoints } from './gameplay/Checkpoints'
 import { Signs } from './gameplay/Signs'
 import { Cutscenes } from './gameplay/Cutscenes'
@@ -181,6 +183,7 @@ export class Game implements GameApi {
     ctx.cameraRig = new CameraRig(ctx)
     ctx.collectibles = new Collectibles(ctx)
     ctx.enemies = new Enemies(ctx)
+    ctx.factory = new EnemyFactory(ctx)
     ctx.checkpoints = new Checkpoints(ctx)
     ctx.signs = new Signs(ctx)
     ctx.cutscenes = new Cutscenes(ctx)
@@ -223,6 +226,7 @@ export class Game implements GameApi {
       ['Placing the camera', 0.5, () => ctx.cameraRig.init()],
       ['Scattering star shards', 1, () => ctx.collectibles.init()],
       ['Summoning gloomlings', 1, () => ctx.enemies.init()],
+      ['Raising the legion', 1.5, () => ctx.factory.init()],
       ['Forging weapons', 0.5, () => ctx.weapons.init()],
       ['Lighting lanterns', 0.5, () => ctx.checkpoints.init()],
       ['Painting signposts', 0.5, () => ctx.signs.init()],
@@ -348,9 +352,9 @@ export class Game implements GameApi {
     this.bus.emit('ui:toast', { kind: 'info', title: 'Creative', body })
   }
 
-  /** Creative: whether the gloomlings are out. */
+  /** Creative: whether the world's enemies are out (gloomlings, map guards). Always true in the story. */
   get creativeEnemies(): boolean {
-    return this.creative && this.save.enemies.length < ENEMIES.length
+    return !this.creative || this.save.enemies.length < ENEMIES.length
   }
 
   setCreativeEnemies(on: boolean): void {
@@ -358,6 +362,71 @@ export class Game implements GameApi {
     this.save.enemies = on ? [] : ENEMIES.map((_, i) => i)
     this.saveDirty = true
     this.ctx.enemies.syncWithSave()
+    // A map's guards go with them (they come back on the next visit when switched on).
+    if (!on) this.ctx.factory.clear('map')
+  }
+
+  /**
+   * Creative: call up an enemy in front of the player — a mob a few steps away, a boss further
+   * out with a summoning circle that takes the player in. False outside Creative or when full.
+   */
+  spawnEnemy(kind: EnemyKind): boolean {
+    if (!this.creative || this.phase === 'title' || this.phase === 'loading') return false
+    const boss = isBossKind(kind)
+    return !!this.spawnAhead(kind, boss ? 9 : 6, 'sandbox')
+  }
+
+  /** Creative: remove everything the spawner called up. */
+  clearSpawnedEnemies(): void {
+    this.ctx.factory.clear('sandbox')
+  }
+
+  /**
+   * Test & debug hook (window.__starfall.dev): spawn, inspect and damage factory enemies anywhere.
+   * Not wired to any input; the Creative spawner is the player-facing way in.
+   */
+  readonly dev = {
+    kinds: (): EnemyKind[] => [...MOB_KINDS, ...BOSS_KINDS, 'turret'],
+    spawn: (kind: EnemyKind, o: { distance?: number; x?: number; z?: number; instant?: boolean; aggressive?: boolean; seed?: number } = {}): LiveEnemy | null => {
+      if (o.x !== undefined && o.z !== undefined) {
+        // The floor near the player's height there (not the top of a tree trunk overhead).
+        const y = this.ctx.collision.groundAt(o.x, o.z, Math.max(this.ctx.player.position.y, heightAt(o.x, o.z)) + 1.5, 0.4).y
+        return this.ctx.factory.spawn(kind, { x: o.x, y, z: o.z }, { group: 'dev', instant: o.instant, aggressive: o.aggressive, seed: o.seed })
+      }
+      return this.spawnAhead(kind, o.distance ?? (isBossKind(kind) ? 9 : 6), 'dev', o)
+    },
+    list: () =>
+      this.ctx.factory.list().map(e => ({
+        uid: e.uid, kind: e.kind, boss: e.boss, hp: e.hp, maxHp: e.maxHp, phase: e.phase, alive: e.alive,
+        x: +e.position.x.toFixed(2), y: +e.position.y.toFixed(2), z: +e.position.z.toFixed(2),
+      })),
+    find: (uid: number): LiveEnemy | null => this.ctx.factory.list().find(e => e.uid === uid) ?? null,
+    damage: (uid: number, amount: number): boolean => {
+      const e = this.ctx.factory.list().find(x => x.uid === uid)
+      if (!e) return false
+      e.damage(amount)
+      return true
+    },
+    clear: (): void => this.ctx.factory.clear(),
+    /**
+     * Run the game forward `seconds` of game time in fixed steps without drawing (tests on slow
+     * software renderers). Only while playing.
+     */
+    advance: (seconds: number, step = 1 / 30): number => {
+      if (this.phase !== 'playing') return 0
+      const n = Math.min(3600, Math.ceil(seconds / step))
+      for (let i = 0; i < n && this.phase === 'playing'; i++) this.simulate(step, step)
+      return n * step
+    },
+  }
+
+  private spawnAhead(kind: EnemyKind, distance: number, group: string, o: { instant?: boolean; aggressive?: boolean; seed?: number } = {}): LiveEnemy | null {
+    const p = this.ctx.player.position
+    const yaw = this.ctx.player.yaw
+    const x = p.x + Math.sin(yaw) * distance
+    const z = p.z + Math.cos(yaw) * distance
+    const y = this.ctx.collision.groundAt(x, z, p.y + 3, 0.4).y
+    return this.ctx.factory.spawn(kind, { x, y, z }, { group, aggressive: o.aggressive ?? true, instant: o.instant, seed: o.seed })
   }
 
   pause(): void {
@@ -387,6 +456,7 @@ export class Game implements GameApi {
   quitToTitle(): void {
     this.resetTransient()
     this.flushSave()
+    this.ctx.factory.clear()
     this.ctx.input.exitPointerLock()
     if (this.ctx.cutscenes.active) this.ctx.cutscenes.skip()
     this.closeDialogInternal()
@@ -505,7 +575,7 @@ export class Game implements GameApi {
     this.resizeObs?.disconnect()
     document.removeEventListener('visibilitychange', this.onVisibility)
     const ctx = this.ctx
-    for (const s of [ctx.net, ctx.audio, ctx.post, ctx.ambient, ctx.fx, ctx.cutscenes, ctx.signs, ctx.checkpoints, ctx.build, ctx.worlds, ctx.weapons, ctx.enemies, ctx.collectibles, ctx.cameraRig, ctx.player, ctx.character, ctx.zones, ctx.vegetation, ctx.env]) {
+    for (const s of [ctx.net, ctx.audio, ctx.post, ctx.ambient, ctx.fx, ctx.cutscenes, ctx.signs, ctx.checkpoints, ctx.build, ctx.worlds, ctx.weapons, ctx.factory, ctx.enemies, ctx.collectibles, ctx.cameraRig, ctx.player, ctx.character, ctx.zones, ctx.vegetation, ctx.env]) {
       try {
         s?.dispose()
       } catch (err) {
@@ -838,6 +908,7 @@ export class Game implements GameApi {
 
   private syncAll(): void {
     const ctx = this.ctx
+    ctx.factory.clear()
     ctx.collectibles.syncWithSave()
     ctx.enemies.syncWithSave()
     ctx.checkpoints.syncWithSave()
@@ -969,6 +1040,45 @@ export class Game implements GameApi {
     }
   }
 
+  /** One gameplay step (no rendering): every system in the fixed order. */
+  private simulate(dt: number, frameDt: number): void {
+    const ctx = this.ctx
+    const phase = this.phase
+    ctx.clock.t += dt
+    if (phase === 'playing') this.save.playTime += dt
+    ctx.zones.update(dt)
+    ctx.player.update(dt)
+    ctx.weapons.update(dt)
+    ctx.character.setMotion(ctx.player.motion)
+    ctx.character.update(dt)
+    ctx.net.update(frameDt)
+    ctx.enemies.update(dt)
+    ctx.factory.update(dt)
+    ctx.worlds.update(dt)
+    ctx.collectibles.update(dt)
+    ctx.checkpoints.update(dt)
+    ctx.signs.update(dt)
+    ctx.cutscenes.update(dt)
+    ctx.cameraRig.update(dt)
+    ctx.build.update(dt)
+    ctx.env.setShadowFocus(ctx.player.position)
+    ctx.env.update(dt)
+    ctx.vegetation.update(dt)
+    ctx.fx.update(dt)
+    ctx.ambient.update(dt)
+    ctx.audio.update(frameDt)
+    this.sparkChainT -= dt
+    this.updateHud(dt)
+    this.saveFlushT -= dt
+    if (this.saveDirty && this.saveFlushT <= 0) {
+      this.saveFlushT = 5
+      this.flushSave()
+    }
+    // Safety net: anything that ends up far below the world respawns.
+    const p = ctx.player.position
+    if (phase === 'playing' && !this.dying && (p.y < ctx.worlds.killY || !Number.isFinite(p.y))) this.playerDied('fall')
+  }
+
   private frame = (now: number): void => {
     if (this.disposed) return
     this.raf = requestAnimationFrame(this.frame)
@@ -997,38 +1107,7 @@ export class Game implements GameApi {
     const sim = phase === 'playing' || phase === 'cutscene' || phase === 'dialog'
     try {
       if (sim) {
-        ctx.clock.t += dt
-        if (phase === 'playing') this.save.playTime += dt
-        ctx.zones.update(dt)
-        ctx.player.update(dt)
-        ctx.weapons.update(dt)
-        ctx.character.setMotion(ctx.player.motion)
-        ctx.character.update(dt)
-        ctx.net.update(frameDt)
-        ctx.enemies.update(dt)
-        ctx.worlds.update(dt)
-        ctx.collectibles.update(dt)
-        ctx.checkpoints.update(dt)
-        ctx.signs.update(dt)
-        ctx.cutscenes.update(dt)
-        ctx.cameraRig.update(dt)
-        ctx.build.update(dt)
-        ctx.env.setShadowFocus(ctx.player.position)
-        ctx.env.update(dt)
-        ctx.vegetation.update(dt)
-        ctx.fx.update(dt)
-        ctx.ambient.update(dt)
-        ctx.audio.update(frameDt)
-        this.sparkChainT -= dt
-        this.updateHud(dt)
-        this.saveFlushT -= dt
-        if (this.saveDirty && this.saveFlushT <= 0) {
-          this.saveFlushT = 5
-          this.flushSave()
-        }
-        // Safety net: anything that ends up far below the world respawns.
-        const p = ctx.player.position
-        if (phase === 'playing' && !this.dying && (p.y < ctx.worlds.killY || !Number.isFinite(p.y))) this.playerDied('fall')
+        this.simulate(dt, frameDt)
       } else if (phase === 'title') {
         ctx.clock.t += dt
         ctx.zones.update(dt)

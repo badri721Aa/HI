@@ -10,7 +10,7 @@
 import type * as THREE from 'three'
 import type { CollisionWorld, Collider } from './collision'
 import type { BlockMsg } from './build/blocks'
-import type { BossId, CutsceneName, EventBus, GamePhase, MapId, MusicMood, V3, WeaponId } from './events'
+import type { BossId, CutsceneName, EnemyKind, EventBus, GamePhase, MapId, MusicMood, V3, WeaponId } from './events'
 import type { Input } from './input'
 import type { ModeId, Spot } from './net/modes/defs'
 import type { ModeView } from './net/modes/Modes'
@@ -45,6 +45,7 @@ export interface Ctx {
   cameraRig: ICameraRig
   collectibles: ICollectibles
   enemies: IEnemies
+  factory: IEnemyFactory
   checkpoints: ICheckpoints
   signs: ISigns
   cutscenes: ICutscenes
@@ -76,6 +77,8 @@ export interface GameApi {
   readonly isTouch: boolean
   /** A Creative game: everything unlocked, no damage, flying (save.mode === 'creative'). */
   readonly creative: boolean
+  /** Creative: the world's enemies are switched on (always true outside Creative). */
+  readonly creativeEnemies: boolean
   /** Shards collected so far. */
   shardCount(): number
   collectShard(index: number): void
@@ -265,6 +268,11 @@ export interface IPlayerController extends System {
   resetHealth(): void
   /** External launch (bounce pads, stomps). */
   launch(vy: number): void
+  /**
+   * A steady external push this frame (wind, a vortex's pull), in m/s: it moves the hero without
+   * touching his velocity, so walking against it still works. Call every frame it applies.
+   */
+  drift(x: number, z: number): void
   /** Is the player currently in an attacking spin (enemies take damage)? */
   readonly attacking: boolean
   /** Did the player land on top of something this frame from above (for stomps)? Returns the downward speed or 0. */
@@ -320,12 +328,79 @@ export interface IEnemies extends System {
   readonly minionCount: number
 }
 
-/** Something besides the gloomlings that weapon blows can strike (bosses). */
+/** Something besides the gloomlings that weapon blows can strike (bosses, factory enemies). */
 export interface HitTarget {
   /** Take the blow if its sphere touches you; true when it landed. */
   takeHit(h: WeaponHit): boolean
   /** Point melee swings turn toward (written to `out`); false while not targetable. */
   aimPoint(out: THREE.Vector3): boolean
+  /** Hunting the player right now (keeps the danger music playing). */
+  engaged?(): boolean
+}
+
+/* ────────────────────────────────────────────────────────────
+   Enemy Factory (gameplay/enemies)
+   ──────────────────────────────────────────────────────────── */
+
+/** A floor circle a boss fights on (its feet stay at `y`, inside radius `r`). */
+export interface ArenaCircle {
+  x: number
+  y: number
+  z: number
+  r: number
+}
+
+export interface SpawnOptions {
+  /** Facing (rotation.y); default: toward the player. */
+  yaw?: number
+  /** Hunt the player at once (sandbox, summons) instead of guarding the spawn point. Default true. */
+  aggressive?: boolean
+  /** Guard mobs: wander this far from the spawn point and give up the chase beyond `leash`. */
+  patrol?: number
+  leash?: number
+  /** Bosses: the floor they fight on. Without one a summoning circle rises around the spawn point. */
+  arena?: ArenaCircle
+  /** Bosses: record the defeat in the save. Default false (sandbox). */
+  persist?: boolean
+  /** Deterministic behaviour (a boss's attack timeline); default derived from the spawn id. */
+  seed?: number
+  /** Appear at once, without the entrance. */
+  instant?: boolean
+  /** A label to clear together (map placements, waves). */
+  group?: string
+}
+
+/** A spawned enemy as other systems and tests see it. */
+export interface LiveEnemy {
+  /** Unique per spawn. */
+  readonly uid: number
+  readonly kind: EnemyKind
+  readonly boss: boolean
+  /** Feet position. */
+  readonly position: THREE.Vector3
+  readonly hp: number
+  readonly maxHp: number
+  /** 1-based fight phase (mobs: always 1). */
+  readonly phase: number
+  /** Not yet defeated (the entrance counts as alive). */
+  readonly alive: boolean
+  /** Remove at once, without a death. */
+  despawn(): void
+  /** Damage it directly (scripted events, the dev hook); ignores blocks and shields. */
+  damage(amount: number): void
+}
+
+/** gameplay/enemies/Factory.ts — data-driven mobs and bosses: models, behaviour, projectiles, telegraphs, drops. */
+export interface IEnemyFactory extends System {
+  /** The mob models are loaded (or have fallen back to their procedural stand-ins). */
+  readonly ready: boolean
+  spawn(kind: EnemyKind, pos: V3, opts?: SpawnOptions): LiveEnemy | null
+  /** Every enemy still in the world (dying ones included until they fade). */
+  list(): readonly LiveEnemy[]
+  /** Remove every enemy (or those of a group) and their projectiles at once. */
+  clear(group?: string): void
+  /** Count alive within radius. */
+  aliveNear(p: V3, radius: number): number
 }
 
 /** A weapon blow against the gloomlings. */

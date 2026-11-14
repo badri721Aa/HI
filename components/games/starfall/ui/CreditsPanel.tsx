@@ -7,6 +7,10 @@ import { cx, LABEL } from './theme'
 
 const CREDITS: Array<[string, string]> = [
   ['Hero', '“Low Poly Boy” rigged character, re-lit and animated for the island'],
+  ['The legion', 'KayKit Character Pack: Skeletons by Kay Lousberg (kaylousberg.com), CC0 — recoloured and re-equipped'],
+  ['Iron Titan', '“RobotExpressive” by Tomás Laulhé (Quaternius), modified by Don McCurdy, CC0 — re-armoured'],
+  ['Bosses', 'Dragon, Big Alien and Ghost Skull from Quaternius’s monster packs (quaternius.com), CC0 — recoloured'],
+  ['Sentry turret', 'Space Kit by Kenney (kenney.nl), CC0'],
   ['Design & code', 'Alhekma Arcade'],
   ['Rendering', 'three.js on WebGL 2'],
   ['Music & sound', 'Composed and synthesised live with the Web Audio API'],

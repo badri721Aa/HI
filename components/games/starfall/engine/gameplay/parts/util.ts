@@ -37,14 +37,17 @@ function colliderCovers(c: Collider, x: number, z: number, radius: number): bool
 /**
  * Highest walkable height at (x, z) that is no more than `stepUp` above `footY`:
  * terrain, or the top of a collider (pier deck, plaza paving, crates…).
- * Much cheaper than CollisionWorld.groundAt (no normals / surface lookups).
+ * Much cheaper than CollisionWorld.groundAt (no normals / surface lookups). Colliders tagged
+ * `ignoreTag` are skipped.
  */
-export function supportHeight(ctx: Ctx, x: number, z: number, footY: number, radius: number, stepUp = 0.45): number {
+export function supportHeight(ctx: Ctx, x: number, z: number, footY: number, radius: number, stepUp = 0.45, ignoreTag?: string): number {
   let h = heightAt(x, z)
   const limit = footY + stepUp
   const list = ctx.collision.query(x, z, radius + 1)
   for (let i = 0; i < list.length; i++) {
     const c = list[i]
+    // e.g. 'enemy': walkers don't stand on each other (or on their own collider).
+    if (ignoreTag !== undefined && c.tag === ignoreTag) continue
     const t = colliderTop(c)
     if (t > limit || t <= h) continue
     if (colliderCovers(c, x, z, radius)) h = t

@@ -10,6 +10,7 @@ import { focusEl, focusFirst, goBack, isTextField, keepFocus, useMenuNav } from 
 import { OnlinePanel } from './OnlinePanel'
 import { BackHint, Panel } from './Panel'
 import { SettingsPanel } from './SettingsPanel'
+import { SpawnerPanel } from './SpawnerPanel'
 import { cx, formatTime, LABEL } from './theme'
 import styles from './ui.module.css'
 import type { PausePanel } from './uiStore'
@@ -85,10 +86,11 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
     },
     { id: 'settings', label: 'Settings', onSelect: () => go('settings') },
     { id: 'controls', label: 'Controls', onSelect: () => go('controls') },
+    ...(creative ? [{ id: 'spawner', label: 'Spawn enemies', meta: 'Mobs · bosses', onSelect: () => go('spawner') }] : []),
     ...(creative
       ? [{
           id: 'enemies',
-          label: 'Enemies',
+          label: 'World enemies',
           meta: enemies ? 'On' : 'Off',
           sound: 'ui-toggle' as const,
           onSelect: () => {
@@ -140,6 +142,7 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
               {panel === 'online' && <OnlinePanel onBack={() => go('root')} primary={{ label: 'Resume', onClick: resume }} />}
               {panel === 'settings' && <SettingsPanel onBack={() => go('root')} />}
               {panel === 'controls' && <ControlsPanel onBack={() => go('root')} />}
+              {panel === 'spawner' && <SpawnerPanel onBack={() => go('root')} />}
               {panel === 'quit' && (
                 <div>
                   <PanelHeader eyebrow="Quit" title="Return to the title screen?" aside={<BackHint onBack={() => go('root')} />} />

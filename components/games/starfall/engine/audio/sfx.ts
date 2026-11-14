@@ -4,7 +4,7 @@
  * randomised a little so repeats never sound mechanical. Positional effects go
  * through a PannerNode at their world position; the player's own sounds stay centred.
  */
-import type { BossId, V3, WeaponId } from '../events'
+import type { BossId, EnemyCue, V3, WeaponId } from '../events'
 import { KIND } from '../gameplay/weapons/defs'
 import type { ModeCue } from '../net/modes/Modes'
 import type { SfxName } from '../types'
@@ -656,7 +656,25 @@ export class Sfx extends SfxKit {
     const t = this.t
     const s = this.s
     const v = this.voice(this.mix.sfx, 2.2, { pos, ref: 14, wet: 0.6 })
-    const stone = boss === 'frostGolem'
+    // The factory's bosses each have their own voice on top of the shared growl.
+    if (boss === 'ironTitan') {
+      this.noiseHit(v, t, 'bandpass', 420, 2.5, 0.5, 0.05, 1.1, 180, s.brown)
+      this.tone(v, t, 'square', 48, 38, 0.18, 0.1, 1.2)
+      this.chime(v, t + 0.05, 140, 0.12, 1.4, 3.5, 2.5)
+    } else if (boss === 'vortexWeaver') {
+      this.whoosh(v, t, 400, 3200, 1.3, 0.5, 1.2)
+      this.whoosh(v, t + 0.15, 2600, 500, 1.1, 0.35, 1.4)
+    } else if (boss === 'plasmaOverlord') {
+      const e = s.gain(0, v)
+      const end = s.ahr(e.gain, t, 0.12, 0.1, 0.6, 0.6)
+      const o = s.osc('sawtooth', 70, e, t, end)
+      s.glide(o.frequency, t, 70, 420, 1.2)
+      s.osc('square', 35 * 6, s.gain(0.06, e.gain), t, end)
+    } else if (boss === 'voidStalker') {
+      this.whoosh(v, t, 1800, 180, 1.4, 0.45, 2)
+      this.tone(v, t + 0.1, 'sine', 90, 55, 0.3, 0.3, 1.1)
+    }
+    const stone = boss === 'frostGolem' || boss === 'ironTitan'
     const env = s.gain(0, v)
     const lp = s.filter('lowpass', stone ? 500 : 900, 2, env)
     s.glide(lp.frequency, t, stone ? 300 : 500, stone ? 900 : 1500, 0.5)
@@ -668,6 +686,136 @@ export class Sfx extends SfxKit {
   }
 
   /** A boss lands, stomps or crashes: a huge thud and a rumble. */
+  /** The Enemy Factory's cues: wind-ups, shots, blocks, blasts, beams, blinks. */
+  enemyCue(cue: EnemyCue, pos: V3): void {
+    if (!this.gate(`cue-${cue}`, cue === 'turretShot' || cue === 'block' ? 0.05 : 0.12)) return
+    const t = this.t
+    const s = this.s
+    const v = this.voice(this.mix.sfx, 1.2, { pos, ref: 7, wet: 0.35 })
+    switch (cue) {
+      case 'windup':
+        // A rising scrape and a growl: something is about to come at you.
+        this.whoosh(v, t, 300, 1400, 0.6, 0.18, 2)
+        this.tone(v, t, 'sawtooth', 70, 110, 0.06, 0.1, 0.5)
+        break
+      case 'charge':
+        this.whoosh(v, t, 1600, 300, 0.5, 0.35, 1)
+        this.tone(v, t, 'square', 140, 60, 0.08, 0.005, 0.3)
+        break
+      case 'slash':
+        this.whoosh(v, t, 3200, 900, 0.18, 0.25, 1.5)
+        break
+      case 'block':
+        // Metal on metal.
+        this.noiseHit(v, t, 'bandpass', 3400, 4, 0.3, 0.001, 0.12)
+        this.chime(v, t, rand(1500, 1800), 0.09, 0.45, 3.5, 2)
+        break
+      case 'guardBreak':
+        this.noiseHit(v, t, 'lowpass', 2400, 1, 0.5, 0.002, 0.3, 300)
+        this.chime(v, t, 900, 0.12, 0.8, 2.7, 3)
+        this.tone(v, t + 0.04, 'triangle', 600, 180, 0.12, 0.004, 0.35)
+        break
+      case 'bash':
+        this.tone(v, t, 'sine', 120, 50, 0.35, 0.003, 0.25)
+        this.noiseHit(v, t, 'lowpass', 900, 1, 0.3, 0.003, 0.18, 200, s.brown)
+        break
+      case 'fuse': {
+        // A sizzling fuse that speeds up.
+        const e = s.gain(0, v)
+        const hp = s.filter('highpass', 3000, 0.8, e)
+        const end = s.ahr(e.gain, t, 0.18, 0.05, 1.1, 0.2)
+        s.noise(hp, t, end, s.white)
+        for (let i = 0; i < 6; i++) this.tone(v, t + 0.2 * Math.sqrt(i) * 1.3, 'square', 1800, 1800, 0.04, 0.001, 0.04)
+        break
+      }
+      case 'explode':
+        this.tone(v, t, 'sine', 110, 30, 0.8, 0.003, 0.7)
+        this.noiseHit(v, t, 'lowpass', 2400, 0.8, 0.7, 0.003, 0.8, 120, s.brown)
+        this.noiseHit(v, t, 'bandpass', 1200, 1, 0.3, 0.002, 0.3, 300)
+        break
+      case 'aim':
+        // The laser locks: a thin rising whine and two pips.
+        this.tone(v, t, 'sine', 1400, 2600, 0.05, 0.01, 0.35)
+        this.tone(v, t + 0.12, 'square', 2800, 2800, 0.03, 0.002, 0.05)
+        this.tone(v, t + 0.24, 'square', 2800, 2800, 0.03, 0.002, 0.05)
+        break
+      case 'snipe':
+        this.noiseHit(v, t, 'highpass', 2000, 0.8, 0.35, 0.001, 0.12)
+        this.tone(v, t, 'triangle', 900, 180, 0.15, 0.002, 0.18)
+        break
+      case 'heal':
+        this.chime(v, t, mtof(84), 0.06, 0.8, 2, 0.6)
+        this.chime(v, t + 0.12, mtof(88), 0.05, 0.8, 2, 0.6)
+        this.chime(v, t + 0.24, mtof(91), 0.05, 0.9, 2, 0.6)
+        break
+      case 'buff':
+        this.chime(v, t, mtof(79), 0.06, 1, 3, 1.4)
+        this.chime(v, t + 0.1, mtof(86), 0.05, 1, 3, 1.4)
+        this.whoosh(v, t, 600, 2400, 0.5, 0.12, 1)
+        break
+      case 'blink':
+      case 'teleport':
+        this.whoosh(v, t, 2400, 300, 0.35, 0.3, 3)
+        this.tone(v, t, 'sine', 900, 200, 0.08, 0.005, 0.3)
+        break
+      case 'deploy':
+        this.tone(v, t, 'square', 300, 600, 0.06, 0.005, 0.12)
+        this.tone(v, t + 0.12, 'square', 450, 900, 0.06, 0.005, 0.12)
+        this.noiseHit(v, t + 0.25, 'lowpass', 900, 1, 0.2, 0.003, 0.15, 200)
+        break
+      case 'turretShot':
+        this.tone(v, t, 'square', 1200, 300, 0.07, 0.002, 0.09)
+        this.noiseHit(v, t, 'highpass', 3500, 0.7, 0.06, 0.001, 0.05)
+        break
+      case 'volley':
+        this.whoosh(v, t, 500, 2600, 0.4, 0.22, 1.5)
+        this.tone(v, t, 'triangle', 300, 900, 0.07, 0.01, 0.3)
+        break
+      case 'beamCharge': {
+        const e = s.gain(0, v)
+        const end = s.ahr(e.gain, t, 0.1, 0.9, 0.1, 0.2)
+        const o = s.osc('sawtooth', 120, s.filter('lowpass', 1400, 2, e), t, end)
+        s.glide(o.frequency, t, 120, 900, 1.1)
+        break
+      }
+      case 'beam': {
+        const e = s.gain(0, v)
+        const end = s.ahr(e.gain, t, 0.16, 0.05, 1.6, 0.6)
+        s.osc('sawtooth', 82, s.filter('lowpass', 900, 3, e), t, end)
+        s.osc('square', 164, s.gain(0.4, s.filter('bandpass', 1600, 4, e)), t, end)
+        this.noiseHit(v, t, 'bandpass', 2400, 1.2, 0.2, 0.01, 2, 900)
+        break
+      }
+      case 'quake':
+        this.tone(v, t, 'sine', 50, 28, 0.5, 0.2, 1.2)
+        this.noiseHit(v, t, 'lowpass', 400, 1, 0.4, 0.3, 1.2, 80, s.brown)
+        break
+      case 'gust':
+        this.whoosh(v, t, 300, 1800, 0.9, 0.45, 0.8)
+        break
+      case 'vortex':
+        this.whoosh(v, t, 200, 1200, 2.2, 0.4, 1.2)
+        this.whoosh(v, t + 0.6, 1400, 300, 2, 0.3, 1.2)
+        break
+      case 'clone':
+        this.whoosh(v, t, 3000, 400, 0.5, 0.3, 4)
+        this.chime(v, t + 0.05, mtof(70), 0.06, 1.1, 1.41, 2)
+        this.chime(v, t + 0.12, mtof(71), 0.05, 1.1, 1.41, 2)
+        break
+      case 'darkness':
+        this.swellChord(v, t, [38, 41, 45], 1.4, 1, 2, 0.06, 200, 900)
+        break
+      case 'vent':
+        this.noiseHit(v, t, 'highpass', 1800, 0.6, 0.35, 0.05, 1.6, 4000)
+        this.tone(v, t, 'sine', 300, 120, 0.06, 0.05, 0.8)
+        break
+      case 'spawn':
+        this.swellChord(v, t, [50, 57, 62], 0.8, 0.6, 1.2, 0.05, 300, 2400)
+        this.whoosh(v, t, 200, 2000, 1.6, 0.25, 1)
+        break
+    }
+  }
+
   bossSlam(pos: V3): void {
     if (!this.gate('bslam', 0.12)) return
     const t = this.t

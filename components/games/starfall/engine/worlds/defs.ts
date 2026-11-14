@@ -5,7 +5,7 @@
  * plane) and high above the sea, from ZoneKit geometry and colliders. No three.js here, so
  * the HUD and the network can share it.
  */
-import type { BossId, MapId } from '../events'
+import type { BossId, MapId, MobKind } from '../events'
 
 export interface Spot {
   x: number
@@ -21,6 +21,19 @@ export interface ArchDef {
   yaw: number
   /** Ground height under the arch (island arches: read from the terrain at build time). */
   y?: number
+}
+
+/** A factory mob guarding part of a map (offsets from the map's centre; it stands on whatever floor is there). */
+export interface MobPlacement {
+  kind: MobKind
+  dx: number
+  dz: number
+  /** Floor height offset from the centre's y. */
+  dy?: number
+  yaw?: number
+  /** Wander radius and how far it follows the player from home. */
+  patrol?: number
+  leash?: number
 }
 
 export interface MapDef {
@@ -46,6 +59,8 @@ export interface MapDef {
   objective: string
   /** Portal swirl colours (inner, outer). */
   swirl: [string, string]
+  /** Factory mobs placed on every visit. */
+  mobs?: MobPlacement[]
 }
 
 const RIFT = { x: 2400, y: 120, z: 0 }
@@ -67,6 +82,11 @@ export const MAPS: Record<Exclude<MapId, 'isle'>, MapDef> = {
     arena: { x: RIFT.x, y: RIFT.y, z: RIFT.z, r: 17 },
     objective: 'Defeat the Gloom King',
     swirl: ['#f0b8ff', '#5a1d9c'],
+    // Two guards where the causeway meets the arena, outside the Gloom King's circle.
+    mobs: [
+      { kind: 'shieldBearer', dx: -3.5, dz: 19.5, yaw: 0, patrol: 2, leash: 7 },
+      { kind: 'bomber', dx: 4, dz: 19, yaw: 0, patrol: 2, leash: 8 },
+    ],
   },
   frost: {
     id: 'frost',
@@ -86,14 +106,28 @@ export const MAPS: Record<Exclude<MapId, 'isle'>, MapDef> = {
     arena: { x: FROST.x, y: FROST.y + 14, z: FROST.z - 30, r: 14.5 },
     objective: 'Climb Frost Peak and defeat the Frost Golem',
     swirl: ['#e6fbff', '#2a7fc0'],
+    // A patrol on the plateau below the climb: a shield wall with a rusher, mended from behind.
+    mobs: [
+      { kind: 'shieldBearer', dx: -2.5, dz: 17, yaw: 0, patrol: 3, leash: 16 },
+      { kind: 'rusher', dx: 5, dz: 15, yaw: 0, patrol: 4, leash: 16 },
+      { kind: 'healer', dx: 0.5, dz: 9, yaw: 0, patrol: 2, leash: 16 },
+    ],
   },
 }
 
 export const PORTAL_MAPS = [MAPS.rift, MAPS.frost] as const
 
-export const BOSS_IDS: readonly BossId[] = ['gloomKing', 'frostGolem']
+/** The 'boss' cutscene's argument is an index into this list (append only). */
+export const BOSS_IDS: readonly BossId[] = ['gloomKing', 'frostGolem', 'ironTitan', 'vortexWeaver', 'plasmaOverlord', 'voidStalker']
 
-export const BOSS_NAMES: Record<BossId, string> = { gloomKing: 'Gloom King', frostGolem: 'Frost Golem' }
+export const BOSS_NAMES: Record<BossId, string> = {
+  gloomKing: 'Gloom King',
+  frostGolem: 'Frost Golem',
+  ironTitan: 'Iron Titan',
+  vortexWeaver: 'Vortex Weaver',
+  plasmaOverlord: 'Plasma Overlord',
+  voidStalker: 'Void Stalker',
+}
 
 export const MAP_NAMES: Record<MapId, string> = { isle: 'Starfall Isle', rift: MAPS.rift.name, frost: MAPS.frost.name }
 

@@ -38,6 +38,8 @@ export abstract class Boss {
   mode: 'sleep' | 'intro' | 'fight' | 'dying' | 'dead' = 'sleep'
   /** Called once when the defeat animation has finished (the chest appears). */
   onDefeated: (() => void) | null = null
+  /** Record the defeat in the save (map bosses; the Creative spawner's bosses don't). */
+  persist = true
 
   /** Seconds left of the current vulnerable window. */
   protected stunT = 0
@@ -219,7 +221,8 @@ export abstract class Boss {
     return true
   }
 
-  private damage(amount: number, at: V3, weapon: WeaponId): void {
+  protected damage(amount: number, at: V3, weapon: WeaponId): void {
+    if (this.mode !== 'fight') return
     const dmg = Math.max(1, Math.round(amount))
     this.hp = Math.max(0, this.hp - dmg)
     this.flash = 1
@@ -237,6 +240,7 @@ export abstract class Boss {
       this.shieldT = 1.6
       this.hazards.clear()
       this.roar()
+      this.ctx.bus.emit('boss:phase', { pos: { x: this.pos.x, y: this.pos.y + 2, z: this.pos.z }, boss: this.id, phase })
       this.onPhase(phase)
     }
   }
@@ -248,7 +252,7 @@ export abstract class Boss {
     this.hazards.clear()
     this.ctx.enemies.clearMinions()
     if (this.collider) this.collider.enabled = false
-    this.ctx.game.defeatBoss(this.id)
+    if (this.persist) this.ctx.game.defeatBoss(this.id)
     this.ctx.game.timeWarp(0.25, 0.6)
     this.ctx.game.shake(0.7, 0.5)
     this.roar()

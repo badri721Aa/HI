@@ -14,6 +14,9 @@ import type { V3 } from '../../events'
 import type { Ctx } from '../../types'
 import { rockGeometry } from '../geo'
 
+const UP = new THREE.Vector3(0, 1, 0)
+const _n = new THREE.Vector3()
+
 const RINGS = 8
 const WARNS = 40
 /** Projectile pool: half orbs, half boulders. */
@@ -97,6 +100,7 @@ const WARN_FS = /* glsl */ `
 uniform vec3 uColor;
 uniform float uFill;
 uniform float uTime;
+uniform float uInner;
 varying vec2 vUv;
 void main() {
   float d = length(vUv - 0.5) * 2.0;
@@ -104,6 +108,13 @@ void main() {
   float fill = step(d, uFill) * 0.32 + smoothstep(uFill - 0.08, uFill, d) * step(d, uFill) * 0.5;
   float pulse = 0.65 + 0.35 * sin(uTime * (10.0 + uFill * 14.0));
   float a = (rim * 0.9 * pulse + fill) * smoothstep(1.0, 0.97, d);
+  // A ring telegraph (uInner > 0): the middle is safe — drawn as a clear hole with its own rim.
+  if (uInner > 0.0) {
+    float hole = smoothstep(uInner - 0.02, uInner + 0.02, d);
+    float innerRim = smoothstep(uInner - 0.06, uInner, d) * (1.0 - smoothstep(uInner, uInner + 0.05, d));
+    float fillIn = step(d, uInner + (1.0 - uInner) * uFill) * hole * 0.32;
+    a = (rim * 0.9 * pulse + innerRim * 0.9 * pulse + fillIn) * smoothstep(1.0, 0.97, d);
+  }
   gl_FragColor = vec4(uColor * (1.0 + uFill), a);
 }`
 
@@ -148,7 +159,7 @@ export class Hazards {
       const mat = own(new THREE.ShaderMaterial({
         vertexShader: WARN_VS, fragmentShader: WARN_FS, transparent: true, depthWrite: false,
         polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
-        uniforms: { uColor: { value: this.warnColor }, uFill: { value: 0 }, uTime: { value: 0 } },
+        uniforms: { uColor: { value: this.warnColor }, uFill: { value: 0 }, uTime: { value: 0 }, uInner: { value: 0 } },
       }))
       const mesh = new THREE.Mesh(warnGeo, mat)
       mesh.visible = false
@@ -215,8 +226,11 @@ export class Hazards {
     r.mesh.visible = true
   }
 
-  /** A warning circle of radius `r` that fills for `delay` seconds, then calls `boom`. */
-  warn(x: number, y: number, z: number, r: number, delay: number, boom: (() => void) | null): void {
+  /**
+   * A warning circle of radius `r` that fills for `delay` seconds, then calls `boom`.
+   * `inner` (0..r) makes it a ring whose middle is safe; `normal` tilts it onto sloped ground.
+   */
+  warn(x: number, y: number, z: number, r: number, delay: number, boom: (() => void) | null, opts?: { inner?: number; normal?: V3 }): void {
     const w = this.warns.find(q => !q.on)
     if (!w) {
       boom?.()
@@ -228,7 +242,11 @@ export class Hazards {
     w.boom = boom
     w.mesh.position.set(x, y + 0.04, z)
     w.mesh.scale.setScalar(r)
+    w.mesh.quaternion.identity()
+    const n = opts?.normal
+    if (n && n.y > 0.5) w.mesh.quaternion.setFromUnitVectors(UP, _n.set(n.x, n.y, n.z).normalize())
     w.mat.uniforms.uFill.value = 0
+    w.mat.uniforms.uInner.value = opts?.inner ? THREE.MathUtils.clamp(opts.inner / r, 0, 0.95) : 0
     w.mesh.visible = true
     this.ctx.bus.emit('boss:telegraph', { pos: { x, y, z }, delay })
   }

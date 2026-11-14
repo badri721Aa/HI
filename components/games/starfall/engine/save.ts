@@ -47,7 +47,7 @@ export interface Profile {
 
 const WEAPON_IDS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
 const MAP_IDS: readonly MapId[] = ['rift', 'frost']
-const BOSS_IDS: readonly BossId[] = ['gloomKing', 'frostGolem']
+const BOSS_IDS: readonly BossId[] = ['gloomKing', 'frostGolem', 'ironTitan', 'vortexWeaver', 'plasmaOverlord', 'voidStalker']
 const isWeapon = (w: unknown): w is WeaponId => WEAPON_IDS.includes(w as WeaponId)
 const isMap = (m: unknown): m is MapId => MAP_IDS.includes(m as MapId)
 const isBoss = (b: unknown): b is BossId => BOSS_IDS.includes(b as BossId)

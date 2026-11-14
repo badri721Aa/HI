@@ -33,7 +33,23 @@ export type WeaponId = 'fists' | 'sword' | 'hammer' | 'bow' | 'starblade' | 'fro
 /** The worlds: Starfall Isle plus the maps behind its portal arches. */
 export type MapId = 'isle' | 'rift' | 'frost'
 
-export type BossId = 'gloomKing' | 'frostGolem'
+/** Map bosses (Gloom King, Frost Golem) and the Enemy Factory's bosses (sandbox now, Block B arenas later). */
+export type BossId = 'gloomKing' | 'frostGolem' | 'ironTitan' | 'vortexWeaver' | 'plasmaOverlord' | 'voidStalker'
+
+/** Every enemy the Enemy Factory can spawn: six mob archetypes, the four factory bosses and the sentry turrets a Turret-Spawner deploys. */
+export type MobKind = 'rusher' | 'shieldBearer' | 'bomber' | 'sniper' | 'healer' | 'turretSpawner'
+export type FactoryBossKind = 'ironTitan' | 'vortexWeaver' | 'plasmaOverlord' | 'voidStalker'
+export type EnemyKind = MobKind | FactoryBossKind | 'turret'
+
+/**
+ * A sound (and Block D's animation/VFX) cue an enemy raises at a moment that matters: a wind-up,
+ * a telegraph, a shot, a block. Data-driven: the enemy definitions name the cues they use.
+ */
+export type EnemyCue =
+  | 'windup' | 'charge' | 'slash' | 'block' | 'guardBreak' | 'bash' | 'fuse' | 'explode'
+  | 'aim' | 'snipe' | 'heal' | 'buff' | 'blink' | 'deploy' | 'turretShot' | 'volley'
+  | 'beamCharge' | 'beam' | 'quake' | 'gust' | 'vortex' | 'teleport' | 'clone' | 'darkness'
+  | 'vent' | 'spawn'
 
 export interface VictoryStats {
   time: number
@@ -89,7 +105,7 @@ export interface GameEventMap {
   'collect:shard': { pos: V3; index: number; collected: number }
   'enemy:alert': { pos: V3 }
   'enemy:stomp': { pos: V3 }
-  'enemy:defeat': { pos: V3; big: boolean }
+  'enemy:defeat': { pos: V3; big: boolean; kind?: EnemyKind }
   /** A weapon blow landed (damage numbers, impact sound and sparks). */
   'enemy:hit': { pos: V3; damage: number; killed: boolean; big: boolean; weapon: WeaponId }
   'checkpoint': { id: string; pos: V3; first: boolean }
@@ -111,6 +127,14 @@ export interface GameEventMap {
   /** A hazard's warning circle or lane appeared; it goes off in `delay` seconds (0 = when the boss commits). */
   'boss:telegraph': { pos: V3; delay: number }
   'boss:defeat': { pos: V3; boss: BossId }
+  /** A boss entered a new phase (it roars and its shield is up for a moment). */
+  'boss:phase': { pos: V3; boss: BossId; phase: number }
+
+  // ── enemy factory ──────────────────────────────────────
+  /** An enemy began to appear (its entrance plays now). */
+  'enemy:spawn': { pos: V3; kind: EnemyKind; id: number }
+  /** An enemy cue (see EnemyCue): the audio engine and effects react. */
+  'enemy:cue': { pos: V3; cue: EnemyCue; kind: EnemyKind }
   'chest:open': { pos: V3 }
 
   // ── building ───────────────────────────────────────────
