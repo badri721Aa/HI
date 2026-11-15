@@ -1,15 +1,19 @@
 /**
- * Worlds — Starfall Isle (map 0) and the maps behind its portal arches.
+ * Worlds — the Map Manager: Starfall Isle (map 0) and the maps behind its portal arches.
  *
- *   arches    two ancient arches stand on the island (summit path, Sky Ruins). Each wakes when
- *             enough shards are found (sealed until then: a dark pane and a message) and leads
- *             to its map; a golden arch in each map leads home
- *   travel    walk in → fade to black → the map is built on its first visit (behind the fade)
- *             → the player arrives, the atmosphere switches → fade back in
- *   maps      built from ZoneKit geometry + colliders in their own regions far from the island;
- *             each has checkpoints (the entrance first), a boss arena and a reward chest
+ *   arches    an ancient arch on the island for every map. Each wakes when its unlock rule is met
+ *             (enough shards, or a boss beaten; sealed until then: a dark pane and a message
+ *             saying what it needs) and leads to its map; a golden arch in each map leads home.
+ *             Creative opens them all.
+ *   travel    walk in (or pick a map in the Travel menu) → fade to black → the map is built behind
+ *             the fade and the one being left is freed → the player arrives, the atmosphere
+ *             switches → fade back in
+ *   maps      a MapDef (defs.ts: where everything stands) and a MapSpec (registry.ts: builder,
+ *             boss, reward), built from ZoneKit geometry + colliders in their own region far from
+ *             the island; each has checkpoints (the entrance first), a boss arena and guards
  *   bosses    the fight starts when the player walks into the arena (a short intro the first
- *             time); dying or leaving resets it; a defeated boss stays defeated (saved)
+ *             time); dying or leaving resets it; a defeated boss stays defeated (saved), leaves
+ *             its reward chest or its drops, and may wake other arches
  */
 import * as THREE from 'three'
 import type { MapId, V3 } from '../events'
@@ -20,16 +24,11 @@ import type { BossIntro, Ctx, IWorlds } from '../types'
 import { heightAt, PLAY_RADIUS, SEA_LEVEL } from '../world/heightfield'
 import { ZoneKit } from '../world/zones/kit'
 import type { Boss } from './bosses/Boss'
-import { FrostGolem } from './bosses/FrostGolem'
-import { GloomKing } from './bosses/GloomKing'
 import { Hazards } from './bosses/hazards'
 import { Chest } from './chest'
-import { BOSS_IDS, BOSS_NAMES, MAPS, PORTAL_MAPS, type MapDef, type Spot } from './defs'
-import { buildFrost, FROST_RADIUS } from './frost'
+import { BOSS_IDS, BOSS_NAMES, lairOf, MAPS, PORTAL_MAPS, unlockMet, type MapDef, type PortalMapId, type Spot } from './defs'
 import { Arch } from './portal'
-import { buildRift, RIFT_RADIUS, type MapBuild } from './rift'
-
-type PortalMap = Exclude<MapId, 'isle'>
+import { MAP_SPECS, type MapBuild, type MapSpec } from './registry'
 
 const FADE_OUT = 0.45
 const FADE_IN = 0.6
@@ -41,42 +40,41 @@ const HOME_COLORS: [string, string] = ['#fff1c8', '#d0862a']
 /** Factory spawn group of a map's guards (cleared when leaving). */
 const MAP_GROUP = 'map'
 
-const REWARD = { rift: 'starblade', frost: 'frostHammer' } as const
-const HAZARD_COLORS = { rift: { ring: '#b46bff', warn: '#ff5ad1' }, frost: { ring: '#bfeaff', warn: '#6fd0ff' } }
-const ARCH_HINT: Record<PortalMap, string> = {
-  rift: 'The ancient arch beside the summit path hums with violet light.',
-  frost: 'The arch on the meadow below the Sky Ruins glitters with frost.',
-}
-
 interface Rune {
   sprite: THREE.Sprite
   spot: Spot
 }
 
+/** The map the player is in: everything built for this visit, freed on leaving. */
 interface Visit {
   def: MapDef
+  spec: MapSpec
   kit: ZoneKit
   build: MapBuild
   exit: Arch
   hazards: Hazards
   boss: Boss
-  chest: Chest
+  /** The reward chest (maps whose boss guards a weapon). */
+  chest: Chest | null
+  weaponKit: WeaponKit | null
   runes: Rune[]
   /** Index into def.checkpoints of the furthest one reached this visit. */
   checkpoint: number
-  introSeen: boolean
+  /** The boss was made before its model arrived and wears the stand-in until it is swapped. */
+  standIn: boolean
 }
 
 export class Worlds implements IWorlds {
   private _current: MapId = 'isle'
-  private visits = new Map<PortalMap, Visit>()
-  private arches = new Map<PortalMap, Arch>()
+  private here: Visit | null = null
+  private arches = new Map<PortalMapId, Arch>()
   private islandKit: ZoneKit | null = null
   private trip: { to: MapId; t: number; arrived: number } | null = null
   private cooldown = 0
   private sealedT = 0
-  private announce: PortalMap[] = []
-  private weaponKit: WeaponKit | null = null
+  private announce: PortalMapId[] = []
+  /** Maps whose boss intro has played (later fights start at once). */
+  private introSeen = new Set<PortalMapId>()
   private runeDim: THREE.SpriteMaterial | null = null
   private runeLit: THREE.SpriteMaterial | null = null
   private glow: { texture: THREE.Texture; owned: boolean } | null = null
@@ -94,6 +92,11 @@ export class Worlds implements IWorlds {
     return this.trip !== null
   }
 
+  get fighting(): boolean {
+    const mode = this.here?.boss.mode
+    return mode === 'intro' || mode === 'fight' || mode === 'dying'
+  }
+
   get killY(): number {
     return this._current === 'isle' ? SEA_LEVEL - 25 : MAPS[this._current].killY
   }
@@ -107,11 +110,11 @@ export class Worlds implements IWorlds {
   }
 
   isUnlocked(id: MapId): boolean {
-    return id === 'isle' || this.ctx.game.save.maps.includes(id)
+    return id === 'isle' || this.ctx.game.creative || this.ctx.game.save.maps.includes(id)
   }
 
   spawnPoint(): Spot | null {
-    const v = this.visit()
+    const v = this.here
     return v ? v.def.checkpoints[v.checkpoint] : null
   }
 
@@ -125,7 +128,7 @@ export class Worlds implements IWorlds {
       // Sit the plinth on the lowest ground under it so no corner floats.
       let y = Infinity
       for (let i = -2; i <= 2; i++) for (let j = -1; j <= 1; j++) y = Math.min(y, heightAt(a.x + i, a.z + j * 0.6))
-      this.arches.set(def.id as PortalMap, new Arch(ctx, kit, { x: a.x, y, z: a.z, yaw: a.yaw }, def.swirl))
+      this.arches.set(def.id, new Arch(ctx, kit, { x: a.x, y, z: a.z, yaw: a.yaw }, def.swirl))
     }
     kit.finalize()
     this.glow = glowTexture(ctx)
@@ -135,11 +138,11 @@ export class Worlds implements IWorlds {
 
     const bus = ctx.bus
     this.unsubs.push(
-      bus.on('collect:shard', e => this.unlockFor(e.collected, true)),
+      bus.on('collect:shard', () => this.unlockEarned(true)),
       bus.on('cutscene:end', () => this.announceUnlocks()),
       bus.on('player:respawn', () => this.restartFight()),
       bus.on('chest:open', () => {
-        const v = this.visit()
+        const v = this.here
         if (v) bus.emit('ui:objective', { text: this.objective(v) })
       }),
     )
@@ -152,15 +155,14 @@ export class Worlds implements IWorlds {
     this.cooldown = 0
     this.announce = []
     if (this._current !== 'isle') {
-      this.leave(this._current)
+      this.leave()
       this._current = 'isle'
       ctx.env.setAtmosphere('isle', 0)
     }
     this.setBounds()
-    // Saves from before the portals existed: whatever the shard count already earns.
-    this.unlockFor(ctx.game.shardCount(), false)
+    // Older saves: whatever their shards and bosses already earn.
+    this.unlockEarned(false)
     for (const [id, arch] of this.arches) arch.setOpen(this.isUnlocked(id), true)
-    for (const v of this.visits.values()) this.prepare(v)
   }
 
   travel(to: MapId): void {
@@ -177,14 +179,16 @@ export class Worlds implements IWorlds {
     const ctx = this.ctx
     const playing = ctx.game.phase === 'playing'
     for (const a of this.arches.values()) a.update(dt)
-    const v = this.visit()
+    const v = this.here
     if (v) {
       const live = playing && !this.trip
+      const kind = v.spec.factoryBoss
+      if (v.standIn && kind && v.boss.mode === 'sleep' && ctx.factory.bossModelReady(kind)) this.swapStandIn(v)
       v.build.update(dt, ctx.clock.t)
       v.exit.update(dt)
       if (playing) v.hazards.update(dt)
       v.boss.update(dt, live)
-      v.chest.update(dt, live)
+      v.chest?.update(dt, live)
     }
     if (this.trip) this.stepTrip(dt)
     if (!playing || this.trip || !ctx.player.controlEnabled) return
@@ -198,7 +202,7 @@ export class Worlds implements IWorlds {
   }
 
   nearestPortal(p: V3, out: V3): boolean {
-    const v = this.visit()
+    const v = this.here
     let best: Arch | null = v ? v.exit : null
     if (!v) {
       let bestD = Infinity
@@ -224,7 +228,7 @@ export class Worlds implements IWorlds {
       const dz = z - p.z
       out.push({ angle: wrap(cameraYaw - Math.atan2(dx, dz)), dist: Math.hypot(dx, dz), kind })
     }
-    const v = this.visit()
+    const v = this.here
     if (!v) {
       for (const [id, arch] of this.arches) {
         if (this.isUnlocked(id) && !save.bosses.includes(MAPS[id].boss)) mark(arch.x, arch.z, 'portal')
@@ -236,10 +240,10 @@ export class Worlds implements IWorlds {
   }
 
   bossIntro(): BossIntro | null {
-    const v = this.visit()
+    const v = this.here
     if (!v || v.boss.mode !== 'sleep') return null
     const boss = v.boss
-    this.head.set(boss.pos.x, boss.pos.y + (v.def.id === 'rift' ? 4.2 : 4.6), boss.pos.z)
+    this.head.set(boss.pos.x, boss.pos.y + v.spec.head, boss.pos.z)
     return {
       name: boss.name,
       title: boss.title,
@@ -253,13 +257,12 @@ export class Worlds implements IWorlds {
   dispose(): void {
     for (const u of this.unsubs) u()
     this.unsubs = []
-    for (const id of [...this.visits.keys()]) this.disposeVisit(id)
+    if (this.here) this.disposeVisit(this.here)
+    this.here = null
     for (const a of this.arches.values()) a.dispose()
     this.arches.clear()
     this.islandKit?.dispose()
     this.islandKit = null
-    this.weaponKit?.dispose()
-    this.weaponKit = null
     this.runeDim?.dispose()
     this.runeLit?.dispose()
     if (this.glow?.owned) this.glow.texture.dispose()
@@ -287,31 +290,44 @@ export class Worlds implements IWorlds {
   private arrive(to: MapId): void {
     const ctx = this.ctx
     const from = this._current
-    if (from !== 'isle') this.leave(from)
+    this.leave()
+    let v: Visit | null = null
+    if (to !== 'isle') {
+      try {
+        v = this.open(to)
+      } catch (err) {
+        // A map that fails to build must not stop the game: the player steps back out of its arch.
+        console.error(`[starfall] building ${to} failed`, err)
+        ctx.bus.emit('ui:toast', { kind: 'warning', title: 'The portal flickered out', body: 'Its magic faltered. Try the arch again.' })
+      }
+    }
+    const dest: MapId = v ? to : 'isle'
     let spot: Spot
-    if (to === 'isle') {
-      spot = this.arches.get(from as PortalMap)?.exitSpot() ?? ctx.checkpoints.spawnPoint(ctx.game.save.checkpoint)
-    } else {
-      const v = this.ensure(to)
-      v.kit.root.visible = true
-      v.checkpoint = 0
+    if (v) {
       this.prepare(v)
       spot = v.def.checkpoints[0]
+    } else {
+      // Out of the island arch of the map just left (or of the one that failed to open).
+      const arch = to !== 'isle' ? this.arches.get(to) : from !== 'isle' ? this.arches.get(from) : undefined
+      spot = arch?.exitSpot() ?? ctx.checkpoints.spawnPoint(ctx.game.save.checkpoint)
     }
-    this._current = to
+    this.here = v
+    this._current = dest
     this.setBounds()
     ctx.character.cancelRagdoll()
     ctx.player.teleport(spot.x, spot.y, spot.z, spot.yaw)
     ctx.player.resetHealth()
     ctx.cameraRig.snapBehind()
-    ctx.env.setAtmosphere(to, 0)
+    ctx.env.setAtmosphere(dest, 0)
     ctx.enemies.clearMinions()
     ctx.game.setMusic('explore')
-    ctx.bus.emit('world:travel', { from, to })
-    if (to !== 'isle') {
-      ctx.bus.emit('ui:objective', { text: this.objective(this.visit()!) })
-      this.placeGuards(MAPS[to])
+    ctx.bus.emit('world:travel', { from, to: dest })
+    if (!v) {
+      this.announceUnlocks()
+      return
     }
+    ctx.bus.emit('ui:objective', { text: this.objective(v) })
+    this.placeGuards(v.def)
   }
 
   /** The map's factory mobs, fresh on every visit (Creative: only with its enemies switched on). */
@@ -325,25 +341,41 @@ export class Worlds implements IWorlds {
     }
   }
 
-  /** Leaving a map: its fight resets and it goes dark. */
-  private leave(id: MapId): void {
+  /** Leaving the current map: its guards go, its fight ends, and everything built for it is freed. */
+  private leave(): void {
     this.ctx.factory.clear(MAP_GROUP)
-    const v = this.visits.get(id as PortalMap)
-    if (!v) return
-    v.boss.reset()
-    v.chest.hide()
-    v.kit.root.visible = false
+    if (this.here) this.disposeVisit(this.here)
+    this.here = null
   }
 
-  /** Builds a map on its first visit (behind the fade). */
-  private ensure(id: PortalMap): Visit {
-    const existing = this.visits.get(id)
-    if (existing) return existing
+  /** Builds a map (on arrival, behind the fade). If anything throws, what was built so far is freed. */
+  private open(id: PortalMapId): Visit {
+    const made: Array<{ dispose(): void }> = []
+    const keep = <T extends { dispose(): void }>(o: T): T => {
+      made.push(o)
+      return o
+    }
+    try {
+      return this.assemble(id, keep)
+    } catch (err) {
+      for (const o of made.reverse()) {
+        try {
+          o.dispose()
+        } catch {
+          /* already broken: free the rest */
+        }
+      }
+      throw err
+    }
+  }
+
+  private assemble(id: PortalMapId, keep: <T extends { dispose(): void }>(o: T) => T): Visit {
     const ctx = this.ctx
     const def = MAPS[id]
-    const kit = new ZoneKit(ctx, `map:${id}`)
-    const build = id === 'rift' ? buildRift(ctx, kit, def) : buildFrost(ctx, kit, def)
-    const exit = new Arch(ctx, kit, { x: def.exit.x, y: def.exit.y ?? def.center.y, z: def.exit.z, yaw: def.exit.yaw }, HOME_COLORS)
+    const spec = MAP_SPECS[id]
+    const kit = keep(new ZoneKit(ctx, `map:${id}`))
+    const build = keep(spec.build(ctx, kit, def))
+    const exit = keep(new Arch(ctx, kit, { x: def.exit.x, y: def.exit.y ?? def.center.y, z: def.exit.z, yaw: def.exit.yaw }, HOME_COLORS))
     const runes: Rune[] = def.checkpoints.slice(1).map(spot => {
       // A rune stone beside the spot; its glow brightens once reached.
       const sx = spot.x + Math.cos(spot.yaw) * 1.6
@@ -356,14 +388,13 @@ export class Worlds implements IWorlds {
       return { sprite, spot }
     })
     kit.finalize()
-    const hazards = new Hazards(ctx, HAZARD_COLORS[id])
-    const arena = { ...def.arena, r: id === 'rift' ? RIFT_RADIUS : FROST_RADIUS }
-    const boss = id === 'rift' ? new GloomKing(ctx, hazards, arena, build.pillars) : new FrostGolem(ctx, hazards, arena)
-    this.weaponKit ??= new WeaponKit(ctx.textures)
-    const chest = new Chest(ctx, def.arena.x, def.arena.y, def.arena.z, 0, REWARD[id], this.weaponKit)
-    const v: Visit = { def, kit, build, exit, hazards, boss, chest, runes, checkpoint: 0, introSeen: false }
+    const weaponKit = spec.reward ? keep(new WeaponKit(ctx.textures)) : null
+    const chest = spec.reward && weaponKit ? keep(new Chest(ctx, def.arena.x, def.arena.y, def.arena.z, 0, spec.reward, weaponKit)) : null
+    const hazards = keep(new Hazards(ctx, spec.hazards))
+    const { boss, standIn } = this.makeBoss(def, spec, hazards, build)
+    keep(boss)
+    const v: Visit = { def, spec, kit, build, exit, hazards, boss, chest, weaponKit, runes, checkpoint: 0, standIn }
     boss.onDefeated = () => this.bossDefeated(v)
-    this.visits.set(id, v)
     try {
       ctx.renderer.compile(ctx.scene, ctx.camera)
     } catch {
@@ -372,31 +403,46 @@ export class Worlds implements IWorlds {
     return v
   }
 
+  /** The map's boss asleep in its arena; `standIn`: made before its model arrived. */
+  private makeBoss(def: MapDef, spec: MapSpec, hazards: Hazards, build: MapBuild): { boss: Boss; standIn: boolean } {
+    const kind = spec.factoryBoss
+    const standIn = !!kind && !this.ctx.factory.bossModelReady(kind)
+    return { boss: spec.boss(this.ctx, hazards, { ...def.arena, r: spec.arenaRadius }, build), standIn }
+  }
+
+  /** The boss's model arrived while it slept in its stand-in: swap in the real one. */
+  private swapStandIn(v: Visit): void {
+    v.boss.dispose()
+    const next = this.makeBoss(v.def, v.spec, v.hazards, v.build)
+    v.boss = next.boss
+    v.standIn = next.standIn
+    v.boss.onDefeated = () => this.bossDefeated(v)
+  }
+
   /** Boss and chest as the save says: beaten (chest open once the reward is owned) or waiting. */
   private prepare(v: Visit): void {
     const save = this.ctx.game.save
+    const reward = v.spec.reward
     if (save.bosses.includes(v.def.boss)) {
       v.boss.markDead()
-      v.chest.show(save.weapons.includes(REWARD[v.def.id as PortalMap]))
+      if (reward) v.chest?.show(save.weapons.includes(reward))
     } else {
       if (v.boss.mode === 'dead') v.boss.mode = 'sleep'
       v.boss.reset()
-      v.chest.hide()
+      v.chest?.hide()
     }
     v.hazards.clear()
     for (let i = 0; i < v.runes.length; i++) v.runes[i].sprite.material = i + 1 <= v.checkpoint ? this.runeLit! : this.runeDim!
   }
 
-  private disposeVisit(id: PortalMap): void {
-    const v = this.visits.get(id)
-    if (!v) return
+  private disposeVisit(v: Visit): void {
     v.boss.dispose()
-    v.chest.dispose()
+    v.chest?.dispose()
+    v.weaponKit?.dispose()
     v.hazards.dispose()
     v.exit.dispose()
     v.build.dispose()
     v.kit.dispose()
-    this.visits.delete(id)
   }
 
   /* ── triggers ────────────────────────────────────────────── */
@@ -404,7 +450,7 @@ export class Worlds implements IWorlds {
   private checkPortals(): void {
     if (this.cooldown > 0) return
     const p = this.ctx.player.position
-    const v = this.visit()
+    const v = this.here
     if (v) {
       if (v.exit.inside(p)) this.travel('isle')
       return
@@ -414,15 +460,19 @@ export class Worlds implements IWorlds {
         if (arch.inside(p)) this.travel(id)
       } else if (arch.inside(p, 0.75) && this.sealedT <= 0) {
         this.sealedT = SEALED_TOAST_GAP
-        const need = MAPS[id].shards
-        const have = Math.min(need, this.ctx.game.shardCount())
-        this.ctx.bus.emit('ui:toast', {
-          kind: 'warning',
-          title: 'The arch is sealed',
-          body: `Its runes wake when ${need} star shards are found (${have} of ${need}).`,
-        })
+        this.ctx.bus.emit('ui:toast', { kind: 'warning', title: 'The arch is sealed', body: this.sealedText(MAPS[id]) })
       }
     }
+  }
+
+  private sealedText(def: MapDef): string {
+    const rule = def.unlock
+    if ('shards' in rule) {
+      const have = Math.min(rule.shards, this.ctx.game.shardCount())
+      return `Its runes wake when ${rule.shards} star shards are found (${have} of ${rule.shards}).`
+    }
+    const lair = lairOf(rule.boss)
+    return `Its runes wake once the ${BOSS_NAMES[rule.boss]}${lair ? ` ${lair.where}` : ''} is defeated.`
   }
 
   private checkCheckpoints(v: Visit): void {
@@ -444,18 +494,18 @@ export class Worlds implements IWorlds {
     const a = v.def.arena
     const p = this.ctx.player.position
     if (Math.hypot(p.x - a.x, p.z - a.z) > a.r || p.y < a.y - 1) return
-    if (v.introSeen) {
+    if (this.introSeen.has(v.def.id)) {
       v.boss.wake()
       this.beginFight(v)
       return
     }
-    v.introSeen = true
+    this.introSeen.add(v.def.id)
     void this.ctx.game.playCutscene('boss', BOSS_IDS.indexOf(v.def.boss))
   }
 
   /** The player died: the fight starts over from the boss's sleep (the entrance checkpoint holds). */
   private restartFight(): void {
-    const v = this.visit()
+    const v = this.here
     if (!v || (v.boss.mode !== 'fight' && v.boss.mode !== 'intro')) return
     v.boss.reset()
     this.ctx.game.setMusic('explore')
@@ -471,39 +521,47 @@ export class Worlds implements IWorlds {
   private bossDefeated(v: Visit): void {
     const ctx = this.ctx
     ctx.game.setMusic('explore')
-    v.chest.show(false, true)
-    ctx.bus.emit('ui:toast', { kind: 'reward', title: `${BOSS_NAMES[v.def.boss]} defeated!`, body: 'A chest has appeared in the arena.' })
+    const kind = v.spec.factoryBoss
+    if (kind) ctx.factory.bossDrops(kind, v.boss.pos.x, v.def.arena.y, v.boss.pos.z)
+    v.chest?.show(false, true)
+    ctx.bus.emit('ui:toast', {
+      kind: 'reward',
+      title: `${BOSS_NAMES[v.def.boss]} defeated!`,
+      body: v.chest ? 'A chest has appeared in the arena.' : 'It left hearts behind. The golden arch leads home.',
+    })
     ctx.bus.emit('ui:objective', { text: this.objective(v) })
+    // Arches this boss guarded wake now; the island hears about it on the way back.
+    this.unlockEarned(true)
   }
 
   private objective(v: Visit): string {
-    if (!this.ctx.game.save.bosses.includes(v.def.boss)) return v.def.objective
-    return this.ctx.game.save.weapons.includes(REWARD[v.def.id as PortalMap]) ? 'Return home through the golden arch' : 'Open the reward chest'
+    const save = this.ctx.game.save
+    if (!save.bosses.includes(v.def.boss)) return v.def.objective
+    const reward = v.spec.reward
+    return reward && !save.weapons.includes(reward) ? 'Open the reward chest' : 'Return home through the golden arch'
   }
 
   /* ── unlocking ───────────────────────────────────────────── */
 
-  /** Unlock every map the shard count has earned; `tell` queues the announcement. */
-  private unlockFor(shards: number, tell: boolean): void {
+  /** Wake every arch whose rule the progress now meets; `tell` queues the announcement. */
+  private unlockEarned(tell: boolean): void {
+    const game = this.ctx.game
+    const shards = game.shardCount()
     for (const def of PORTAL_MAPS) {
-      const id = def.id as PortalMap
-      if (shards < def.shards || this.isUnlocked(id)) continue
-      this.ctx.game.unlockMap(id)
-      this.arches.get(id)?.setOpen(true)
-      if (tell) this.announce.push(id)
+      if (this.isUnlocked(def.id) || !unlockMet(def.unlock, shards, game.save.bosses)) continue
+      game.unlockMap(def.id)
+      this.arches.get(def.id)?.setOpen(true)
+      if (tell) this.announce.push(def.id)
     }
   }
 
-  /** After the shard cutscene: tell the player which arch woke up. */
+  /** On the island (after the shard cutscene, or back from a map): say which arches woke up. */
   private announceUnlocks(): void {
+    if (this._current !== 'isle') return
     for (const id of this.announce) {
-      this.ctx.bus.emit('ui:toast', { kind: 'reward', title: `${MAPS[id].name} portal awakened`, body: ARCH_HINT[id] })
+      this.ctx.bus.emit('ui:toast', { kind: 'reward', title: `${MAPS[id].name} portal awakened`, body: MAP_SPECS[id].archHint })
     }
     this.announce = []
-  }
-
-  private visit(): Visit | null {
-    return this._current === 'isle' ? null : (this.visits.get(this._current) ?? null)
   }
 
   private setBounds(): void {

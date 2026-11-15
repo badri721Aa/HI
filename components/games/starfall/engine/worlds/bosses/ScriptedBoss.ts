@@ -112,6 +112,11 @@ export abstract class ScriptedBoss extends Boss implements LiveEnemy {
     return this.mode !== 'dying' && this.mode !== 'dead'
   }
 
+  /** Still in the scene (not yet disposed). */
+  get inScene(): boolean {
+    return this.root.parent !== null
+  }
+
   despawn(): void {
     this.dispose()
   }

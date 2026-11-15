@@ -1,9 +1,11 @@
 /**
  * The worlds: Starfall Isle (map 0) and the maps behind its portal arches.
  *
- * Each portal map is built in its own region far from the island (beyond the camera's far
- * plane) and high above the sea, from ZoneKit geometry and colliders. No three.js here, so
- * the HUD and the network can share it.
+ * Each portal map is built in its own region far from the island and from every other map
+ * (≥ 2400 m apart, far beyond the camera's 900 m far plane) and high above the sea, from ZoneKit
+ * geometry and colliders. This file is the data half of a map (where it is, its arches,
+ * checkpoints, arena, guards, unlock rule, mode spawns); worlds/registry.ts is the code half
+ * (builder, boss, reward). No three.js here, so the HUD and the network can share it.
  */
 import type { BossId, MapId, MobKind } from '../events'
 
@@ -36,11 +38,16 @@ export interface MobPlacement {
   leash?: number
 }
 
+/** What wakes a map's island arch: enough star shards, or a boss beaten. */
+export type UnlockRule = { shards: number } | { boss: BossId }
+
 export interface MapDef {
-  id: MapId
+  id: PortalMapId
   name: string
-  /** Shards needed to wake its island arch. */
-  shards: number
+  /** The name inside a sentence: 'in the Shadow Rift', 'on Frost Peak'. */
+  where: string
+  /** What wakes its island arch (Creative: always awake). */
+  unlock: UnlockRule
   /** Centre of the map's region; its main floor is at `center.y`. */
   center: { x: number; y: number; z: number }
   /** Soft wall radius around the centre. */
@@ -54,23 +61,52 @@ export interface MapDef {
   /** Respawn points in order along the map; the first is the entrance. */
   checkpoints: Spot[]
   boss: BossId
-  /** Fight trigger: the player inside this circle (and above `arenaY - 1`). */
+  /** Fight trigger: the player inside this circle (and above `arenaY - 1`). The boss itself moves within the registry's arenaRadius. */
   arena: { x: number; y: number; z: number; r: number }
   objective: string
-  /** Portal swirl colours (inner, outer). */
+  /** Portal swirl colours (inner, outer); the Travel menu uses the outer one as the map's accent. */
   swirl: [string, string]
   /** Factory mobs placed on every visit. */
   mobs?: MobPlacement[]
+  /** Eight well-spread standing points on the main floor for online game modes (see modeSpawns). */
+  spawns?: Spot[]
+}
+
+/** Every map but the island. */
+export type PortalMapId = Exclude<MapId, 'isle'>
+
+/**
+ * Eight mode spawns on a floor around (x, z): alternating between an inner and an outer ring,
+ * spread evenly, each facing the middle.
+ */
+function ringSpawns(c: { x: number; y: number; z: number }, inner: number, outer: number): Spot[] {
+  return Array.from({ length: 8 }, (_, i) => {
+    const a = ((i + 0.5) / 8) * Math.PI * 2
+    const r = i % 2 ? outer : inner
+    const x = Math.round((c.x + Math.sin(a) * r) * 100) / 100
+    const z = Math.round((c.z + Math.cos(a) * r) * 100) / 100
+    return { x, y: c.y, z, yaw: Math.atan2(c.x - x, c.z - z) }
+  })
 }
 
 const RIFT = { x: 2400, y: 120, z: 0 }
 const FROST = { x: -2400, y: 100, z: 0 }
+/*
+ * The four newer maps share one layout (placeholder scenery until each gets its full map): the
+ * entrance ledge with the golden arch lies south (+z) of the arena, a terrace where the guards
+ * stand leads north to it, and the boss waits in the middle facing the way in.
+ */
+const VOLCANIC = { x: 0, y: 110, z: 2400 }
+const SKY = { x: 0, y: 160, z: -2400 }
+const NEON = { x: 2400, y: 140, z: 2400 }
+const GLITCH = { x: -2400, y: 100, z: -2400 }
 
-export const MAPS: Record<Exclude<MapId, 'isle'>, MapDef> = {
+export const MAPS: Record<PortalMapId, MapDef> = {
   rift: {
     id: 'rift',
     name: 'Shadow Rift',
-    shards: 3,
+    where: 'in the Shadow Rift',
+    unlock: { shards: 3 },
     center: RIFT,
     radius: 60,
     killY: RIFT.y - 28,
@@ -87,11 +123,14 @@ export const MAPS: Record<Exclude<MapId, 'isle'>, MapDef> = {
       { kind: 'shieldBearer', dx: -3.5, dz: 19.5, yaw: 0, patrol: 2, leash: 7 },
       { kind: 'bomber', dx: 4, dz: 19, yaw: 0, patrol: 2, leash: 8 },
     ],
+    // Inside and outside the ring of pillars (radius 13), clear of the rim crystals.
+    spawns: ringSpawns(RIFT, 8, 17),
   },
   frost: {
     id: 'frost',
     name: 'Frost Peak',
-    shards: 5,
+    where: 'on Frost Peak',
+    unlock: { shards: 5 },
     center: FROST,
     radius: 70,
     killY: FROST.y - 26,
@@ -112,10 +151,130 @@ export const MAPS: Record<Exclude<MapId, 'isle'>, MapDef> = {
       { kind: 'rusher', dx: 5, dz: 15, yaw: 0, patrol: 4, leash: 16 },
       { kind: 'healer', dx: 0.5, dz: 9, yaw: 0, patrol: 2, leash: 16 },
     ],
+    // On the Frost Golem's summit arena (radius 16), inside its rim of rocks and crystals.
+    spawns: ringSpawns({ x: FROST.x, y: FROST.y + 14, z: FROST.z - 30 }, 6, 11.5),
+  },
+  volcanic: {
+    id: 'volcanic',
+    name: 'Ancient Volcanic Ruins',
+    where: 'in the Ancient Volcanic Ruins',
+    unlock: { boss: 'gloomKing' },
+    center: VOLCANIC,
+    radius: 54,
+    killY: VOLCANIC.y - 30,
+    // In the clearing below Silver Falls, facing east down the path to Beacon Summit.
+    arch: { x: -62, z: -20, yaw: 1.8 },
+    exit: { x: VOLCANIC.x, y: VOLCANIC.y, z: VOLCANIC.z + 45.6, yaw: Math.PI },
+    checkpoints: [
+      { x: VOLCANIC.x, y: VOLCANIC.y, z: VOLCANIC.z + 41.5, yaw: Math.PI },
+      { x: VOLCANIC.x - 5, y: VOLCANIC.y, z: VOLCANIC.z + 25.5, yaw: Math.PI },
+    ],
+    boss: 'ironTitan',
+    // The Titan's shockwaves run out to its circle + 3 m and its quake ring is 11 m wide: a 20 m
+    // circle (registry) on a 24 m floor, entered from the south.
+    arena: { x: VOLCANIC.x, y: VOLCANIC.y, z: VOLCANIC.z, r: 16 },
+    objective: 'Cross the ruins and defeat the Iron Titan',
+    swirl: ['#ffd9a0', '#d23c0e'],
+    // A shield wall and a bomber on the terrace, a rusher out in front.
+    mobs: [
+      { kind: 'rusher', dx: 0.5, dz: 29.5, yaw: 0, patrol: 3, leash: 12 },
+      { kind: 'shieldBearer', dx: -2.5, dz: 31.5, yaw: 0, patrol: 2, leash: 12 },
+      { kind: 'bomber', dx: 3.5, dz: 33, yaw: 0, patrol: 2, leash: 12 },
+    ],
+    spawns: ringSpawns(VOLCANIC, 10, 17),
+  },
+  sky: {
+    id: 'sky',
+    name: 'Floating Sky Isles',
+    where: 'on the Floating Sky Isles',
+    unlock: { boss: 'gloomKing' },
+    center: SKY,
+    radius: 53,
+    killY: SKY.y - 35,
+    // On the high meadows north of Beacon Summit, at the head of the valley that climbs to them
+    // between the summit and the falls' mesa (facing down it).
+    arch: { x: -42, z: -112, yaw: 0.33 },
+    exit: { x: SKY.x, y: SKY.y, z: SKY.z + 44.6, yaw: Math.PI },
+    checkpoints: [
+      { x: SKY.x, y: SKY.y, z: SKY.z + 40.5, yaw: Math.PI },
+      { x: SKY.x - 5, y: SKY.y, z: SKY.z + 24.5, yaw: Math.PI },
+    ],
+    boss: 'vortexWeaver',
+    // The Weaver flies a 9 m orbit and drags the player toward the middle with its vortex: a 19 m
+    // circle (registry) on a 23 m floor so gusts near the rim don't throw anyone off.
+    arena: { x: SKY.x, y: SKY.y, z: SKY.z, r: 15 },
+    objective: 'Defeat the Vortex Weaver above the clouds',
+    swirl: ['#f2ffe8', '#47b86a'],
+    // A sniper at the back of the terrace, covered by a rusher and a healer.
+    mobs: [
+      { kind: 'rusher', dx: -3, dz: 29, yaw: 0, patrol: 3, leash: 12 },
+      { kind: 'healer', dx: 3, dz: 31, yaw: 0, patrol: 2, leash: 12 },
+      { kind: 'sniper', dx: 0, dz: 34, yaw: 0, patrol: 1.5, leash: 10 },
+    ],
+    spawns: ringSpawns(SKY, 9.5, 16.5),
+  },
+  neon: {
+    id: 'neon',
+    name: 'Cyberpunk Neon Metropolis',
+    where: 'in the Neon Metropolis',
+    unlock: { boss: 'frostGolem' },
+    center: NEON,
+    radius: 52,
+    killY: NEON.y - 30,
+    // In the fields east of Meadow Village, facing the village.
+    arch: { x: 50, z: 68, yaw: Math.atan2(-36, -16) },
+    exit: { x: NEON.x, y: NEON.y, z: NEON.z + 43.6, yaw: Math.PI },
+    checkpoints: [
+      { x: NEON.x, y: NEON.y, z: NEON.z + 39.5, yaw: Math.PI },
+      { x: NEON.x - 5, y: NEON.y, z: NEON.z + 23.5, yaw: Math.PI },
+    ],
+    boss: 'plasmaOverlord',
+    // The Overlord's sweeping beams reach 1.35 × its circle: an 18 m circle (registry) on a 22 m
+    // rooftop keeps every beam over the floor or just past its rim.
+    arena: { x: NEON.x, y: NEON.y, z: NEON.z, r: 14.5 },
+    objective: 'Defeat the Plasma Overlord on the rooftop',
+    swirl: ['#ffd6fb', '#d02ad6'],
+    // A turret thrower behind a shield, and a sniper painting the way in.
+    mobs: [
+      { kind: 'shieldBearer', dx: -2.5, dz: 28.5, yaw: 0, patrol: 2, leash: 12 },
+      { kind: 'turretSpawner', dx: -3, dz: 32, yaw: 0, patrol: 2, leash: 12 },
+      { kind: 'sniper', dx: 3.5, dz: 32.5, yaw: 0, patrol: 1.5, leash: 10 },
+    ],
+    spawns: ringSpawns(NEON, 9, 16),
+  },
+  glitch: {
+    id: 'glitch',
+    name: 'Glitch Grid',
+    where: 'in the Glitch Grid',
+    unlock: { boss: 'frostGolem' },
+    center: GLITCH,
+    radius: 52,
+    killY: GLITCH.y - 30,
+    // In the meadow south of Whispering Wood, facing the village.
+    arch: { x: -54, z: 78, yaw: 1.4 },
+    exit: { x: GLITCH.x, y: GLITCH.y, z: GLITCH.z + 43.6, yaw: Math.PI },
+    checkpoints: [
+      { x: GLITCH.x, y: GLITCH.y, z: GLITCH.z + 39.5, yaw: Math.PI },
+      { x: GLITCH.x - 5, y: GLITCH.y, z: GLITCH.z + 23.5, yaw: Math.PI },
+    ],
+    boss: 'voidStalker',
+    // The Stalker blinks to 2.3 m behind the player and circles clones around them: an 18 m circle
+    // (registry) on a 22 m floor leaves room for a blink behind someone standing at the edge.
+    arena: { x: GLITCH.x, y: GLITCH.y, z: GLITCH.z, r: 14.5 },
+    objective: 'Defeat the Void Stalker in the Glitch Grid',
+    swirl: ['#e6fffb', '#0fb8b0'],
+    // Rushers and a bomber in front, a turret thrower behind them.
+    mobs: [
+      { kind: 'rusher', dx: -3, dz: 28.5, yaw: 0, patrol: 3, leash: 12 },
+      { kind: 'bomber', dx: 3, dz: 30, yaw: 0, patrol: 2, leash: 12 },
+      { kind: 'turretSpawner', dx: 0, dz: 33, yaw: 0, patrol: 2, leash: 12 },
+    ],
+    spawns: ringSpawns(GLITCH, 9, 16),
   },
 }
 
-export const PORTAL_MAPS = [MAPS.rift, MAPS.frost] as const
+/** Every portal map, in the order the menus list them (the Travel menu puts the island first). */
+export const PORTAL_MAPS: readonly MapDef[] = [MAPS.rift, MAPS.frost, MAPS.volcanic, MAPS.sky, MAPS.neon, MAPS.glitch]
 
 /** The 'boss' cutscene's argument is an index into this list (append only). */
 export const BOSS_IDS: readonly BossId[] = ['gloomKing', 'frostGolem', 'ironTitan', 'vortexWeaver', 'plasmaOverlord', 'voidStalker']
@@ -129,10 +288,49 @@ export const BOSS_NAMES: Record<BossId, string> = {
   voidStalker: 'Void Stalker',
 }
 
-export const MAP_NAMES: Record<MapId, string> = { isle: 'Starfall Isle', rift: MAPS.rift.name, frost: MAPS.frost.name }
+export const MAP_NAMES: Record<MapId, string> = {
+  isle: 'Starfall Isle',
+  rift: MAPS.rift.name,
+  frost: MAPS.frost.name,
+  volcanic: MAPS.volcanic.name,
+  sky: MAPS.sky.name,
+  neon: MAPS.neon.name,
+  glitch: MAPS.glitch.name,
+}
 
-/** Wire codes for the network (append new maps at the end). */
-const MAP_CODES: readonly MapId[] = ['isle', 'rift', 'frost']
+/** Has this progress met the rule? */
+export function unlockMet(rule: UnlockRule, shards: number, bosses: readonly BossId[]): boolean {
+  return 'shards' in rule ? shards >= rule.shards : bosses.includes(rule.boss)
+}
+
+/** The map a boss guards. */
+export function lairOf(boss: BossId): MapDef | undefined {
+  return PORTAL_MAPS.find(m => m.boss === boss)
+}
+
+/** What still opens a sealed arch, as a menu line: "Find 3 star shards (1 of 3)", "Defeat the Gloom King in the Shadow Rift". */
+export function unlockText(rule: UnlockRule, shards: number): string {
+  if ('shards' in rule) return `Find ${rule.shards} star shards (${Math.min(shards, rule.shards)} of ${rule.shards})`
+  return `Defeat the ${BOSS_NAMES[rule.boss]} ${lairOf(rule.boss)?.where ?? ''}`.trimEnd()
+}
+
+const NO_SPAWNS: readonly Spot[] = []
+
+/**
+ * Where players stand at the start of an online game mode hosted on a map (Infection,
+ * Juggernaut, Gun Game, Boss Raid): eight well-spread points on its main floor, each facing the
+ * middle (yaw as everywhere: 0 faces +z). Empty for the island, which has its own mode spawns
+ * (net/modes).
+ */
+export function modeSpawns(map: MapId): readonly Spot[] {
+  return map === 'isle' ? NO_SPAWNS : (MAPS[map].spawns ?? NO_SPAWNS)
+}
+
+/** Wire codes for the network (append new maps at the end; older clients read unknown codes as the island). */
+const MAP_CODES: readonly MapId[] = ['isle', 'rift', 'frost', 'volcanic', 'sky', 'neon', 'glitch']
+
+/** How many map wire codes exist (net/protocol rejects anything beyond). */
+export const MAP_CODE_COUNT = MAP_CODES.length
 
 export function mapCode(m: MapId): number {
   return Math.max(0, MAP_CODES.indexOf(m))

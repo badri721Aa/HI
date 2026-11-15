@@ -44,13 +44,37 @@ import { AudioEngine } from './audio/AudioEngine'
 import { Network } from './net/Network'
 import { Weapons } from './gameplay/Weapons'
 import { Worlds } from './worlds/Worlds'
-import { BOSS_NAMES, MAP_NAMES, PORTAL_MAPS } from './worlds/defs'
+import { BOSS_NAMES, MAP_NAMES, PORTAL_MAPS, unlockText } from './worlds/defs'
 import { Building } from './build/Building'
 import { HOTBAR } from './gameplay/weapons/defs'
 
 interface Timer {
   at: number
   fn: () => void
+}
+
+/** One row of the Travel menu. */
+export interface TravelEntry {
+  id: MapId
+  name: string
+  /** The boss guarding it (null for the island). */
+  boss: string | null
+  /** The player is in this map now. */
+  here: boolean
+  /** Its arch is awake (the island always is). */
+  open: boolean
+  defeated: boolean
+  /** Sealed: what wakes it ("Find 3 star shards (1 of 3)"). */
+  requirement: string | null
+  /** Accent colour (its arch's swirl). */
+  color: string
+}
+
+export interface TravelInfo {
+  here: MapId
+  /** Why travel is off right now (a boss fight, a game mode round, a cutscene), or null. */
+  blocked: string | null
+  maps: TravelEntry[]
 }
 
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
@@ -342,7 +366,10 @@ export class Game implements GameApi {
   /** The Creative sandbox (its own save slot): everything unlocked, no damage, flying, building from the start. */
   startCreative(): void {
     if (this.phase !== 'title' || this.halted) return
-    this.begin(loadSave('creative') ?? this.newCreativeSave())
+    const saved = loadSave('creative')
+    // Slots from before a map existed: its boss counts as beaten like the others.
+    if (saved) for (const m of PORTAL_MAPS) if (!saved.bosses.includes(m.boss)) saved.bosses.push(m.boss)
+    this.begin(saved ?? this.newCreativeSave())
     this.ctx.build.setActive(true)
     const device = this.ctx.input.device
     const body =
@@ -561,12 +588,59 @@ export class Game implements GameApi {
         ...n(m.arch.x, m.arch.z),
         id: m.id,
         name: m.name,
-        shards: m.shards,
+        requirement: unlockText(m.unlock, this.shardCount()),
         unlocked: worlds.isUnlocked(m.id),
         boss: BOSS_NAMES[m.boss],
         defeated: this.save.bosses.includes(m.boss),
       })),
     }
+  }
+
+  /** The Travel menu: the island and every map, and why travel is off right now (null when it isn't). */
+  getTravelInfo(): TravelInfo {
+    const worlds = this.ctx.worlds
+    const here = worlds.current
+    const shards = this.shardCount()
+    const maps: TravelEntry[] = [
+      { id: 'isle', name: MAP_NAMES.isle, boss: null, here: here === 'isle', open: true, defeated: false, requirement: null, color: '#F5B455' },
+      ...PORTAL_MAPS.map(m => {
+        const open = here === m.id || worlds.isUnlocked(m.id)
+        return {
+          id: m.id,
+          name: m.name,
+          boss: BOSS_NAMES[m.boss],
+          here: here === m.id,
+          open,
+          defeated: this.save.bosses.includes(m.boss),
+          requirement: open ? null : unlockText(m.unlock, shards),
+          color: m.swirl[1],
+        }
+      }),
+    ]
+    return { here, blocked: this.travelBlock(), maps }
+  }
+
+  /**
+   * Travel menu: go to `id` exactly as its arch would take you (the fade, the build, the entrance
+   * checkpoint, the world:travel event the network and audio follow). Call from a click: the game
+   * resumes and needs pointer lock. False when travel isn't possible right now.
+   */
+  travelTo(id: MapId): boolean {
+    const worlds = this.ctx.worlds
+    if ((this.phase !== 'paused' && this.phase !== 'playing') || this.travelBlock() || id === worlds.current || !worlds.isUnlocked(id)) return false
+    if (this.phase === 'paused') this.resume()
+    worlds.travel(id)
+    return true
+  }
+
+  /** Why the Travel menu can't send the player anywhere right now (null: it can). */
+  private travelBlock(): string | null {
+    const ctx = this.ctx
+    if (ctx.net.modes.active) return 'A game mode round is on. Travel opens again when it ends.'
+    if (ctx.worlds.fighting || this.hud.get().boss) return 'A boss fight is on. Win it, or fall and try again, before travelling.'
+    if (ctx.cutscenes.active) return 'Wait for the scene to finish.'
+    if (ctx.worlds.travelling || this.dying) return 'You are already on your way.'
+    return null
   }
 
   dispose(): void {

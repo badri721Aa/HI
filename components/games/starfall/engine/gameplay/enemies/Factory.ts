@@ -7,7 +7,11 @@
  *   a model that can't be had falls back to its procedural stand-in, silently.
  *
  *   Shared by every enemy: one projectile pool, one beam pool, one set of mob telegraphs, the
- *   HP bars, contact shadows and heart drops. One boss at a time (the HUD has one boss bar).
+ *   HP bars, contact shadows and heart drops. One summoned boss at a time (the HUD has one boss bar).
+ *
+ *   Map bosses: mapBoss() hands Worlds one of the four bosses asleep in a map's arena. Worlds runs
+ *   it like its own bosses (intro, fight, resets, the save); the factory only lends it the shared
+ *   models, projectiles and beams, and lists it with the other enemies.
  *
  * Weapons reach the enemies through IEnemies.addTarget (each enemy registers itself), so swings,
  * slams and arrows need no changes; the projectile pool also registers a target so blades can
@@ -104,6 +108,8 @@ export class EnemyFactory implements IEnemyFactory {
   private mobs: Mob[] = []
   private live: Mob[] = []
   private bosses: BossHandle[] = []
+  /** Map bosses lent to Worlds (it updates and disposes them). */
+  private mapBosses = new Set<ScriptedBoss>()
   private nextUid = 1
   private dropSeed = 0
   private unsubs: Array<() => void> = []
@@ -195,7 +201,30 @@ export class EnemyFactory implements IEnemyFactory {
     const out: LiveEnemy[] = []
     for (const m of this.mobs) if (m.state !== 'gone') out.push(m)
     for (const b of this.bosses) if (!b.removed) out.push(b)
+    for (const b of this.mapBosses) if (b.inScene && b.mode !== 'dead') out.push(b)
     return out
+  }
+
+  mapBoss(kind: FactoryBossKind, hazards: Hazards, arena: ArenaCircle): ScriptedBoss {
+    const def = BOSSES[kind]
+    this.lib.prefetch([def.model.id])
+    for (const b of this.mapBosses) if (!b.inScene) this.mapBosses.delete(b)
+    const uid = this.nextUid++
+    const seed = mixSeed(kind.length * 977, 31, Math.round(arena.x * 10), Math.round(arena.z * 10))
+    const b = createBoss(kind, this.ctx, hazards, arena, { lib: this.lib, projectiles: this.projectiles!, beams: this.beams! }, uid, seed)
+    b.reset()
+    this.mapBosses.add(b)
+    return b
+  }
+
+  bossModelReady(kind: FactoryBossKind): boolean {
+    return this.lib.settled(BOSSES[kind].model.id)
+  }
+
+  bossDrops(kind: FactoryBossKind, x: number, y: number, z: number): void {
+    const def = BOSSES[kind]
+    for (let i = 0; i < def.drops.hearts; i++) this.drops?.heart(x, y, z, ++this.dropSeed)
+    this.ctx.fx.burst('shard', { x, y: y + 2, z }, { color: def.color, scale: 1.4 })
   }
 
   clear(group?: string): void {
@@ -252,6 +281,7 @@ export class EnemyFactory implements IEnemyFactory {
     this.mobs = []
     this.live = []
     for (const b of [...this.bosses]) this.removeBoss(b)
+    this.mapBosses.clear()
     this.projectiles?.dispose()
     this.beams?.dispose()
     this.hazards?.dispose()
@@ -430,10 +460,7 @@ export class EnemyFactory implements IEnemyFactory {
     const ctx = this.ctx
     const def = BOSSES[h.kind]
     const b = h.body
-    const x = b ? b.pos.x : h.arena.x
-    const z = b ? b.pos.z : h.arena.z
-    for (let i = 0; i < def.drops.hearts; i++) this.drops!.heart(x, h.arena.y, z, ++this.dropSeed)
-    ctx.fx.burst('shard', { x, y: h.arena.y + 2, z }, { color: def.color, scale: 1.4 })
+    this.bossDrops(h.kind, b ? b.pos.x : h.arena.x, h.arena.y, b ? b.pos.z : h.arena.z)
     ctx.game.setMusic('explore')
     ctx.bus.emit('ui:toast', { kind: 'reward', title: `${BOSS_NAMES[h.kind]} defeated!`, body: def.title })
   }

@@ -131,7 +131,9 @@ const TRAILS: Record<TrailKind, { spec: SpecName; spacing: number; scatter: numb
 const TRAIL_MAX = 24
 const TRAIL_REACH = 6
 /** Portals tint their entry swirl by where they lead. */
-const PORTAL_TINT: Record<MapId, string> = { isle: '#ffd98a', rift: '#c79bff', frost: '#bfeaff' }
+const PORTAL_TINT: Record<MapId, string> = {
+  isle: '#ffd98a', rift: '#c79bff', frost: '#bfeaff', volcanic: '#ffb070', sky: '#c8f5c0', neon: '#ff9af0', glitch: '#8ff7ea',
+}
 
 /** Each boss bursts in its own colour when defeated. */
 const BOSS_TINT: Record<BossId, string> = {

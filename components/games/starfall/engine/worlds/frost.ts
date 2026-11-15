@@ -8,7 +8,7 @@ import type { Ctx } from '../types'
 import type { ZoneKit } from '../world/zones/kit'
 import type { MapDef } from './defs'
 import { jaggedCone, place, rockGeometry, scaleUv, seeded, slab } from './geo'
-import type { MapBuild } from './rift'
+import type { MapBuild } from './registry'
 
 /** Arena radius (m) on top of the rock column. */
 export const FROST_RADIUS = 16

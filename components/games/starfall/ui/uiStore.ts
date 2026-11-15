@@ -34,7 +34,7 @@ export interface Objective {
   leaving: boolean
 }
 
-export type PausePanel = 'root' | 'map' | 'settings' | 'controls' | 'online' | 'spawner' | 'quit'
+export type PausePanel = 'root' | 'map' | 'travel' | 'settings' | 'controls' | 'online' | 'spawner' | 'quit'
 
 export interface UiState {
   phase: GamePhase

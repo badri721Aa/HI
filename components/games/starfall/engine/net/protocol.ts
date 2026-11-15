@@ -17,6 +17,7 @@
 import type { GestureName, PlayerState, WeaponId } from '../types'
 import { PARTICLE_COUNT } from '../player/ragdoll/skeleton'
 import { WORLD_HALF } from '../world/heightfield'
+import { MAP_CODE_COUNT } from '../worlds/defs'
 import { CHAT_MAX, NAME_MAX, SHIRT_COLORS } from './config'
 
 /* ── player state codes ──────────────────────────────────── */
@@ -45,8 +46,6 @@ export const FLAG_ACTIVE = 8
 
 /** Weapon wire codes (append new weapons at the end). */
 const WEAPONS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
-/** Number of map wire codes (see worlds/defs mapCode). */
-const MAP_COUNT = 3
 
 export function weaponCode(w: WeaponId): number {
   return Math.max(0, WEAPONS.indexOf(w))
@@ -114,7 +113,7 @@ export const KIND_HIT = 6
 export const STATE_BYTES = 40
 export const PING_BYTES = 16
 
-/** The island plus the portal maps' regions (out to ±2400 m, up to ~140 m). */
+/** The island plus the portal maps' regions (map centres out to ±2400 m on each axis, floors up to ~160 m). */
 const LIMIT_XZ = 2400 + WORLD_HALF
 const LIMIT_Y_LO = -40
 const LIMIT_Y_HI = 400
@@ -140,7 +139,7 @@ function sanitizeSnapshot(s: Snapshot): boolean {
   s.wading = clamp(fin(s.wading) ? s.wading : 0, 0, 1)
   s.slope = clamp(fin(s.slope) ? s.slope : 0, -1, 1)
   if (!(s.weapon >= 0 && s.weapon < WEAPONS.length)) s.weapon = 0
-  if (!(s.map >= 0 && s.map < MAP_COUNT)) s.map = 0
+  if (!(s.map >= 0 && s.map < MAP_CODE_COUNT)) s.map = 0
   s.draw = fin(s.draw) && s.draw >= 0 ? Math.min(1, s.draw) : -1
   return true
 }

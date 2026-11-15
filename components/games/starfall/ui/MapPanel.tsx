@@ -158,7 +158,7 @@ export function MapPanel({ onBack }: { onBack: () => void }) {
               </li>
             ))}
           </ul>
-          <Portals portals={info.portals} found={found} />
+          <Portals portals={info.portals} />
           <Legend />
         </div>
       </div>
@@ -184,8 +184,8 @@ function MapTooltip({ u, v, name, hint, collected }: { u: number; v: number; nam
   )
 }
 
-/** Each portal map: sealed (shards needed), awake (its boss waits) or conquered. */
-function Portals({ portals, found }: { portals: MapInfo['portals']; found: number }) {
+/** Each portal map: sealed (and what wakes it), awake (its boss waits) or conquered. */
+function Portals({ portals }: { portals: MapInfo['portals'] }) {
   return (
     <ul className="mt-4 space-y-1.5 border-t border-[#F3EEE6]/10 pt-4">
       {portals.map(p => (
@@ -198,7 +198,7 @@ function Portals({ portals, found }: { portals: MapInfo['portals']; found: numbe
           <span className="min-w-0">
             <span className={cx('block text-[13px]', p.unlocked ? 'text-[#F3EEE6]' : 'text-[#F3EEE6]/60')}>{p.name}</span>
             <span className="block text-[12px] text-[#F3EEE6]/40">
-              {p.defeated ? `${p.boss} defeated` : p.unlocked ? `The ${p.boss} waits beyond the arch` : `Sealed — wakes at ${p.shards} shards (${Math.min(found, p.shards)} of ${p.shards})`}
+              {p.defeated ? `${p.boss} defeated` : p.unlocked ? `The ${p.boss} waits beyond the arch` : `Sealed — ${p.requirement}`}
             </span>
           </span>
         </li>

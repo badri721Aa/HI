@@ -1,6 +1,7 @@
 import type { BossId, MapId, WeaponId } from './events'
 import { DEFAULT_SETTINGS, detectQuality, type Settings } from './settings'
 import { TOTAL_SHARDS } from './world/level'
+import { PORTAL_MAPS } from './worlds/defs'
 
 /** The save slots: the story, and the Creative sandbox. */
 export type GameMode = 'story' | 'creative'
@@ -29,7 +30,7 @@ export interface SaveGame {
   /** Weapons picked up (fists are always owned) and the one in hand. */
   weapons: WeaponId[]
   weapon: WeaponId
-  /** Portal maps unlocked so far (the island is always open). */
+  /** Portal maps unlocked so far (the island is always open; Creative opens every map without listing it). */
   maps: MapId[]
   /** Bosses defeated. */
   bosses: BossId[]
@@ -46,7 +47,7 @@ export interface Profile {
 }
 
 const WEAPON_IDS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
-const MAP_IDS: readonly MapId[] = ['rift', 'frost']
+const MAP_IDS: readonly MapId[] = PORTAL_MAPS.map(m => m.id)
 const BOSS_IDS: readonly BossId[] = ['gloomKing', 'frostGolem', 'ironTitan', 'vortexWeaver', 'plasmaOverlord', 'voidStalker']
 const isWeapon = (w: unknown): w is WeaponId => WEAPON_IDS.includes(w as WeaponId)
 const isMap = (m: unknown): m is MapId => MAP_IDS.includes(m as MapId)

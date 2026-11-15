@@ -10,7 +10,7 @@
 import type * as THREE from 'three'
 import type { CollisionWorld, Collider } from './collision'
 import type { BlockMsg } from './build/blocks'
-import type { BossId, CutsceneName, EnemyKind, EventBus, GamePhase, MapId, MusicMood, V3, WeaponId } from './events'
+import type { BossId, CutsceneName, EnemyKind, EventBus, FactoryBossKind, GamePhase, MapId, MusicMood, V3, WeaponId } from './events'
 import type { Input } from './input'
 import type { ModeId, Spot } from './net/modes/defs'
 import type { ModeView } from './net/modes/Modes'
@@ -18,6 +18,8 @@ import type { SaveGame } from './save'
 import type { QualityProfile, Settings } from './settings'
 import type { CompassMarker, HudStore } from './store'
 import type { TextureLib } from './textures'
+import type { Boss } from './worlds/bosses/Boss'
+import type { Hazards } from './worlds/bosses/hazards'
 
 export interface Ctx {
   renderer: THREE.WebGLRenderer
@@ -401,6 +403,16 @@ export interface IEnemyFactory extends System {
   clear(group?: string): void
   /** Count alive within radius. */
   aliveNear(p: V3, radius: number): number
+  /**
+   * A map's boss: one of the four scripted bosses asleep on `arena`, for Worlds to run like its
+   * own bosses (wake, begin, update, reset, dispose). It shares the factory's models, projectiles
+   * and beams, records its defeat in the save and is listed with the other enemies until disposed.
+   */
+  mapBoss(kind: FactoryBossKind, hazards: Hazards, arena: ArenaCircle): Boss
+  /** The boss's model has loaded (or failed for good): a mapBoss made now shows it rather than its stand-in. */
+  bossModelReady(kind: FactoryBossKind): boolean
+  /** What a defeated boss leaves where it fell: hearts and a burst of motes. */
+  bossDrops(kind: FactoryBossKind, x: number, y: number, z: number): void
 }
 
 /** A weapon blow against the gloomlings. */
@@ -452,7 +464,7 @@ export interface IWeapons extends System {
   syncWithSave(): void
 }
 
-/** worlds/Worlds.ts — portal arches, the maps behind them (built on first visit), their bosses and rewards. */
+/** worlds/Worlds.ts — portal arches, the maps behind them (built on arrival, freed on leaving), their bosses and rewards. */
 export interface IWorlds extends System {
   readonly current: MapId
   /** A portal fade is running (the player can't act). */
@@ -466,7 +478,7 @@ export interface IWorlds extends System {
   isUnlocked(id: MapId): boolean
   /** Respawn point inside the current map; null on the island (use the checkpoint). */
   spawnPoint(): { x: number; y: number; z: number; yaw: number } | null
-  /** Fade out, build the map on its first visit, move the player there and fade back in. */
+  /** Fade out, build the map (leaving the last one, which is freed), move the player to its entrance and fade back in. */
   travel(to: MapId): void
   /** The nearest open portal arch in the current map (its middle) → out; false when there is none. */
   nearestPortal(p: V3, out: V3): boolean
@@ -476,6 +488,8 @@ export interface IWorlds extends System {
   bossIntro(): BossIntro | null
   /** Back on the island with every fight reset (new game / continue / quit to title). */
   syncWithSave(): void
+  /** The current map's boss is waking, fighting or falling (travel waits until it's over). */
+  readonly fighting: boolean
 }
 
 export interface BossIntro {

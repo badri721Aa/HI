@@ -320,6 +320,8 @@ export class EnemyModel {
     this.root.removeFromParent()
     for (const m of this.materials) m.dispose()
     this.materials = []
+    // Each skinned clone has its own skeleton, whose bone-matrix texture lives on the GPU.
+    for (const m of this.meshes) (m as THREE.SkinnedMesh).skeleton?.dispose()
     this.puppet.dispose()
   }
 

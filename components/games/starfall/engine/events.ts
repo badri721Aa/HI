@@ -30,10 +30,10 @@ export type MusicMood = 'title' | 'explore' | 'danger' | 'cutscene' | 'victory' 
  */
 export type WeaponId = 'fists' | 'sword' | 'hammer' | 'bow' | 'starblade' | 'frostHammer'
 
-/** The worlds: Starfall Isle plus the maps behind its portal arches. */
-export type MapId = 'isle' | 'rift' | 'frost'
+/** The worlds: Starfall Isle plus the maps behind its portal arches (see worlds/defs). */
+export type MapId = 'isle' | 'rift' | 'frost' | 'volcanic' | 'sky' | 'neon' | 'glitch'
 
-/** Map bosses (Gloom King, Frost Golem) and the Enemy Factory's bosses (sandbox now, Block B arenas later). */
+/** Every map boss: the Gloom King and Frost Golem, and the Enemy Factory's four (each guards a map; Creative can summon them too). */
 export type BossId = 'gloomKing' | 'frostGolem' | 'ironTitan' | 'vortexWeaver' | 'plasmaOverlord' | 'voidStalker'
 
 /** Every enemy the Enemy Factory can spawn: six mob archetypes, the four factory bosses and the sentry turrets a Turret-Spawner deploys. */

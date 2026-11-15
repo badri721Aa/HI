@@ -10,17 +10,11 @@ import { worldCylinder, type ZoneKit } from '../world/zones/kit'
 import type { Pillar } from './bosses/GloomKing'
 import type { MapDef } from './defs'
 import { jaggedCone, place, rockGeometry, seeded, slab } from './geo'
+import type { MapBuild } from './registry'
 
 /** Arena radius (m) — the fight circle; the floor reaches this far. */
 export const RIFT_RADIUS = 22.5
 const FLOATERS = 12
-
-export interface MapBuild {
-  /** Pillars a charging boss crashes into. */
-  pillars: Pillar[]
-  update(dt: number, t: number): void
-  dispose(): void
-}
 
 const VOID_VS = /* glsl */ `
 varying vec3 vDir;

@@ -338,6 +338,17 @@ export function PortalIcon(p: IconProps) {
   )
 }
 
+/** A padlock (a sealed portal). */
+export function LockIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="5" y="10.5" width="14" height="10" rx="2" fill="currentColor" fillOpacity={0.2} stroke="currentColor" strokeWidth={1.6} />
+      <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+      <path d="M12 14.5v2.5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+    </svg>
+  )
+}
+
 /** A crown (bosses). */
 export function CrownIcon(p: IconProps) {
   return (

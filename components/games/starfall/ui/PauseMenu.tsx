@@ -1,5 +1,5 @@
 'use client'
-/** Pause menu: resume / map / online / settings / controls / restart / quit, with run stats. */
+/** Pause menu: resume / map / travel / online / settings / controls / restart / quit, with run stats. */
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { playUi, useGameUi, useHud, useNet, usePresence, useUi } from './context'
 import { Button, KeyCap, MenuList, PanelHeader, type MenuEntry } from './controls'
@@ -12,6 +12,7 @@ import { BackHint, Panel } from './Panel'
 import { SettingsPanel } from './SettingsPanel'
 import { SpawnerPanel } from './SpawnerPanel'
 import { cx, formatTime, LABEL } from './theme'
+import { TravelPanel } from './TravelPanel'
 import styles from './ui.module.css'
 import type { PausePanel } from './uiStore'
 
@@ -37,6 +38,11 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
   const roomPlayers = useNet(s => s.players.length)
   const creative = useHud(h => h.creative)
   const [enemies, setEnemies] = useState(() => game.creativeEnemies)
+  // How many maps are awake (the world is frozen while paused).
+  const [travelMeta] = useState(() => {
+    const maps = game.getTravelInfo().maps
+    return `${maps.filter(m => m.open).length} of ${maps.length} open`
+  })
 
   useEffect(() => {
     if (state !== 'open') return
@@ -78,6 +84,7 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
   const items: MenuEntry[] = [
     { id: 'resume', label: 'Resume', onSelect: resume },
     { id: 'map', label: 'Map', onSelect: () => go('map') },
+    { id: 'travel', label: 'Travel', meta: travelMeta, onSelect: () => go('travel') },
     {
       id: 'online',
       label: 'Online',
@@ -139,6 +146,7 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
           <div className="flex min-w-0 flex-1 items-start px-[clamp(16px,3vw,48px)] py-[clamp(16px,6vh,72px)] md:pl-0">
             <Panel panelRef={panelRef} label={panel} wide={panel === 'map'}>
               {panel === 'map' && <MapPanel onBack={() => go('root')} />}
+              {panel === 'travel' && <TravelPanel onBack={() => go('root')} />}
               {panel === 'online' && <OnlinePanel onBack={() => go('root')} primary={{ label: 'Resume', onClick: resume }} />}
               {panel === 'settings' && <SettingsPanel onBack={() => go('root')} />}
               {panel === 'controls' && <ControlsPanel onBack={() => go('root')} />}
