@@ -160,27 +160,32 @@ export const MAPS: Record<PortalMapId, MapDef> = {
     where: 'in the Ancient Volcanic Ruins',
     unlock: { boss: 'gloomKing' },
     center: VOLCANIC,
-    radius: 54,
+    radius: 76,
+    // The lava sea lies 27 m below the courtyard.
     killY: VOLCANIC.y - 30,
     // In the clearing below Silver Falls, facing east down the path to Beacon Summit.
     arch: { x: -62, z: -20, yaw: 1.8 },
-    exit: { x: VOLCANIC.x, y: VOLCANIC.y, z: VOLCANIC.z + 45.6, yaw: Math.PI },
+    // The gate plaza, 4 m below the courtyard, south of the Lava River.
+    exit: { x: VOLCANIC.x, y: VOLCANIC.y - 4, z: VOLCANIC.z + 67.6, yaw: Math.PI },
     checkpoints: [
-      { x: VOLCANIC.x, y: VOLCANIC.y, z: VOLCANIC.z + 41.5, yaw: Math.PI },
-      { x: VOLCANIC.x - 5, y: VOLCANIC.y, z: VOLCANIC.z + 25.5, yaw: Math.PI },
+      { x: VOLCANIC.x, y: VOLCANIC.y - 4, z: VOLCANIC.z + 63.5, yaw: Math.PI },
+      // The temple's forecourt at the top of the stairs, above the courtyard.
+      { x: VOLCANIC.x - 1.8, y: VOLCANIC.y + 1.6, z: VOLCANIC.z + 28.3, yaw: Math.PI },
     ],
     boss: 'ironTitan',
     // The Titan's shockwaves run out to its circle + 3 m and its quake ring is 11 m wide: a 20 m
-    // circle (registry) on a 24 m floor, entered from the south.
+    // circle (registry) in a sunken courtyard 23 m across to its stepped ring, entered from the south.
     arena: { x: VOLCANIC.x, y: VOLCANIC.y, z: VOLCANIC.z, r: 16 },
     objective: 'Cross the ruins and defeat the Iron Titan',
     swirl: ['#ffd9a0', '#d23c0e'],
-    // A shield wall and a bomber on the terrace, a rusher out in front.
+    // A shield wall and a rusher on the riverside landing past the broken bridge, a bomber
+    // lobbing from the landing above.
     mobs: [
-      { kind: 'rusher', dx: 0.5, dz: 29.5, yaw: 0, patrol: 3, leash: 12 },
-      { kind: 'shieldBearer', dx: -2.5, dz: 31.5, yaw: 0, patrol: 2, leash: 12 },
-      { kind: 'bomber', dx: 3.5, dz: 33, yaw: 0, patrol: 2, leash: 12 },
+      { kind: 'rusher', dx: 1.5, dz: 44.5, dy: -4, yaw: 0, patrol: 2, leash: 12 },
+      { kind: 'shieldBearer', dx: -1.6, dz: 43, dy: -4, yaw: 0, patrol: 1.5, leash: 12 },
+      { kind: 'bomber', dx: 2.2, dz: 35.6, dy: -1.2, yaw: 0, patrol: 1.5, leash: 10 },
     ],
+    // On the courtyard floor, clear of the fallen column, the stumps and the toppled head.
     spawns: ringSpawns(VOLCANIC, 10, 17),
   },
   sky: {
