@@ -323,7 +323,8 @@ export class Weapons implements IWeapons {
   private setPrompt(st: Stand | null): void {
     if (st === this.prompted) return
     this.prompted = st
-    this.ctx.bus.emit('ui:prompt', st ? { key: this.ctx.input.interactKey, label: `Take the ${WEAPON_NAMES[st.weapon].toLowerCase()}` } : null)
+    const at = st ? { x: st.x, y: st.midY, z: st.z } : undefined
+    this.ctx.bus.emit('ui:prompt', st ? { key: this.ctx.input.interactKey, label: `Take the ${WEAPON_NAMES[st.weapon].toLowerCase()}`, at } : null)
   }
 
   private take(st: Stand): void {

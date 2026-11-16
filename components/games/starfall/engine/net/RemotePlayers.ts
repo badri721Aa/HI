@@ -132,7 +132,7 @@ class Avatar implements MoveBody {
     this.motion = {
       state: 'idle', stateTime: 0, speed: 0,
       walkSpeed: local?.walkSpeed ?? 2.2, runSpeed: local?.runSpeed ?? 5.6, sprintSpeed: local?.sprintSpeed ?? 8.6,
-      vy: 0, grounded: true, turnRate: 0, landImpact: 0, wading: 0, slope: 0,
+      vy: 0, grounded: true, turnRate: 0, landImpact: 0, wading: 0, slope: 0, wallSide: 0,
     }
 
     if (template) this.buildHero(template)
@@ -303,6 +303,7 @@ class Avatar implements MoveBody {
       m.landImpact = p.landImpact
       m.wading = p.wading
       m.slope = p.slope
+      m.wallSide = p.wallSide
       a.setMotion(m)
       // A move in progress keeps its weapon in hand until it is over.
       const held = moves.pose.move !== 'none' ? moves.pose.weapon : p.weapon

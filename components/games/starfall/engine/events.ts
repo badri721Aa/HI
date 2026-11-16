@@ -74,7 +74,8 @@ export interface GameEventMap {
   'ui:dialog': { title: string; text: string; page: number; pages: number } | null
   'ui:subtitle': { speaker?: string; text: string } | null
   'ui:letterbox': { on: boolean; skippable: boolean }
-  'ui:prompt': { key: string; label: string } | null
+  /** `at`: where the thing on offer is (the hero looks at it). */
+  'ui:prompt': { key: string; label: string; at?: V3 } | null
   'ui:objective': { text: string }
   /** 0 = clear, 1 = black. */
   'ui:fade': { to: number; duration: number }

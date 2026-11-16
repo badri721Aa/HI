@@ -16,7 +16,7 @@ import { heightAt } from '../world/heightfield'
 import { EXTRAPOLATE_DIRECT, EXTRAPOLATE_RELAY, INTERP_DELAY, TELEPORT_DIST } from './config'
 import type { PeerLink } from './p2p'
 import {
-  Bucket, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, SeqWindow, copySnapshot, makeSnapshot, stateFromCode, weaponFromCode,
+  Bucket, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, FLAG_WALL_RIGHT, SeqWindow, copySnapshot, makeSnapshot, stateFromCode, weaponFromCode,
   type MemberInfo, type Snapshot,
 } from './protocol'
 import { RagdollBuffer } from './ragdollSync'
@@ -49,6 +49,8 @@ export class RemotePeer implements NetPeer {
   away = false
   wading = 0
   slope = 0
+  /** Wall-running: the side the wall is on (-1 their left, 1 their right); 0 otherwise. */
+  wallSide = 0
   weapon: WeaponId = 'fists'
   map: MapId = 'isle'
   /** Bow draw 0..1, or -1 when not drawing. */
@@ -218,6 +220,7 @@ export class RemotePeer implements NetPeer {
     this.wasGrounded = this.grounded = grounded
     this.ragdoll = (a.flags & FLAG_RAGDOLL) !== 0 || state === 'ragdoll'
     this.away = (a.flags & FLAG_AWAY) !== 0
+    this.wallSide = state !== 'wallRun' ? 0 : (a.flags & FLAG_WALL_RIGHT) !== 0 ? 1 : -1
     this.wading = a.wading
     this.slope = a.slope
     this.weapon = weaponFromCode(a.weapon)

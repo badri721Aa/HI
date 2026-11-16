@@ -10,6 +10,7 @@
  * dialog or asks the game to activate the Beacon.
  */
 import * as THREE from 'three'
+import type { V3 } from '../events'
 import type { Ctx, ISigns } from '../types'
 import { SIGNS, TOTAL_SHARDS, type SignDef } from '../world/level'
 import { heightAt } from '../world/heightfield'
@@ -43,6 +44,7 @@ export class Signs implements ISigns {
   private shown = ''
   /** The prompt this module last asked for: it only clears its own (weapon stands show theirs too). */
   private mine = ''
+  private readonly at: V3 = { x: 0, y: 0, z: 0 }
   private unsub: (() => void) | null = null
 
   private readonly m = new THREE.Matrix4()
@@ -117,6 +119,8 @@ export class Signs implements ISigns {
     let label = ''
     let sign: SignDef | null = null
     let beacon = false
+    // Where the thing on offer is (the hero looks at it).
+    const at = this.at
 
     // Only on his feet and in control: not while limp, dying or fading out to respawn.
     if (game.phase === 'playing' && player.controlEnabled && player.hp > 0 && !ctx.character.ragdolling && !ctx.cutscenes.active) {
@@ -129,6 +133,9 @@ export class Signs implements ISigns {
         if (d < best && Math.abs(p.y - s.y) < 2.5) {
           best = d
           sign = s.def
+          at.x = s.x
+          at.y = s.y + 1.3
+          at.z = s.z
         }
       }
       const altar = ctx.zones.beaconAltar
@@ -139,6 +146,9 @@ export class Signs implements ISigns {
         if (d < ALTAR_RANGE * ALTAR_RANGE && d < (sign ? best : Infinity) && Math.abs(p.y - altar.y) < 3) {
           sign = null
           beacon = true
+          at.x = altar.x
+          at.y = altar.y + 1
+          at.z = altar.z
         }
       }
       if (sign) label = 'Read'
@@ -147,7 +157,7 @@ export class Signs implements ISigns {
 
     const key = ctx.input.interactKey
     const want = label ? `${key}|${label}` : ''
-    if (want !== this.shown && (want || this.shown === this.mine)) ctx.bus.emit('ui:prompt', label ? { key, label } : null)
+    if (want !== this.shown && (want || this.shown === this.mine)) ctx.bus.emit('ui:prompt', label ? { key, label, at: { x: at.x, y: at.y, z: at.z } } : null)
     this.mine = want
 
     if (label && ctx.input.state.interact) {

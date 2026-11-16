@@ -186,6 +186,7 @@ export const SIGNS: SignDef[] = [
     lines: [
       { kbm: 'Hold Shift to sprint.', pad: 'Hold RB or RT to sprint.', touch: 'Push the stick to its edge to sprint.' },
       { kbm: 'Dash with Q or a right-click. It works in mid-air, too.', pad: 'Dash with B. It works in mid-air, too.', touch: 'Tap Dash to surge ahead. It works in mid-air, too.' },
+      { kbm: 'Roll out of harm with V, and press C at a sprint to slide.', pad: 'Roll out of harm with LT, and click the left stick at a sprint to slide.', touch: 'Tap Roll to tumble out of harm. At a sprint, it slides.' },
       'Something bright is caught at the top of the windmill.',
     ],
   },
