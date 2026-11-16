@@ -571,7 +571,7 @@ export class Sfx extends SfxKit {
 
   /* ── game modes ──────────────────────────────────────────── */
 
-  /** Round moments: countdown ticks, the start and end, tags, knockouts, rings and points. */
+  /** Round moments: countdown ticks, the start and end, tags, knockouts, rings and points, and the arena modes' own. */
   mode(cue: ModeCue): void {
     if (!this.gate(`mode-${cue}`, cue === 'count' ? 0.5 : 0.12)) return
     const t = this.t
@@ -616,6 +616,41 @@ export class Sfx extends SfxKit {
         break
       case 'end':
         for (const [k, n] of [81, 78, 74].entries()) this.chime(v, t + k * 0.12, mtof(n), 0.05, 1.2)
+        break
+      case 'infect':
+        // It spreads: a wet squelch and two sour notes sliding down.
+        this.noiseHit(v, t, 'bandpass', 700, 3, 0.2, 0.004, 0.16, 240)
+        this.tone(v, t, 'sawtooth', 330, 196, 0.045, 0.01, 0.3)
+        this.tone(v, t + 0.07, 'sine', 466, 277, 0.07, 0.01, 0.34)
+        this.chime(v, t + 0.12, mtof(66), 0.03, 0.8, 2.6, 0.5)
+        break
+      case 'last':
+        // One survivor left: a lone bell, twice, over a held low note.
+        this.tone(v, t, 'sine', 110, 104, 0.12, 0.05, 1.1)
+        this.chime(v, t, mtof(79), 0.06, 1.4)
+        this.chime(v, t + 0.42, mtof(78), 0.05, 1.6)
+        break
+      case 'crown':
+        // A Juggernaut is crowned: a heavy footfall, then a brass-bright fanfare of fifths.
+        this.tone(v, t, 'sine', 120, 42, 0.4, 0.004, 0.5)
+        this.noiseHit(v, t, 'lowpass', 700, 0.8, 0.26, 0.004, 0.3, 160, this.s.brown)
+        for (const [k, n] of [62, 69, 74].entries()) {
+          this.tone(v, t + 0.1 + k * 0.11, 'sawtooth', mtof(n), mtof(n), 0.035, 0.012, 0.34)
+          this.chime(v, t + 0.1 + k * 0.11, mtof(n + 12), 0.045, 1.1)
+        }
+        break
+      case 'rung':
+        // Up a rung: a ratchet click and a quick rising pair.
+        this.noiseHit(v, t, 'highpass', 3200, 0.9, 0.1, 0.001, 0.035)
+        this.noiseHit(v, t + 0.05, 'highpass', 3800, 0.9, 0.08, 0.001, 0.03)
+        this.chime(v, t + 0.06, mtof(81), 0.05, 0.5)
+        this.chime(v, t + 0.15, mtof(88), 0.055, 0.8)
+        break
+      case 'final':
+        // The last rung: the ratchet, then a tense rising run that hangs on its top note.
+        this.noiseHit(v, t, 'highpass', 3200, 0.9, 0.1, 0.001, 0.035)
+        for (const [k, n] of [76, 79, 83, 88].entries()) this.chime(v, t + 0.05 + k * 0.08, mtof(n), 0.05, k === 3 ? 1.8 : 0.6)
+        this.tone(v, t + 0.3, 'triangle', mtof(52), mtof(52), 0.07, 0.03, 0.9)
         break
     }
   }

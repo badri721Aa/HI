@@ -152,7 +152,8 @@ export const TWO_INFECTED = 6
 
 /** Start points for participant slot `i` of `n` (feet on the ground; the arena floor for Knockout). */
 export function startSpot(mode: ModeId, i: number, n: number, map: MapId = 'isle'): Spot {
-  if (MODE_BY_ID[mode].arena) return arenaSpot(mode, map, i)
+  // Arena modes: the players are dealt out evenly over the arena's slots (two start opposite each other).
+  if (MODE_BY_ID[mode].arena) return arenaSpot(mode, map, Math.floor((i * ARENA_SLOTS) / Math.max(1, Math.min(n, ARENA_SLOTS))))
   const a = (i / Math.max(1, n)) * Math.PI * 2
   const ring = (cx: number, cz: number, r: number, y?: number): Spot => {
     const x = cx + Math.sin(a) * r
