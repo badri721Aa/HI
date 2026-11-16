@@ -253,27 +253,33 @@ export const MAPS: Record<PortalMapId, MapDef> = {
     where: 'in the Glitch Grid',
     unlock: { boss: 'frostGolem' },
     center: GLITCH,
-    radius: 52,
+    // Out to the entrance pad, 66 m south of the arena's centre (the layout is in worlds/glitch.ts).
+    radius: 74,
     killY: GLITCH.y - 30,
     // In the meadow south of Whispering Wood, facing the village.
     arch: { x: -54, z: 78, yaw: 1.4 },
-    exit: { x: GLITCH.x, y: GLITCH.y, z: GLITCH.z + 43.6, yaw: Math.PI },
+    // On the entrance pad, 3 m above the arena floor.
+    exit: { x: GLITCH.x, y: GLITCH.y + 3, z: GLITCH.z + 63.4, yaw: Math.PI },
+    // The entrance, and the bridge tile before the arena.
     checkpoints: [
-      { x: GLITCH.x, y: GLITCH.y, z: GLITCH.z + 39.5, yaw: Math.PI },
-      { x: GLITCH.x - 5, y: GLITCH.y, z: GLITCH.z + 23.5, yaw: Math.PI },
+      { x: GLITCH.x, y: GLITCH.y + 3, z: GLITCH.z + 59.3, yaw: Math.PI },
+      { x: GLITCH.x, y: GLITCH.y + 0.6, z: GLITCH.z + 26, yaw: Math.PI },
     ],
     boss: 'voidStalker',
     // The Stalker blinks to 2.3 m behind the player and circles clones around them: an 18 m circle
-    // (registry) on a 22 m floor leaves room for a blink behind someone standing at the edge.
+    // (registry) on an octagonal floor 22 m to each side leaves room for a blink behind someone
+    // standing at the edge.
     arena: { x: GLITCH.x, y: GLITCH.y, z: GLITCH.z, r: 14.5 },
     objective: 'Defeat the Void Stalker in the Glitch Grid',
     swirl: ['#e6fffb', '#0fb8b0'],
-    // Rushers and a bomber in front, a turret thrower behind them.
+    // On the guards' deck (1.2 m above the arena floor; the gaps round it keep them there): a
+    // rusher and a bomber in front, a turret thrower behind them.
     mobs: [
-      { kind: 'rusher', dx: -3, dz: 28.5, yaw: 0, patrol: 3, leash: 12 },
-      { kind: 'bomber', dx: 3, dz: 30, yaw: 0, patrol: 2, leash: 12 },
-      { kind: 'turretSpawner', dx: 0, dz: 33, yaw: 0, patrol: 2, leash: 12 },
+      { kind: 'rusher', dx: -3.5, dz: 33.5, dy: 1.2, yaw: 0, patrol: 2.5, leash: 8 },
+      { kind: 'bomber', dx: 3.5, dz: 34, dy: 1.2, yaw: 0, patrol: 2, leash: 8 },
+      { kind: 'turretSpawner', dx: 0, dz: 37.5, dy: 1.2, yaw: 0, patrol: 1.5, leash: 8 },
     ],
+    // On the arena floor, inside its ring of pylons (22.3 m out).
     spawns: ringSpawns(GLITCH, 9, 16),
   },
 }
