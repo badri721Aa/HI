@@ -56,7 +56,7 @@ const RIVER_W = 5.4
 const CASCADE: PathPoint[] = [[12.7, 0.5, 24.6], [12.7, 0.1, 27.5], [12.5, -0.8, 31], [12.8, -1.7, 35], [12.6, -3.1, 39.5], [12.2, -4.3, 44], [11.6, -5.05, 48], [10.6, RIVER_Y, 50.6]]
 const CASCADE_W = 2.6
 /** The lavafall: over the west lip and down the cliff into the sea. */
-const FALL: PathPoint[] = [[-14.6, RIVER_Y, 53], [-15.9, RIVER_Y - 0.25, 53.05], [-16.8, RIVER_Y - 1.4, 53.1], [-17.4, -9.5, 53.2], [-17.9, -15, 53.3], [-18.3, -21, 53.4], [-18.6, SEA_Y - 0.5, 53.5]]
+const FALL: PathPoint[] = [[-15, RIVER_Y, 53], [-15.9, RIVER_Y - 0.25, 53.05], [-16.8, RIVER_Y - 1.4, 53.1], [-17.4, -9.5, 53.2], [-17.9, -15, 53.3], [-18.3, -21, 53.4], [-18.6, SEA_Y - 0.5, 53.5]]
 
 /** Basalt shelves: [x, z, radius, top, seed]. Tops sit 5 cm under the paving they meet. */
 const SHELVES: ReadonlyArray<readonly [number, number, number, number, number]> = [
@@ -109,17 +109,17 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
 
   /* ── materials ─────────────────────────────────────────── */
 
-  const heat = heatField('#ff6420')
+  const heat = heatField('#ff7030')
   heat.plane.set(cy + SEA_Y, 12)
   const basalt = own(heatMaterial(ctx, heat, {
-    map: 'rock_albedo', color: '#5f5955', roughness: 0.74, gain: 14, saturation: 0.22, fissures: 1,
+    map: 'rock_albedo', color: '#5f5955', roughness: 0.74, gain: 9, saturation: 0.22, fissures: 1,
     triplanar: { scale: 0.21, top: 'dirt_albedo', topScale: 0.28, topColor: '#77706a' },
   }, 'volcanic-basalt'))
   const masonry = own(heatMaterial(ctx, heat, {
-    map: 'stone_albedo', normal: 'stone_normal', color: '#ad9c8e', roughness: 0.86, gain: 2.2, saturation: 0.45, ash: 0.55, ashColor: '#5e5853',
+    map: 'stone_albedo', normal: 'stone_normal', color: '#ad9c8e', roughness: 0.86, gain: 1.4, saturation: 0.45, ash: 0.55, ashColor: '#5e5853',
   }, 'volcanic-masonry'))
   const carved = own(heatMaterial(ctx, heat, {
-    map: 'plaster_albedo', color: '#b3aa9f', roughness: 0.8, gain: 2.4, saturation: 0.3,
+    map: 'plaster_albedo', color: '#b3aa9f', roughness: 0.8, gain: 1.6, saturation: 0.3,
     triplanar: { scale: 0.32, top: 'dirt_albedo', topScale: 0.35, topColor: '#6a625b' },
   }, 'volcanic-carved'))
   const floor = own(courtyardFloor(ctx, heat, cx, cz))
@@ -346,7 +346,7 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
     }
     solid(ctx.collision.addBox({ x: cx + 16.5, y: cy + 0.6, z: cz - 3, hx: 2.05, hy: 0.6, hz: 0.6, yaw: a + Math.PI / 2, surface: 'stone' }))
   }
-  for (const [x, z, h] of [[-12, 11, 1.6], [10.5, -13, 2.2]] as const) {
+  for (const [x, z, h] of [[-12, 11, 1.6], [-11, -12.5, 2.2]] as const) {
     kit.box({ x: cx + x, y: cy, z: cz + z, w: 1.45, h: 0.38, d: 1.45, yaw: x, mat: masonry, collide: { surface: 'stone' } })
     kit.add(shaftGeo(h, 0.45, 40 + x), carved, at(x, 0.38, z, 0, rnd() * 6, 0))
     solid(ctx.collision.addCylinder({ x: cx + x, y: cy, z: cz + z, r: 0.66, h: h + 0.38, surface: 'stone' }))
@@ -355,21 +355,27 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   kit.add(lathe([[0.55, 0], [0.62, 0.12], [0.82, 0.38], [0.86, 0.46]], 24, { uvScale: 2 }), carved, at(-17.2, 0.1, -1.6, 0.4, 0.6, 1.9))
   solid(ctx.collision.addBox({ x: cx - 17, y: cy + 0.45, z: cz - 2, hx: 0.95, hy: 0.45, hz: 0.95, yaw: 0.6, surface: 'stone' }))
   {
-    // The head lies where it fell, tipped back on its crown with its face turned up toward the arena.
-    const hx = -15.6
-    const hz = -14.6
+    // The head stands where it fell, its broken neck sunk in the paving, tipped back a little and
+    // gazing across the arena toward the setting sun.
+    const hx = 13.6
+    const hz = -16.4
     const s = 1.9
     const head = statueHead(5).applyMatrix4(new THREE.Matrix4().compose(
       new THREE.Vector3(),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.95, Math.atan2(-hx, -hz), -0.32, 'YXZ')),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.28, Math.atan2(-hx, -hz) - 0.25, 0.22, 'YXZ')),
       new THREE.Vector3(s, s, s),
     ))
     head.computeBoundingBox()
     const box = head.boundingBox!
-    kit.add(head, carved, at(hx, -box.min.y - 0.35, hz))
-    const top = box.max.y - box.min.y - 0.35
-    solid(ctx.collision.addCylinder({ x: cx + hx + (box.min.x + box.max.x) / 2, y: cy, z: cz + hz + (box.min.z + box.max.z) / 2, r: 0.42 * Math.min(box.max.x - box.min.x, box.max.z - box.min.z), h: top * 0.85, surface: 'stone' }))
-    for (let i = 0; i < 6; i++) kit.add(rockGeometry(0.25 + rnd() * 0.35, 940 + i), carved, at(hx + (rnd() - 0.5) * 6, 0.1, hz + (rnd() - 0.5) * 6, rnd(), rnd() * 6, 0))
+    const sink = 0.9
+    kit.add(head, carved, at(hx, -box.min.y - sink, hz))
+    const top = box.max.y - box.min.y - sink
+    solid(ctx.collision.addCylinder({ x: cx + hx, y: cy, z: cz + hz, r: 1.45, h: top * 0.8, surface: 'stone' }))
+    for (let i = 0; i < 7; i++) {
+      const a = rnd() * Math.PI * 2
+      const d = 1.9 + rnd() * 1.6
+      kit.add(rockGeometry(0.22 + rnd() * 0.3, 940 + i), carved, at(hx + Math.sin(a) * d, 0.08, hz + Math.cos(a) * d, rnd(), rnd() * 6, 0))
+    }
   }
 
   /* ── the colossus ──────────────────────────────────────── */
@@ -473,8 +479,8 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   kit.add(rockGeometry(3.4, 42, 1), basalt, at(17.8, RIVER_Y + 2.8, 50.6, 0, 0.3, 0, 0.8, 1.2, 1.1))
 
   // The heat the lava throws on the rock (slots 0–9).
-  setHeat(heat, 0, cx - 7, cy + RIVER_Y + 0.6, cz + 52.4, 11)
-  setHeat(heat, 1, cx + 6, cy + RIVER_Y + 0.6, cz + 51.6, 11)
+  setHeat(heat, 0, cx - 7, cy + RIVER_Y + 0.4, cz + 52.4, 8.5)
+  setHeat(heat, 1, cx + 6, cy + RIVER_Y + 0.4, cz + 51.6, 8.5)
   setHeat(heat, 2, cx - 16.5, cy + RIVER_Y - 2, cz + 53, 9)
   setHeat(heat, 3, cx + 12.6, cy - 0.2, cz + 29, 7)
   setHeat(heat, 4, cx + 12.3, cy - 3.6, cz + 41.5, 7)
@@ -523,6 +529,7 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   const push = { x: 0, z: 0 }
   const from = { x: 0, y: 0, z: 0 }
   const impulse = { x: 0, y: 0, z: 0 }
+  const spark = { x: 0, y: 0, z: 0 }
   let burnCd = 0
   /** Lava under the player's feet: one heart, and a throw back toward safe ground. */
   function burn(b: Burn): void {
@@ -531,8 +538,11 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
     burnCd = 0.25
     const p = pl.position
     b.dir(p.x, p.z, push)
-    ctx.fx.burst('hit', { x: p.x, y: p.y + 0.3, z: p.z }, { color: '#ff8a2a', scale: 1.3 })
-    ctx.fx.burst('dust', { x: p.x, y: p.y + 0.2, z: p.z }, { color: '#3a2a22', scale: 1.2, count: 5 })
+    spark.x = p.x
+    spark.y = p.y + 0.3
+    spark.z = p.z
+    ctx.fx.burst('hit', spark, SIZZLE)
+    ctx.fx.burst('dust', spark, SMOKE)
     const fresh = !pl.invulnerable
     if (fresh) {
       from.x = p.x - push.x
@@ -574,6 +584,10 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
 }
 
 /* ── helpers ──────────────────────────────────────────────── */
+
+/** Bursts when lava bites (shared option objects: nothing allocated per hit). */
+const SIZZLE = { color: '#ff8a2a', scale: 1.3 }
+const SMOKE = { color: '#3a2a22', scale: 1.2, count: 5 }
 
 const _near = { nx: 0, nz: 0, side: 1 }
 
@@ -754,6 +768,7 @@ void main() {
     col = mix(col, pc, p * 0.92);
     a = max(a, p * 0.92);
     float halo = exp(-(x * x) / (0.004 + hgt * 0.02)) * exp(-hgt * 14.0) * (1.0 - p);
+    halo *= smoothstep(base - 0.03, base, el);
     col += vec3(0.9, 0.25, 0.05) * halo * 0.5;
     a = max(a, halo * 0.4);
   }

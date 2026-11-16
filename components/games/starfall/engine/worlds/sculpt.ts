@@ -237,25 +237,25 @@ export function statueHead(seed = 11): THREE.BufferGeometry {
     const ux = pos.getX(i)
     const uy = pos.getY(i)
     const uz = pos.getZ(i)
-    // An egg: narrower jaw, flatter face, a fuller back of the skull.
-    const jaw = smooth(-0.15, -0.95, uy)
-    let x = ux * 0.78 * (1 - 0.24 * jaw)
+    // A monumental block of a head: broad, square-jawed, the face flattened like a carved slab.
+    const jaw = smooth(-0.2, -0.95, uy)
+    let x = ux * 0.84 * (1 - 0.12 * jaw)
     let y = uy
-    let z = uz * (uz > 0 ? 0.8 : 0.9) * (1 - 0.18 * jaw * (uz < 0 ? 1 : 0.2))
+    let z = uz * (uz > 0 ? 0.74 : 0.9) * (1 - 0.15 * jaw * (uz < 0 ? 1 : 0))
     if (uy > 0.55) y += (uy - 0.55) * 0.08
-    // The face: features pushed out along +z on the front.
-    const front = smooth(0.25, 0.7, uz)
+    // The face: bold features pushed out along +z on the front, sized to read from afar.
+    const front = smooth(0.2, 0.62, uz)
     const ax = Math.abs(x)
     let f = 0
-    f += 0.2 * bump(x / 0.1, (y + 0.24) / 0.13) + 0.1 * bump(x / 0.075, (y + 0.02) / 0.2) // nose tip and bridge
-    f += 0.05 * bump((ax - 0.1) / 0.055, (y + 0.3) / 0.05) // nostril wings
-    f += 0.06 * bump(x / 0.42, (y - 0.2) / 0.07) // brow
-    f -= 0.085 * bump((ax - 0.26) / 0.12, (y - 0.05) / 0.085) // eye sockets
-    f += 0.045 * bump((ax - 0.26) / 0.075, (y - 0.04) / 0.045) // closed lids
-    f += 0.045 * bump((ax - 0.36) / 0.13, (y + 0.14) / 0.12) // cheekbones
-    f += 0.06 * bump(x / 0.17, (y + 0.47) / 0.045) + 0.055 * bump(x / 0.14, (y + 0.57) / 0.045) // lips
-    f -= 0.03 * bump(x / 0.16, (y + 0.52) / 0.02) // the line between them
-    f += 0.07 * bump(x / 0.16, (y + 0.8) / 0.09) // chin
+    f += 0.3 * bump(x / 0.14, (y + 0.27) / 0.14) + 0.16 * bump(x / 0.09, (y + 0.02) / 0.22) // nose tip and bridge
+    f += 0.08 * bump((ax - 0.14) / 0.07, (y + 0.33) / 0.06) // nostril wings
+    f += 0.1 * bump(x / 0.5, (y - 0.19) / 0.08) // brow
+    f -= 0.15 * bump((ax - 0.29) / 0.14, (y - 0.03) / 0.1) // eye sockets
+    f += 0.085 * bump((ax - 0.29) / 0.09, (y - 0.01) / 0.055) // heavy closed lids
+    f += 0.06 * bump((ax - 0.42) / 0.14, (y + 0.17) / 0.13) // cheekbones
+    f += 0.1 * bump(x / 0.22, (y + 0.52) / 0.055) + 0.09 * bump(x / 0.18, (y + 0.65) / 0.055) // full lips
+    f -= 0.06 * bump(x / 0.21, (y + 0.585) / 0.022) // the line between them
+    f += 0.1 * bump(x / 0.2, (y + 0.86) / 0.1) // chin
     z += f * front
     // Ears on the sides.
     const side = smooth(0.75, 0.95, Math.abs(ux))

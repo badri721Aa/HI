@@ -173,8 +173,8 @@ const LAVA_MODES = {
     float heat = clamp(n1 * 0.62 + n2 * 0.38, 0.0, 1.0);
     float edge = abs(vEdge);
     // The banks skin over first; the middle runs hot.
-    float cool = 1.0 - smoothstep(0.36, 0.52, heat + 0.12 - edge * 0.22);
-    cool = max(cool, smoothstep(0.7, 1.0, edge) * 0.85);
+    float cool = 1.0 - smoothstep(0.44, 0.58, heat + 0.06 - edge * 0.25);
+    cool = max(cool, smoothstep(0.65, 1.0, edge) * 0.9);
     float c = texture2D(tNoise, vec2(p.x * 0.325 + 0.17, (p.y - s1) * 0.325), 1.0).r;
     float cw = max(fwidth(c) * 1.3, 0.025);
     float seam = (1.0 - smoothstep(0.0, cw, abs(c - 0.5))) * (0.025 / cw);`,
@@ -187,7 +187,7 @@ const LAVA_MODES = {
     float heat = clamp(n1 * 0.55 + n2 * 0.45 + 0.08, 0.0, 1.0);
     float edge = abs(vEdge);
     // Dark strands of crust stretched down the curtain, thickest at its sides.
-    float cool = 1.0 - smoothstep(0.34, 0.5, heat - edge * 0.25);
+    float cool = 1.0 - smoothstep(0.4, 0.55, heat - edge * 0.3);
     float seam = 0.0;`,
   sea: /* glsl */ `
     vec2 p = vW.xz - uOrigin;
@@ -195,10 +195,11 @@ const LAVA_MODES = {
     float big = lavaN(p * 0.0045 + vec2(d, d * 0.6));
     float n1 = lavaN(p * 0.017 + vec2(-d * 1.4, d));
     float heat = clamp(big * 0.55 + n1 * 0.45, 0.0, 1.0);
-    float cool = 1.0 - smoothstep(0.6, 0.74, heat);
+    // A crusted lake: rare hot pools, a web of glowing veins.
+    float cool = 1.0 - smoothstep(0.68, 0.8, heat);
     float c = texture2D(tNoise, p * 0.031 + vec2(d * 0.8, -d * 1.2) + 0.21, 1.5).r;
     float cw = max(fwidth(c) * 1.4, 0.03);
-    float seam = (1.0 - smoothstep(0.0, cw, abs(c - 0.5))) * (0.03 / cw) * smoothstep(0.4, 0.62, big) * 0.6;`,
+    float seam = (1.0 - smoothstep(0.0, cw, abs(c - 0.5))) * (0.03 / cw) * (0.35 + 0.65 * smoothstep(0.38, 0.6, big));`,
 } as const
 
 export type LavaMode = keyof typeof LAVA_MODES
@@ -252,9 +253,9 @@ export function lavaMaterial(ctx: Ctx, mode: LavaMode, uTime: TimeUniform, look:
   Object.assign(uniforms, {
     uTime,
     tNoise: { value: ctx.textures.get('noise') },
-    uHot: { value: col(look.hot ?? '#ffd27a', 3.2) },
-    uWarm: { value: col(look.warm ?? '#ff6a12', 2.2) },
-    uDeep: { value: col(look.deep ?? '#b3200a', 0.85) },
+    uHot: { value: col(look.hot ?? '#ffd27a', 2.7) },
+    uWarm: { value: col(look.warm ?? '#ff6a12', 1.7) },
+    uDeep: { value: col(look.deep ?? '#b3200a', 0.8) },
     uCrust: { value: col(look.crust ?? '#2a1712', 0.6) },
     uOrigin: { value: new THREE.Vector2(look.origin?.x ?? 0, look.origin?.z ?? 0) },
     uGlow: { value: look.glow ?? 1 },
