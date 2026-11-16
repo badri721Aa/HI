@@ -8,10 +8,11 @@
  *   bridge       −4   an old stone bridge over the Lava River, its middle span fallen (a jump)
  *   riverside    −4   a podium landing where the guards wait; the river pours off the west
  *                     cliff as a lavafall; a lava cascade runs down the terraces on the east
+ *                     from a spout in the temple's retaining wall
  *   two flights  −4 → −1.2 → +1.6, between basalt terraces of hexagonal columns
  *   precinct     +1.6 the temple's forecourt (checkpoint) between two braziers
  *   courtyard    0    sunk 1.6 m in a ring of stepped masonry crowned by broken columns: the
- *                     Iron Titan's arena (floor radius 26 for its 20 m circle and shockwaves);
+ *                     Iron Titan's arena (floor radius 23 for its 20 m circle and shockwaves);
  *                     a toppled colossal head and fallen drums give a little cover
  *   colossus     +1.65 north of the courtyard, the trunkless legs the head fell from
  *
@@ -739,9 +740,10 @@ vec2 volcano(float az, float el, float az0, float w, float h, float seed) {
   x = atan(sin(x), cos(x)) / w;
   float ax = abs(x);
   float y = (el + 0.03) / h;
+  if (ax >= 1.0 || y > 1.0) return vec2(0.0);
   float top = (1.0 - pow(min(ax, 1.0), 0.6)) * 0.97 + (dn(vec2(x * 0.9 + seed, 0.37)) - 0.5) * 0.05;
   top = min(top, 0.88 + smoothstep(0.05, 0.14, ax) * 0.06);
-  float inside = (1.0 - smoothstep(top - 0.01, top + 0.01, y)) * (1.0 - step(1.0, ax));
+  float inside = 1.0 - smoothstep(top - 0.01, top + 0.01, y);
   float drop = clamp(1.0 - y / 0.9, 0.0, 1.0);
   float riv = 0.0;
   for (int i = 0; i < 3; i++) {
@@ -759,21 +761,28 @@ void main() {
   vec3 d = normalize(vDir);
   float az = atan(d.x, abs(d.x) + abs(d.z) < 1e-5 ? 1.0 : d.z);
   float el = d.y;
+  // Below the horizon nothing (the lava sea is there).
+  if (el < -0.07) discard;
   float u = az / 6.2831853;
   float t = uTime;
   vec3 col = vec3(0.0);
   float a = 0.0;
   // Smoke bands drifting across the sky.
-  float band = dn(vec2(u * 2.0 + t * 0.0012, el * 1.3 + 0.2)) * 0.6 + dn(vec2(u * 5.0 - t * 0.002, el * 3.0)) * 0.4;
-  float smoke = smoothstep(0.48, 0.78, band) * smoothstep(0.02, 0.12, el) * (1.0 - smoothstep(0.35, 0.75, el));
-  vec3 smokeCol = mix(vec3(0.22, 0.06, 0.03), vec3(0.06, 0.03, 0.03), smoothstep(0.05, 0.4, el));
-  col = smokeCol;
-  a = smoke * 0.75;
-  // Far ridges, then nearer ones, darker.
-  float r1 = 0.03 + 0.07 * dn(vec2(u * 3.0, 0.11)) + 0.03 * dn(vec2(u * 11.0, 0.53));
-  float r2 = 0.005 + 0.05 * dn(vec2(u * 5.0 + 0.5, 0.71)) + 0.02 * dn(vec2(u * 17.0, 0.29));
-  float far = 1.0 - smoothstep(r1 - 0.004, r1 + 0.004, el);
-  float near = 1.0 - smoothstep(r2 - 0.003, r2 + 0.003, el);
+  if (el > 0.02 && el < 0.75) {
+    float band = dn(vec2(u * 2.0 + t * 0.0012, el * 1.3 + 0.2)) * 0.6 + dn(vec2(u * 5.0 - t * 0.002, el * 3.0)) * 0.4;
+    float smoke = smoothstep(0.48, 0.78, band) * smoothstep(0.02, 0.12, el) * (1.0 - smoothstep(0.35, 0.75, el));
+    col = mix(vec3(0.22, 0.06, 0.03), vec3(0.06, 0.03, 0.03), smoothstep(0.05, 0.4, el));
+    a = smoke * 0.75;
+  }
+  // Far ridges, then nearer ones, darker (none reach above 0.14).
+  float far = 0.0;
+  float near = 0.0;
+  if (el < 0.14) {
+    float r1 = 0.03 + 0.07 * dn(vec2(u * 3.0, 0.11)) + 0.03 * dn(vec2(u * 11.0, 0.53));
+    float r2 = 0.005 + 0.05 * dn(vec2(u * 5.0 + 0.5, 0.71)) + 0.02 * dn(vec2(u * 17.0, 0.29));
+    far = 1.0 - smoothstep(r1 - 0.004, r1 + 0.004, el);
+    near = 1.0 - smoothstep(r2 - 0.003, r2 + 0.003, el);
+  }
   vec3 farCol = uFog * 0.62;
   vec3 nearCol = uFog * 0.36;
   col = mix(col, farCol, far);
@@ -796,9 +805,12 @@ void main() {
     float x = az - az0;
     x = atan(sin(x), cos(x)) + hgt * 1.3;
     float wdt = 0.03 + hgt * 0.8;
-    float body = 1.0 - smoothstep(0.35, 1.0, abs(x) / wdt);
-    float puff = dn(vec2(x * 3.0 + float(i) * 0.4, hgt * 2.0 - t * 0.01));
-    float p = body * smoothstep(0.32, 0.62, puff) * step(base - 0.004, el) * (1.0 - smoothstep(0.22, 0.5, hgt));
+    float p = 0.0;
+    if (abs(x) < wdt && el > base - 0.004 && hgt < 0.5) {
+      float body = 1.0 - smoothstep(0.35, 1.0, abs(x) / wdt);
+      float puff = dn(vec2(x * 3.0 + float(i) * 0.4, hgt * 2.0 - t * 0.01));
+      p = body * smoothstep(0.32, 0.62, puff) * (1.0 - smoothstep(0.22, 0.5, hgt));
+    }
     vec3 pc = mix(vec3(0.85, 0.24, 0.05), vec3(0.08, 0.045, 0.045), smoothstep(0.0, 0.06, hgt));
     col = mix(col, pc, p * 0.92);
     a = max(a, p * 0.92);
@@ -811,7 +823,6 @@ void main() {
   float horizon = exp(-abs(el + 0.01) * 40.0);
   col += vec3(0.5, 0.12, 0.03) * horizon * 0.5;
   a = max(a, horizon * 0.35);
-  // Below the horizon nothing (the lava sea is there).
   a *= smoothstep(-0.06, -0.035, el);
   gl_FragColor = vec4(clamp(col, 0.0, 3.0), clamp(a, 0.0, 1.0));
   #include <tonemapping_fragment>
@@ -821,6 +832,14 @@ void main() {
 /** The painted distance (see DOME_FS); `update` keeps its haze matched to the live fog colour. */
 function backdrop(ctx: Ctx, uTime: TimeUniform): { mesh: THREE.Mesh; update(): void; dispose(): void } {
   const geo = new THREE.SphereGeometry(430, 64, 32)
+  // Its own plain bilinear sampler on the noise image: every lookup here is a band along one
+  // axis, which the shared texture's anisotropic mip filtering would make many times dearer
+  // (and would draw a seam where the azimuth wraps, due north).
+  const noise = ctx.textures.get('noise').clone()
+  noise.anisotropy = 1
+  noise.generateMipmaps = false
+  noise.minFilter = THREE.LinearFilter
+  noise.needsUpdate = true
   const mat = new THREE.ShaderMaterial({
     vertexShader: DOME_VS,
     fragmentShader: DOME_FS,
@@ -828,7 +847,7 @@ function backdrop(ctx: Ctx, uTime: TimeUniform): { mesh: THREE.Mesh; update(): v
     transparent: true,
     depthWrite: false,
     fog: false,
-    uniforms: { uTime, tNoise: { value: ctx.textures.get('noise') }, uFog: { value: new THREE.Color('#5a2414') } },
+    uniforms: { uTime, tNoise: { value: noise }, uFog: { value: new THREE.Color('#5a2414') } },
   })
   const mesh = new THREE.Mesh(geo, mat)
   mesh.name = 'volcanic-dome'
@@ -844,6 +863,7 @@ function backdrop(ctx: Ctx, uTime: TimeUniform): { mesh: THREE.Mesh; update(): v
     dispose() {
       geo.dispose()
       mat.dispose()
+      noise.dispose()
     },
   }
 }
