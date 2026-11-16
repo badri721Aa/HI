@@ -45,18 +45,28 @@ const STAIR_GAP = 0.108
 const RIVER_Y = -5.3
 const SEA_Y = -27
 const SINK = 0.3
-/** The throw out of lava: sideways and up (m/s). */
+/**
+ * The throw out of lava: sideways and up (m/s), then carried on toward the bank for a moment
+ * (m/s, s) so a wall of rock in the way can't drop the player straight back in.
+ */
 const THROW_SIDE = 7
-const THROW_UP = 10.5
+const THROW_UP = 11.5
+const THROW_CARRY = 3.5
+const THROW_TIME = 0.6
 
 /** The Lava River's centre line, east (its cave) to west (the lip of the lavafall). */
 const RIVER: PathPoint[] = [[20, RIVER_Y, 50.6], [12, RIVER_Y, 51], [6, RIVER_Y, 51.6], [0, RIVER_Y, 52], [-6, RIVER_Y, 52.3], [-12, RIVER_Y, 52.8], [-15.2, RIVER_Y, 53]]
-const RIVER_W = 5.4
+/**
+ * Its width at each point: it fills its bed from bank to bank (the shelves stand over its edges),
+ * narrowing in the cave and at the lip of the fall.
+ */
+const RIVER_W = [7, 10.4, 10.4, 10.4, 10.4, 9.4, 6.4]
 /** The cascade: from the temple's lava spout down the east terraces into the river. */
-const CASCADE: PathPoint[] = [[12.7, 0.5, 24.6], [12.7, 0.1, 27.5], [12.5, -0.8, 31], [12.8, -1.7, 35], [12.6, -3.1, 39.5], [12.2, -4.3, 44], [11.6, -5.05, 48], [10.6, RIVER_Y, 50.6]]
-const CASCADE_W = 2.6
-/** The lavafall: over the west lip and down the cliff into the sea. */
+const CASCADE: PathPoint[] = [[12.7, 0.55, 24.1], [12.7, 0.1, 27.5], [12.5, -0.8, 31], [12.8, -1.7, 35], [12.6, -3.1, 39.5], [12.2, -4.3, 44], [11.6, -5.05, 48], [10.6, RIVER_Y, 50.6]]
+const CASCADE_W = [2.6, 3.6, 4.6, 5.4, 5.4, 5.4, 5.6, 5.6]
+/** The lavafall: over the west lip and down the cliff into the sea, thinning as it drops. */
 const FALL: PathPoint[] = [[-15, RIVER_Y, 53], [-15.9, RIVER_Y - 0.25, 53.05], [-16.8, RIVER_Y - 1.4, 53.1], [-17.4, -9.5, 53.2], [-17.9, -15, 53.3], [-18.3, -21, 53.4], [-18.6, SEA_Y - 0.5, 53.5]]
+const FALL_W = [6.4, 6, 5, 4.4]
 
 /** Basalt shelves: [x, z, radius, top, seed]. Tops sit 5 cm under the paving they meet. */
 const SHELVES: ReadonlyArray<readonly [number, number, number, number, number]> = [
@@ -68,6 +78,10 @@ const SHELVES: ReadonlyArray<readonly [number, number, number, number, number]> 
   [-7, 39.5, 3.6, -2.6, 13], [7, 39.5, 3.6, -2.8, 14],
   [-7, 33.5, 4.2, -1.25, 15], [7, 33.5, 4.2, -1.25, 16], [-12, 36.5, 3, -2.1, 17],
   [-8, 27.5, 3.5, 0.2, 18], [8, 27.5, 3.5, 0.2, 19],
+  // rock packed in beside the stairs, by the temple's lava spout and at the river's east bank
+  [-3.9, 42.5, 1.5, -4.15, 21], [3.9, 42.5, 1.5, -4.15, 22], [-4.5, 37, 1.5, -2, 23], [4.5, 37, 1.5, -2.2, 24],
+  [-4.7, 30.2, 1.6, -0.5, 25], [4.7, 30.2, 1.6, -0.5, 26], [15.3, 22.4, 2, 1.3, 27], [16.3, 25.3, 1.7, 0.9, 28],
+  [13.4, 58.2, 2.7, -4.2, 29],
   // the colossus's platform north of the courtyard
   [0, -31, 6.5, 1.6, 20],
 ]
@@ -75,6 +89,7 @@ const SHELVES: ReadonlyArray<readonly [number, number, number, number, number]> 
 /** The east crag: tall basalt walls the river leaves and the cascade runs beside. */
 const CRAGS: ReadonlyArray<readonly [number, number, number, number, number]> = [
   [20.5, 51.5, 4.6, 6.5, 30], [19, 40.5, 5.4, 5, 31], [18.5, 30.5, 5, 5.5, 32], [20, 22.5, 4.2, 4, 33], [17, 61, 4.5, 3.6, 34],
+  [16, 45.8, 2.1, 2.4, 35], [17.7, 56.3, 1.8, 1.6, 36],
 ]
 
 /**
@@ -335,6 +350,16 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
     kit.box({ x: cx + Math.sin(am) * r, y: cy + 2.26 + 5.6 + 0.82, z: cz + Math.cos(am) * r, w: len, h: 0.85, d: 1.2, yaw: am, mat: masonry, uvScale: 2.5 })
   }
 
+  // The temple's lava spout: a culvert through the east retaining wall, feeding the cascade.
+  {
+    const x = cx + 12.7
+    kit.box({ x, y: cy - 3, z: cz + 23.4, w: 3.6, h: 4.9, d: 1.6, mat: masonry, uvScale: 2.5, collide: { surface: 'stone' } })
+    kit.box({ x, y: cy + 1.9, z: cz + 23.4, w: 4, h: 0.3, d: 1.9, mat: masonry })
+    kit.box({ x, y: cy + 0.3, z: cz + 24.2, w: 2.5, h: 1.05, d: 0.08, mat: obsidian })
+    kit.box({ x, y: cy + 1.35, z: cz + 24.3, w: 3.1, h: 0.3, d: 0.3, mat: masonry })
+    for (const side of [-1, 1]) kit.box({ x: x + side * 1.5, y: cy - 0.6, z: cz + 25, w: 0.4, h: 1.55, d: 1.6, mat: masonry, collide: { surface: 'stone' } })
+  }
+
   // Cover on the floor: a fallen column, two stumps, a capital, and the toppled head.
   {
     const a = Math.atan2(16.5, -3)
@@ -356,13 +381,13 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   solid(ctx.collision.addBox({ x: cx - 17, y: cy + 0.45, z: cz - 2, hx: 0.95, hy: 0.45, hz: 0.95, yaw: 0.6, surface: 'stone' }))
   {
     // The head stands where it fell, its broken neck sunk in the paving, tipped back a little and
-    // gazing across the arena toward the setting sun.
+    // gazing at whoever comes down the stairs, the setting sun raking across its face.
     const hx = 13.6
     const hz = -16.4
     const s = 1.9
     const head = statueHead(5).applyMatrix4(new THREE.Matrix4().compose(
       new THREE.Vector3(),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.28, Math.atan2(-hx, -hz) - 0.25, 0.22, 'YXZ')),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.2, Math.atan2(-hx, FLOOR_R - hz), 0.2, 'YXZ')),
       new THREE.Vector3(s, s, s),
     ))
     head.computeBoundingBox()
@@ -458,15 +483,15 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   /* ── lava ──────────────────────────────────────────────── */
 
   const flows = [
-    lavaRibbon(RIVER, RIVER_W + 1.2, 0.55),
-    lavaRibbon(CASCADE, CASCADE_W + 0.8, 1.1, 0.6),
+    lavaRibbon(RIVER, RIVER_W, 0.55),
+    lavaRibbon(CASCADE, CASCADE_W, 1.1, 0.6),
     lavaPool(-7.6, -1.24, 32.6, 1.35),
   ]
   const flowGeo = own(mergeLava(flows))
   const flowMesh = kit.addObject(new THREE.Mesh(flowGeo, lava))
   flowMesh.position.set(cx, cy, cz)
   flowMesh.name = 'lava-flows'
-  const fallGeo = own(lavaRibbon(FALL, [RIVER_W, RIVER_W - 0.4, RIVER_W - 1.2, RIVER_W - 1.6], 4, 0.6, 0.15))
+  const fallGeo = own(lavaRibbon(FALL, FALL_W, 4, 0.6, 0.15))
   const fallMesh = kit.addObject(new THREE.Mesh(fallGeo, lavaFall))
   fallMesh.position.set(cx, cy, cz)
   fallMesh.name = 'lavafall'
@@ -474,7 +499,11 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   const sea = kit.addObject(new THREE.Mesh(seaGeo, lavaSea))
   sea.position.set(cx, cy + SEA_Y, cz)
   sea.name = 'lava-sea'
-  // Rocks the lavafall slides over, and the river's cave in the crag.
+  // The river's bed (piers of rock under the lava), the rocks the lavafall slides over, and the
+  // river's cave in the crag.
+  for (const [x, seed] of [[-9, 43], [-1.5, 44], [6, 45], [13, 46]]) {
+    kit.add(jaggedCone(5.8, 2.2, RIVER_Y - SEA_Y + 2, seed), basalt, at(x, RIVER_Y - 0.3, 52, 0, seed, 0), { castShadow: false })
+  }
   kit.add(jaggedCone(3.2, 1.2, 22, 41), basalt, at(-14.2, RIVER_Y - 0.4, 53, 0, 0, 0, 1, 1, 1.4), { castShadow: false })
   kit.add(rockGeometry(3.4, 42, 1), basalt, at(17.8, RIVER_Y + 2.8, 50.6, 0, 0.3, 0, 0.8, 1.2, 1.1))
 
@@ -501,13 +530,11 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
       out.z = 0
     },
   }
+  // The pool sits near the west cliff: always toward the stairs.
   const pool: Burn = {
-    dir(px, pz, out) {
-      const dx = px - (cx - 7.6)
-      const dz = pz - (cz + 32.6)
-      const l = Math.hypot(dx, dz)
-      out.x = l > 1e-3 ? dx / l : 1
-      out.z = l > 1e-3 ? dz / l : 0
+    dir(_px, _pz, out) {
+      out.x = 1
+      out.z = 0
     },
   }
   const hot = (o: BoxOptions, b: Burn) => solid(ctx.collision.addBox({ ...o, surface: 'rock', tag: 'lava', onStand: () => burn(b) }))
@@ -515,14 +542,14 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
     const [ax, , az] = RIVER[i]
     const [bx, , bz] = RIVER[i + 1]
     const len = Math.hypot(bx - ax, bz - az)
-    hot({ x: cx + (ax + bx) / 2, y: cy + RIVER_Y - SINK - 0.5, z: cz + (az + bz) / 2, hx: len / 2 + 0.6, hy: 0.5, hz: RIVER_W / 2, yaw: Math.atan2(bx - ax, bz - az) - Math.PI / 2 }, river)
+    hot({ x: cx + (ax + bx) / 2, y: cy + RIVER_Y - SINK - 0.5, z: cz + (az + bz) / 2, hx: len / 2 + 0.6, hy: 0.5, hz: Math.max(RIVER_W[i], RIVER_W[i + 1]) / 2, yaw: Math.atan2(bx - ax, bz - az) - Math.PI / 2 }, river)
   }
   for (let i = 0; i < CASCADE.length - 1; i++) {
     const [ax, ay, az] = CASCADE[i]
     const [bx, by, bz] = CASCADE[i + 1]
     const len = Math.hypot(bx - ax, bz - az)
     const y = (ay + by) / 2 - SINK
-    hot({ x: cx + (ax + bx) / 2, y: cy + y - 0.5, z: cz + (az + bz) / 2, hx: CASCADE_W / 2, hy: 0.5, hz: len / 2 + 0.2, yaw: Math.atan2(bx - ax, bz - az) }, cascade)
+    hot({ x: cx + (ax + bx) / 2, y: cy + y - 0.5, z: cz + (az + bz) / 2, hx: Math.max(CASCADE_W[i], CASCADE_W[i + 1]) / 2, hy: 0.5, hz: len / 2 + 0.2, yaw: Math.atan2(bx - ax, bz - az) }, cascade)
   }
   hot({ x: cx - 7.6, y: cy - 1.25 - 0.45, z: cz + 32.6, hx: 1.1, hy: 0.5, hz: 1.1 }, pool)
 
@@ -531,11 +558,13 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   const impulse = { x: 0, y: 0, z: 0 }
   const spark = { x: 0, y: 0, z: 0 }
   let burnCd = 0
+  let carry = 0
   /** Lava under the player's feet: one heart, and a throw back toward safe ground. */
   function burn(b: Burn): void {
     const pl = ctx.player
     if (burnCd > 0 || ctx.game.creative || pl.hp <= 0 || !pl.controlEnabled || pl.state === 'dash') return
     burnCd = 0.25
+    carry = THROW_TIME
     const p = pl.position
     b.dir(p.x, p.z, push)
     spark.x = p.x
@@ -574,6 +603,12 @@ export function buildVolcanic(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
       uTime.value = t
       heat.time.value = t
       burnCd = Math.max(0, burnCd - dt)
+      if (carry > 0) {
+        carry -= dt
+        // Landed already: the throw is over.
+        if (ctx.player.grounded && carry < THROW_TIME - 0.15) carry = 0
+        else ctx.player.drift(push.x * THROW_CARRY, push.z * THROW_CARRY)
+      }
       sparks.update(t)
       dome.update()
     },
