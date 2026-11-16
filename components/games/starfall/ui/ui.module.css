@@ -83,7 +83,47 @@
     linear-gradient(90deg, rgba(11, 15, 20, 0.92) 0%, rgba(11, 15, 20, 0.74) 32%, rgba(11, 15, 20, 0.5) 70%, rgba(11, 15, 20, 0.42) 100%);
 }
 .topShade {
-  background: linear-gradient(180deg, rgba(8, 10, 14, 0.38) 0%, rgba(8, 10, 14, 0) 100%);
+  background: linear-gradient(180deg, rgba(8, 10, 14, 0.46) 0%, rgba(8, 10, 14, 0.16) 55%, rgba(8, 10, 14, 0) 100%);
+}
+
+/* ── surfaces ───────────────────────────────────────────────────────── */
+
+/* Menu panel: a lit top edge, a faint amber wash from the corner its accent starts in, and real depth below. */
+.panel {
+  border: 1px solid rgba(243, 238, 230, 0.11);
+  border-radius: 12px;
+  background:
+    radial-gradient(520px 220px at 0% 0%, rgba(245, 180, 85, 0.085) 0%, rgba(245, 180, 85, 0) 70%),
+    linear-gradient(180deg, rgba(24, 30, 40, 0.97) 0%, rgba(13, 17, 23, 0.97) 38%, rgba(10, 13, 18, 0.97) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(243, 238, 230, 0.09),
+    0 0 0 1px rgba(4, 6, 9, 0.55),
+    0 34px 90px -28px rgba(0, 0, 0, 0.85);
+}
+.panelAccent {
+  background: linear-gradient(90deg, var(--sf-amber) 0%, rgba(245, 180, 85, 0.5) 22%, rgba(245, 180, 85, 0) 62%);
+}
+
+/* A soft dark pad behind HUD groups and stats so they read over bright scenery. No backdrop blur: it is costly
+   over a WebGL canvas. The HUD's pads only exist on laptop-size screens and up, where the top row has the room. */
+.plate,
+.hudPlate {
+  border: 1px solid rgba(243, 238, 230, 0.1);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(15, 19, 26, 0.66) 0%, rgba(9, 12, 17, 0.5) 100%);
+  box-shadow: inset 0 1px 0 rgba(243, 238, 230, 0.07), 0 12px 30px -18px rgba(0, 0, 0, 0.85);
+}
+@media (max-width: 1023.98px) {
+  .hudPlate {
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+}
+.dashReady {
+  background: linear-gradient(90deg, #f5b455 0%, #ffd592 100%);
+  box-shadow: 0 0 8px rgba(245, 180, 85, 0.65);
 }
 
 /* ── loading ────────────────────────────────────────────────────────── */
@@ -326,7 +366,7 @@
   height: 44px;
   padding: 0 22px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
@@ -340,27 +380,36 @@
   font-size: 11px;
 }
 .btn[data-variant='primary'] {
-  background: var(--sf-amber);
+  background: linear-gradient(180deg, #ffd592 0%, #f5b455 52%, #eaa341 100%);
   color: var(--sf-ink);
-  box-shadow: inset 0 -2px 0 rgba(11, 15, 20, 0.2), 0 10px 24px -14px rgba(245, 180, 85, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -2px 0 rgba(11, 15, 20, 0.18),
+    0 10px 24px -14px rgba(245, 180, 85, 0.9);
 }
 .btn[data-variant='primary']:focus {
-  background: #fad08a;
-  box-shadow: inset 0 -2px 0 rgba(11, 15, 20, 0.2), 0 12px 28px -12px rgba(245, 180, 85, 1);
+  background: linear-gradient(180deg, #ffe3b3 0%, #fac672 52%, #f0ad4c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -2px 0 rgba(11, 15, 20, 0.18),
+    0 0 0 3px rgba(245, 180, 85, 0.22),
+    0 14px 30px -12px rgba(245, 180, 85, 1);
 }
 .btn[data-variant='primary']:active {
-  background: #e6a23f;
+  background: linear-gradient(180deg, #e9a440 0%, #e6a23f 100%);
   box-shadow: inset 0 2px 0 rgba(11, 15, 20, 0.22);
 }
 .btn[data-variant='secondary'] {
-  border-color: rgba(243, 238, 230, 0.28);
-  background: rgba(243, 238, 230, 0.04);
-  color: rgba(243, 238, 230, 0.88);
+  border-color: rgba(243, 238, 230, 0.26);
+  background: linear-gradient(180deg, rgba(243, 238, 230, 0.09) 0%, rgba(243, 238, 230, 0.03) 100%);
+  color: rgba(243, 238, 230, 0.9);
+  box-shadow: inset 0 1px 0 rgba(243, 238, 230, 0.08);
 }
 .btn[data-variant='secondary']:focus {
-  border-color: rgba(243, 238, 230, 0.75);
-  background: rgba(243, 238, 230, 0.12);
+  border-color: rgba(245, 180, 85, 0.8);
+  background: linear-gradient(180deg, rgba(245, 180, 85, 0.2) 0%, rgba(245, 180, 85, 0.08) 100%);
   color: var(--sf-text);
+  box-shadow: inset 0 1px 0 rgba(243, 238, 230, 0.1), 0 0 0 3px rgba(245, 180, 85, 0.14);
 }
 .btn[data-variant='secondary']:active {
   background: rgba(243, 238, 230, 0.2);
@@ -419,9 +468,9 @@
   height: 34px;
   padding: 0 12px 0 8px;
   border: 1px solid rgba(243, 238, 230, 0.16);
-  border-radius: 6px;
-  background: rgba(243, 238, 230, 0.03);
-  color: rgba(243, 238, 230, 0.62);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(243, 238, 230, 0.07) 0%, rgba(243, 238, 230, 0.02) 100%);
+  color: rgba(243, 238, 230, 0.66);
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
@@ -443,8 +492,9 @@
 /* Large choice (device picker). */
 .card {
   border: 1px solid rgba(243, 238, 230, 0.14);
-  border-radius: 8px;
-  background: rgba(243, 238, 230, 0.03);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(243, 238, 230, 0.06) 0%, rgba(243, 238, 230, 0.02) 100%);
+  box-shadow: inset 0 1px 0 rgba(243, 238, 230, 0.06);
 }
 .card:focus {
   border-color: rgba(243, 238, 230, 0.55);
@@ -473,8 +523,9 @@
   width: 100%;
   min-height: var(--row-h, 44px);
   padding: 0 14px 0 18px;
-  border-radius: 6px;
-  color: rgba(243, 238, 230, 0.66);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(243, 238, 230, 0.7);
   text-align: left;
 }
 /* Marker: an amber bar that grows in on the selected row. */
@@ -492,8 +543,19 @@
 }
 .menuRow:focus,
 .menuRow[data-current='true'] {
-  background: rgba(245, 180, 85, 0.17);
+  border-color: rgba(245, 180, 85, 0.3);
+  background: linear-gradient(90deg, rgba(245, 180, 85, 0.27) 0%, rgba(245, 180, 85, 0.11) 58%, rgba(245, 180, 85, 0.04) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 226, 170, 0.1), 0 10px 26px -18px rgba(245, 180, 85, 0.7);
   color: var(--sf-text);
+}
+.menuRow .rowIcon {
+  color: rgba(243, 238, 230, 0.4);
+  transition: color 150ms ease-out, transform 160ms var(--sf-ease);
+}
+.menuRow:focus .rowIcon,
+.menuRow[data-current='true'] .rowIcon {
+  color: var(--sf-amber);
+  transform: scale(1.1);
 }
 .menuRow:focus::before,
 .menuRow[data-current='true']::before {
@@ -528,6 +590,9 @@
 /* A panel is open: its row stays selected; the others only brighten under the mouse. */
 .menuList[data-locked='true'] .menuRow:not([data-current='true']):hover {
   color: var(--sf-text);
+}
+.menuList[data-locked='true'] .menuRow:not([data-current='true']):hover .rowIcon {
+  color: rgba(243, 238, 230, 0.75);
 }
 [data-touch='true'] .menuRow {
   min-height: max(var(--row-h, 44px), 46px);
@@ -930,6 +995,7 @@
   .menuRow::before,
   .menuRow .rowLabel,
   .menuRow .rowChevron,
+  .menuRow .rowIcon,
   .sliderThumb,
   .loadFill,
   .loadHead {

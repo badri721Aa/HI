@@ -43,10 +43,17 @@ export function Hud() {
       <div className={cx('absolute flex flex-col items-start', GUTTER)}>
         <div className="flex items-center gap-3">
           {touch && <TouchPause enabled={playing} />}
-          {creative ? <CreativeBadge /> : <Hearts />}
+          {creative ? (
+            <CreativeBadge />
+          ) : (
+            <div className={cx(styles.hudPlate, 'lg:px-3 lg:py-2.5')}>
+              <Hearts />
+              {/* On touch the Dash button carries its own charge ring. */}
+              {!touch && <DashMeter />}
+            </div>
+          )}
         </div>
-        {/* On touch the Dash button carries its own charge ring. */}
-        {!touch && <DashMeter />}
+        {creative && !touch && <DashMeter />}
         <NetChip />
         <ObjectiveLine hidden={!playing} />
       </div>
@@ -55,8 +62,10 @@ export function Hud() {
       <BossBar />
 
       <div className={cx('absolute flex flex-col items-end gap-2', GUTTER_R)}>
-        <ShardSlots />
-        <SparkCount />
+        <div className={cx(styles.hudPlate, 'flex flex-col items-end gap-2 lg:px-3 lg:py-2.5')}>
+          <ShardSlots />
+          <SparkCount />
+        </div>
         <Fps />
       </div>
 
@@ -94,7 +103,7 @@ function Hearts() {
   const hits = pulse?.kind === 'lost' ? pulse.id : 0
 
   return (
-    <div key={hits} className={cx('flex items-center gap-[5px]', hits > 0 && styles.heartsHit)} role="img" aria-label={`Health ${hp} of ${max}`}>
+    <div key={hits} className={cx('flex items-center gap-[5px] lg:gap-[6px]', hits > 0 && styles.heartsHit)} role="img" aria-label={`Health ${hp} of ${max}`}>
       {Array.from({ length: max }, (_, i) => {
         const full = i < hp
         const pulsing = pulse && i >= pulse.from && i < pulse.to
@@ -102,7 +111,7 @@ function Hearts() {
           <span
             key={pulsing ? `${i}-${pulse.id}` : i}
             className={cx(
-              'relative block h-[22px] w-[22px] max-sm:h-5 max-sm:w-5',
+              'relative block h-[22px] w-[22px] max-sm:h-5 max-sm:w-5 lg:h-[26px] lg:w-[26px]',
               pulsing && (pulse.kind === 'lost' ? styles.heartLost : styles.heartGained),
               full && hp === 1 && styles.heartLow,
             )}
@@ -127,10 +136,10 @@ function DashMeter() {
   const ready = dash >= 1
   return (
     <div className="mt-2.5 flex items-center gap-2" aria-label={ready ? 'Dash ready' : 'Dash recharging'}>
-      <DashIcon className={cx(styles.hudIcon, 'h-3.5 w-3.5 transition-colors duration-200', ready ? 'text-[#F5B455]' : 'text-[#F3EEE6]/40')} />
-      <div className="relative h-[3px] w-[52px] overflow-hidden rounded-full bg-[#0B0F14]/35 ring-1 ring-[#F3EEE6]/15">
+      <DashIcon className={cx(styles.hudIcon, 'h-3.5 w-3.5 transition-colors duration-200 lg:h-4 lg:w-4', ready ? 'text-[#F5B455]' : 'text-[#F3EEE6]/40')} />
+      <div className="relative h-[3px] w-[52px] overflow-hidden rounded-full bg-[#0B0F14]/35 ring-1 ring-[#F3EEE6]/15 lg:h-[5px] lg:w-auto lg:min-w-[96px] lg:flex-1 lg:bg-[#05070A]/55">
         <div
-          className={cx('absolute inset-y-0 left-0 rounded-full transition-[width,background-color] duration-100 ease-linear', ready ? 'bg-[#F5B455]' : 'bg-[#F3EEE6]/55')}
+          className={cx('absolute inset-y-0 left-0 rounded-full transition-[width,background-color] duration-100 ease-linear', ready ? styles.dashReady : 'bg-[#F3EEE6]/55')}
           style={{ width: `${Math.round(Math.min(1, Math.max(0, dash)) * 100)}%` }}
         />
       </div>
@@ -189,9 +198,9 @@ function ShardSlots() {
     <div className="flex items-center gap-[5px]" role="img" aria-label={`${found} of ${shards.length} star shards`}>
       {shards.map((got, i) =>
         got ? (
-          <StarIcon key={`f${i}`} className={cx(styles.starFill, styles.starGlow, 'h-[19px] w-[19px] text-[#F5B455] max-sm:h-4 max-sm:w-4')} style={{ '--d': `${i * 40}ms` } as CSSProperties} />
+          <StarIcon key={`f${i}`} className={cx(styles.starFill, styles.starGlow, 'h-[19px] w-[19px] text-[#F5B455] max-sm:h-4 max-sm:w-4 lg:h-5 lg:w-5')} style={{ '--d': `${i * 40}ms` } as CSSProperties} />
         ) : (
-          <StarIcon key={`e${i}`} filled={false} className={cx(styles.hudIcon, 'h-[19px] w-[19px] text-[#F3EEE6]/45 max-sm:h-4 max-sm:w-4')} />
+          <StarIcon key={`e${i}`} filled={false} className={cx(styles.hudIcon, 'h-[19px] w-[19px] text-[#F3EEE6]/45 max-sm:h-4 max-sm:w-4 lg:h-5 lg:w-5 lg:text-[#F3EEE6]/55')} />
         ),
       )}
     </div>
@@ -202,10 +211,10 @@ function SparkCount() {
   const sparks = useHud(h => h.sparks)
   const total = useHud(h => h.sparksTotal)
   return (
-    <div className={cx(styles.hudText, 'flex items-center gap-1.5 text-[13px] tabular-nums')} aria-label={`${sparks} sparks`}>
-      <SparkIcon className={cx(styles.hudIcon, 'h-3 w-3 text-[#F5B455]')} />
+    <div className={cx(styles.hudText, 'flex items-center gap-1.5 text-[13px] tabular-nums lg:text-[15px]')} aria-label={`${sparks} sparks`}>
+      <SparkIcon className={cx(styles.hudIcon, 'h-3 w-3 text-[#F5B455] lg:h-3.5 lg:w-3.5')} />
       <span key={sparks} className={cx('font-semibold text-[#F3EEE6]', sparks > 0 && styles.pop)}>{sparks}</span>
-      {total > 0 && <span className="text-[#F3EEE6]/45">/ {total}</span>}
+      {total > 0 && <span className="text-[#F3EEE6]/55">/ {total}</span>}
     </div>
   )
 }

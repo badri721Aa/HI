@@ -5,7 +5,7 @@
  * Selection is focus: hovering a control focuses it (nav.ts hoverFocus), so mouse and keyboard
  * always agree on which single control is highlighted.
  */
-import { useContext, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ComponentType, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type SVGProps } from 'react'
 import type { SfxName } from '../engine/types'
 import { GameContext, playUi, useGameUi } from './context'
 import { ChevronIcon } from './icons'
@@ -21,6 +21,8 @@ const holdFocus = (e: MouseEvent) => e.preventDefault()
 export interface MenuEntry {
   id: string
   label: string
+  /** Leads the row; lights up with the selection. */
+  icon?: ComponentType<SVGProps<SVGSVGElement>>
   /** Quiet secondary text on the right (e.g. save summary). */
   meta?: string
   onSelect: () => void
@@ -66,6 +68,7 @@ export function MenuList({ items, current, size = 'lg' }: { items: MenuEntry[]; 
               it.onSelect()
             }}
           >
+            {it.icon && <it.icon aria-hidden className={cx(styles.rowIcon, 'h-[18px] w-[18px] shrink-0')} />}
             <span className={cx(styles.rowLabel, 'shrink-0')}>{it.label}</span>
             {it.meta && <span className="min-w-0 truncate font-inter text-xs tracking-normal opacity-60">{it.meta}</span>}
             <ChevronIcon aria-hidden className={cx(styles.rowChevron, 'h-4 w-4 shrink-0 text-[#F5B455]')} />

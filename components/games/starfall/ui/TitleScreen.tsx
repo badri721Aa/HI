@@ -10,7 +10,7 @@ import { Button, KeyCap, MenuList, PanelHeader, type MenuEntry } from './control
 import { ControlsPanel } from './ControlsPanel'
 import { CreditsPanel } from './CreditsPanel'
 import { DevicePicker } from './DevicePicker'
-import { BackIcon } from './icons'
+import { BackIcon, CubeIcon, GamepadIcon, GearIcon, InfoIcon, PlayIcon, StarIcon, UsersIcon } from './icons'
 import { focusFirst, keepFocus, useMenuNav } from './nav'
 import { OnlinePanel } from './OnlinePanel'
 import { BackHint, Panel } from './Panel'
@@ -117,21 +117,23 @@ function TitleContent({ state }: { state: 'open' | 'closed' }) {
       ? [{
           id: 'continue',
           label: 'Continue',
+          icon: PlayIcon,
           meta: summary ? `${summary.place ? `${summary.place} · ` : ''}${summary.shards} of ${summary.total} shards` : undefined,
           onSelect: () => game.continueGame(),
         }]
       : []),
-    { id: 'new', label: 'New Game', onSelect: () => (hasSave ? open('confirmNew', 'new') : start()) },
-    { id: 'creative', label: 'Creative', meta: 'Build & fly · no enemies', onSelect: () => game.startCreative() },
+    { id: 'new', label: 'New Game', icon: StarIcon, onSelect: () => (hasSave ? open('confirmNew', 'new') : start()) },
+    { id: 'creative', label: 'Creative', icon: CubeIcon, meta: 'Build & fly · no enemies', onSelect: () => game.startCreative() },
     {
       id: 'online',
       label: 'Play Online',
+      icon: UsersIcon,
       meta: room ? `${room.name} · ${Math.max(room.players, roomPlayers)} / ${room.max}` : undefined,
       onSelect: () => open('online', 'online'),
     },
-    { id: 'settings', label: 'Settings', onSelect: () => open('settings', 'settings') },
-    { id: 'controls', label: 'Controls', onSelect: () => open('controls', 'controls') },
-    { id: 'credits', label: 'Credits', onSelect: () => open('credits', 'credits') },
+    { id: 'settings', label: 'Settings', icon: GearIcon, onSelect: () => open('settings', 'settings') },
+    { id: 'controls', label: 'Controls', icon: GamepadIcon, onSelect: () => open('controls', 'controls') },
+    { id: 'credits', label: 'Credits', icon: InfoIcon, onSelect: () => open('credits', 'credits') },
   ]
 
   return (

@@ -26,11 +26,12 @@ export function Panel({
       className={cx(
         styles.slide,
         'outline-none',
-        'relative flex max-h-full w-full flex-col overflow-hidden rounded-[4px] border border-[#F3EEE6]/10 bg-[#0B0F14]/[0.9] shadow-[0_24px_80px_-24px_rgba(0,0,0,0.7)]',
+        styles.panel,
+        'relative flex max-h-full w-full flex-col overflow-hidden',
         wide ? 'max-w-[860px]' : 'max-w-[640px]',
       )}
     >
-      <span aria-hidden className="absolute left-0 top-0 h-px w-16 bg-[#F5B455]" />
+      <span aria-hidden className={cx(styles.panelAccent, 'absolute inset-x-0 top-0 h-[2px]')} />
       <div className="min-h-0 flex-1 overflow-y-auto px-[clamp(18px,3vw,36px)] py-[clamp(18px,3.2vh,32px)] [scrollbar-color:rgba(243,238,230,0.2)_transparent] [scrollbar-width:thin]">
         {children}
       </div>

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { playUi, useGameUi, useHud, useNet, usePresence, useUi } from './context'
 import { Button, KeyCap, MenuList, PanelHeader, type MenuEntry } from './controls'
 import { ControlsPanel } from './ControlsPanel'
-import { StarIcon } from './icons'
+import { CrownIcon, ExitIcon, GamepadIcon, GearIcon, MapIcon, PlayIcon, PortalIcon, RefreshIcon, StarIcon, SwordIcon, UsersIcon } from './icons'
 import { MapPanel } from './MapPanel'
 import { focusEl, focusFirst, goBack, isTextField, keepFocus, useMenuNav } from './nav'
 import { OnlinePanel } from './OnlinePanel'
@@ -82,22 +82,24 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
   })
 
   const items: MenuEntry[] = [
-    { id: 'resume', label: 'Resume', onSelect: resume },
-    { id: 'map', label: 'Map', onSelect: () => go('map') },
-    { id: 'travel', label: 'Travel', meta: travelMeta, onSelect: () => go('travel') },
+    { id: 'resume', label: 'Resume', icon: PlayIcon, onSelect: resume },
+    { id: 'map', label: 'Map', icon: MapIcon, onSelect: () => go('map') },
+    { id: 'travel', label: 'Travel', icon: PortalIcon, meta: travelMeta, onSelect: () => go('travel') },
     {
       id: 'online',
       label: 'Online',
+      icon: UsersIcon,
       meta: room ? `${room.code.toUpperCase()} · ${Math.max(room.players, roomPlayers)} / ${room.max}` : 'Play with friends',
       onSelect: () => go('online'),
     },
-    { id: 'settings', label: 'Settings', onSelect: () => go('settings') },
-    { id: 'controls', label: 'Controls', onSelect: () => go('controls') },
-    ...(creative ? [{ id: 'spawner', label: 'Spawn enemies', meta: 'Mobs · bosses', onSelect: () => go('spawner') }] : []),
+    { id: 'settings', label: 'Settings', icon: GearIcon, onSelect: () => go('settings') },
+    { id: 'controls', label: 'Controls', icon: GamepadIcon, onSelect: () => go('controls') },
+    ...(creative ? [{ id: 'spawner', label: 'Spawn enemies', icon: CrownIcon, meta: 'Mobs · bosses', onSelect: () => go('spawner') }] : []),
     ...(creative
       ? [{
           id: 'enemies',
           label: 'World enemies',
+          icon: SwordIcon,
           meta: enemies ? 'On' : 'Off',
           sound: 'ui-toggle' as const,
           onSelect: () => {
@@ -106,8 +108,8 @@ function PauseContent({ state }: { state: 'open' | 'closed' }) {
           },
         }]
       : []),
-    { id: 'restart', label: 'Restart from checkpoint', onSelect: () => game.restartFromCheckpoint(), separated: true },
-    { id: 'quit', label: 'Quit to title', onSelect: () => go('quit') },
+    { id: 'restart', label: 'Restart from checkpoint', icon: RefreshIcon, onSelect: () => game.restartFromCheckpoint(), separated: true },
+    { id: 'quit', label: 'Quit to title', icon: ExitIcon, onSelect: () => go('quit') },
   ]
   const open = panel !== 'root'
 
@@ -200,8 +202,8 @@ function RunStats() {
   const r = useRun()
   const cell = 'min-w-[96px] border-l border-[#F3EEE6]/12 pl-5 first:border-l-0 first:pl-0'
   return (
-    <div className={cx(styles.rise, 'absolute bottom-[clamp(24px,7vh,72px)] right-[clamp(20px,6vw,88px)] hidden md:block')} style={{ '--d': '200ms' } as CSSProperties}>
-      <div className={cx(LABEL, 'mb-4 text-right text-[10px] text-[#F3EEE6]/40')}>This journey</div>
+    <div className={cx(styles.rise, styles.plate, 'absolute bottom-[clamp(24px,7vh,72px)] right-[clamp(20px,6vw,88px)] hidden px-6 pb-4 pt-5 md:block')} style={{ '--d': '200ms' } as CSSProperties}>
+      <div className={cx(LABEL, 'mb-4 text-right text-[10px] text-[#F5B455]/80')}>This journey</div>
       <div className="flex items-end">
         <Stat className={cell} label="Time" value={formatTime(r.playTime)} />
         <div className={cell}>

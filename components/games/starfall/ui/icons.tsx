@@ -207,6 +207,56 @@ export function RefreshIcon(p: IconProps) {
   )
 }
 
+/* Menu rows. */
+
+export function PlayIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M7.2 4.9v14.2a.8.8 0 0 0 1.2.7l11.3-7.1a.8.8 0 0 0 0-1.4L8.4 4.2a.8.8 0 0 0-1.2.7Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** A folded chart. */
+export function MapIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M3.4 6.5 9 4.2l6 2.3 5.6-2.3v13.3L15 19.8l-6-2.3-5.6 2.3Z" {...stroke} />
+      <path d="M9 4.2v13.3M15 6.5v13.3" {...stroke} />
+    </svg>
+  )
+}
+
+export function GearIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="12" cy="12" r="6.2" {...stroke} />
+      <circle cx="12" cy="12" r="2.3" {...stroke} />
+      <path d="M12 2.6v3.2M12 18.2v3.2M2.6 12h3.2M18.2 12h3.2M5.35 5.35l2.27 2.27M16.38 16.38l2.27 2.27M18.65 5.35l-2.27 2.27M7.62 16.38l-2.27 2.27" {...stroke} />
+    </svg>
+  )
+}
+
+export function GamepadIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M7.3 7.4h9.4a4.6 4.6 0 0 1 4.5 5.5l-.5 2.7a2.3 2.3 0 0 1-4 1.1l-1.6-1.9H8.9l-1.6 1.9a2.3 2.3 0 0 1-4-1.1l-.5-2.7a4.6 4.6 0 0 1 4.5-5.5Z" {...stroke} />
+      <path d="M7.7 10.2v3M6.2 11.7h3" {...stroke} />
+      <path d="M15.3 10.9v.01M17.5 12.7v.01" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** A doorway with an arrow out. */
+export function ExitIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M10.2 4.2H6.4a1.7 1.7 0 0 0-1.7 1.7v12.2a1.7 1.7 0 0 0 1.7 1.7h3.8" {...stroke} />
+      <path d="M14.8 8.1 18.7 12l-3.9 3.9M18.5 12H9.6" {...stroke} />
+    </svg>
+  )
+}
+
 /** An isometric block — build mode. */
 export function CubeIcon(p: IconProps) {
   return (
