@@ -14,7 +14,7 @@
  */
 import * as THREE from 'three'
 import type { V3 } from '../events'
-import type { Ctx } from '../types'
+import type { Ctx, LiveEnemy } from '../types'
 
 type Kind = 'none' | 'aim' | 'enemy' | 'boss' | 'player' | 'thing'
 
@@ -35,6 +35,7 @@ const AIM_AHEAD = 14
 const BOSS_EYE = 2.2
 const PLAYER_EYE = 1.45
 const HERO_EYE = 1.42
+const NO_ENEMIES: readonly LiveEnemy[] = []
 
 export class LookDirector {
   private kind: Kind = 'none'
@@ -70,7 +71,7 @@ export class LookDirector {
     this.keepT -= dt
     this.scanT -= dt
     // Aiming follows the camera every frame; everything else is re-chosen at a calmer pace.
-    if (ctx.weapons.pose.move === 'draw') {
+    if (ctx.weapons?.pose.move === 'draw') {
       ctx.camera.getWorldDirection(this.dir)
       const p = pl.position
       this.target.set(p.x + this.dir.x * AIM_AHEAD, p.y + HERO_EYE + this.dir.y * AIM_AHEAD, p.z + this.dir.z * AIM_AHEAD)
@@ -103,7 +104,7 @@ export class LookDirector {
     const ctx = this.ctx
     const p = ctx.player.position
     const f = this.found
-    if (ctx.enemies.nearest(p, ENEMY_RANGE, f)) return 'enemy'
+    if (ctx.enemies?.nearest(p, ENEMY_RANGE, f)) return 'enemy'
     if (this.boss()) return 'boss'
     if (this.player()) return 'player'
     const t = this.thing
@@ -119,7 +120,7 @@ export class LookDirector {
     const p = this.ctx.player.position
     const f = this.found
     let ok = false
-    if (this.kind === 'enemy') ok = this.ctx.enemies.nearest(p, ENEMY_RANGE * 1.3, f)
+    if (this.kind === 'enemy') ok = !!this.ctx.enemies?.nearest(p, ENEMY_RANGE * 1.3, f)
     else if (this.kind === 'boss') ok = this.boss()
     else if (this.kind === 'player') ok = this.player()
     if (ok) this.target.copy(f)
@@ -132,7 +133,7 @@ export class LookDirector {
     const f = this.found
     let best = BOSS_RANGE * BOSS_RANGE
     let found = false
-    const list = ctx.factory.list()
+    const list = ctx.factory?.list() ?? NO_ENEMIES
     for (let i = 0; i < list.length; i++) {
       const e = list[i]
       if (!e.boss || !e.alive) continue
@@ -143,7 +144,7 @@ export class LookDirector {
       f.set(e.position.x, e.position.y + BOSS_EYE, e.position.z)
     }
     if (found) return true
-    return ctx.worlds.fighting && ctx.enemies.nearest(p, BOSS_RANGE, f)
+    return !!ctx.worlds?.fighting && !!ctx.enemies?.nearest(p, BOSS_RANGE, f)
   }
 
   /** The nearest other player in this map. */
@@ -153,7 +154,7 @@ export class LookDirector {
     if (!peers || peers.size === 0) return false
     const p = ctx.player.position
     const f = this.found
-    const here = ctx.worlds.current
+    const here = ctx.worlds?.current ?? 'isle'
     let best = PLAYER_RANGE * PLAYER_RANGE
     let found = false
     for (const peer of peers.values()) {

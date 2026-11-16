@@ -77,10 +77,10 @@ export const SLIDE: PoseSpec = {
 
 /** Wall-run: the arm on the wall's side, reaching out to brush it (both arms authored; one is used). */
 export const WALL_REACH: PoseSpec = {
-  shoulders: [0, 0, 10],
-  arms: [-24, 10, 82],
-  elbows: 30,
-  hands: [0, 0, 12],
+  shoulders: [0, 0, 6],
+  arms: [-16, 8, 56],
+  elbows: 36,
+  hands: [0, 0, 14],
   curl: 0.06,
 }
 
@@ -99,5 +99,5 @@ export const rollTuck = (f: number): number => smooth((f - 0.08) / 0.24) * (1 - 
 export const SLIDE_PIVOT = new THREE.Vector3(0, 0, 0)
 
 /** Wall-run: lean away from the wall (rad), about a point on the body's axis that puts the feet on the wall. */
-export const WALL_LEAN = 0.56
+export const WALL_LEAN = 0.5
 export const WALL_PIVOT = new THREE.Vector3(0, 0.62, 0)

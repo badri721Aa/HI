@@ -251,10 +251,10 @@ export const SLIDE = {
   /** The low press is remembered this long (s): pressed in the air, it slides on touchdown. */
   buffer: 0.18,
   /** Jumping out: a long, low leap. Lift (m/s), speed gained (×) and its floor and ceiling (m/s). */
-  jumpSpeed: 7,
-  jumpBoost: 1.15,
-  jumpMin: 10.5,
-  jumpMax: 13,
+  jumpSpeed: 7.4,
+  jumpBoost: 1.3,
+  jumpMin: 12,
+  jumpMax: 14,
 } as const
 
 /** Running along a wall. */

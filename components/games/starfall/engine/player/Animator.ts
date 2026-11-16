@@ -1241,7 +1241,7 @@ export class Animator {
       this.lookYaw = damp(this.lookYaw, this.lookYawLead, 9, dt)
       this.lookPitch = damp(this.lookPitch, this.lookPitchLead, 9, dt)
     }
-    this.lookW = damp(this.lookW, wTarget, wTarget > this.lookW ? 5 : 7, dt)
+    this.lookW = damp(this.lookW, wTarget, 5, dt)
   }
 
   /** Keeps the head steady against spine motion and turns it toward the look target. */
