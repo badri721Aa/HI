@@ -384,8 +384,9 @@ export class Sfx extends SfxKit {
     this.noiseHit(v, t, 'lowpass', (heavy ? 1200 : 2600) * p, 3, 0.4, 0.002, heavy ? 0.22 : 0.12, heavy ? 150 : 400)
     this.tone(v, t, 'sine', (heavy ? 160 : 300) * p, heavy ? 50 : 110, heavy ? 0.45 : 0.3, 0.002, heavy ? 0.25 : 0.12)
     if (kind === 'sword') this.noiseHit(v, t, 'highpass', 5000, 0.7, 0.08, 0.001, 0.05)
-    // An arrow goes in with a dry thwack.
+    // An arrow goes in with a dry thwack; a star bolt or a comet with a glassy sizzle.
     if (kind === 'bow') this.tone(v, t, 'triangle', 620 * p, 190, 0.14, 0.001, 0.07)
+    if (kind === 'blaster' || kind === 'launcher') this.chime(v, t, 1500 * p, 0.035, 0.22, 3.5, 1.4)
     if (weapon === 'frostHammer') this.chime(v, t + 0.02, 2600, 0.04, 0.5, 3.5, 1.2)
     if (killed) this.tone(v, t + 0.05, 'triangle', 380, 1500, 0.08, 0.01, 0.28)
   }
@@ -406,6 +407,12 @@ export class Sfx extends SfxKit {
     } else if (weapon === 'bow') {
       this.noiseHit(v, t, 'bandpass', 1200, 4, 0.12, 0.002, 0.05)
       this.tone(v, t + 0.02, 'triangle', 196, 192, 0.06, 0.003, 0.3)
+    } else if (kind === 'blaster' || kind === 'launcher') {
+      // Star-tech wakes up: a click, then the core's hum rising to a clear note.
+      const low = kind === 'launcher'
+      this.noiseHit(v, t, 'bandpass', low ? 900 : 2200, 5, 0.1, 0.002, 0.04)
+      this.tone(v, t + 0.03, 'sine', low ? 150 : 320, low ? 420 : 960, 0.07, 0.03, 0.22)
+      this.chime(v, t + 0.2, low ? 660 : 1320, 0.03, 0.7, 2, 0.7)
     } else {
       this.whoosh(v, t, 600, 1400, 0.14, 0.08, 1)
     }
@@ -862,5 +869,46 @@ export class Sfx extends SfxKit {
     this.noiseHit(v, t, 'bandpass', 700, 6, 0.2, 0.02, 0.3, 1100)
     this.tone(v, t + 0.25, 'sine', 140, 90, 0.18, 0.004, 0.12)
     for (let k = 0; k < 6; k++) this.chime(v, t + 0.3 + k * 0.08, mtof(HIGH_PENTA[k % HIGH_PENTA.length] + 12), 0.035, 1.2, 2, 0.6)
+  }
+
+  /* ── star-tech ───────────────────────────────────────────── */
+
+  /** A shot leaves: the blaster's bright falling "pew", or the launcher's thump with the comet whistling away. */
+  starFire(weapon: WeaponId, pos?: V3): void {
+    const t = this.t
+    if (KIND[weapon] === 'launcher') {
+      if (!this.gate('comet', 0.2)) return
+      const v = this.voice(this.mix.sfx, 1.3, { pos, ref: 7, wet: 0.4 })
+      this.tone(v, t, 'sine', 170, 46, 0.42, 0.004, 0.34)
+      this.noiseHit(v, t, 'lowpass', 1300, 0.8, 0.26, 0.003, 0.2, 260, this.s.brown)
+      this.whoosh(v, t + 0.03, 500, 2600, 0.55, 0.1, 1.3)
+      this.chime(v, t + 0.02, mtof(62), 0.05, 0.7, 2, 1.4)
+      return
+    }
+    if (!this.gate('pew', 0.07)) return
+    const p = rand(0.94, 1.07)
+    const v = this.voice(this.mix.sfx, 0.9, { pos, ref: 6, wet: 0.2 })
+    this.tone(v, t, 'triangle', 1500 * p, 430 * p, 0.11, 0.002, 0.1)
+    this.chime(v, t, 2300 * p, 0.03, 0.14, 2, 1.6)
+    this.noiseHit(v, t, 'highpass', 4200, 0.7, 0.04, 0.001, 0.03)
+  }
+
+  /** A star bolt fizzles on what it struck, or a comet bursts: a deep boom under a shower of sparks. */
+  starBlast(weapon: WeaponId, pos: V3): void {
+    const t = this.t
+    if (KIND[weapon] === 'launcher') {
+      if (!this.gate('burst', 0.12)) return
+      const v = this.voice(this.mix.sfx, 1.5, { pos, ref: 9, wet: 0.6 })
+      this.tone(v, t, 'sine', 115, 30, 0.6, 0.003, 0.55)
+      this.noiseHit(v, t, 'lowpass', 1500, 0.8, 0.42, 0.003, 0.36, 150, this.s.brown)
+      this.noiseHit(v, t + 0.01, 'bandpass', 3000, 1.4, 0.12, 0.002, 0.14, 1100)
+      this.whoosh(v, t + 0.05, 2600, 500, 0.5, 0.06, 1.2)
+      for (let k = 0; k < 4; k++) this.chime(v, t + 0.04 + k * rand(0.03, 0.06), mtof(HIGH_PENTA[Math.floor(Math.random() * HIGH_PENTA.length)]), 0.028, 0.6, 2, 0.6)
+      return
+    }
+    if (!this.gate('fizz', 0.06)) return
+    const v = this.voice(this.mix.sfx, 0.8, { pos, ref: 5 })
+    this.noiseHit(v, t, 'bandpass', 3400 * rand(0.9, 1.1), 2, 0.12, 0.002, 0.07, 1500)
+    this.tone(v, t, 'sine', 900, 320, 0.05, 0.002, 0.06)
   }
 }

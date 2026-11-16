@@ -193,9 +193,8 @@ export class CameraRig implements ICameraRig {
     this.yaw = wrapAngle(this.yaw - lx)
     this.pitch = clamp(this.pitch + ly, C.pitchMin, C.pitchMax)
     if (s.zoom) this.zoom = clamp(this.zoom + s.zoom * C.zoomStep, C.zoomMin, C.zoomMax)
-    const move = this.ctx.weapons?.pose.move
-    // Bow drawn or building: over the shoulder, so the crosshair isn't on the hero.
-    this.aimW = damp(this.aimW, move === 'draw' || move === 'release' || this.ctx.build?.active ? 1 : 0, 7, dt)
+    // Aiming (a drawn bow, a star-tech weapon firing) or building: over the shoulder, so the crosshair isn't on the hero.
+    this.aimW = damp(this.aimW, this.ctx.weapons?.aiming || this.ctx.build?.active ? 1 : 0, 7, dt)
     this.boom = damp(this.boom, this.zoom * (1 - AIM_ZOOM * this.aimW), 10, dt)
     this.assist(dt)
     this.followPivot(dt)

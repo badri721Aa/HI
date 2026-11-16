@@ -46,7 +46,7 @@ export interface Profile {
   deviceSetup: boolean
 }
 
-const WEAPON_IDS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
+const WEAPON_IDS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer', 'starBlaster', 'cometLauncher']
 const MAP_IDS: readonly MapId[] = PORTAL_MAPS.map(m => m.id)
 const BOSS_IDS: readonly BossId[] = ['gloomKing', 'frostGolem', 'ironTitan', 'vortexWeaver', 'plasmaOverlord', 'voidStalker']
 const isWeapon = (w: unknown): w is WeaponId => WEAPON_IDS.includes(w as WeaponId)

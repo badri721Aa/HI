@@ -327,6 +327,31 @@ export function FrostHammerIcon(p: IconProps) {
   )
 }
 
+/** Star-tech: a hand cannon with a star at its muzzle. */
+export function StarBlasterIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M3.6 8.4h11.6l1.8 1.5v2.7H9.9l-1.2 6H4.6l1.1-6H3.6Z" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+      <circle cx="7.6" cy="10.5" r="1.25" fill="currentColor" />
+      <path d="M9.9 12.6c.4 2 1.6 2.6 3.4 2.2" fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+      <path d="M20.6 7.7c.3 1.6 1.1 2.4 2.8 2.8-1.7.3-2.5 1.1-2.8 2.8-.3-1.7-1.1-2.5-2.8-2.8 1.7-.4 2.5-1.2 2.8-2.8Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** Star-tech: a flared tube and the comet it throws. */
+export function CometLauncherIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M2.6 9.2h10.6l3.6-2v9.6l-3.6-2H2.6Z" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+      <path d="M6 9.2v5.6M8.8 9.2v5.6" fill="none" stroke="currentColor" strokeWidth={1.1} strokeOpacity={0.6} />
+      <path d="M5.2 15v3.8M10.4 15v2.4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+      <circle cx="21.2" cy="12" r="1.8" fill="currentColor" />
+      <path d="M18.4 10.4l-1 .5M18.4 13.6l-1-.5" fill="none" stroke="currentColor" strokeWidth={1.1} strokeLinecap="round" strokeOpacity={0.7} />
+    </svg>
+  )
+}
+
 /** A portal arch (compass, map). */
 export function PortalIcon(p: IconProps) {
   return (

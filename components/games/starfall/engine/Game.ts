@@ -369,6 +369,8 @@ export class Game implements GameApi {
     const saved = loadSave('creative')
     // Slots from before a map existed: its boss counts as beaten like the others.
     if (saved) for (const m of PORTAL_MAPS) if (!saved.bosses.includes(m.boss)) saved.bosses.push(m.boss)
+    // Likewise a weapon made since: Creative's hotbar holds them all.
+    if (saved) for (const w of HOTBAR) if (w !== 'fists' && !saved.weapons.includes(w)) saved.weapons.push(w)
     this.begin(saved ?? this.newCreativeSave())
     this.ctx.build.setActive(true)
     const device = this.ctx.input.device

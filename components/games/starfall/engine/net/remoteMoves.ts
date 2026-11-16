@@ -2,15 +2,17 @@
  * Another player's moves, played on their avatar. Each announced move (protocol ACTIONS) starts
  * the same weapon clip their own Animator plays, with the same timing as Weapons, skipped ahead
  * by how old the news is; the effects match too — swing arcs, the slam's shockwave and debris,
- * the bow string pulled back and a cosmetic arrow, the fist spin's trail, the dash's afterimage —
- * and the sounds play where it happens ('net:action'). Allocation-free per frame.
+ * the bow string pulled back and a cosmetic arrow, star bolts and comets, the fist spin's trail,
+ * the dash's afterimage — and the sounds play where it happens ('net:action'). Allocation-free
+ * per frame.
  */
 import * as THREE from 'three'
 import type { GroundHit } from '../collision'
 import type { NetFxAction, V3 } from '../events'
 import type { Arrows } from '../gameplay/weapons/Arrows'
-import { BOW, FROST_HAMMER, HAMMER, KIND, SWORD } from '../gameplay/weapons/defs'
+import { BOW, COMET_LAUNCHER, FROST_HAMMER, HAMMER, isStarWeapon, KIND, STAR_BLASTER, SWORD, type StarWeapon } from '../gameplay/weapons/defs'
 import type { HeldWeapon, WeaponModel } from '../gameplay/weapons/models'
+import type { StarShots } from '../gameplay/weapons/StarShots'
 import { ARC_FROM, ARC_TO, SWING_ARC, SwingTrail } from '../gameplay/weapons/swing'
 import { MOVE } from '../player/control/tuning'
 import type { Ctx, WeaponId, WeaponMove, WeaponPose } from '../types'
@@ -59,8 +61,9 @@ export class RemoteMoves {
 
   constructor(
     private ctx: Ctx,
-    /** Shared cosmetic arrows (made on first use). */
+    /** Shared cosmetic arrows and star-tech shots (made on first use). */
     private arrows: () => Arrows,
+    private shots: () => StarShots,
   ) {
     this.swing = new SwingTrail(ctx.fx)
     this.spinTrail = new SwingTrail(ctx.fx)
@@ -91,6 +94,10 @@ export class RemoteMoves {
         this.emit('draw', m.weapon, pos)
         break
       case 'release':
+        if (isStarWeapon(m.weapon)) {
+          this.shoot(m, m.weapon, skip)
+          break
+        }
         pose.weapon = m.weapon
         pose.move = 'release'
         pose.charge = 0
@@ -156,6 +163,21 @@ export class RemoteMoves {
 
     this.updateSpin(dt, body)
     this.updateDash(dt, peer, body)
+  }
+
+  /** A star-tech shot left their weapon: the arm kicks (the launcher's clip is joined where the comet leaves) and a cosmetic shot flies. */
+  private shoot(m: ActionMsg, weapon: StarWeapon, skip: number): void {
+    const pose = this.pose
+    const blaster = weapon === 'starBlaster'
+    pose.weapon = weapon
+    pose.move = blaster ? 'blast' : 'lob'
+    pose.charge = 0
+    this.moveTime = blaster ? STAR_BLASTER.hold : COMET_LAUNCHER.time
+    pose.t = Math.min(1, (blaster ? 0 : COMET_LAUNCHER.fireAt) + skip / this.moveTime)
+    this.a.set(m.x, m.y, m.z)
+    this.b.set(m.vx, m.vy, m.vz)
+    if (this.b.lengthSq() > 1) this.shots().fire(weapon, this.a, this.b)
+    this.emit('fire', weapon, this.a)
   }
 
   private updateDraw(dt: number, peer: RemotePeer): void {

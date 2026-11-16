@@ -12,7 +12,8 @@ import { playUi, useGameUi, useHud, useNet, useUi } from './context'
 import { KeyCap } from './controls'
 import { DamageNumbers } from './DamageNumbers'
 import {
-  BowIcon, DashIcon, FistIcon, FrostHammerIcon, HammerIcon, HeartIcon, InteractIcon, MouseIcon, PauseIcon, SparkIcon, StarbladeIcon, StarIcon, SwordIcon,
+  BowIcon, CometLauncherIcon, DashIcon, FistIcon, FrostHammerIcon, HammerIcon, HeartIcon, InteractIcon, MouseIcon, PauseIcon, SparkIcon, StarBlasterIcon,
+  StarbladeIcon, StarIcon, SwordIcon,
 } from './icons'
 import { NetChip } from './OnlineHud'
 import { cx, LABEL } from './theme'
@@ -327,6 +328,7 @@ function BossBar() {
 
 const WEAPON_ICON: Record<WeaponId, ComponentType<SVGProps<SVGSVGElement>>> = {
   fists: FistIcon, sword: SwordIcon, hammer: HammerIcon, bow: BowIcon, starblade: StarbladeIcon, frostHammer: FrostHammerIcon,
+  starBlaster: StarBlasterIcon, cometLauncher: CometLauncherIcon,
 }
 
 /** Owned weapons, bottom centre; the one in hand is lit. On touch the slots are the way to switch. */

@@ -61,6 +61,8 @@ export class RemotePeer implements NetPeer {
   ready = false
   /** The rendered position jumped this frame (teleport / first placement). */
   snapped = false
+  /** Body size against the usual (set by the game modes: the Juggernaut is bigger, and easier to hit). */
+  scale = 1
 
   /* link bookkeeping (managed by the room) */
   /** Local time (s) this player appeared in presence. */
@@ -74,10 +76,12 @@ export class RemotePeer implements NetPeer {
   readonly rags = new Bucket(2, 0.5)
   /** Block edits and list parts (senders pace themselves at 4 a second). */
   readonly blocks = new Bucket(24, 6)
-  /** Ragdoll frames (20 Hz direct plus 6 Hz relayed at most), move starts and hits on us. */
+  /** Ragdoll frames (20 Hz direct plus 6 Hz relayed at most), move starts and hits on us (pvp.ts also spaces hits by weapon). */
   readonly frames = new Bucket(30, 28)
   readonly actions = new Bucket(12, 8)
-  readonly hits = new Bucket(3, 1.5)
+  readonly hits = new Bucket(8, 6)
+  /** Local time (s) their last hit on us counted. */
+  lastHitAt = -Infinity
   /** Game-mode messages: the host sends on change plus a 1 Hz heartbeat. */
   readonly modeMsgs = new Bucket(8, 4)
   readonly actionSeqs = new SeqWindow()

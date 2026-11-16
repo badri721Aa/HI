@@ -203,7 +203,7 @@ export class Network implements INetwork {
     this.unsubs.push(
       bus.on('weapon:swing', e => this.sendAction(KIND[e.weapon] === 'hammer' ? 'slam' : 'slash', e.weapon, e.pos, e.combo)),
       bus.on('weapon:draw', e => this.sendAction('draw', held(), e.pos)),
-      bus.on('weapon:fire', e => this.sendAction('release', held(), e.pos, 0, e.charge, e.vel)),
+      bus.on('weapon:fire', e => this.sendAction('release', e.weapon ?? held(), e.pos, 0, e.charge, e.vel)),
       bus.on('player:attack', e => this.sendAction('spin', held(), e.pos)),
       bus.on('player:dash', e => this.sendAction('dash', held(), e.pos, 0, 0, e.dir)),
       bus.on('player:land', e => this.ragdoll.noteImpact(e.impact)),
@@ -400,6 +400,11 @@ export class Network implements INetwork {
   strike(blow: WeaponHit, power: number): number {
     const room = this.session
     return room ? this.pvpRules.strike(room, blow, power, this.now()) : 0
+  }
+
+  near(p: V3, radius: number): boolean {
+    const room = this.session
+    return room ? this.pvpRules.near(room, p, radius) : false
   }
 
   /* ── frame ───────────────────────────────────────────────── */
@@ -664,7 +669,8 @@ export class Network implements INetwork {
     encodeAction(this.actionPacket, a)
     const data = this.actionPacket.buffer as ArrayBuffer
     room.sendDirect(data)
-    room.send('bin', { from: this.selfId, d: toBase64(data) })
+    // The relay copy is a backup; a stream of star bolts only takes it for players without a direct link.
+    if (KIND[weapon] !== 'blaster' || room.needsRelay(this.now())) room.send('bin', { from: this.selfId, d: toBase64(data) })
   }
 
   /* ── lobby (public room counts) ─────────────────────────── */

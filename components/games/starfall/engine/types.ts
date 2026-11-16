@@ -431,8 +431,8 @@ export interface WeaponHit {
   freeze?: number
 }
 
-/** Arm moves the animator layers over the body for the held weapon. */
-export type WeaponMove = 'none' | 'slash1' | 'slash2' | 'slash3' | 'slam' | 'draw' | 'release'
+/** Arm moves the animator layers over the body for the held weapon ('blast' / 'lob': the star-tech shots). */
+export type WeaponMove = 'none' | 'slash1' | 'slash2' | 'slash3' | 'slam' | 'draw' | 'release' | 'blast' | 'lob'
 
 export interface WeaponPose {
   weapon: WeaponId
@@ -454,10 +454,17 @@ export interface IWeapons extends System {
   readonly moveScale: number
   /** Heading the hero should turn to (aiming, a locked-on swing), or null. */
   readonly aimYaw: number | null
+  /** Aiming with the crosshair right now (a drawn bow, a star-tech weapon firing): the camera moves over the shoulder. */
+  readonly aiming: boolean
+  /** Game modes: scales the hero's ground speed while a role demands it (the Juggernaut is heavy). 1 = normal. */
+  handicap: number
   readonly pose: WeaponPose
   equip(id: WeaponId): void
-  /** Game modes: put `id` in hand as the only weapon, without saving (null gives the saved loadout back). */
-  lend(id: WeaponId | null): void
+  /**
+   * Game modes: hand out a loadout without saving it — one weapon, or several (the first goes in
+   * hand). The stands are left alone meanwhile; null gives the saved loadout back.
+   */
+  lend(ids: WeaponId | readonly WeaponId[] | null): void
   /** A reward: own `id` (saved), put it in hand and announce it. */
   grant(id: WeaponId): void
   /** Re-sync owned weapons and pickups with ctx.game.save (new game / continue). */
@@ -665,6 +672,8 @@ export interface INetwork extends System {
    * whose body it overlaps is sent a hit (they validate and apply it). Returns how many were hit.
    */
   strike(blow: WeaponHit, power: number): number
+  /** With pvp on: is another player's body within `radius` of `p`? (A comet bursts on the first one it meets.) */
+  near(p: V3, radius: number): boolean
   /** Game modes in the current room. */
   readonly modes: IModes
 }

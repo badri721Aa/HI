@@ -8,6 +8,7 @@
  * few times per second.
  */
 import type { GameEventMap, GamePhase, MusicMood } from '../events'
+import { isStarWeapon } from '../gameplay/weapons/defs'
 import type { Ctx, IAudio, SfxName } from '../types'
 import { Ambience, type AmbienceInput } from './ambience'
 import { Mixer, OUTPUT_FADE } from './mixer'
@@ -93,7 +94,7 @@ export class AudioEngine implements IAudio {
       bus.on('weapon:swing', e => this.sfx?.swing(e.weapon, e.combo)),
       bus.on('weapon:slam', e => this.sfx?.slam(e.pos)),
       bus.on('weapon:draw', () => this.sfx?.bowDraw()),
-      bus.on('weapon:fire', e => this.sfx?.bowFire(e.charge)),
+      bus.on('weapon:fire', e => (e.weapon && isStarWeapon(e.weapon) ? this.sfx?.starFire(e.weapon) : this.sfx?.bowFire(e.charge))),
       bus.on('net:action', e => this.remoteAction(e)),
       bus.on('weapon:equip', e => this.sfx?.equip(e.weapon)),
       bus.on('weapon:pickup', () => this.sfx?.pickup()),
@@ -117,6 +118,7 @@ export class AudioEngine implements IAudio {
       bus.on('cutscene:end', e => this.sfx?.cutscene(false, e.skipped)),
       bus.on('mode:cue', e => this.sfx?.mode(e.cue)),
       bus.on('enemy:cue', e => this.sfx?.enemyCue(e.cue, e.pos)),
+      bus.on('weapon:blast', e => this.sfx?.starBlast(e.weapon, e.pos)),
     )
   }
 
@@ -259,7 +261,8 @@ export class AudioEngine implements IAudio {
         sfx.bowDraw(e.pos)
         break
       case 'fire':
-        sfx.bowFire(e.charge ?? 0, e.pos)
+        if (isStarWeapon(e.weapon)) sfx.starFire(e.weapon, e.pos)
+        else sfx.bowFire(e.charge ?? 0, e.pos)
         break
       case 'spin':
         sfx.attack(e.pos)

@@ -19,6 +19,8 @@ export const SWING_ARC: Record<HeldWeapon, SwingArc | null> = {
   hammer: { length: 0.6, color: 0xffd9a0 },
   frostHammer: { length: 0.6, color: 0xbfeaff },
   bow: null,
+  starBlaster: null,
+  cometLauncher: null,
 }
 
 /** The part of a melee move (0..1) during which the weapon is really moving. */
