@@ -84,8 +84,10 @@ export interface GameEventMap {
   'ui:error': { message: string }
 
   // ── player ──────────────────────────────────────────────
-  'player:footstep': { pos: V3; surface: Surface; sprint: boolean }
-  'player:jump': { pos: V3; double: boolean }
+  /** `wall`: a step on the wall being run along (`pos` is on the wall). */
+  'player:footstep': { pos: V3; surface: Surface; sprint: boolean; wall?: boolean }
+  /** `from`: the long low leap out of a slide, or the kick off a wall-run (absent: a plain jump). */
+  'player:jump': { pos: V3; double: boolean; from?: 'slide' | 'wall' }
   /** impact = downward speed in m/s at touchdown. */
   'player:land': { pos: V3; impact: number; surface: Surface }
   'player:dash': { pos: V3; dir: V3 }
@@ -98,6 +100,18 @@ export interface GameEventMap {
   'player:wade': { pos: V3 }
   /** The limp body slammed into something hard enough for a cartoon "boing" / "oof". */
   'player:flop': { pos: V3; impact: number }
+  /** A dodge-roll began, heading `dir` (unit, in the ground plane). */
+  'player:roll': { pos: V3; dir: V3 }
+  /** A sprint slide began along `dir` / ended (`jumped`: with the leap out of it). */
+  'player:slide': { pos: V3; dir: V3; surface: Surface }
+  'player:slideEnd': { pos: V3; jumped: boolean }
+  /**
+   * A wall-run began / ended (`jumped`: with a kick off the wall). `pos` is where the feet meet the
+   * wall, `normal` points from the wall to the hero (unit, in the ground plane), and `side` is -1
+   * with the wall on his left, 1 with it on his right.
+   */
+  'player:wallRun': { pos: V3; normal: V3; side: number; surface: Surface }
+  'player:wallRunEnd': { pos: V3; jumped: boolean }
 
   // ── world & gameplay ───────────────────────────────────
   'collect:spark': { pos: V3; total: number; chain: number }
@@ -180,7 +194,10 @@ export interface GameEventMap {
   'mode:cue': { cue: ModeCue }
 }
 
-export type NetFxAction = 'swing' | 'slam' | 'draw' | 'fire' | 'spin' | 'dash' | 'flop' | 'hit'
+export type NetFxAction =
+  | 'swing' | 'slam' | 'draw' | 'fire' | 'spin' | 'dash' | 'flop' | 'hit'
+  /** Another player's roll, slide and wall-run starting, and their kick off a wall (`dir`: heading; the wall's normal for 'wallRun'). */
+  | 'roll' | 'slide' | 'wallRun' | 'wallJump'
 
 type Handler<T> = (payload: T) => void
 

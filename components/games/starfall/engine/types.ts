@@ -161,6 +161,8 @@ export interface IZones extends System {
 export type PlayerState =
   | 'idle' | 'move' | 'jump' | 'doubleJump' | 'fall' | 'land' | 'dash'
   | 'attack' | 'hurt' | 'dead' | 'wade' | 'bounce' | 'cutscene' | 'ragdoll'
+  /** A dodge-roll along the ground · a sprint slide · running along a wall. */
+  | 'roll' | 'slide' | 'wallRun'
 
 /** What the animator needs to pose the character each frame. */
 export interface MotionState {
@@ -183,6 +185,8 @@ export interface MotionState {
   wading: number
   /** Ground slope under the feet along the facing direction (-1..1, + = uphill). */
   slope: number
+  /** Wall-running: the side the wall is on (-1 = his left, 1 = his right); 0 or absent otherwise. */
+  wallSide?: number
 }
 
 /** Named one-shot / looping poses used by gameplay and cutscenes. */
@@ -251,11 +255,13 @@ export interface IPlayerController extends System {
   readonly motion: MotionState
   /** 0..1 dash readiness. */
   readonly dashReady: number
-  /** True while invulnerable after a hit. */
+  /** True while invulnerable: after a hit, and through the middle of a dodge-roll. */
   readonly invulnerable: boolean
-  /** Capsule radius (m) and height (m). */
+  /** Capsule radius (m) and body height (m; lower while rolling or sliding, so high shots pass over). */
   readonly radius: number
   readonly height: number
+  /** While wall-running: the wall's unit normal in the ground plane, pointing from it to the hero. Null otherwise. */
+  readonly wallNormal: V3 | null
   /** When false, input is ignored (cutscenes, dialogs) but physics still runs. */
   controlEnabled: boolean
   /** Creative flight (double-tap jump): no gravity, jump rises, descend sinks; touching down ends it. */
