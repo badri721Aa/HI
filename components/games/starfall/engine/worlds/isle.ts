@@ -214,7 +214,7 @@ export function isleMaterial(ctx: Ctx): THREE.MeshStandardMaterial {
           float grain = texture2D(tIsleNoise, vIsleW.xz * 0.19 + vIsleW.y * 0.083).r;
           // Rock in warm and cool strata, banded by height.
           float strata = texture2D(tIsleNoise, vec2(vIsleW.y * 0.09 + patches * 0.2, 0.37)).r;
-          vec3 col = mix(vec3(dot(rock, vec3(0.34))), rock, 0.55) * mix(vec3(0.74, 0.72, 0.72), vec3(1.22, 1.14, 1.02), smoothstep(0.3, 0.7, strata));
+          vec3 col = mix(vec3(dot(rock, vec3(0.34))), rock, 0.55) * mix(vec3(0.62, 0.62, 0.66), vec3(1.26, 1.16, 1.02), smoothstep(0.32, 0.68, strata));
           // Moss on ledges that look up.
           float moss = smoothstep(0.35, 0.8, isleN.y) * smoothstep(0.35, 0.65, grain) * smoothstep(0.6, 1.4, vIsleDepth);
           col = mix(col, vec3(0.2, 0.27, 0.1) * (0.7 + 0.6 * grain), moss * 0.7);
@@ -223,7 +223,7 @@ export function isleMaterial(ctx: Ctx): THREE.MeshStandardMaterial {
           col = mix(col, dirt, 1.0 - smoothstep(0.4, 1.7, vIsleDepth + (grain - 0.5) * 1.3));
           // Grass on top, and turf draped a little way over the lip.
           float sward = smoothstep(0.25, 0.75, patches * 0.7 + grain * 0.3);
-          vec3 grass = texture2D(tIsleGrass, vIsleW.xz * 0.23).rgb * mix(vec3(0.7, 0.86, 0.6), vec3(1.12, 1.06, 0.74), sward);
+          vec3 grass = (texture2D(tIsleGrass, vIsleW.xz * 0.23).rgb * 0.55 + texture2D(tIsleGrass, vIsleW.zx * 0.83).rgb * 0.45) * mix(vec3(0.68, 0.84, 0.56), vec3(1.14, 1.08, 0.72), sward);
           float onTop = smoothstep(0.5, 0.8, isleN.y) * (1.0 - smoothstep(0.3, 0.7, vIsleDepth));
           float drape = 1.0 - smoothstep(0.05, 0.35 + grain * 0.9, vIsleDepth);
           col = mix(col, grass, max(onTop, drape));

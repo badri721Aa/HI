@@ -179,7 +179,8 @@ export function buildSky(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
 
   const ground = own(isleMaterial(ctx))
   const paving = kit.mat('stone', { color: '#ebe5d8', key: 'sky-paving' })
-  const monolithMat = kit.mat('stone', { color: '#c9c3b6', roughness: 0.96, key: 'sky-monolith' })
+  const monolithMat = kit.mat('rock', { color: '#d6d1c6', key: 'sky-monolith' })
+  const flag = kit.mat('rock', { color: '#c4bfb4', key: 'sky-flag' })
   const mossy = kit.mat('mossStone', { color: '#a7b98c', key: 'sky-mossy' })
   const rune = kit.mat('glow', { color: '#e8fbff', emissive: '#7fe8ff', emissiveIntensity: 1.3, key: 'sky-rune' })
   const pondBed = kit.mat('rock', { color: '#5c6f78', key: 'sky-pond' })
@@ -267,10 +268,16 @@ export function buildSky(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
     const a1 = ((i + 1) / 8) * Math.PI * 2 - 0.06 - rnd() * 0.16
     kit.add(annulus(SKY_RADIUS - 0.9, SKY_RADIUS, a0, a1, -0.2, 0.035, 12), paving, at(0, 0, 0), { castShadow: false })
   }
+  // Eight worn spokes point out from the dais like a wind rose.
+  for (let i = 0; i < 8; i++) {
+    const a = GATE_ANGLE + (i / 8) * Math.PI * 2
+    const len = i % 2 ? 1.7 : 3
+    kit.box({ x: cx + Math.sin(a) * (5 + len / 2), y: cy - 0.16, z: cz + Math.cos(a) * (5 + len / 2), w: 0.42, h: 0.2, d: len, yaw: a, mat: paving, castShadow: false })
+  }
   // Flagstones from the gate to the dais.
-  for (let d = 6; d < 22.5; d += 1.45) {
+  for (let d = 9; d < 22.5; d += 1.45) {
     const a = GATE_ANGLE + (rnd() - 0.5) * 0.05
-    kit.add(slab(0.55 + rnd() * 0.2, 0.6, 0.2, 7, 1.5), paving, at(Math.sin(a) * d, -0.065, Math.cos(a) * d, 0, rnd() * 6, 0), { castShadow: false })
+    kit.add(slab(0.55 + rnd() * 0.2, 0.6, 0.2, 7, 1.5), flag, at(Math.sin(a) * d, -0.065, Math.cos(a) * d, 0, rnd() * 6, 0), { castShadow: false })
   }
 
   /** A standing stone: tapered, a little twisted, its top either worn flat or snapped off. */
@@ -318,7 +325,7 @@ export function buildSky(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   kit.add(slab(3, 3, 0.3, 28, 2), paving, at(exitX, exitY - 0.11, exitZ - 0.6), { castShadow: false })
   for (let i = 1; i <= 6; i++) {
     const t = i / 7
-    kit.add(slab(0.5 + rnd() * 0.2, 0.55, 0.2, 7, 1.5), paving, at(exitX + (BRIDGES[0][0] - exitX) * t + (rnd() - 0.5) * 0.4, exitY - 0.065, exitZ - 3.4 + (BRIDGES[0][2] - exitZ + 3.4) * t, 0, rnd() * 6, 0), { castShadow: false })
+    kit.add(slab(0.5 + rnd() * 0.2, 0.55, 0.2, 7, 1.5), flag, at(exitX + (BRIDGES[0][0] - exitX) * t + (rnd() - 0.5) * 0.4, exitY - 0.065, exitZ - 3.4 + (BRIDGES[0][2] - exitZ + 3.4) * t, 0, rnd() * 6, 0), { castShadow: false })
   }
   for (const s of [-1, 1]) monolith(exitX + s * 3.3, exitY, exitZ + 0.4, 2.1 + rnd() * 0.8, 0.5, 0.2 * s, 340 + s, 0.4)
   // The shrine's marker on the gate isle, and a cairn by the lone tree.
@@ -372,7 +379,7 @@ export function buildSky(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   const sea = own(cloudSea(ctx, uTime, cx, cy + CLOUD_Y, cz, CLOUD_AMP, cloudLook))
   kit.addObject(sea.mesh)
   const puffGeo = own(new THREE.IcosahedronGeometry(1, low || ctx.quality.level === 'medium' ? 2 : 3))
-  const puffMat = own(puffMaterial(ctx, uTime, cloudLook, ctx.env.fogColor))
+  const puffMat = own(puffMaterial(ctx, uTime, { ...cloudLook, shade: '#9fb3d3' }, ctx.env.fogColor))
   const puffs: Array<[number, number, number, number, number, number]> = []
   const towers = low ? 7 : 12
   for (let i = 0; i < towers; i++) {
@@ -475,9 +482,17 @@ export function buildSky(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   // Long grass keeps to the rims and the small isles, so the arena's telegraphs stay readable.
   const inRing = (x: number, z: number) => x * x + z * z < (SKY_RADIUS + 0.6) ** 2
   const tufts = spots(low ? 260 : ctx.quality.level === 'medium' ? 640 : 900, 0.5, (x, z) => !inRing(x, z))
-  batch(buildTallGrass(), plant, tufts.length, false, i => {
+  const grassGeo = buildTallGrass()
+  batch(grassGeo, plant, tufts.length, false, i => {
     const [x, y, z] = tufts[i]
     stand(x, y, z, rnd() * 6.28, 0.55 + rnd() * 0.5)
+    return tint.setRGB(0.5 + rnd() * 0.14, 0.74 + rnd() * 0.12, 0.36 + rnd() * 0.1)
+  })
+  // Inside the ring it grows ankle-high.
+  const sward = spots(low ? 90 : 260, 0.5, inRing)
+  batch(grassGeo, plant, sward.length, false, i => {
+    const [x, y, z] = sward[i]
+    stand(x, y, z, rnd() * 6.28, 0.26 + rnd() * 0.16)
     return tint.setRGB(0.5 + rnd() * 0.14, 0.74 + rnd() * 0.12, 0.36 + rnd() * 0.1)
   })
   const blooms = spots(low ? 90 : 210, 0.6, (x, z) => !inRing(x, z) || rnd() < 0.3)
