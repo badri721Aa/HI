@@ -1,0 +1,239 @@
+'use client'
+/** Pause menu: resume / map / travel / online / settings / controls / restart / quit, with run stats. */
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { playUi, useGameUi, useHud, useNet, usePresence, useUi } from './context'
+import { Button, KeyCap, MenuList, PanelHeader, type MenuEntry } from './controls'
+import { ControlsPanel } from './ControlsPanel'
+import { CrownIcon, ExitIcon, GamepadIcon, GearIcon, MapIcon, PlayIcon, PortalIcon, RefreshIcon, StarIcon, SwordIcon, UsersIcon } from './icons'
+import { MapPanel } from './MapPanel'
+import { focusEl, focusFirst, goBack, isTextField, keepFocus, useMenuNav } from './nav'
+import { OnlinePanel } from './OnlinePanel'
+import { BackHint, Panel } from './Panel'
+import { SettingsPanel } from './SettingsPanel'
+import { SpawnerPanel } from './SpawnerPanel'
+import { cx, formatTime, LABEL } from './theme'
+import { TravelPanel } from './TravelPanel'
+import styles from './ui.module.css'
+import type { PausePanel } from './uiStore'
+
+/** Ignore Esc/P this long after opening, so the key that paused can't instantly resume. */
+const REOPEN_GUARD_MS = 350
+
+export function PauseMenu() {
+  const phase = useUi(s => s.phase)
+  const visible = phase === 'paused'
+  const mounted = usePresence(visible, 240)
+  if (!mounted) return null
+  return <PauseContent state={visible ? 'open' : 'closed'} />
+}
+
+function PauseContent({ state }: { state: 'open' | 'closed' }) {
+  const { game, store, touch } = useGameUi()
+  const panel = useUi(s => s.pausePanel)
+  const zone = useHud(h => h.zone)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+  const lastOpener = useRef<PausePanel>('root')
+  const room = useNet(s => s.room)
+  const roomPlayers = useNet(s => s.players.length)
+  const creative = useHud(h => h.creative)
+  const [enemies, setEnemies] = useState(() => game.creativeEnemies)
+  // How many maps are awake (the world is frozen while paused).
+  const [travelMeta] = useState(() => {
+    const maps = game.getTravelInfo().maps
+    return `${maps.filter(m => m.open).length} of ${maps.length} open`
+  })
+
+  useEffect(() => {
+    if (state !== 'open') return
+    if (panel === 'map') focusEl(panelRef.current, true)
+    else if (panel !== 'root') focusFirst(panelRef.current, '[data-autofocus]')
+    else focusFirst(menuRef.current, `[data-id="${lastOpener.current === 'root' ? 'resume' : lastOpener.current}"]`)
+  }, [panel, state])
+
+  const go = (p: PausePanel) => {
+    if (p !== 'root') lastOpener.current = p
+    playUi(game, p === 'root' ? 'ui-back' : 'ui-open')
+    store.setPausePanel(p)
+  }
+  const resume = () => game.resume()
+
+  useMenuNav({
+    scope: panel === 'root' ? menuRef : panelRef,
+    enabled: state === 'open',
+    onBack: panel !== 'root' ? () => go('root') : undefined,
+    onKey: e => {
+      // Letters typed into the Online panel's fields are text, not shortcuts.
+      if (isTextField(e.target as Element | null) && e.key !== 'Escape') return false
+      const isEsc = e.key === 'Escape'
+      if (isEsc || e.code === 'KeyP') {
+        if (e.repeat || performance.now() - store.get().pausedAt < REOPEN_GUARD_MS) return true
+        // One level up: a nested view first (device setup), then the panel, then out of the menu.
+        if (panel !== 'root') goBack(() => go('root'))
+        else resume()
+        return true
+      }
+      if (e.code === 'KeyM' && !e.repeat) {
+        go(panel === 'map' ? 'root' : 'map')
+        return true
+      }
+      return false
+    },
+  })
+
+  const items: MenuEntry[] = [
+    { id: 'resume', label: 'Resume', icon: PlayIcon, onSelect: resume },
+    { id: 'map', label: 'Map', icon: MapIcon, onSelect: () => go('map') },
+    { id: 'travel', label: 'Travel', icon: PortalIcon, meta: travelMeta, onSelect: () => go('travel') },
+    {
+      id: 'online',
+      label: 'Online',
+      icon: UsersIcon,
+      meta: room ? `${room.code.toUpperCase()} · ${Math.max(room.players, roomPlayers)} / ${room.max}` : 'Play with friends',
+      onSelect: () => go('online'),
+    },
+    { id: 'settings', label: 'Settings', icon: GearIcon, onSelect: () => go('settings') },
+    { id: 'controls', label: 'Controls', icon: GamepadIcon, onSelect: () => go('controls') },
+    ...(creative ? [{ id: 'spawner', label: 'Spawn enemies', icon: CrownIcon, meta: 'Mobs · bosses', onSelect: () => go('spawner') }] : []),
+    ...(creative
+      ? [{
+          id: 'enemies',
+          label: 'World enemies',
+          icon: SwordIcon,
+          meta: enemies ? 'On' : 'Off',
+          sound: 'ui-toggle' as const,
+          onSelect: () => {
+            game.setCreativeEnemies(!enemies)
+            setEnemies(game.creativeEnemies)
+          },
+        }]
+      : []),
+    { id: 'restart', label: 'Restart from checkpoint', icon: RefreshIcon, onSelect: () => game.restartFromCheckpoint(), separated: true },
+    { id: 'quit', label: 'Quit to title', icon: ExitIcon, onSelect: () => go('quit') },
+  ]
+  const open = panel !== 'root'
+
+  return (
+    <div data-state={state} onMouseDown={keepFocus} className={cx(styles.presence, 'absolute inset-0 z-50')}>
+      <div aria-hidden className={cx(styles.pauseScrim, 'absolute inset-0')} />
+
+      <div className="absolute inset-0 flex">
+        <aside
+          className={cx(
+            'relative flex h-full w-full shrink-0 flex-col px-[clamp(20px,6vw,88px)] py-[clamp(24px,7vh,72px)] md:w-[min(40vw,460px)]',
+            open && 'max-md:hidden',
+          )}
+        >
+          <div className={styles.rise}>
+            <div className={cx(LABEL, 'text-[#F5B455]')}>Paused</div>
+            <h1 className="mt-2 font-nacelle text-[clamp(30px,3.6vw,44px)] font-semibold leading-none tracking-[-0.01em] text-[#F3EEE6]">
+              {zone || 'Starfall Isle'}
+            </h1>
+          </div>
+          <RunLine className="mt-4 md:hidden" />
+
+          <div ref={menuRef} className="-mx-[18px] mt-auto pt-6">
+            <MenuList items={items} current={open ? panel : null} size="md" />
+          </div>
+
+          {!touch && !open && (
+            <div aria-hidden className={cx(styles.rise, 'mt-8 flex items-center gap-4 text-[11px] uppercase tracking-[0.16em] text-[#F3EEE6]/35')} style={{ '--d': '420ms' } as CSSProperties}>
+              <span className="flex items-center gap-2"><KeyCap>Esc</KeyCap>Resume</span>
+              <span className="flex items-center gap-2"><KeyCap>M</KeyCap>Map</span>
+            </div>
+          )}
+        </aside>
+
+        {open && (
+          <div className="flex min-w-0 flex-1 items-start px-[clamp(16px,3vw,48px)] py-[clamp(16px,6vh,72px)] md:pl-0">
+            <Panel panelRef={panelRef} label={panel} wide={panel === 'map'}>
+              {panel === 'map' && <MapPanel onBack={() => go('root')} />}
+              {panel === 'travel' && <TravelPanel onBack={() => go('root')} />}
+              {panel === 'online' && <OnlinePanel onBack={() => go('root')} primary={{ label: 'Resume', onClick: resume }} />}
+              {panel === 'settings' && <SettingsPanel onBack={() => go('root')} />}
+              {panel === 'controls' && <ControlsPanel onBack={() => go('root')} />}
+              {panel === 'spawner' && <SpawnerPanel onBack={() => go('root')} />}
+              {panel === 'quit' && (
+                <div>
+                  <PanelHeader eyebrow="Quit" title="Return to the title screen?" aside={<BackHint onBack={() => go('root')} />} />
+                  <p className="max-w-[440px] text-[15px] leading-relaxed text-[#F3EEE6]/70">
+                    Your shards and sparks are saved. You will continue from the last lantern you lit.
+                  </p>
+                  <div className="mt-8 flex flex-wrap gap-3">
+                    <Button variant="danger" onClick={() => game.quitToTitle()}>
+                      Quit to title
+                    </Button>
+                    <Button onClick={() => go('root')} autofocus>
+                      Keep playing
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Panel>
+          </div>
+        )}
+      </div>
+
+      {!open && <RunStats />}
+    </div>
+  )
+}
+
+function useRun() {
+  const playTime = useHud(h => h.playTime)
+  const shards = useHud(h => h.shards)
+  const sparks = useHud(h => h.sparks)
+  const sparksTotal = useHud(h => h.sparksTotal)
+  const deaths = useHud(h => h.deaths)
+  return { playTime, shards, found: shards.filter(Boolean).length, sparks, sparksTotal, deaths }
+}
+
+/** Compact one-liner for narrow screens. */
+function RunLine({ className }: { className?: string }) {
+  const r = useRun()
+  return (
+    <div className={cx('text-[13px] text-[#F3EEE6]/55', className)}>
+      {formatTime(r.playTime)} · {r.found} of {r.shards.length} shards · {r.sparks} sparks
+    </div>
+  )
+}
+
+function RunStats() {
+  const r = useRun()
+  const cell = 'min-w-[96px] border-l border-[#F3EEE6]/12 pl-5 first:border-l-0 first:pl-0'
+  return (
+    <div className={cx(styles.rise, styles.plate, 'absolute bottom-[clamp(24px,7vh,72px)] right-[clamp(20px,6vw,88px)] hidden px-6 pb-4 pt-5 md:block')} style={{ '--d': '200ms' } as CSSProperties}>
+      <div className={cx(LABEL, 'mb-4 text-right text-[10px] text-[#F5B455]/80')}>This journey</div>
+      <div className="flex items-end">
+        <Stat className={cell} label="Time" value={formatTime(r.playTime)} />
+        <div className={cell}>
+          <div className={cx(LABEL, 'text-[10px] text-[#F3EEE6]/40')}>Shards</div>
+          <div className="mt-1.5 font-nacelle text-[26px] leading-none text-[#F3EEE6]">
+            {r.found}
+            <span className="text-[#F3EEE6]/35"> / {r.shards.length}</span>
+          </div>
+          <div className="mt-2 flex gap-[3px]">
+            {r.shards.map((got, i) => (
+              <StarIcon key={i} filled={got} className={cx('h-2.5 w-2.5', got ? 'text-[#F5B455]' : 'text-[#F3EEE6]/30')} />
+            ))}
+          </div>
+        </div>
+        <Stat className={cell} label="Sparks" value={String(r.sparks)} sub={r.sparksTotal ? `/ ${r.sparksTotal}` : undefined} />
+        <Stat className={cell} label="Falls" value={String(r.deaths)} />
+      </div>
+    </div>
+  )
+}
+
+function Stat({ label, value, sub, className }: { label: string; value: string; sub?: string; className?: string }) {
+  return (
+    <div className={className}>
+      <div className={cx(LABEL, 'text-[10px] text-[#F3EEE6]/40')}>{label}</div>
+      <div className="mt-1.5 font-nacelle text-[26px] leading-none text-[#F3EEE6]">
+        {value}
+        {sub && <span className="text-[#F3EEE6]/35"> {sub}</span>}
+      </div>
+      <div className="mt-2 h-2.5" />
+    </div>
+  )
+}

@@ -1,0 +1,450 @@
+/** Hand-drawn inline SVG icons for the Starfall UI (24×24 grid unless noted). */
+import type { SVGProps } from 'react'
+
+type IconProps = SVGProps<SVGSVGElement>
+
+const base = (p: IconProps): IconProps => ({ viewBox: '0 0 24 24', 'aria-hidden': true, focusable: false, ...p })
+
+/** Four-point star used for shards. Concave sides read well at small sizes. */
+export const STAR_PATH = 'M12 1.6C12.8 7.4 16.6 11.2 22.4 12C16.6 12.8 12.8 16.6 12 22.4C11.2 16.6 7.4 12.8 1.6 12C7.4 11.2 11.2 7.4 12 1.6Z'
+
+export function StarIcon({ filled = true, ...p }: IconProps & { filled?: boolean }) {
+  return (
+    <svg {...base(p)}>
+      <path
+        d={STAR_PATH}
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={filled ? 0 : 1.4}
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export const HEART_PATH =
+  'M12 20.6c-.3 0-.6-.1-.8-.3C6.3 16.2 2.6 12.9 2.6 8.9 2.6 6 4.8 3.8 7.6 3.8c1.8 0 3.4.9 4.4 2.3 1-1.4 2.6-2.3 4.4-2.3 2.8 0 5 2.2 5 5.1 0 4-3.7 7.3-8.6 11.4-.2.2-.5.3-.8.3Z'
+
+export function HeartIcon({ filled = true, ...p }: IconProps & { filled?: boolean }) {
+  return (
+    <svg {...base(p)}>
+      <path
+        d={HEART_PATH}
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={filled ? 0 : 1.5}
+        strokeLinejoin="round"
+      />
+      {filled && <path d="M6.2 7.4c.5-1 1.4-1.6 2.4-1.7" stroke="white" strokeOpacity={0.45} strokeWidth={1.4} strokeLinecap="round" fill="none" />}
+    </svg>
+  )
+}
+
+/** Spark — a small faceted diamond. */
+export function SparkIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12 2.5 18.5 12 12 21.5 5.5 12Z" fill="currentColor" />
+      <path d="M12 2.5 15 12 12 21.5" fill="black" fillOpacity={0.18} />
+    </svg>
+  )
+}
+
+export function BeaconIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="12" cy="12" r="4.2" fill="currentColor" />
+      <g stroke="currentColor" strokeWidth={1.6} strokeLinecap="round">
+        <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" />
+      </g>
+    </svg>
+  )
+}
+
+export function LanternIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M9.5 4.5h5M12 2.5v2" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" fill="none" />
+      <path d="M8 7.5c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2v9c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2Z" fill="currentColor" fillOpacity={0.25} stroke="currentColor" strokeWidth={1.5} />
+      <path d="M12 9.5c1.2 1.3 1.6 2.4 1.6 3.3a1.6 1.6 0 0 1-3.2 0c0-.9.4-2 1.6-3.3Z" fill="currentColor" />
+      <path d="M9 21.5h6" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** Map player marker: a sharp arrowhead pointing up. */
+export function ArrowIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12 2.5 19.5 20.5 12 16.6 4.5 20.5Z" fill="currentColor" stroke="#0B0F14" strokeWidth={1.4} strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function PauseIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="6.5" y="5" width="3.6" height="14" rx="1" fill="currentColor" />
+      <rect x="13.9" y="5" width="3.6" height="14" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function JumpIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M6 13.5 12 7.5l6 6M6 18.5l6-6 6 6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function DashIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M5.5 6.5 11 12l-5.5 5.5M12.5 6.5 18 12l-5.5 5.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function SpinIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M19 12a7 7 0 1 1-2.05-4.95" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      <path d="M17.6 3.6v3.9h-3.9" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function InteractIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth={1.8} />
+      <circle cx="12" cy="12" r="2.6" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function MouseIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="6.5" y="3" width="11" height="18" rx="5.5" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M12 6.5v3.5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function BackIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M19 12H5.5M11 6l-6 6 6 6" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function ChevronIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M9 5.5 15.5 12 9 18.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function SkipIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M5 6.5 11 12l-6 5.5ZM12 6.5 18 12l-6 5.5Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function InfoIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M12 11v5.5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+      <circle cx="12" cy="7.8" r="1.1" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function WarningIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12 3.5 21.5 20h-19Z" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+      <path d="M12 9.5v5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+      <circle cx="12" cy="17.2" r="1.1" fill="currentColor" />
+    </svg>
+  )
+}
+
+/* ── online ─────────────────────────────────────────────────────── */
+
+const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' } as const
+
+export function CopyIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="8.5" y="8.5" width="11" height="11" rx="2" {...stroke} />
+      <path d="M15.5 5.5v-.5a1.5 1.5 0 0 0-1.5-1.5H6A2.5 2.5 0 0 0 3.5 6v8A1.5 1.5 0 0 0 5 15.5h.5" {...stroke} />
+    </svg>
+  )
+}
+
+export function CheckIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="m5 12.5 4.5 4.5L19 7.5" {...stroke} strokeWidth={2} />
+    </svg>
+  )
+}
+
+export function RefreshIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" {...stroke} />
+      <path d="M19.8 4.2v4.3h-4.3" {...stroke} />
+    </svg>
+  )
+}
+
+/* Menu rows. */
+
+export function PlayIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M7.2 4.9v14.2a.8.8 0 0 0 1.2.7l11.3-7.1a.8.8 0 0 0 0-1.4L8.4 4.2a.8.8 0 0 0-1.2.7Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** A folded chart. */
+export function MapIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M3.4 6.5 9 4.2l6 2.3 5.6-2.3v13.3L15 19.8l-6-2.3-5.6 2.3Z" {...stroke} />
+      <path d="M9 4.2v13.3M15 6.5v13.3" {...stroke} />
+    </svg>
+  )
+}
+
+export function GearIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="12" cy="12" r="6.2" {...stroke} />
+      <circle cx="12" cy="12" r="2.3" {...stroke} />
+      <path d="M12 2.6v3.2M12 18.2v3.2M2.6 12h3.2M18.2 12h3.2M5.35 5.35l2.27 2.27M16.38 16.38l2.27 2.27M18.65 5.35l-2.27 2.27M7.62 16.38l-2.27 2.27" {...stroke} />
+    </svg>
+  )
+}
+
+export function GamepadIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M7.3 7.4h9.4a4.6 4.6 0 0 1 4.5 5.5l-.5 2.7a2.3 2.3 0 0 1-4 1.1l-1.6-1.9H8.9l-1.6 1.9a2.3 2.3 0 0 1-4-1.1l-.5-2.7a4.6 4.6 0 0 1 4.5-5.5Z" {...stroke} />
+      <path d="M7.7 10.2v3M6.2 11.7h3" {...stroke} />
+      <path d="M15.3 10.9v.01M17.5 12.7v.01" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** A doorway with an arrow out. */
+export function ExitIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M10.2 4.2H6.4a1.7 1.7 0 0 0-1.7 1.7v12.2a1.7 1.7 0 0 0 1.7 1.7h3.8" {...stroke} />
+      <path d="M14.8 8.1 18.7 12l-3.9 3.9M18.5 12H9.6" {...stroke} />
+    </svg>
+  )
+}
+
+/** An isometric block — build mode. */
+export function CubeIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12 3.2 19.6 7.6v8.8L12 20.8l-7.6-4.4V7.6Z" {...stroke} />
+      <path d="M4.6 7.7 12 12l7.4-4.3M12 12v8.6" {...stroke} />
+    </svg>
+  )
+}
+
+/** Two figures — player counts. */
+export function UsersIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="9" cy="8.5" r="3.3" fill="currentColor" />
+      <path d="M2.8 19.5c.5-3.4 3-5.4 6.2-5.4s5.7 2 6.2 5.4Z" fill="currentColor" />
+      <circle cx="16.6" cy="9.3" r="2.6" fill="currentColor" fillOpacity={0.55} />
+      <path d="M16.2 14.3c2.6.1 4.6 1.8 5 4.7h-4.3c-.2-1.8-.8-3.4-1.9-4.6Z" fill="currentColor" fillOpacity={0.55} />
+    </svg>
+  )
+}
+
+export function ChatIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 13.5Z" {...stroke} />
+      <path d="M8.5 9h7M8.5 12h4.5" {...stroke} />
+    </svg>
+  )
+}
+
+/** Raised open hand — emotes. */
+export function WaveIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path
+        d="M7.5 12.5V6.8a1.4 1.4 0 0 1 2.8 0v4.7M10.3 11V5a1.4 1.4 0 0 1 2.8 0v6M13.1 11V6a1.4 1.4 0 0 1 2.8 0v6.5M15.9 12.5V9.3a1.4 1.4 0 0 1 2.8 0V15a6.5 6.5 0 0 1-6.5 6.5h-.6a6 6 0 0 1-4.6-2.2l-3-3.8a1.4 1.4 0 0 1 2.1-1.8l1.4 1.5"
+        {...stroke}
+      />
+    </svg>
+  )
+}
+
+/** Three signal bars; `level` 0..3 fills that many. */
+export function SignalIcon({ level, ...p }: IconProps & { level: number }) {
+  return (
+    <svg {...base(p)}>
+      {[0, 1, 2].map(i => (
+        <rect key={i} x={4 + i * 6} y={15 - i * 4.5} width="4" height={5 + i * 4.5} rx="1" fill="currentColor" fillOpacity={i < level ? 1 : 0.22} />
+      ))}
+    </svg>
+  )
+}
+
+/* ── weapons (hotbar) ───────────────────────────────────────────── */
+
+export function FistIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path
+        d="M7 10.2V8.6a1.6 1.6 0 0 1 3.2 0v1M10.2 9.6V7.8a1.6 1.6 0 0 1 3.2 0v1.8M13.4 9.6V8.4a1.6 1.6 0 0 1 3.2 0v2.2M16.6 10.6a1.6 1.6 0 0 1 3.2 0v3.2a6.4 6.4 0 0 1-6.4 6.4h-1.6A5.8 5.8 0 0 1 6 14.4v-2.6a1.6 1.6 0 0 1 1.6-1.6h3.6a1.6 1.6 0 0 1 0 3.2H9.4"
+        fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function SwordIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M19.8 4.2 9.6 14.4l-1.4-.6.4-1.6L18.6 3.6l1.6-.2Z" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+      <path d="m6.4 12.2 5.4 5.4M7.6 16.4l-3.4 3.4" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" />
+      <circle cx="3.9" cy="20.1" r="1.1" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function HammerIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12.6 11.4 4.4 19.6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
+      <path d="m10.4 6.4 4.2-4.2 7.2 7.2-4.2 4.2Z" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+      <path d="m12.5 4.3 7.2 7.2" fill="none" stroke="currentColor" strokeWidth={1.2} strokeOpacity={0.6} />
+    </svg>
+  )
+}
+
+export function BowIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M6 3.2c7.6 1.4 13.4 7.2 14.8 14.8" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" />
+      <path d="M6 3.2 20.8 18" fill="none" stroke="currentColor" strokeWidth={1} strokeOpacity={0.65} />
+      <path d="M3.4 20.6 15 9M15 9h-3.2M15 9v3.2M5.6 18.4l-2.4.2.2-2.4" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** The Gloom King's reward: a sword with a star at its tip. */
+export function StarbladeIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M17.6 6.4 9.6 14.4l-1.4-.6.4-1.6 7.8-7.8" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+      <path d="m6.4 12.2 5.4 5.4M7.6 16.4l-3.4 3.4" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" />
+      <circle cx="3.9" cy="20.1" r="1.1" fill="currentColor" />
+      <path d="M19.6 1.4c.3 1.6 1.1 2.4 2.8 2.8-1.7.3-2.5 1.1-2.8 2.8-.3-1.7-1.1-2.5-2.8-2.8 1.7-.4 2.5-1.2 2.8-2.8Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** The Frost Golem's reward: a hammer with a snowflake. */
+export function FrostHammerIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12.6 11.4 4.4 19.6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
+      <path d="m10.4 6.4 4.2-4.2 7.2 7.2-4.2 4.2Z" fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+      <path d="M16 4.8v4.6M13.8 6l4.4 2.2M18.2 6l-4.4 2.2" fill="none" stroke="currentColor" strokeWidth={1.1} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** A portal arch (compass, map). */
+export function PortalIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M5 21V10a7 7 0 0 1 14 0v11" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      <path d="M8.6 21v-9.6a3.4 3.4 0 0 1 6.8 0V21Z" fill="currentColor" fillOpacity={0.35} />
+      <path d="M3 21h18" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** A padlock (a sealed portal). */
+export function LockIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="5" y="10.5" width="14" height="10" rx="2" fill="currentColor" fillOpacity={0.2} stroke="currentColor" strokeWidth={1.6} />
+      <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+      <path d="M12 14.5v2.5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** A crown (bosses). */
+export function CrownIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M3.5 8.5 7.6 12 12 5l4.4 7 4.1-3.5-1.8 10H5.3Z" fill="currentColor" fillOpacity={0.25} stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+      <path d="M5.6 21h12.8" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/* ── devices (first-run setup) ──────────────────────────────────── */
+
+export function LaptopIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="4.5" y="5" width="15" height="10" rx="1.4" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M2.5 18.5h19" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function DesktopIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="2.8" y="4" width="13.4" height="10" rx="1.4" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M9.5 14v3.5M6.5 18.5h6" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+      <rect x="18" y="4" width="3.4" height="15" rx="1" fill="none" stroke="currentColor" strokeWidth={1.5} />
+      <path d="M19.7 7.2v.1M19.7 9.4v.1" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function PhoneIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="7" y="2.8" width="10" height="18.4" rx="2" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M11 18h2" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function SchoolLaptopIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <rect x="4.5" y="6.5" width="15" height="9" rx="1.4" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M2.5 19h19M9.5 3.6 12 2.4l2.5 1.2L12 4.8Z" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}

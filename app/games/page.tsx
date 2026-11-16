@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { StarfallFeaturedBanner } from '@/components/games/starfall/ui/FeaturedBanner'
 
 interface Game {
   id: string
@@ -169,6 +170,8 @@ export default function GamesPage() {
         {/* HTML5 Games tab */}
         {activeTab === 'html5' && (
           <>
+            <StarfallFeaturedBanner />
+
             {/* Category filter */}
             <div className="mb-6 flex items-center gap-1.5 flex-wrap">
               {CATEGORIES.map(c => (
