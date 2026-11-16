@@ -8,6 +8,12 @@
  * buffering, a double jump, a dash, a spin attack, moving-platform riding, bounce pads,
  * wading and drowning. Every frame `motion` is filled for the animator.
  *
+ * Three more moves sit on top (tuning: ROLL, SLIDE, WALLRUN): a dodge-roll, committed along the
+ * stick's direction, that nothing can hurt in its middle; a slide out of a sprint that keeps the
+ * momentum, gains on a downhill, loses on the flat and leaps long and low when jumped out of; and
+ * a wall-run, caught by jumping into a wall at a glancing angle (control/wall.ts feels for it),
+ * that arcs along it until it is kicked off, let go of or runs out. Each wall once per airtime.
+ *
  * Creative: nothing hurts, and a double-tapped jump toggles flight (no gravity; jump rises,
  * descend sinks, boost speeds up; touching down ends it).
  *
@@ -21,7 +27,8 @@ import { v3, type V3 } from '../events'
 import type { Ctx, IPlayerController, MotionState, PlayerState } from '../types'
 import { clamp, lerp, PLAY_RADIUS, smoothstep, type Surface } from '../world/heightfield'
 import { approach, damp, wrapAngle } from './control/math'
-import { MOVE as M } from './control/tuning'
+import { MOVE as M, ROLL, SLIDE, WALLRUN as W } from './control/tuning'
+import { WallSensor, makeWallContact, type WallContact } from './control/wall'
 
 const ISLE_BOUNDS = { x: 0, z: 0, r: PLAY_RADIUS }
 
@@ -31,14 +38,13 @@ export class PlayerController implements IPlayerController {
   readonly position = new THREE.Vector3()
   readonly velocity = new THREE.Vector3()
   readonly radius = M.radius
-  readonly height = M.height
   readonly maxHp = M.maxHp
   controlEnabled = true
 
   readonly motion: MotionState = {
     state: 'idle', stateTime: 0, speed: 0,
     walkSpeed: M.walkSpeed, runSpeed: M.runSpeed, sprintSpeed: M.sprintSpeed,
-    vy: 0, grounded: true, turnRate: 0, landImpact: 0, wading: 0, slope: 0,
+    vy: 0, grounded: true, turnRate: 0, landImpact: 0, wading: 0, slope: 0, wallSide: 0,
   }
 
   private _yaw = 0
@@ -66,6 +72,7 @@ export class PlayerController implements IPlayerController {
   private platVY = 0
   private platVZ = 0
 
+  /** Sliding down ground too steep to stand on (the sprint slide is `slideT`). */
   private sliding = false
   /** Vertical speed used to move this frame: the average of before/after gravity (frame-rate independent arcs). */
   private vyMove = 0
@@ -88,6 +95,34 @@ export class PlayerController implements IPlayerController {
   private attackT = 0
   private attackCd = 0
   private attackBufT = 0
+
+  /** Seconds into the dodge-roll (-1: not rolling), its heading, and the wait before the next. */
+  private rollT = -1
+  private rollX = 0
+  private rollZ = 1
+  private rollCd = 0
+  private rollBufT = 0
+  /** Seconds into the sprint slide (-1: not sliding), the wait before the next, and the buffered low press. */
+  private slideT = -1
+  private slideCd = 0
+  private lowBufT = 0
+  /** Seconds into the wall-run (-1: not on a wall), the wall, the way along it and the speed held. */
+  private wallT = -1
+  private wallCd = 0
+  private readonly wall = makeWallContact()
+  private readonly wallFound = makeWallContact()
+  private readonly wallNrm: V3 = { x: 0, y: 0, z: 1 }
+  private wallTX = 0
+  private wallTZ = 0
+  private wallSpeed = 0
+  /** -1 with the wall on the hero's left, 1 on his right, 0 off the wall. */
+  private wallSide = 0
+  /** How long the stick has pointed away from the wall. */
+  private wallAwayT = 0
+  /** Normals (x, z pairs) of the walls run along since the last landing: each wall once per airtime. */
+  private readonly wallsUsed = new Float32Array(8)
+  private wallsUsedN = 0
+  private readonly sensor: WallSensor
 
   private hurtT = 0
   private invulnT = 0
@@ -123,12 +158,17 @@ export class PlayerController implements IPlayerController {
 
   private failed = false
 
-  constructor(private ctx: Ctx) {}
+  constructor(private ctx: Ctx) {
+    this.sensor = new WallSensor(ctx.collision)
+  }
 
   /* ── IPlayerController getters ───────────────────────────── */
 
   get yaw(): number {
     return this._yaw
+  }
+  get height(): number {
+    return this.rollT >= 0 || this.slideT >= 0 ? ROLL.height : M.height
   }
   get state(): PlayerState {
     return this._state
@@ -140,7 +180,10 @@ export class PlayerController implements IPlayerController {
     return this._grounded
   }
   get invulnerable(): boolean {
-    return this.invulnT > 0
+    return this.invulnT > 0 || this.rollSafe
+  }
+  get wallNormal(): V3 | null {
+    return this.wallT >= 0 ? this.wallNrm : null
   }
   get attacking(): boolean {
     return this.attackT > 0
@@ -196,8 +239,11 @@ export class PlayerController implements IPlayerController {
     this.writeMotion()
   }
 
-  /** Clears every move in progress (jumps, dashes, attacks, landings, slides). */
+  /** Clears every move in progress (jumps, dashes, attacks, landings, rolls, slides, wall-runs). */
   private resetMotion(): void {
+    this.cancelMoves()
+    this.rollCd = this.slideCd = this.wallCd = this.rollBufT = this.lowBufT = 0
+    this.wallsUsedN = 0
     this.hurtT = this.dashT = this.dashCd = this.attackT = this.attackCd = 0
     this.coyoteT = this.jumpBufT = this.dashBufT = this.attackBufT = 0
     this.landT = this.landImpact = this.airTime = this.turnRate = this.slope = this.wadeT = this.vyMove = 0
@@ -227,9 +273,10 @@ export class PlayerController implements IPlayerController {
 
   hurt(amount: number, from: V3): void {
     if (this.ctx.game.creative) return
-    if (!(amount > 0) || this.invulnT > 0 || this.dashT > 0 || this.dead || !this.controlEnabled) return
+    if (!(amount > 0) || this.invulnT > 0 || this.dashT > 0 || this.rollSafe || this.dead || !this.controlEnabled) return
     const p = this.position
     const v = this.velocity
+    this.cancelMoves()
     this._hp = Math.max(0, this._hp - amount)
     let dx = p.x - from.x
     let dz = p.z - from.z
@@ -279,6 +326,7 @@ export class PlayerController implements IPlayerController {
       return
     }
     const v = this.velocity
+    this.cancelMoves()
     v.x += impulse.x
     v.z += impulse.z
     v.y = Math.max(v.y, impulse.y)
@@ -301,6 +349,7 @@ export class PlayerController implements IPlayerController {
   launch(vy: number): void {
     if (this.dead || this.ctx.character.ragdolling) return
     this.dashT = 0
+    this.cancelMoves()
     this.bounce(vy)
     this.writeMotion()
   }
@@ -325,6 +374,11 @@ export class PlayerController implements IPlayerController {
     this.attackBufT -= dt
     this.dashCd -= dt
     this.attackCd -= dt
+    this.rollBufT -= dt
+    this.lowBufT -= dt
+    this.rollCd -= dt
+    this.slideCd -= dt
+    this.wallCd -= dt
     this.landT -= dt
     if (this.hurtT > 0) this.hurtT -= dt
     if (this.attackT > 0) this.attackT -= dt
@@ -347,6 +401,8 @@ export class PlayerController implements IPlayerController {
       this.writeMotion()
       return
     }
+    // A roll, slide or wall-run doesn't outlast control (a dialog opening, a cutscene, a fall).
+    if (!live) this.cancelMoves()
     this.readInput(live, dt)
 
     // Ride whatever we stand on before anything else moves us.
@@ -357,6 +413,7 @@ export class PlayerController implements IPlayerController {
       this.dashT -= dt
       if (this.dashT <= 0) this.endDash(false)
     }
+    this.tickMoves(dt)
 
     // Creative: a quick second jump press toggles flight instead of jumping.
     const toggled = live && s.jump && this.flyTap()
@@ -366,14 +423,21 @@ export class PlayerController implements IPlayerController {
       if (live) {
         if (s.jump && !toggled) this.pressJump()
         if (s.dash) this.dashBufT = M.actionBuffer
+        if (s.roll) this.rollBufT = M.actionBuffer
+        if (s.low) this.pressLow()
         // With a weapon in hand the Weapons system owns the attack button.
         if (s.attack && !ctx.weapons.armed) this.attackBufT = M.actionBuffer
       } else {
-        this.jumpBufT = this.dashBufT = this.attackBufT = 0
+        this.jumpBufT = this.dashBufT = this.attackBufT = this.rollBufT = this.lowBufT = 0
       }
-      if (this.jumpBufT > 0 && (this._grounded || this.coyoteT > 0)) this.jump(false)
+      // A roll is committed: a jump only cuts its recovery short.
+      const rollLocked = this.rollT >= 0 && this.rollT < ROLL.jumpFrom
+      if (this.jumpBufT > 0 && (this._grounded || this.coyoteT > 0) && !rollLocked) this.jump(false)
       if (this.dashBufT > 0) this.tryDash()
+      if (this.rollBufT > 0) this.tryRoll()
+      if (this.lowBufT > 0) this.trySlide()
       if (this.attackBufT > 0) this.tryAttack()
+      if (live && this.wallT < 0) this.tryWallRun()
 
       this.steer(dt)
       this.gravity(dt, live && s.jumpHeld)
@@ -383,7 +447,10 @@ export class PlayerController implements IPlayerController {
     const travel = Math.max(Math.hypot(v.x, v.z), Math.abs(v.y)) * dt
     const n = Math.min(24, Math.max(1, Math.ceil(travel / M.maxSubstep)))
     const h = dt / n
-    for (let i = 0; i < n && !this.limp; i++) this.subStep(h)
+    for (let i = 0; i < n && !this.limp; i++) {
+      if (this.wallT >= 0) this.wallStep(h)
+      else this.subStep(h)
+    }
     this.applyDrift(dt)
     if (this.limp) {
       // Knocked flat by the landing: the ragdoll has taken over.
@@ -468,6 +535,7 @@ export class PlayerController implements IPlayerController {
     this.lastJumpTap = -1
     this._flying = !this._flying
     if (this._flying) {
+      this.cancelMoves()
       this.leaveGround(false)
       this.dashT = this.attackT = this.jumpBufT = 0
       this.jumpCut = false
@@ -490,6 +558,10 @@ export class PlayerController implements IPlayerController {
   }
 
   private pressJump(): void {
+    if (this.wallT >= 0) {
+      this.wallJump()
+      return
+    }
     // About to touch down? Keep the press for a proper ground jump instead of wasting the double.
     if (!this._grounded && this.coyoteT <= 0 && this.canDouble && (this.dashT > 0 || !this.nearLanding())) {
       this.jump(true)
@@ -512,6 +584,8 @@ export class PlayerController implements IPlayerController {
     this.coyoteT = 0
     this.attackT = 0
     if (this.dashT > 0) this.endDash(true)
+    if (this.rollT >= 0) this.endRoll()
+    const fromSlide = !double && this.slideT >= 0
     if (double) {
       this.canDouble = false
       v.y = Math.max(v.y, M.doubleJumpSpeed)
@@ -526,19 +600,29 @@ export class PlayerController implements IPlayerController {
       const onPlatform = this._grounded && !!this.support?.dynamic
       const lift = onPlatform ? Math.max(0, this.platVY) : 0
       this.leaveGround(onPlatform)
-      v.y = M.jumpSpeed + lift
+      v.y = (fromSlide ? SLIDE.jumpSpeed : M.jumpSpeed) + lift
+      if (fromSlide) {
+        // Out of a slide the leap is long and low: less lift, more speed.
+        const sp = Math.hypot(v.x, v.z)
+        const k = sp > 1e-3 ? clamp(sp * SLIDE.jumpBoost, SLIDE.jumpMin, SLIDE.jumpMax) / sp : 1
+        v.x *= k
+        v.z *= k
+      }
     }
+    if (this.slideT >= 0) this.endSlide(fromSlide)
     this.airMax = Math.max(M.runSpeed, Math.hypot(v.x, v.z))
     this.jumpCut = true
     this.setState(double ? 'doubleJump' : 'jump')
-    this.ctx.bus.emit('player:jump', { pos: v3(this.position), double })
+    this.ctx.bus.emit('player:jump', fromSlide ? { pos: v3(this.position), double, from: 'slide' } : { pos: v3(this.position), double })
   }
 
   private tryDash(): void {
-    if (this.dashT > 0 || this.dashCd > 0) return
+    if (this.dashT > 0 || this.dashCd > 0 || this.rollT >= 0) return
     const air = !this._grounded
     if (air && !this.airDash) return
     this.dashBufT = 0
+    if (this.slideT >= 0) this.endSlide(false)
+    if (this.wallT >= 0) this.endWallRun(false)
     let dx = this.wishX
     let dz = this.wishZ
     if (this.wishMag === 0) {
@@ -572,7 +656,7 @@ export class PlayerController implements IPlayerController {
   }
 
   private tryAttack(): void {
-    if (this.attackT > 0 || this.attackCd > 0 || this.dashT > 0) return
+    if (this.attackT > 0 || this.attackCd > 0 || this.dashT > 0 || this.rollT >= 0 || this.slideT >= 0 || this.wallT >= 0) return
     this.attackBufT = 0
     this.attackT = M.attackTime
     this.attackCd = M.attackTime + M.attackCooldown
@@ -591,12 +675,280 @@ export class PlayerController implements IPlayerController {
     this.leaveGround(false)
     v.y = this.vyMove = vy
     this.canDouble = this.airDash = this.airSpin = true
+    this.wallsUsedN = 0
     this.jumpCut = false
     this.coyoteT = 0
     this.airTime = 0
     this._stompSpeed = 0
     this.airMax = Math.max(this.airMax, M.runSpeed, Math.hypot(v.x, v.z))
     this.setState('bounce')
+  }
+
+  /* ── roll, slide, wall-run ───────────────────────────────── */
+
+  /** In the middle of a roll, where nothing can hurt. */
+  private get rollSafe(): boolean {
+    return this.rollT >= ROLL.invulnFrom && this.rollT < ROLL.invulnTo
+  }
+
+  /** Ends a roll, slide or wall-run in progress (a hit, a launch, a ragdoll, losing control). */
+  private cancelMoves(): void {
+    if (this.rollT >= 0) this.endRoll()
+    if (this.slideT >= 0) this.endSlide(false)
+    if (this.wallT >= 0) this.endWallRun(false)
+  }
+
+  /** Advances the roll, the slide and the wall-run, and ends each when its time or its footing runs out. */
+  private tickMoves(dt: number): void {
+    const v = this.velocity
+    if (this.rollT >= 0) {
+      this.rollT += dt
+      if (this.rollT >= ROLL.time || !this._grounded) this.endRoll()
+    }
+    if (this.slideT >= 0) {
+      this.slideT += dt
+      const slow = this.slideT >= SLIDE.minTime && Math.hypot(v.x, v.z) < SLIDE.endSpeed
+      const airborne = !this._grounded && this.coyoteT <= 0
+      if (slow || airborne || this.sliding || this.depth > M.wadeMin) this.endSlide(false)
+    }
+    if (this.wallT >= 0) {
+      this.wallT += dt
+      const c = this.wall
+      const away = (this.wishX * c.nx + this.wishZ * c.nz) * this.wishMag
+      this.wallAwayT = away > 0.5 ? this.wallAwayT + dt : 0
+      if (this.wallT >= W.time || this.wallAwayT > W.letGo) this.endWallRun(false)
+    }
+  }
+
+  private tryRoll(): void {
+    if (this.rollT >= 0 || this.rollCd > 0 || this.dashT > 0 || !this._grounded || this.depth > M.wadeMin) return
+    this.rollBufT = 0
+    let dx = this.wishX
+    let dz = this.wishZ
+    if (this.wishMag === 0) {
+      dx = Math.sin(this._yaw)
+      dz = Math.cos(this._yaw)
+    }
+    if (this.slideT >= 0) this.endSlide(false)
+    this.rollX = dx
+    this.rollZ = dz
+    this.rollT = 0
+    this.attackT = 0
+    this.landT = 0
+    this._yaw = Math.atan2(dx, dz)
+    this.setState('roll')
+    this.ctx.bus.emit('player:roll', { pos: v3(this.position), dir: { x: dx, y: 0, z: dz } })
+  }
+
+  /** Out of the roll at the speed it ends on; the stick takes over from there. */
+  private endRoll(): void {
+    this.rollT = -1
+    this.rollCd = ROLL.cooldown
+  }
+
+  /** The low button: stands up out of a slide, else asks for one (remembered briefly: it can land into it). */
+  private pressLow(): void {
+    if (this.slideT > 0.2) {
+      this.endSlide(false)
+      this.lowBufT = 0
+    } else this.lowBufT = SLIDE.buffer
+  }
+
+  private trySlide(): void {
+    if (this.slideT >= 0 || this.slideCd > 0 || this.rollT >= 0 || this.dashT > 0 || this.attackT > 0) return
+    if (!this._grounded || this.depth > M.wadeMin) return
+    const v = this.velocity
+    const sp = Math.hypot(v.x, v.z)
+    if (sp < SLIDE.enterSpeed) return
+    this.lowBufT = 0
+    this.slideT = 0
+    this.landT = 0
+    // Dropping into it gives a little push (never past boostMax, never a loss).
+    const k = Math.max(sp, Math.min(sp + SLIDE.boost, SLIDE.boostMax)) / sp
+    v.x *= k
+    v.z *= k
+    this.setState('slide')
+    this.ctx.bus.emit('player:slide', { pos: v3(this.position), dir: { x: v.x / (sp * k), y: 0, z: v.z / (sp * k) }, surface: this.surface() })
+  }
+
+  private endSlide(jumped: boolean): void {
+    this.slideT = -1
+    this.slideCd = SLIDE.cooldown
+    this.ctx.bus.emit('player:slideEnd', { pos: v3(this.position), jumped })
+  }
+
+  /** The sprint slide: momentum carried along the ground. Slopes pull, the flat brakes, the stick nudges the heading. */
+  private slideAlong(dt: number): void {
+    const v = this.velocity
+    const g = this.hit
+    let sp = Math.hypot(v.x, v.z)
+    if (sp < 1e-3) return
+    let yaw = Math.atan2(v.x, v.z)
+    let brake = SLIDE.friction * (g.surface === 'ice' ? M.iceGrip : 1)
+    if (this.wishMag > 0) {
+      const want = wrapAngle(Math.atan2(this.wishX, this.wishZ) - yaw)
+      // Pulling back brakes; anything else turns the slide a little.
+      if (Math.abs(want) > 2.2) brake += SLIDE.brake * this.wishMag
+      else yaw += clamp(want, -1, 1) * SLIDE.steer * this.wishMag * dt
+    }
+    // Gravity along the slope (for a unit normal: g · ny · the normal's horizontal part).
+    const pull = g.collider ? 0 : SLIDE.gravity * g.ny * dt
+    v.x = Math.sin(yaw) * sp + g.nx * pull
+    v.z = Math.cos(yaw) * sp + g.nz * pull
+    sp = Math.hypot(v.x, v.z)
+    if (sp < 1e-3) return
+    const k = Math.min(Math.max(0, sp - brake * dt), SLIDE.maxSpeed) / sp
+    v.x *= k
+    v.z *= k
+  }
+
+  /** Airborne at speed and brushing a wall at a glancing angle: start running along it. */
+  private tryWallRun(): void {
+    if (this._grounded || this.sliding || this.dashT > 0 || this.wallCd > 0 || this.airTime < 0.06) return
+    const v = this.velocity
+    const p = this.position
+    const sp = Math.hypot(v.x, v.z)
+    if (sp < W.minSpeed || v.y < -W.maxFall) return
+    const hx = v.x / sp
+    const hz = v.z / sp
+    const c = this.wallFound
+    if (!this.sensor.find(p.x, p.y, p.z, hx, hz, c) || c.dist > M.radius + 0.3) return
+    // Glancing, and meant: the heading or the stick leans into the wall.
+    const into = -(hx * c.nx + hz * c.nz)
+    const push = -(this.wishX * c.nx + this.wishZ * c.nz) * this.wishMag
+    if (into > W.maxInto || into < -0.2 || Math.max(into, push) < 0.12) return
+    const along = sp * Math.sqrt(Math.max(0, 1 - into * into))
+    if (along < W.minSpeed * 0.9) return
+    const used = this.wallsUsed
+    for (let i = 0; i < this.wallsUsedN; i++) {
+      if (c.nx * used[i * 2] + c.nz * used[i * 2 + 1] > W.sameWall) return
+    }
+    // Clear of the floor (a cliff's own foot under the feet doesn't count as one).
+    const g = this.ctx.collision.groundAt(p.x, p.z, p.y, M.radius, M.airStepUp, this.probe)
+    if ((g.collider || g.ny >= M.walkableNy) && p.y - g.y < W.minHeight) return
+    this.startWallRun(c, hx, hz, along)
+  }
+
+  private startWallRun(c: WallContact, hx: number, hz: number, speed: number): void {
+    const v = this.velocity
+    // The way along the wall that keeps the heading; it also tells the side the wall is on.
+    const side = -c.nz * hx + c.nx * hz >= 0 ? 1 : -1
+    this.wallSide = side
+    this.wallSpeed = clamp(speed, W.speed, W.maxSpeed)
+    this.wallT = 0
+    this.wallAwayT = 0
+    this.setWall(c)
+    const used = this.wallsUsed
+    const slot = this.wallsUsedN < used.length / 2 ? this.wallsUsedN++ : 0
+    used[slot * 2] = c.nx
+    used[slot * 2 + 1] = c.nz
+    // A slight arc: up a little, then back down. A fall is caught, not reversed.
+    v.y = this.vyMove = v.y >= 0 ? W.rise : Math.max(W.rise + v.y * 0.5, -1.5)
+    this.attackT = 0
+    this.jumpCut = false
+    this.stepPhase = 0.5
+    this.setState('wallRun')
+    this.ctx.bus.emit('player:wallRun', { pos: this.wallPoint(), normal: { x: c.nx, y: 0, z: c.nz }, side, surface: c.surface })
+  }
+
+  /** Takes `c` as the wall being run along: its normal and the direction along it. */
+  private setWall(c: WallContact): void {
+    const w = this.wall
+    w.nx = this.wallNrm.x = c.nx
+    w.nz = this.wallNrm.z = c.nz
+    w.dist = c.dist
+    w.lean = c.lean
+    w.surface = c.surface
+    this.wallTX = -c.nz * this.wallSide
+    this.wallTZ = c.nx * this.wallSide
+  }
+
+  /** Where the feet meet the wall. */
+  private wallPoint(): V3 {
+    const p = this.position
+    const c = this.wall
+    return { x: p.x - c.nx * c.dist, y: p.y + 0.1, z: p.z - c.nz * c.dist }
+  }
+
+  /** Jump on a wall: kick off away from it, keeping part of the run's speed. */
+  private wallJump(): void {
+    const v = this.velocity
+    const c = this.wall
+    const keep = this.wallSpeed * W.kickKeep
+    v.x = c.nx * W.kickOut + this.wallTX * keep
+    v.z = c.nz * W.kickOut + this.wallTZ * keep
+    v.y = this.vyMove = W.kickUp
+    this.jumpBufT = 0
+    this.endWallRun(true)
+    this.jumpCut = true
+    this.setState('jump')
+    this.ctx.bus.emit('player:jump', { pos: v3(this.position), double: false, from: 'wall' })
+  }
+
+  private endWallRun(jumped: boolean): void {
+    const v = this.velocity
+    this.wallT = -1
+    this.wallCd = W.cooldown
+    this.wallSide = 0
+    this.airMax = Math.max(M.runSpeed, Math.hypot(v.x, v.z))
+    this.ctx.bus.emit('player:wallRunEnd', { pos: v3(this.position), jumped })
+  }
+
+  /** One sub-step of the wall-run: along the wall on its arc, held to it by the feelers. */
+  private wallStep(h: number): void {
+    const col = this.ctx.collision
+    const p = this.position
+    const v = this.velocity
+    const y0 = p.y
+    p.x += v.x * h
+    p.z += v.z * h
+    p.y += this.vyMove * h
+    if (this.vyMove > 0) {
+      const ceil = col.ceilingAt(p.x, p.z, y0 + M.height, M.radius)
+      if (p.y + M.height > ceil) {
+        p.y = Math.max(y0, ceil - M.height)
+        v.y = this.vyMove = 0
+      }
+    }
+
+    // Feel for the wall again: it may have ended, or turned a corner too sharp to follow.
+    const c = this.wall
+    const f = this.wallFound
+    if (!this.sensor.feel(p.x, p.y, p.z, -c.nx, -c.nz, M.radius + W.reach + 0.15, f) || f.nx * c.nx + f.nz * c.nz < W.sameWall) {
+      this.endWallRun(false)
+      return
+    }
+    // Close (or open) the gap to it and take its new direction.
+    const off = clamp(f.dist - (M.radius + W.gap), -0.25, 0.25)
+    p.x -= f.nx * off
+    p.z -= f.nz * off
+    f.dist -= off
+    this.setWall(f)
+    v.x = this.wallTX * this.wallSpeed
+    v.z = this.wallTZ * this.wallSpeed
+
+    // Something solid in the way ends the run.
+    const w = col.pushOut(p, M.radius, M.height, M.airStepUp, this.push)
+    if (w.hit && w.nx * this.wallTX + w.nz * this.wallTZ < -0.5) {
+      this.endWallRun(false)
+      return
+    }
+    // So does the ground: floors are landed on; a cliff's foot is left to the steep-ground slide.
+    const g = col.groundAt(p.x, p.z, p.y, M.radius, M.airStepUp, this.hit)
+    if (p.y > g.y) return
+    const floor = !!g.collider || g.ny >= M.walkableNy
+    this.endWallRun(false)
+    if (!floor) return
+    p.y = g.y
+    this.land(g, false)
+  }
+
+  /** Footfalls on the wall, at a run's cadence. */
+  private wallSteps(dt: number): void {
+    this.stepPhase += (this.wallSpeed * dt) / M.stepRun
+    if (this.stepPhase < 1) return
+    this.stepPhase -= Math.floor(this.stepPhase)
+    this.ctx.bus.emit('player:footstep', { pos: this.wallPoint(), surface: this.wall.surface, sprint: true, wall: true })
   }
 
   /* ── velocity ────────────────────────────────────────────── */
@@ -608,7 +960,20 @@ export class PlayerController implements IPlayerController {
       v.z = this.dashZ * M.dashSpeed
       return
     }
+    if (this.rollT >= 0) {
+      // Fast out of the gate, easing down to a speed a run can pick up from.
+      const speed = lerp(ROLL.speed, ROLL.endSpeed, smoothstep(0.25, 1, this.rollT / ROLL.time))
+      v.x = this.rollX * speed
+      v.z = this.rollZ * speed
+      return
+    }
+    if (this.wallT >= 0) {
+      v.x = this.wallTX * this.wallSpeed
+      v.z = this.wallTZ * this.wallSpeed
+      return
+    }
     if (this.sliding) return this.slide(dt)
+    if (this.slideT >= 0) return this.slideAlong(dt)
     const sp = Math.hypot(v.x, v.z)
 
     if (this._grounded) {
@@ -683,6 +1048,13 @@ export class PlayerController implements IPlayerController {
     const v = this.velocity
     if (this._grounded || this.sliding) {
       this.vyMove = v.y
+      return
+    }
+    if (this.wallT >= 0) {
+      // The wall carries most of his weight: a gentle arc.
+      const vy = v.y
+      v.y -= W.gravity * dt
+      this.vyMove = (vy + v.y) * 0.5
       return
     }
     if (this.jumpCut) {
@@ -827,6 +1199,7 @@ export class PlayerController implements IPlayerController {
     this.setSupport(c)
     v.y = 0
     this.canDouble = this.airDash = this.airSpin = true
+    this.wallsUsedN = 0
     this.jumpCut = false
     this.stepPhase = 0.5
     if (impact > M.landStateImpact) {
@@ -1022,6 +1395,7 @@ export class PlayerController implements IPlayerController {
       this.ctx.bus.emit('player:splash', { pos: { x: p.x, y: level, z: p.z }, big: true })
       this.dead = true
       this.attackT = this.dashT = 0
+      this.cancelMoves()
       this.setState('dead')
       this.ctx.game.playerDied('water')
       return
@@ -1047,15 +1421,17 @@ export class PlayerController implements IPlayerController {
     const aim = this.ctx.weapons.aimYaw
     let target: number
     if (this.dashT > 0) target = Math.atan2(this.dashX, this.dashZ)
+    else if (this.rollT >= 0) target = Math.atan2(this.rollX, this.rollZ)
+    else if (this.wallT >= 0) target = Math.atan2(this.wallTX, this.wallTZ)
     else if (this.dead || this.hurtT > 0) return
-    else if (this.sliding) {
+    else if (this.sliding || this.slideT >= 0) {
       if (Math.hypot(v.x, v.z) < 1.5) return
       target = Math.atan2(v.x, v.z)
     } else if (aim !== null) target = aim
     else if (this.wishMag > 0) target = Math.atan2(this.wishX, this.wishZ)
     else return
     const diff = wrapAngle(target - this._yaw)
-    const air = !this._grounded
+    const air = !this._grounded && this.wallT < 0
     const k = 1 - Math.exp(-M.turnSharp * (air ? M.airTurnScale : 1) * dt)
     const max = M.turnRate * (air ? M.airTurnScale : 1) * dt
     this._yaw = wrapAngle(this._yaw + clamp(diff * k, -max, max))
@@ -1078,9 +1454,10 @@ export class PlayerController implements IPlayerController {
 
   /** One footstep event per stride, with the same stride lengths the animator uses. */
   private footsteps(dt: number): void {
+    if (this.wallT >= 0) return this.wallSteps(dt)
     const v = this.velocity
     const sp = Math.hypot(v.x, v.z)
-    if (!this._grounded || this.dashT > 0 || sp < 0.5) {
+    if (!this._grounded || this.dashT > 0 || this.rollT >= 0 || this.slideT >= 0 || sp < 0.5) {
       if (this._grounded) this.stepPhase = 0.5
       return
     }
@@ -1110,6 +1487,9 @@ export class PlayerController implements IPlayerController {
     if (this.dead) next = 'dead'
     else if (this.hurtT > 0) next = 'hurt'
     else if (this.dashT > 0) next = 'dash'
+    else if (this.rollT >= 0) next = 'roll'
+    else if (this.wallT >= 0) next = 'wallRun'
+    else if (this.slideT >= 0) next = 'slide'
     else if (this.attackT > 0) next = 'attack'
     else if (this.sliding) next = 'fall'
     else if (this._flying) next = v.y < M.fallAfterVy ? 'fall' : 'jump'
@@ -1154,5 +1534,6 @@ export class PlayerController implements IPlayerController {
     m.landImpact = this.landImpact
     m.wading = clamp(this.depth / M.wadeMax, 0, 1)
     m.slope = this.slope
+    m.wallSide = this.wallSide
   }
 }
