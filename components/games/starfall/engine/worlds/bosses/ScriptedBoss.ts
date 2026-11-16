@@ -69,6 +69,8 @@ export abstract class ScriptedBoss extends Boss implements LiveEnemy {
   protected lift = 0
   /** Extra aura flare (wind-ups), eased back to 0. */
   protected flare = 0
+  /** The phase the aura is coloured for (colour strings are parsed once per phase, not per frame). */
+  private auraPhase = 0
   private readonly aura: THREE.Mesh[] = []
   private readonly auraU: AuraUniforms
   private readonly sigil: THREE.Mesh
@@ -257,8 +259,11 @@ export abstract class ScriptedBoss extends Boss implements LiveEnemy {
     this.flare = Math.max(0, this.flare - dt * 1.6)
     const colors = this.def.aura[Math.min(this.def.aura.length - 1, this.phase - 1)]
     const u = this.auraU
-    u.uA.value.set(colors[0])
-    u.uB.value.set(colors[1])
+    if (this.auraPhase !== this.phase) {
+      this.auraPhase = this.phase
+      u.uA.value.set(colors[0])
+      u.uB.value.set(colors[1])
+    }
     u.uTime.value = t
     const base = this.mode === 'sleep' ? 0.25 : this.mode === 'dying' ? 1.4 : 0.5 + (this.phase - 1) * 0.22
     const strength = this.def.auraStrength ?? 1

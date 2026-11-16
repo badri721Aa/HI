@@ -97,6 +97,8 @@ export class HpBars {
       this.mesh.instanceMatrix.needsUpdate = true
       this.attr.needsUpdate = true
     }
+    // Enemies that vanished while their bar was up never come round the list again.
+    if (this.trail.size > n) for (const s of this.trail.keys()) if (!s.alive) this.trail.delete(s)
   }
 
   dispose(): void {

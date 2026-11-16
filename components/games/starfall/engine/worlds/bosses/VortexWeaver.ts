@@ -279,6 +279,11 @@ export class VortexWeaver extends ScriptedBoss {
     this.orbitA = 0
   }
 
+  /** A phase change cuts any move short, so a perched Weaver must be sent back up here. */
+  protected phaseChanged(): void {
+    this.liftTo = this.def.hover
+  }
+
   /* ── moves ───────────────────────────────────────────────── */
 
   private done(): void {

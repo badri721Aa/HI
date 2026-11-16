@@ -54,6 +54,8 @@ export class VoidStalker extends ScriptedBoss {
   private orbitA = 0
   private readonly spot = new THREE.Vector3()
   private readonly v = new THREE.Vector3()
+  /** Rend's lunge heading; its own vector because pose() reuses `v` between frames. */
+  private readonly rendDir = new THREE.Vector3()
   private readonly clones: Clone[] = []
   private readonly dark: THREE.Mesh
   private darkness = 0
@@ -201,13 +203,13 @@ export class VoidStalker extends ScriptedBoss {
             const dx = this.spot.x - this.pos.x
             const dz = this.spot.z - this.pos.z
             const d = Math.max(0.5, Math.hypot(dx, dz))
-            this.v.set(dx / d, 0, dz / d)
+            this.rendDir.set(dx / d, 0, dz / d)
           }
-          this.pos.x += this.v.x * 17 * dt
-          this.pos.z += this.v.z * 17 * dt
+          this.pos.x += this.rendDir.x * 17 * dt
+          this.pos.z += this.rendDir.z * 17 * dt
           this.clampToArena(this.pos, this.def.radius + 0.5)
           this.contact(1, 0.9)
-          this.ctx.fx.trail('ghost', { x: this.pos.x, y: this.arena.y + 1.5, z: this.pos.z }, { x: this.pos.x - this.v.x, y: this.arena.y + 1.5, z: this.pos.z - this.v.z }, 0xb26bff)
+          this.ctx.fx.trail('ghost', { x: this.pos.x, y: this.arena.y + 1.5, z: this.pos.z }, { x: this.pos.x - this.rendDir.x, y: this.arena.y + 1.5, z: this.pos.z - this.rendDir.z }, 0xb26bff)
         } else if (this.count === 1) {
           this.count = 2
           this.stun(tune.exposed + 0.4)

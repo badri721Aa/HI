@@ -16,7 +16,7 @@
  * draw() and decorate(); the numbers they use come from MOBS in defs.ts.
  */
 import * as THREE from 'three'
-import type { Collider } from '../../collision'
+import type { Collider, WallPush } from '../../collision'
 import type { EnemyCue, V3 } from '../../events'
 import type { Ctx, LiveEnemy, SpawnOptions, WeaponHit } from '../../types'
 import { heightAt, waterLevelAt } from '../../world/heightfield'
@@ -123,6 +123,7 @@ export abstract class Mob implements LiveEnemy {
   private wasFrozen = false
   private owned: Array<{ dispose(): void }> = []
   private readonly push = { x: 0, y: 0, z: 0 }
+  private readonly pushed = {} as WallPush
   private readonly from: V3 = { x: 0, y: 0, z: 0 }
   private readonly hitPos: V3 = { x: 0, y: 0, z: 0 }
 
@@ -517,7 +518,7 @@ export abstract class Mob implements LiveEnemy {
       this.push.x = p.x
       this.push.y = p.y
       this.push.z = p.z
-      this.ctx.collision.pushOut(this.push, this.radius * 0.85, this.height * 0.9, 0.45)
+      this.ctx.collision.pushOut(this.push, this.radius * 0.85, this.height * 0.9, 0.45, this.pushed)
       p.x = this.push.x
       p.z = this.push.z
       if (this.collider) this.collider.enabled = this.alive

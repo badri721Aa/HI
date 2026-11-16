@@ -286,9 +286,11 @@ export class Enemies implements IEnemies {
       n++
       this.weaponHit(g, h)
     }
-    for (const t of this.targets) {
-      if (n >= max) break
+    for (let i = 0; i < this.targets.length && n < max; i++) {
+      const t = this.targets[i]
       if (t.takeHit(h)) n++
+      // A target that dies from the blow takes itself off the list; stay on its slot.
+      if (this.targets[i] !== t) i--
     }
     return n
   }

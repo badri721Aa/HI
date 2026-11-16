@@ -164,6 +164,8 @@ export class EnemyFactory implements IEnemyFactory {
     await Promise.race([this.loading, cap])
     clearInterval(progress)
     if (capTimer) clearTimeout(capTimer)
+    // The game can be torn down during the wait; dispose() has already released everything.
+    if (!this.projectiles) return
     this._ready = true
     this.warmUp()
     ctx.progress(1)
@@ -173,10 +175,7 @@ export class EnemyFactory implements IEnemyFactory {
       ctx.bus.on('player:respawn', () => this.onRespawn()),
       // Whatever was called up stays behind when the player goes through a portal (a map's own
       // guards are placed again by Worlds right after this).
-      ctx.bus.on('world:travel', () => {
-        this.clear()
-        this.drops?.clear()
-      }),
+      ctx.bus.on('world:travel', () => this.clear()),
     )
   }
 
@@ -236,6 +235,7 @@ export class EnemyFactory implements IEnemyFactory {
       this.projectiles?.clear()
       this.hazards?.clear()
       this.beams?.clear()
+      this.drops?.clear()
     }
   }
 
@@ -262,8 +262,11 @@ export class EnemyFactory implements IEnemyFactory {
     this.live.length = 0
     for (const m of this.mobs) if (m.alive) this.live.push(m)
     for (const m of this.mobs) m.update(dt, live)
-    if (this.mobs.some(m => m.state === 'gone')) this.mobs = this.mobs.filter(m => m.state !== 'gone')
-    for (const b of [...this.bosses]) this.updateBoss(b, dt, live)
+    let gone = false
+    for (const m of this.mobs) if (m.state === 'gone') gone = true
+    if (gone) this.mobs = this.mobs.filter(m => m.state !== 'gone')
+    // Backwards: a boss that finishes removes itself from the list.
+    for (let i = this.bosses.length - 1; i >= 0; i--) this.updateBoss(this.bosses[i], dt, live)
     if (playing) this.projectiles.update(dt)
     this.beams!.flush(dt)
     this.bars!.update(dt, this.mobs)
@@ -489,6 +492,7 @@ export class EnemyFactory implements IEnemyFactory {
     for (const h of this.bosses) {
       const b = h.body
       if (!b || h.stage === 'done' || !b.alive) continue
+      if (b.mode === 'fight') this.ctx.game.setMusic('explore')
       b.reset()
       h.hazards.clear()
       h.stage = 'wait'

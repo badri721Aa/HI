@@ -54,6 +54,8 @@ interface Warn {
   t: number
   delay: number
   boom: (() => void) | null
+  /** Identifies this use of the slot, for cancelWarn(). */
+  ticket: number
 }
 
 interface Shot {
@@ -121,6 +123,7 @@ void main() {
 export class Hazards {
   private rings: Ring[] = []
   private warns: Warn[] = []
+  private warnSeq = 0
   private shots: Shot[] = []
   private spikesPool: Spike[] = []
   private lane: THREE.Mesh
@@ -165,7 +168,7 @@ export class Hazards {
       mesh.visible = false
       mesh.renderOrder = 2
       this.group.add(mesh)
-      this.warns.push({ mesh, mat, on: false, t: 0, delay: 1, boom: null })
+      this.warns.push({ mesh, mat, on: false, t: 0, delay: 1, boom: null, ticket: 0 })
     }
 
     // Dark orbs and ice-rimmed boulders.
@@ -229,14 +232,16 @@ export class Hazards {
   /**
    * A warning circle of radius `r` that fills for `delay` seconds, then calls `boom`.
    * `inner` (0..r) makes it a ring whose middle is safe; `normal` tilts it onto sloped ground.
+   * Returns a ticket for cancelWarn() (0 when no circle could be shown).
    */
-  warn(x: number, y: number, z: number, r: number, delay: number, boom: (() => void) | null, opts?: { inner?: number; normal?: V3 }): void {
+  warn(x: number, y: number, z: number, r: number, delay: number, boom: (() => void) | null, opts?: { inner?: number; normal?: V3 }): number {
     const w = this.warns.find(q => !q.on)
     if (!w) {
       boom?.()
-      return
+      return 0
     }
     w.on = true
+    w.ticket = ++this.warnSeq
     w.t = 0
     w.delay = delay
     w.boom = boom
@@ -249,6 +254,18 @@ export class Hazards {
     w.mat.uniforms.uInner.value = opts?.inner ? THREE.MathUtils.clamp(opts.inner / r, 0, 0.95) : 0
     w.mesh.visible = true
     this.ctx.bus.emit('boss:telegraph', { pos: { x, y, z }, delay })
+    return w.ticket
+  }
+
+  /** Take back a warning whose attack was interrupted: the circle goes and nothing lands. */
+  cancelWarn(ticket: number): void {
+    if (!ticket) return
+    for (const w of this.warns) {
+      if (!w.on || w.ticket !== ticket) continue
+      w.on = false
+      w.boom = null
+      w.mesh.visible = false
+    }
   }
 
   /** An orb (falls, purple blast) or a boulder (thrown on an arc) landing at `to` after `dur` s. */

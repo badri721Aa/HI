@@ -188,6 +188,7 @@ export class ShieldBearer extends Mob {
   private t = 0
   private cd = 1
   private struck = false
+  private bashWarn = 0
 
   private get tn(): ShieldTune {
     return this.tune as ShieldTune
@@ -265,12 +266,15 @@ export class ShieldBearer extends Mob {
     this.t = 0
     this.struck = false
     this.poise = m === 'bash'
+    // A bash cut short (guard broken, flinch) takes its warning circle with it.
+    this.host.hazards.cancelWarn(this.bashWarn)
+    this.bashWarn = 0
     switch (m) {
       case 'bash': {
         this.act('bash', { once: true, speed: 0.9 })
         const p = this.position
         const r = 1.5
-        this.host.hazards.warn(p.x + Math.sin(this.yaw) * 1.5, p.y, p.z + Math.cos(this.yaw) * 1.5, r, this.tn.bashWindup, null)
+        this.bashWarn = this.host.hazards.warn(p.x + Math.sin(this.yaw) * 1.5, p.y, p.z + Math.cos(this.yaw) * 1.5, r, this.tn.bashWindup, null)
         break
       }
       case 'brace':
@@ -287,6 +291,11 @@ export class ShieldBearer extends Mob {
 
   protected onFlinch(): void {
     if (this.mode === 'bash') this.begin('advance')
+  }
+
+  protected onDeath(): void {
+    this.host.hazards.cancelWarn(this.bashWarn)
+    this.bashWarn = 0
   }
 
   protected onCalm(): void {
@@ -306,6 +315,7 @@ export class ShieldBearer extends Mob {
 export class Bomber extends Mob {
   private fuse = -1
   private exploded = false
+  private fuseWarn = 0
 
   private get tn(): BomberTune {
     return this.tune as BomberTune
@@ -333,7 +343,7 @@ export class Bomber extends Mob {
     this.act('raise', { speed: 1.3 })
     this.cue('fuse')
     const p = this.position
-    this.host.hazards.warn(p.x, p.y, p.z, tn.radius, tn.fuse, null)
+    this.fuseWarn = this.host.hazards.warn(p.x, p.y, p.z, tn.radius, tn.fuse, null)
   }
 
   private explode(): void {
@@ -345,6 +355,9 @@ export class Bomber extends Mob {
   }
 
   protected onDeath(byWeapon: boolean): void {
+    // Its own fuse circle goes with it; a dropped bomb draws a smaller one below.
+    this.host.hazards.cancelWarn(this.fuseWarn)
+    this.fuseWarn = 0
     if (this.exploded || !byWeapon) return
     // The bomb drops and goes off a moment later — smaller, but still dangerous (to enemies too).
     const tn = this.tn
@@ -688,7 +701,11 @@ export class Healer extends Mob {
         found = true
       }
     }
-    if (!found || d > tn.flee * 2) return
+    if (!found || d > tn.flee * 2) {
+      // Cornered: carry on supporting and look for a way out again shortly.
+      this.blinkCd = 0.6
+      return
+    }
     this.blinkCd = tn.blinkCooldown
     this.target = null
     this.mode = 'blink'
