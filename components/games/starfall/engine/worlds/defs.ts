@@ -194,28 +194,33 @@ export const MAPS: Record<PortalMapId, MapDef> = {
     where: 'on the Floating Sky Isles',
     unlock: { boss: 'gloomKing' },
     center: SKY,
-    radius: 53,
-    killY: SKY.y - 35,
+    radius: 98,
+    // The cloud sea rolls 43 m below the main isle's lawn.
+    killY: SKY.y - 41,
     // On the high meadows north of Beacon Summit, at the head of the valley that climbs to them
     // between the summit and the falls' mesa (facing down it).
     arch: { x: -42, z: -112, yaw: 0.33 },
-    exit: { x: SKY.x, y: SKY.y, z: SKY.z + 44.6, yaw: Math.PI },
+    // The arrival isle, 4 m above the main isle and 82 m south of it.
+    exit: { x: SKY.x, y: SKY.y + 4, z: SKY.z + 86, yaw: Math.PI },
     checkpoints: [
-      { x: SKY.x, y: SKY.y, z: SKY.z + 40.5, yaw: Math.PI },
-      { x: SKY.x - 5, y: SKY.y, z: SKY.z + 24.5, yaw: Math.PI },
+      { x: SKY.x, y: SKY.y + 4, z: SKY.z + 82, yaw: Math.PI },
+      // The gate isle, facing down its bridge to the shrine's gate.
+      { x: SKY.x + 10, y: SKY.y + 1.2, z: SKY.z + 38, yaw: Math.PI + 0.257 },
     ],
     boss: 'vortexWeaver',
     // The Weaver flies a 9 m orbit and drags the player toward the middle with its vortex: a 19 m
-    // circle (registry) on a 23 m floor so gusts near the rim don't throw anyone off.
+    // circle (registry) on a 25 m lawn inside a ring of standing stones, so gusts near the rim
+    // don't throw anyone off.
     arena: { x: SKY.x, y: SKY.y, z: SKY.z, r: 15 },
-    objective: 'Defeat the Vortex Weaver above the clouds',
+    objective: 'Cross the isles and defeat the Vortex Weaver',
     swirl: ['#f2ffe8', '#47b86a'],
-    // A sniper at the back of the terrace, covered by a rusher and a healer.
+    // On the falls isle past the first bridge: a rusher and a healer, a sniper behind them.
     mobs: [
-      { kind: 'rusher', dx: -3, dz: 29, yaw: 0, patrol: 3, leash: 12 },
-      { kind: 'healer', dx: 3, dz: 31, yaw: 0, patrol: 2, leash: 12 },
-      { kind: 'sniper', dx: 0, dz: 34, yaw: 0, patrol: 1.5, leash: 10 },
+      { kind: 'rusher', dx: -13, dz: 55, dy: 2.5, yaw: 0, patrol: 2.5, leash: 11 },
+      { kind: 'healer', dx: -16.5, dz: 58.5, dy: 2.5, yaw: 0, patrol: 1.5, leash: 10 },
+      { kind: 'sniper', dx: -20.5, dz: 61, dy: 2.5, yaw: 0, patrol: 1, leash: 8 },
     ],
+    // On the main isle's lawn, inside the shrine's ring.
     spawns: ringSpawns(SKY, 9.5, 16.5),
   },
   neon: {
