@@ -129,6 +129,7 @@ vec3 neonN = vNeonN / max(length(vNeonN), 1e-4);
 vec2 np = vNeonP.xz - uNeonCentre.xz;
 float neonTop = step(0.7, neonN.y);
 float neonWet = 0.0;
+vec3 neonPaint = vec3(0.0);
 #ifdef NEON_DECK
 {
   float nr = length(np);
@@ -157,6 +158,8 @@ float neonWet = 0.0;
   float yellow = max(max(neonBand(nr, 17.5, 18.0, wr), lanes), neonBand(nr, 20.3, 21.2, wr) * stripes);
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.76, 0.74), white * wear * onPad);
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.6, 0.1), yellow * wear * onPad);
+  // The markings are reflective paint: they stay readable in the dark.
+  neonPaint = (vec3(0.74, 0.76, 0.74) * white + vec3(0.9, 0.6, 0.1) * yellow * (1.0 - white)) * (wear * onPad * 0.09);
 
   // Rain: damp everywhere, standing water where the noise field dips.
   float wn = texture2D(tNeonNoise, np * 0.019).r * 0.6 + texture2D(tNeonNoise, np * 0.057 + 0.37).r * 0.4;
@@ -188,7 +191,7 @@ const DECK_NORMAL = /* glsl */ `
 
 /** Light from the pools on every surface; on the deck, the bars mirrored in the wet floor. */
 const LIT_EMISSIVE = /* glsl */ `
-totalEmissiveRadiance += diffuseColor.rgb * (1.0 - metalnessFactor * 0.5) * neonPools(vNeonP, neonN);
+totalEmissiveRadiance += diffuseColor.rgb * (1.0 - metalnessFactor * 0.5) * neonPools(vNeonP, neonN) + neonPaint;
 #ifdef NEON_DECK
 if (neonTop > 0.5) {
   vec3 nv = vNeonP - cameraPosition;
@@ -257,12 +260,14 @@ varying vec3 vAccent;
 varying vec4 vInfo;
 varying float vWorldY;
 varying float vLit;
+varying vec4 vRoof;
 void main() {
   // The box is a unit cube: its size is the instance's scale.
   vec3 sc = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
   vec3 lp = (position + 0.5) * sc;
   vec2 wm = abs(normal.x) > 0.5 ? lp.zy : lp.xy;
   vWuv = wm / (aWin.z * ${WINDOW_GRID}.0) + aWin.xy;
+  vRoof = vec4(lp.xz, sc.xz);
   vTint = aTint;
   vAccent = aAccent;
   vLit = aWin.w;
@@ -289,9 +294,20 @@ varying vec3 vAccent;
 varying vec4 vInfo;
 varying float vWorldY;
 varying float vLit;
+varying vec4 vRoof;
+${HASH_GLSL}
 void main() {
   float wall = vInfo.x;
   vec3 col = uWall * vInfo.w * mix(0.5, 1.0, wall);
+  // Roofs: a parapet round the edge, plant boxes and a few small lamps (fading out where they get too small to draw).
+  vec2 rim = min(vRoof.xy, vRoof.zw - vRoof.xy);
+  vec2 rg = vRoof.xy / 3.2;
+  vec2 rf = abs(fract(rg) - 0.5);
+  float rh = neonHash(floor(rg) + floor(vRoof.zw * 4.0 + 0.5));
+  float near = clamp(1.5 - max(fwidth(rg.x), fwidth(rg.y)) * 4.0, 0.0, 1.0) * (1.0 - wall);
+  float plant = step(0.72, rh) * step(max(rf.x, rf.y), 0.34) * step(1.6, min(rim.x, rim.y));
+  col *= 1.0 + (plant * 1.1 + (1.0 - step(0.7, min(rim.x, rim.y))) * 0.8) * near;
+  col += vAccent * (step(0.93, rh) * (1.0 - smoothstep(0.03, 0.09, max(rf.x, rf.y))) * near * 0.8);
   col += texture2D(tWindows, vWuv).rgb * vTint * (vLit * wall);
   // A lit band under the roof line.
   float band = smoothstep(vInfo.z - 2.4, vInfo.z - 2.0, vInfo.y) * (1.0 - smoothstep(vInfo.z - 1.0, vInfo.z - 0.6, vInfo.y));

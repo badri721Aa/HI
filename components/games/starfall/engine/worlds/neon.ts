@@ -71,7 +71,7 @@ const JETS: ReadonlyArray<{ z: number; beat: Beat }> = [
   { z: 39.3, beat: { period: 6, offset: 0, open: 2.2 } },
   { z: 42.7, beat: { period: 6, offset: 3, open: 2.2 } },
 ]
-const JET_RADIUS = 0.85
+const JET_RADIUS = 0.7
 const JET_BUILD_UP = 0.5
 
 /** A skyscraper: a box from the streets up to `top`, turned by `yaw`; its +z face carries its sign. */
@@ -180,7 +180,7 @@ export function buildNeon(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
     owned.push(glowMesh.geometry, glowMesh.material as THREE.Material)
   }
   const rain = own(buildRain(Math.round(Math.min(1600, Math.max(420, ctx.quality.particles * 0.7))), uTime))
-  const fx = [rain, own(buildSteam(site.vents, low ? 4 : 7, uTime)), own(buildTraffic(trafficLanes(site, low ? 3 : 6), uTime)), own(buildSmog(ctx, cx, cy - STREETS + 30, cz, 420, uTime))]
+  const fx = [rain, own(buildSteam(site.vents, low ? 4 : 7, uTime)), own(buildTraffic(trafficLanes(site, low ? 3 : 6), uTime)), own(buildSmog(ctx, cx, cy - STREETS + 26, cz, 420, uTime))]
   for (const f of fx) kit.addObject(f.object)
   abyss(ctx, kit, owned, def, 'city', ['#07040f', '#e23ad0'], uTime, cy - STREETS)
 
@@ -333,7 +333,7 @@ function approach(s: Site): void {
   for (const j of JETS) {
     kit.cylinder({ x: cx, y: cy - 0.34, z: cz + j.z, r: 0.5, h: 0.22, segments: 12, mat: mats.stripes, uvScale: 0.8, castShadow: false })
     glow.flat(cx, cy + 0.02, cz + j.z, 1.5, 1.5, SHAPE.ring, AMBER, 1.6, MODE.breathe, j.beat.offset / j.beat.period)
-    s.vents.push({ x: cx, y: cy + 0.1, z: cz + j.z, rise: 3.2, spread: 0.85, life: 0.9, beat: j.beat })
+    s.vents.push({ x: cx, y: cy + 0.1, z: cz + j.z, rise: 3.2, spread: 0.8, life: 0.9, beat: j.beat })
   }
   kit.add(new THREE.CylinderGeometry(0.11, 0.11, span, 8).rotateX(Math.PI / 2), mats.steel, place(cx + 0.9, cy - 0.34, cz + bz), { castShadow: false })
 
@@ -431,7 +431,11 @@ function arrivalRoof(s: Site): void {
   // The exhaust fan: stepping onto it throws the player up to the landing.
   const fx = cx + FAN.x
   const fz = cz + FAN.z
-  kit.cylinder({ x: fx, y, z: fz, r: FAN.r, h: FAN.h, segments: 24, mat: mats.stripes, uvScale: 1.2, collide: { surface: 'metal', bounce: FAN.launch } })
+  const blow = (): void => {
+    s.ctx.player.launch(FAN.launch)
+    s.ctx.bus.emit('player:bounce', { pos: { x: fx, y: y + FAN.h, z: fz } })
+  }
+  kit.cylinder({ x: fx, y, z: fz, r: FAN.r, h: FAN.h, segments: 24, mat: mats.stripes, uvScale: 1.2, collide: { surface: 'metal', onStand: blow } })
   kit.cylinder({ x: fx, y: y + FAN.h, z: fz, r: FAN.r - 0.22, h: 0.02, segments: 24, mat: mats.steel, castShadow: false })
   kit.box({ x: fx, y: y + FAN.h + 0.02, z: fz, w: 1.75, h: 0.02, d: 1.75, mat: mats.grate, uvScale: 0.6, castShadow: false })
   for (let k = 0; k < 4; k++) {
@@ -643,12 +647,12 @@ function fillTowers(mesh: THREE.InstancedMesh, s: Site): void {
 
 /** Sky-car lanes passing the roofs at a distance: [bearing (deg), distance, height, colour]. */
 const LANES: ReadonlyArray<readonly [number, number, number, string]> = [
-  [180, 118, 8, RED],
-  [232, 84, -26, '#ffe2b0'],
-  [95, 132, 22, CYAN],
-  [318, 96, -12, RED],
-  [20, 140, 30, '#ffe2b0'],
-  [140, 100, -34, MAGENTA],
+  [180, 118, 24, RED],
+  [232, 84, 14, '#ffe2b0'],
+  [95, 132, 38, CYAN],
+  [318, 96, 30, RED],
+  [20, 140, 46, '#ffe2b0'],
+  [140, 100, -18, MAGENTA],
 ]
 
 function trafficLanes(s: Site, count: number): Lane[] {

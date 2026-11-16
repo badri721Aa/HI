@@ -79,7 +79,7 @@ void main() {
   float dist = length(toCam);
   vec3 side = cross(fall, toCam);
   side /= max(length(side), 1e-4);
-  p += fall * (-(0.5 + aSeed.z * 0.5) * aCorner.y) + side * (aCorner.x * 0.012);
+  p += fall * (-(0.5 + aSeed.z * 0.5) * aCorner.y) + side * (aCorner.x * 0.015);
   vX = aCorner.x;
   vA = (0.35 + 0.65 * aSeed.y) * (1.0 - smoothstep(11.0, 17.0, dist)) * smoothstep(0.6, 2.5, dist);
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
@@ -90,7 +90,7 @@ varying float vA;
 varying float vX;
 void main() {
   float a = vA * (1.0 - abs(vX));
-  gl_FragColor = vec4(vec3(0.5, 0.58, 0.85) * a * 0.55, 1.0);
+  gl_FragColor = vec4(vec3(0.5, 0.58, 0.85) * a * 0.85, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`
@@ -109,6 +109,7 @@ export function buildRain(count: number, uTime: TimeUniform): Effect & { center:
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
   })
   return { ...mesh('neon-rain', geo, mat, 6), center }
 }
@@ -241,7 +242,7 @@ void main() {
   vec3 head = aFrom + lane * u;
   vec3 side = cross(dir, cameraPosition - head);
   side /= max(length(side), 1e-4);
-  vec3 p = head - dir * (aCorner.y * aCar.z) + side * (aCorner.x * 0.45);
+  vec3 p = head - dir * (aCorner.y * aCar.z) + side * (aCorner.x * 0.8);
   vQ = aCorner;
   vTint = aTint;
   vA = smoothstep(0.0, 0.06, u) * (1.0 - smoothstep(0.94, 1.0, u));
@@ -260,7 +261,7 @@ void main() {
   float tail = (1.0 - vQ.y) * (1.0 - vQ.y);
   float across = 1.0 - abs(vQ.x);
   // A white-hot head, then the trail in the car's colour.
-  vec3 col = (vTint * tail + vec3(1.0) * smoothstep(0.9, 1.0, 1.0 - vQ.y)) * across * vA * 1.6;
+  vec3 col = (vTint * tail + vec3(1.0) * smoothstep(0.9, 1.0, 1.0 - vQ.y)) * across * vA * 3.0;
   #ifdef USE_FOG
     col *= 1.0 - 0.85 * smoothstep(fogNear, fogFar, vFogDepth);
   #endif
@@ -275,7 +276,7 @@ export function buildTraffic(lanes: readonly Lane[], uTime: TimeUniform): Effect
   const cars: Array<{ lane: Lane; phase: number; length: number; tint: THREE.Color }> = []
   for (const lane of lanes) {
     const tint = new THREE.Color(lane.color)
-    for (let k = 0; k < lane.cars; k++) cars.push({ lane, phase: (k + rnd() * 0.7) / lane.cars, length: 9 + rnd() * 9, tint })
+    for (let k = 0; k < lane.cars; k++) cars.push({ lane, phase: (k + rnd() * 0.7) / lane.cars, length: 14 + rnd() * 12, tint })
   }
   const count = cars.length
   const geo = quads(count)
@@ -316,7 +317,7 @@ varying vec2 vP;
 void main() {
   float n = texture2D(tNoise, vP * 0.0031 + vec2(uTime * 0.003, 0.0)).r * 0.6 + texture2D(tNoise, vP * 0.0093 - vec2(0.0, uTime * 0.005)).r * 0.4;
   float edge = 1.0 - smoothstep(0.55, 1.0, length(vP) / uRadius);
-  gl_FragColor = vec4(uColor * (0.55 + 0.9 * n), (0.3 + 0.5 * n) * edge);
+  gl_FragColor = vec4(uColor * (0.55 + 0.9 * n), (0.5 + 0.45 * n) * edge);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`
