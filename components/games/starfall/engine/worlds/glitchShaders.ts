@@ -191,7 +191,10 @@ float glSolid = 1.0;
   glTint = mix(uGlCyan, uGlMagenta, vGlPhase.y) * (1.0 + 0.15 * vGlPhase.y);
   glSolid = vGlPhase.x;
 #endif
-vec3 glEmit = glTint * ((glMajor * 1.5 + glMinor * 0.3 + glMark * 1.3) * glTop + glMajor * 0.35 * glBottom + glRim * 2.0 + glRimGlow * 0.2 + glBand);
+// Where a grid line runs along the rim the brighter of the two shows: summed, every slab's edge
+// would be bright enough to bloom into a haze over the whole view.
+float glLines = max((glMajor * 1.5 + glMinor * 0.3 + glMark * 1.3) * glTop + glMajor * 0.35 * glBottom, glRim * 1.9);
+vec3 glEmit = glTint * (glLines + glRimGlow * 0.2 + glBand);
 glEmit *= 0.3 + 0.7 * glSolid;
 glEmit += (uGlMagenta * glPulse.x + vec3(0.8, 1.0, 1.0) * glPulse.y + uGlCyan * glPulse.z) * (1.3 * glSolid);
 // The sun's shadow on this point (1 = lit), set in the light loop.
