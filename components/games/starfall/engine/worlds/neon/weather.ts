@@ -79,9 +79,9 @@ void main() {
   float dist = length(toCam);
   vec3 side = cross(fall, toCam);
   side /= max(length(side), 1e-4);
-  p += fall * (-(0.5 + aSeed.z * 0.5) * aCorner.y) + side * (aCorner.x * 0.015);
+  p += fall * (-(0.5 + aSeed.z * 0.5) * aCorner.y) + side * (aCorner.x * 0.012);
   vX = aCorner.x;
-  vA = (0.35 + 0.65 * aSeed.y) * (1.0 - smoothstep(11.0, 17.0, dist)) * smoothstep(0.6, 2.5, dist);
+  vA = (0.35 + 0.65 * aSeed.y) * (1.0 - smoothstep(11.0, 17.0, dist)) * smoothstep(1.5, 4.5, dist);
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`
 
@@ -90,12 +90,12 @@ varying float vA;
 varying float vX;
 void main() {
   float a = vA * (1.0 - abs(vX));
-  gl_FragColor = vec4(vec3(0.5, 0.58, 0.85) * a * 0.85, 1.0);
+  gl_FragColor = vec4(vec3(0.5, 0.58, 0.85) * a * 0.6, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`
 
-/** Light rain around the camera: `count` streaks. Set `center.value` to the camera position each frame. */
+/** Light rain around the camera: `count` streaks. Copy the camera position into `center` each frame. */
 export function buildRain(count: number, uTime: TimeUniform): Effect & { center: THREE.Vector3 } {
   const rnd = seeded(91)
   const geo = quads(count)

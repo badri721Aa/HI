@@ -193,7 +193,7 @@ export function buildNeon(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
       rain.center.copy(ctx.camera.position)
 
       // The billboard's light follows its picture (the wipe takes the last fifth of each one).
-      const cyc = Math.max(0, t) / HOLO_PERIOD
+      const cyc = (Number.isFinite(t) ? Math.max(0, t) : 0) / HOLO_PERIOD
       const ad = Math.floor(cyc) % HOLO_ADS
       const wipe = Math.min(1, Math.max(0, (cyc - Math.floor(cyc) - 0.8) / 0.2))
       holoTint.copy(holoTints[ad]).lerp(holoTints[(ad + 1) % HOLO_ADS], wipe)
@@ -546,13 +546,16 @@ function cable(s: Site, a: readonly [number, number, number], b: readonly [numbe
 const TINTS: ReadonlyArray<readonly [number, number, number]> = [[1, 1, 1], [1, 1, 1], [0.75, 0.9, 1.25], [1.25, 0.8, 1.05], [1.2, 1, 0.75]]
 const ACCENTS: ReadonlyArray<readonly [number, number, number]> = [[2.2, 0.3, 1.7], [0.2, 1.6, 2.2], [2.2, 1.2, 0.3], [0.9, 0.5, 2.2], [0, 0, 0], [0, 0, 0]]
 
-/** The towers close enough to matter: [x, z, width, depth, top, what its face carries]. */
-const NEAR: ReadonlyArray<readonly [number, number, number, number, number, 'holo' | 'column' | 'word' | 'none', string]> = [
-  [HOLO.x, HOLO.z, 20, 20, 2, 'holo', CYAN],
+/**
+ * The towers close enough to matter: [x, z, width, depth, top, the sign on its face and its
+ * colour]. The first carries the holographic billboard on its roof.
+ */
+const NEAR: ReadonlyArray<readonly [number, number, number, number, number, 'column' | 'word' | null, string]> = [
+  [HOLO.x, HOLO.z, 20, 20, 2, null, CYAN],
   [42, -46, 22, 22, 58, 'column', AMBER],
   [47, 4, 18, 20, 17, 'word', CYAN],
   [41, 55, 16, 18, 5, 'column', MAGENTA],
-  [-49, 27, 18, 16, -9, 'none', CYAN],
+  [-49, 27, 18, 16, -9, null, CYAN],
   [-41, 65, 16, 20, 9, 'word', VIOLET],
 ]
 

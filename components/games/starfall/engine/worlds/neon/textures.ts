@@ -49,7 +49,7 @@ const MISC_Y = 768
 export const GLYPHS = GLYPH_COLS * GLYPH_ROWS
 
 /** The made-up names on the word signs (index = word cell). */
-const WORDS = ['QUORVEX', 'NYXLUME', 'VANTHEX', 'OZMIRA'] as const
+const WORDS = ['QUORVEX', 'ZEPHLUME', 'VANTHEX', 'OZMIRA'] as const
 export type WordId = 0 | 1 | 2 | 3
 
 function cell(x: number, y: number, w: number, h: number, inset = 0): Cell {
