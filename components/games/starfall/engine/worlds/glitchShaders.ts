@@ -188,10 +188,10 @@ vec3 glTint = uGlCyan;
 float glSolid = 1.0;
 #ifdef GLITCH_TILE
   // Warning: the tile's light turns magenta and swells. Phased out, its outline stays, dimmed.
-  glTint = mix(uGlCyan, uGlMagenta, vGlPhase.y) * (1.0 + 0.6 * vGlPhase.y);
+  glTint = mix(uGlCyan, uGlMagenta, vGlPhase.y) * (1.0 + 0.15 * vGlPhase.y);
   glSolid = vGlPhase.x;
 #endif
-vec3 glEmit = glTint * ((glMajor * 1.5 + glMinor * 0.3 + glMark * 1.3) * glTop + glMajor * 0.35 * glBottom + glRim * 2.4 + glRimGlow * 0.22 + glBand);
+vec3 glEmit = glTint * ((glMajor * 1.5 + glMinor * 0.3 + glMark * 1.3) * glTop + glMajor * 0.35 * glBottom + glRim * 2.0 + glRimGlow * 0.2 + glBand);
 glEmit *= 0.3 + 0.7 * glSolid;
 glEmit += (uGlMagenta * glPulse.x + vec3(0.8, 1.0, 1.0) * glPulse.y + uGlCyan * glPulse.z) * (1.3 * glSolid);
 // The sun's shadow on this point (1 = lit), set in the light loop.
@@ -204,7 +204,7 @@ float glGraze2 = glGraze * glGraze;
 float glFresnel = 0.04 + 0.96 * glGraze2 * glGraze2 * glGraze;
 // The mirrored view direction, turned from view space into the world (the view matrix is a rotation).
 vec3 glBounce = normalize((vec4(reflect(-geometryViewDir, normal), 0.0) * viewMatrix).xyz);
-vec3 glMirror = glHorizon(glBounce, uGlCyan, uGlMagenta) * (glFresnel * 0.9);
+vec3 glMirror = glHorizon(glBounce, uGlCyan, uGlMagenta) * (glFresnel * 0.4);
 #if GLITCH_STREAKS > 0
   // A pylon's light mirrors as a streak from its foot toward the eye, widening as it runs.
   vec2 glEye = cameraPosition.xz - uGlOrigin;
@@ -257,7 +257,7 @@ export interface FloorOptions {
 }
 
 export function floorMaterial(ctx: Ctx, u: GlitchUniforms, o: FloorOptions): THREE.MeshStandardMaterial {
-  const mat = new THREE.MeshStandardMaterial({ color: '#232a33', roughness: 0.2, metalness: 0 })
+  const mat = new THREE.MeshStandardMaterial({ color: '#1a2028', roughness: 0.2, metalness: 0, envMapIntensity: 0.45 })
   mat.defines = { ...mat.defines, GLITCH_STREAKS: o.pylons.length }
   if (o.tile) mat.defines.GLITCH_TILE = o.tile.thick.toFixed(3)
   mat.onBeforeCompile = sh => {
@@ -525,7 +525,7 @@ export function domeMaterial(u: GlitchUniforms): THREE.ShaderMaterial {
         vec3 glow = glHorizon(d, uCyan, uMagenta);
         float az = d.x / max(length(d.xz), 1e-3);
         vec3 tint = mix(uMagenta, uCyan, smoothstep(-0.9, 0.9, az));
-        vec3 col = glow * 0.22 + tint * (rings * low * low * 0.42 + sweep * sweep * 0.3);
+        vec3 col = glow * 0.13 + tint * (rings * low * low * 0.36 + sweep * sweep * 0.3);
         gl_FragColor = vec4(min(col, vec3(2.0)), 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

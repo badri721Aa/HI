@@ -418,7 +418,8 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     bounce: '#041014',
     cloudLit: '#0f5a60',
     cloudShade: '#020a0e',
-    cloudCover: 0.7,
+    // No clouds in a digital void (the cover is a threshold: 1 clears the sky).
+    cloudCover: 1,
     hemiSky: '#5ab8c8',
     hemiGround: '#0a3a40',
     hemiIntensity: 1.1,

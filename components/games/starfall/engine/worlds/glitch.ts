@@ -118,7 +118,7 @@ export function buildGlitch(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   const shell = own(new THREE.MeshStandardMaterial({
     map: ctx.textures.get('stone_albedo'), normalMap: ctx.textures.get('stone_normal'), color: '#2a323e', roughness: 0.5, metalness: 0.6,
   }))
-  const trim = kit.mat('glow', { color: '#c8fbff', emissive: CYAN, emissiveIntensity: 2, key: 'glitch-trim' })
+  const trim = kit.mat('glow', { color: '#c8fbff', emissive: CYAN, emissiveIntensity: 1.5, key: 'glitch-trim' })
   const wire = new WireBatch()
   const metal = { surface: 'metal' as const }
 
@@ -126,10 +126,11 @@ export function buildGlitch(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   const pylon = (x: number, y: number, z: number, height: number, width: number, tint: number) => {
     const foot = width + 0.4
     kit.box({ x, y, z, w: foot, h: 0.5, d: foot, mat: shell, collide: metal })
-    kit.box({ x, y: y + 0.5, z, w: foot + 0.06, h: 0.05, d: foot + 0.06, mat: trim, castShadow: false })
-    const look: WireLook = { tint, glow: 1.5, line: 0.028 * width }
+    // A lit band round the foot (a plate through it: only its edge shows).
+    kit.box({ x, y: y + 0.36, z, w: foot + 0.06, h: 0.05, d: foot + 0.06, mat: trim, castShadow: false })
+    const look: WireLook = { tint, glow: 1.15, line: 0.028 * width }
     wire.mast(x, y + 0.5, z, width, height, width * 1.5, look)
-    wire.beam(x, y + 0.5, z, height + 1.5, width * 0.7, { tint, glow: 1.6, line: 0 })
+    wire.beam(x, y + 0.5, z, height + 1.5, width * 0.7, { tint, glow: 1, line: 0 })
     kit.add(new THREE.OctahedronGeometry(width * 0.35, 0), trim, place(x, y + 0.5 + height + width * 0.35, z), { castShadow: false })
     // Thin enough that the camera looks past it.
     kit.own(ctx.collision.addCylinder({ x, y: y + 0.5, z, r: Math.min(0.55, width * 0.7), h: height, surface: 'metal' }))
@@ -147,7 +148,7 @@ export function buildGlitch(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
     for (const b of octagonBoxes(r)) kit.own(ctx.collision.addBox({ x: cx, y: under - h / 2, z: cz, hx: b.hx, hy: h / 2, hz: b.hz, yaw: b.yaw, surface: 'metal' }))
     under -= h
   }
-  wire.beam(cx, under, cz, -46, 3.2, { tint: 0, glow: 1.3, line: 0 })
+  wire.beam(cx, under, cz, -46, 3.2, { tint: 0, glow: 1, line: 0 })
   for (const p of pylons) pylon(cx + p.x, cy, cz + p.y, 10, 0.8, p.w)
 
   // ── the pads: a slab each, on an inverted ziggurat with a beam of light down from its tip ──
@@ -166,7 +167,7 @@ export function buildGlitch(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
       kit.box({ x, y: below - 0.1, z, w: bw + 0.12, h: 0.1, d: bd + 0.12, mat: trim, castShadow: false })
       below -= bh
     }
-    wire.beam(x, below, z, -30, Math.min(w, d) * 0.2, { tint: 0, glow: 1.2, line: 0 })
+    wire.beam(x, below, z, -30, Math.min(w, d) * 0.2, { tint: 0, glow: 1, line: 0 })
   }
   // Tall pylons behind the arch, corner posts on the deck and the monolith's pad.
   const [entrance, , , deck, , node] = PADS
