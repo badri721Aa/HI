@@ -224,22 +224,24 @@ export const MAPS: Record<PortalMapId, MapDef> = {
     where: 'in the Neon Metropolis',
     unlock: { boss: 'frostGolem' },
     center: NEON,
-    radius: 52,
+    radius: 80,
     killY: NEON.y - 30,
     // In the fields east of Meadow Village, facing the village.
     arch: { x: 50, z: 68, yaw: Math.atan2(-36, -16) },
-    exit: { x: NEON.x, y: NEON.y, z: NEON.z + 43.6, yaw: Math.PI },
+    // On the arrival roof, 5 m below the helipad and south of the megatower.
+    exit: { x: NEON.x, y: NEON.y - 5, z: NEON.z + 66.5, yaw: Math.PI },
     checkpoints: [
-      { x: NEON.x, y: NEON.y, z: NEON.z + 39.5, yaw: Math.PI },
+      { x: NEON.x, y: NEON.y - 5, z: NEON.z + 62.5, yaw: Math.PI },
+      // On the megatower's apron, across the bridge.
       { x: NEON.x - 5, y: NEON.y, z: NEON.z + 23.5, yaw: Math.PI },
     ],
     boss: 'plasmaOverlord',
     // The Overlord's sweeping beams reach 1.35 × its circle: an 18 m circle (registry) on a 22 m
-    // rooftop keeps every beam over the floor or just past its rim.
+    // helipad keeps every beam over the floor or just past its rim.
     arena: { x: NEON.x, y: NEON.y, z: NEON.z, r: 14.5 },
-    objective: 'Defeat the Plasma Overlord on the rooftop',
+    objective: 'Defeat the Plasma Overlord on the helipad',
     swirl: ['#ffd6fb', '#d02ad6'],
-    // A turret thrower behind a shield, and a sniper painting the way in.
+    // On the apron: a turret thrower behind a shield, and a sniper painting the way in.
     mobs: [
       { kind: 'shieldBearer', dx: -2.5, dz: 28.5, yaw: 0, patrol: 2, leash: 12 },
       { kind: 'turretSpawner', dx: -3, dz: 32, yaw: 0, patrol: 2, leash: 12 },
