@@ -118,19 +118,18 @@ export function isleUnder(r: number, depth: number, seed: number): THREE.BufferG
   const tip = rings * seg
   const pos: number[] = []
   const uv: number[] = []
-  /** One facet, wound to face down (or outward, on the skirt's wall). */
+  /** One facet, wound to face down and out (the rock is a height field hanging under the lawn). */
   const tri = (a: number, b: number, c: number) => {
-    const ax = pts[a * 3], ay = pts[a * 3 + 1], az = pts[a * 3 + 2]
-    let bx = pts[b * 3], by = pts[b * 3 + 1], bz = pts[b * 3 + 2]
-    let cx = pts[c * 3], cy = pts[c * 3 + 1], cz = pts[c * 3 + 2]
-    const nx = (by - ay) * (cz - az) - (bz - az) * (cy - ay)
-    const ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az)
-    const nz = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
-    const len = Math.hypot(nx, ny, nz)
-    if (len < 1e-9) return
-    const flat = Math.abs(ny) > 0.2 * len
-    const out = nx * (ax + bx + cx) + nz * (az + bz + cz)
-    if (flat ? ny > 0 : out < 0) {
+    const ax = pts[a * 3]
+    const ay = pts[a * 3 + 1]
+    const az = pts[a * 3 + 2]
+    let bx = pts[b * 3]
+    let by = pts[b * 3 + 1]
+    let bz = pts[b * 3 + 2]
+    let cx = pts[c * 3]
+    let cy = pts[c * 3 + 1]
+    let cz = pts[c * 3 + 2]
+    if ((bz - az) * (cx - ax) - (bx - ax) * (cz - az) > 0) {
       ;[bx, by, bz, cx, cy, cz] = [cx, cy, cz, bx, by, bz]
     }
     pos.push(ax, ay, az, bx, by, bz, cx, cy, cz)
@@ -215,15 +214,16 @@ export function isleMaterial(ctx: Ctx): THREE.MeshStandardMaterial {
           float grain = texture2D(tIsleNoise, vIsleW.xz * 0.19 + vIsleW.y * 0.083).r;
           // Rock in warm and cool strata, banded by height.
           float strata = texture2D(tIsleNoise, vec2(vIsleW.y * 0.09 + patches * 0.2, 0.37)).r;
-          vec3 col = rock * mix(vec3(0.78, 0.7, 0.64), vec3(1.2, 1.1, 0.98), smoothstep(0.3, 0.7, strata));
+          vec3 col = mix(vec3(dot(rock, vec3(0.34))), rock, 0.55) * mix(vec3(0.74, 0.72, 0.72), vec3(1.22, 1.14, 1.02), smoothstep(0.3, 0.7, strata));
           // Moss on ledges that look up.
           float moss = smoothstep(0.35, 0.8, isleN.y) * smoothstep(0.35, 0.65, grain) * smoothstep(0.6, 1.4, vIsleDepth);
           col = mix(col, vec3(0.2, 0.27, 0.1) * (0.7 + 0.6 * grain), moss * 0.7);
           // The earth under the turf.
-          vec3 dirt = texture2D(tIsleDirt, vIsleW.xz * 0.27 + vIsleW.y * 0.19).rgb * vec3(0.82, 0.7, 0.58);
-          col = mix(col, dirt, 1.0 - smoothstep(0.5, 2.4, vIsleDepth + (grain - 0.5) * 1.8));
+          vec3 dirt = texture2D(tIsleDirt, vIsleW.xz * 0.27 + vIsleW.y * 0.19).rgb * vec3(0.7, 0.6, 0.5);
+          col = mix(col, dirt, 1.0 - smoothstep(0.4, 1.7, vIsleDepth + (grain - 0.5) * 1.3));
           // Grass on top, and turf draped a little way over the lip.
-          vec3 grass = texture2D(tIsleGrass, vIsleW.xz * 0.23).rgb * mix(vec3(0.8, 0.94, 0.66), vec3(1.1, 1.08, 0.8), smoothstep(0.25, 0.75, patches));
+          float sward = smoothstep(0.25, 0.75, patches * 0.7 + grain * 0.3);
+          vec3 grass = texture2D(tIsleGrass, vIsleW.xz * 0.23).rgb * mix(vec3(0.7, 0.86, 0.6), vec3(1.12, 1.06, 0.74), sward);
           float onTop = smoothstep(0.5, 0.8, isleN.y) * (1.0 - smoothstep(0.3, 0.7, vIsleDepth));
           float drape = 1.0 - smoothstep(0.05, 0.35 + grain * 0.9, vIsleDepth);
           col = mix(col, grass, max(onTop, drape));
@@ -252,11 +252,11 @@ export interface CloudLook {
 /** The cloud sea's height field (0 … 1) at p metres from the map's centre. */
 const SEA_HEIGHT = /* glsl */ `
 uniform float uTime;
-uniform sampler2D tCloud;
+uniform sampler2D tSeaNoise;
 float seaH(vec2 p, float lod) {
-  float a = textureLod(tCloud, p * 0.0031 + vec2(uTime * 0.0016, uTime * 0.0007), lod).r;
-  float b = textureLod(tCloud, p * 0.0113 - vec2(uTime * 0.0031, 0.0), lod + 1.5).r;
-  return a * 0.72 + b * 0.28;
+  float a = textureLod(tSeaNoise, p * 0.0037 + vec2(uTime * 0.0012, uTime * 0.0005), lod).r;
+  float b = textureLod(tSeaNoise, p * 0.0131 - vec2(uTime * 0.0027, 0.0), lod + 1.0).r;
+  return a * 0.68 + b * 0.32;
 }`
 
 export interface CloudSea {
@@ -272,6 +272,7 @@ export function cloudSea(ctx: Ctx, uTime: TimeUniform, x: number, y: number, z: 
   const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog])
   Object.assign(uniforms, {
     uTime,
+    tSeaNoise: { value: ctx.textures.get('noise') },
     tCloud: { value: ctx.textures.get('clouds') },
     uOrigin: { value: new THREE.Vector2(x, z) },
     uAmp: { value: amp },
@@ -299,6 +300,7 @@ export function cloudSea(ctx: Ctx, uTime: TimeUniform, x: number, y: number, z: 
     fragmentShader: /* glsl */ `
       #include <common>
       #include <fog_pars_fragment>
+      uniform sampler2D tCloud;
       uniform vec2 uOrigin;
       uniform float uAmp;
       uniform vec3 uSun;
@@ -310,15 +312,16 @@ export function cloudSea(ctx: Ctx, uTime: TimeUniform, x: number, y: number, z: 
       void main() {
         vec2 p = vW.xz - uOrigin;
         float e = 3.0 + distance(vW.xz, cameraPosition.xz) * 0.03;
-        float h = seaH(p, 1.0);
-        float hx = seaH(p + vec2(e, 0.0), 1.0);
-        float hz = seaH(p + vec2(0.0, e), 1.0);
-        float fine = texture2D(tCloud, p * 0.031 + vec2(uTime * 0.004, 0.0)).r;
-        vec3 n = normalize(vec3((h - hx) * uAmp * 4.0 / e, 1.0, (h - hz) * uAmp * 4.0 / e));
-        float lit = clamp(dot(n, uSun) * 0.6 + 0.42, 0.0, 1.0);
-        float crest = smoothstep(0.3, 0.7, h + (fine - 0.5) * 0.2);
-        vec3 col = mix(uShade, uLit, lit * (0.3 + 0.7 * crest));
-        col = mix(uDeep, col, smoothstep(0.12, 0.5, h + (fine - 0.5) * 0.12));
+        float h = seaH(p, 0.0);
+        float hx = seaH(p + vec2(e, 0.0), 0.0);
+        float hz = seaH(p + vec2(0.0, e), 0.0);
+        // Wisps drifting over the billows.
+        float wisp = texture2D(tCloud, p * 0.011 + vec2(uTime * 0.004, uTime * 0.002)).r;
+        vec3 n = normalize(vec3((h - hx) * uAmp * 16.0 / e, 1.0, (h - hz) * uAmp * 16.0 / e));
+        float lit = clamp(dot(n, uSun) * 0.7 + 0.36, 0.0, 1.0);
+        float crest = smoothstep(0.34, 0.66, h);
+        vec3 col = mix(uShade, uLit, clamp(lit * (0.45 + 0.55 * crest) + wisp * 0.22, 0.0, 1.0));
+        col = mix(uDeep, col, smoothstep(0.24, 0.47, h + wisp * 0.1));
         gl_FragColor = vec4(clamp(col, 0.0, 1.5), 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

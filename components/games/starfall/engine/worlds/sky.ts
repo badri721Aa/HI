@@ -178,7 +178,7 @@ export function buildSky(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   /* ── materials ─────────────────────────────────────────── */
 
   const ground = own(isleMaterial(ctx))
-  const paving = kit.mat('stone', { color: '#d8d2c4', key: 'sky-paving' })
+  const paving = kit.mat('stone', { color: '#ebe5d8', key: 'sky-paving' })
   const monolithMat = kit.mat('stone', { color: '#c9c3b6', roughness: 0.96, key: 'sky-monolith' })
   const mossy = kit.mat('mossStone', { color: '#a7b98c', key: 'sky-mossy' })
   const rune = kit.mat('glow', { color: '#e8fbff', emissive: '#7fe8ff', emissiveIntensity: 1.3, key: 'sky-rune' })
@@ -368,10 +368,10 @@ export function buildSky(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
 
   /* ── the cloud sea and the cumulus rising from it ──────── */
 
-  const cloudLook: CloudLook = { lit: '#ffffff', shade: '#a9bcd8', deep: '#7f97bd', sun: SUN }
+  const cloudLook: CloudLook = { lit: '#ffffff', shade: '#b3c4de', deep: '#8fa5c6', sun: SUN }
   const sea = own(cloudSea(ctx, uTime, cx, cy + CLOUD_Y, cz, CLOUD_AMP, cloudLook))
   kit.addObject(sea.mesh)
-  const puffGeo = own(new THREE.IcosahedronGeometry(1, low ? 2 : 3))
+  const puffGeo = own(new THREE.IcosahedronGeometry(1, low || ctx.quality.level === 'medium' ? 2 : 3))
   const puffMat = own(puffMaterial(ctx, uTime, cloudLook, ctx.env.fogColor))
   const puffs: Array<[number, number, number, number, number, number]> = []
   const towers = low ? 7 : 12
@@ -478,7 +478,7 @@ export function buildSky(ctx: Ctx, kit: ZoneKit, def: MapDef): MapBuild {
   batch(buildTallGrass(), plant, tufts.length, false, i => {
     const [x, y, z] = tufts[i]
     stand(x, y, z, rnd() * 6.28, 0.55 + rnd() * 0.5)
-    return tint.setRGB(0.8 + rnd() * 0.2, 0.98 + rnd() * 0.1, 0.72 + rnd() * 0.2)
+    return tint.setRGB(0.5 + rnd() * 0.14, 0.74 + rnd() * 0.12, 0.36 + rnd() * 0.1)
   })
   const blooms = spots(low ? 90 : 210, 0.6, (x, z) => !inRing(x, z) || rnd() < 0.3)
   batch(buildFlowers(), plant, blooms.length, false, i => {

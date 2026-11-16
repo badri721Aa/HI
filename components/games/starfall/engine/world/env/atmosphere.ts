@@ -372,7 +372,8 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     waterDeep: '#3a6f96',
     caustics: 0,
     fog: '#d6e6f4',
-    fogScale: 0.7,
+    // Clear air: the cloud sea reaches further out (560 m) than the other maps' sheets.
+    fogScale: 1,
   },
   neon: {
     lightDir: [-0.3, 0.8, 0.5],
