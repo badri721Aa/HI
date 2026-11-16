@@ -26,9 +26,10 @@ export type MusicMood = 'title' | 'explore' | 'danger' | 'cutscene' | 'victory' 
 
 /**
  * Hotbar order: fists are always owned; sword, hammer and bow are found on the island,
- * the starblade and the frost hammer are boss rewards.
+ * the starblade and the frost hammer are boss rewards; the star blaster and the comet launcher
+ * are star-tech (Creative's hotbar, and handed out by the online game modes).
  */
-export type WeaponId = 'fists' | 'sword' | 'hammer' | 'bow' | 'starblade' | 'frostHammer'
+export type WeaponId = 'fists' | 'sword' | 'hammer' | 'bow' | 'starblade' | 'frostHammer' | 'starBlaster' | 'cometLauncher'
 
 /** The worlds: Starfall Isle plus the maps behind its portal arches (see worlds/defs). */
 export type MapId = 'isle' | 'rift' | 'frost' | 'volcanic' | 'sky' | 'neon' | 'glitch'
@@ -149,10 +150,12 @@ export interface GameEventMap {
   /** The hammer hits the ground: shockwave. */
   'weapon:slam': { pos: V3 }
   'weapon:draw': { pos: V3 }
-  /** An arrow leaves the bow; charge 0..1, launch velocity (m/s). */
-  'weapon:fire': { pos: V3; charge: number; vel?: V3 }
+  /** An arrow leaves the bow (or a shot its star-tech `weapon`); charge 0..1, launch velocity (m/s). */
+  'weapon:fire': { pos: V3; charge: number; vel?: V3; weapon?: WeaponId }
   /** An arrow stuck in the ground or a prop. */
   'arrow:stick': { pos: V3 }
+  /** A star bolt or a comet burst where it struck (ours or another player's): sound and sparks. */
+  'weapon:blast': { pos: V3; weapon: WeaponId }
 
   // ── multiplayer ────────────────────────────────────────
   'net:status': { status: 'offline' | 'connecting' | 'online' | 'error'; message?: string }

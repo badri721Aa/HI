@@ -30,6 +30,7 @@ const ROWS: Record<Scheme, Array<{ action: string; keys: ReactNode }>> = {
     { action: 'Attack · hold to draw the bow', keys: <><KeyCap>F</KeyCap><Or /><Note>Left click</Note></> },
     { action: 'Fists · sword · hammer · bow', keys: <><KeyCap>1</KeyCap><KeyCap>2</KeyCap><KeyCap>3</KeyCap><KeyCap>4</KeyCap><Or /><Note>Wheel</Note></> },
     { action: 'Starblade · frost hammer (boss rewards)', keys: <><KeyCap>5</KeyCap><KeyCap>6</KeyCap></> },
+    { action: 'Star blaster · comet launcher (hold to fire)', keys: <><KeyCap>7</KeyCap><KeyCap>8</KeyCap></> },
     { action: 'Interact · talk · pick up', keys: <KeyCap>E</KeyCap> },
     { action: 'Camera zoom', keys: <><KeyCap>+</KeyCap><KeyCap>−</KeyCap><Or /><Note>Alt + wheel</Note></> },
     { action: 'Map', keys: <KeyCap>M</KeyCap> },

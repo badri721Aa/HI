@@ -1,8 +1,9 @@
 /**
  * Weapon arm work for the animator (angles per Pose.ts): how each weapon is carried, and the
  * keyed moves — a three-slash sword combo, the hammer's wind-up and overhead slam, the bow's draw
- * and release. Keys are at normalised times (0..1 through the move) and, like gestures, list only
- * what differs from standing; the animator blends them over the upper body.
+ * and release, the star blaster's levelled arm and kick, the comet launcher's two-handed shot.
+ * Keys are at normalised times (0..1 through the move) and, like gestures, list only what differs
+ * from standing; the animator blends them over the upper body.
  */
 import type { WeaponKind } from '../../gameplay/weapons/defs'
 import type { WeaponMove } from '../../types'
@@ -19,6 +20,10 @@ export const CARRY: Record<Exclude<WeaponKind, 'fists'>, PoseSpec> = {
   hammer: k({ armR: [6, 0, 12], elbowR: 14, handR: [68, 0, 0], curlR: 1 }),
   // Held low at the side.
   bow: k({ armL: [-6, 0, 10], elbowL: 24, handL: [-8, 0, 0], curlL: 1 }),
+  // Low ready: elbow bent, the barrel pointing ahead and down.
+  blaster: k({ armR: [-6, 0, 9], elbowR: 52, handR: [6, 0, 0], curlR: 1 }),
+  // Heavy: the tube hangs level beside the hip.
+  launcher: k({ armR: [8, 0, 11], elbowR: 66, handR: [14, 0, 0], curlR: 1 }),
 }
 
 export interface WeaponClip {
@@ -27,6 +32,14 @@ export interface WeaponClip {
 }
 
 const SWORD_DONE = CARRY.sword
+
+/** Star blaster levelled at arm's length, the body turned a little behind it. */
+const BLASTER_AIM = k({ chest: [0, 12, 0], neck: [0, -6, 0], head: [-2, -6, 0], armR: [-84, 0, 14], elbowR: 8, handR: [0, 0, 0], armL: [-8, 0, 16], elbowL: 34, curlR: 1 })
+/** Comet launcher shouldered low: the trigger hand at the ribs, the other under the fore-grip. */
+const LAUNCHER_AIM = k({
+  spine: [3, -6, 0], chest: [2, -12, 0], neck: [0, 8, 0], head: [-2, 8, 0],
+  armR: [-14, 0, -4], elbowR: 82, handR: [4, 0, 0], armL: [-58, 0, -30], elbowL: 46, handL: [10, 0, 0], curlR: 1, curlL: 0.8,
+})
 
 export const WEAPON_CLIPS: Record<Exclude<WeaponMove, 'none'>, WeaponClip> = {
   /** Forehand: high on the right, down across to the left hip. */
@@ -79,6 +92,27 @@ export const WEAPON_CLIPS: Record<Exclude<WeaponMove, 'none'>, WeaponClip> = {
       [0, k({ chest: [0, 26, 0], neck: [0, -12, 0], head: [-2, -12, 0], armL: [-86, 0, -20], elbowL: 2, armR: [-34, 0, 92], elbowR: 104, curlL: 1, curlR: 0.1 })],
       [0.45, k({ chest: [0, 22, 0], neck: [0, -10, 0], head: [-2, -10, 0], armL: [-80, 0, -16], elbowL: 6, armR: [-28, 0, 70], elbowR: 60, curlL: 1, curlR: 0.2 })],
       [1, CARRY.bow],
+    ],
+  },
+  /** Star blaster, restarted by every bolt: the kick, then the arm settles level and holds its aim. */
+  blast: {
+    keys: [
+      [0, k({ chest: [-3, 13, 0], neck: [0, -6, 0], head: [-3, -6, 0], armR: [-95, 0, 14], elbowR: 26, handR: [-12, 0, 0], armL: [-8, 0, 18], elbowL: 36, curlR: 1 })],
+      [0.28, BLASTER_AIM],
+      [1, BLASTER_AIM],
+    ],
+  },
+  /** Comet launcher: up to the aim, the shot (0.16) rocks the body back, then it settles and lowers. */
+  lob: {
+    keys: [
+      [0, LAUNCHER_AIM],
+      [0.16, LAUNCHER_AIM],
+      [0.3, k({
+        spine: [-9, -6, 0], chest: [-6, -12, 0], neck: [0, 8, 0], head: [4, 8, 0], pos: [0, -0.03, 0],
+        armR: [-26, 0, -4], elbowR: 94, handR: [-6, 0, 0], armL: [-70, 0, -30], elbowL: 56, handL: [10, 0, 0], curlR: 1, curlL: 0.8,
+      })],
+      [0.62, LAUNCHER_AIM],
+      [1, CARRY.launcher],
     ],
   },
 }

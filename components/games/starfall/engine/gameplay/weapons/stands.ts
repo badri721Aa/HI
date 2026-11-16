@@ -6,7 +6,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { TextureLib } from '../../textures'
-import type { HeldWeapon } from './models'
 
 export interface StandShape {
   /** Merged geometry per material. */
@@ -35,7 +34,7 @@ function merge(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return g
 }
 
-export function standShape(kind: HeldWeapon): StandShape {
+export function standShape(kind: 'sword' | 'hammer' | 'bow'): StandShape {
   switch (kind) {
     case 'sword': {
       // Weathered plinth with a cap stone; the blade is buried a hand deep.
