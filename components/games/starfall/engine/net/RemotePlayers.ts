@@ -109,6 +109,8 @@ class Avatar implements MoveBody {
   turnRate = 0
   /** Uniform model scale; the animator's squash and stretch is applied on top of it. */
   private scale = 1
+  /** The whole body's size as drawn, easing toward the peer's `scale`. */
+  private size = 1
   /** 0..1 how far the body has gone limp onto the ground. */
   limp = 0
   readonly hit = {} as GroundHit
@@ -263,6 +265,12 @@ class Avatar implements MoveBody {
     const puppet = this.updatePuppet(now) ? this.puppet : null
     root.position.copy(puppet ? puppet.root : p.position)
     root.rotation.y = puppet ? puppet.yaw : p.yaw
+    // Game modes resize a player (the Juggernaut); a streamed ragdoll keeps its natural size.
+    const size = puppet ? 1 : p.scale
+    if (this.size !== size) {
+      this.size = Math.abs(size - this.size) < 0.004 || puppet ? size : this.size + (size - this.size) * (1 - Math.exp(-5 * dt))
+      root.scale.setScalar(this.size)
+    }
     const raw = Math.atan2(Math.sin(p.yaw - this.prevYaw), Math.cos(p.yaw - this.prevYaw)) / Math.max(dt, 1e-3)
     this.prevYaw = p.yaw
     this.turnRate += (THREE.MathUtils.clamp(raw, -12, 12) - this.turnRate) * (1 - Math.exp(-10 * dt))

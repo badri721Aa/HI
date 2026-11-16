@@ -20,7 +20,7 @@ const BODY_LO = 0.25
 const BODY_HI = 1.35
 const BODY_R = 0.4
 /** Furthest the attacker's copy may stand from us for a blow of each kind to count (m, with lag slack). */
-const REACH: Record<WeaponKind, number> = { fists: 3.4, sword: 4.6, hammer: 7.5, bow: 110, blaster: 80, launcher: 55 }
+export const REACH: Record<WeaponKind, number> = { fists: 3.4, sword: 4.6, hammer: 7.5, bow: 110, blaster: 80, launcher: 55 }
 /** Furthest the reported contact point may be from our body (m). */
 const CONTACT_SLACK = 2.4
 /** Shoves (m/s): horizontal and upward. Arrows drawn this far launch. */

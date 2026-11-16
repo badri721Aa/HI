@@ -192,6 +192,7 @@ export class Network implements INetwork {
       selfName: () => this.profile.name,
       send: payload => void this.session?.send('mode', { from: this.selfId, ...payload }),
       setPvp: on => this.setPvp(on),
+      setJudge: judge => void (this.pvpRules.judge = judge),
     })
     this.service = new ServiceWatch(ctx, () => this.getClient(), () => this.leave())
   }

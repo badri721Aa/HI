@@ -293,6 +293,8 @@ export interface ICameraRig extends System {
   shake(intensity: number, duration: number): void
   /** Briefly pull the field of view (e.g. dash) — additive degrees. */
   kickFov(deg: number, duration: number): void
+  /** The hero's size against the usual (game modes: the Juggernaut is bigger): the pivot rises and the boom lengthens with it. */
+  bodyScale: number
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -487,6 +489,11 @@ export interface IWorlds extends System {
   spawnPoint(): { x: number; y: number; z: number; yaw: number } | null
   /** Fade out, build the map (leaving the last one, which is freed), move the player to its entrance and fade back in. */
   travel(to: MapId): void
+  /**
+   * A game-mode round has the player: portal arches are inert, and a portal map is only a stage —
+   * its boss and guards stay out, its checkpoints and objective are off. Off again restores the map.
+   */
+  setArena(on: boolean): void
   /** The nearest open portal arch in the current map (its middle) → out; false when there is none. */
   nearestPortal(p: V3, out: V3): boolean
   /** Compass markers: awake portals on the island; the boss and the way home elsewhere. */
@@ -678,13 +685,18 @@ export interface INetwork extends System {
   readonly modes: IModes
 }
 
-/** net/modes/Modes.ts — rounds of Tag, Knockout, Race, King of the Hill and Hide and Seek, refereed by the room host. */
+/**
+ * net/modes/Modes.ts — rounds of Tag, Knockout, Race, King of the Hill, Hide and Seek, Infection,
+ * Juggernaut Chaos and Gun Game, refereed by the room host.
+ */
 export interface IModes {
   readonly view: ModeView
   /** We are playing in a round (its countdown or live part). */
   readonly active: boolean
-  /** Host only: start a round (false when not the host, a round is running or too few players). */
-  start(mode: ModeId): boolean
+  /** How long the hero lies limp before the respawn fade (s): longer after a knockout in a round with round health. */
+  readonly respawnDelay: number
+  /** Host only: start a round (false when not the host, a round is running or too few players). Arena modes are played on `map`. */
+  start(mode: ModeId, map?: MapId): boolean
   /** Host only: end the running round now. */
   stop(): void
   /** Not the host: ask the host for a mode (shows them a toast); false when rate-limited. */

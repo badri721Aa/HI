@@ -14,6 +14,8 @@
  *   bosses    the fight starts when the player walks into the arena (a short intro the first
  *             time); dying or leaving resets it; a defeated boss stays defeated (saved), leaves
  *             its reward chest or its drops, and may wake other arches
+ *   rounds    an online game-mode round borrows a map as its stage (setArena): the arches go
+ *             inert, the boss and the guards stay out, checkpoints and the objective are off
  */
 import * as THREE from 'three'
 import type { MapId, V3 } from '../events'
@@ -72,6 +74,8 @@ export class Worlds implements IWorlds {
   private trip: { to: MapId; t: number; arrived: number } | null = null
   private cooldown = 0
   private sealedT = 0
+  /** A game-mode round has the player (see setArena). */
+  private arena = false
   private announce: PortalMapId[] = []
   /** Maps whose boss intro has played (later fights start at once). */
   private introSeen = new Set<PortalMapId>()
@@ -165,6 +169,20 @@ export class Worlds implements IWorlds {
     for (const [id, arch] of this.arches) arch.setOpen(this.isUnlocked(id), true)
   }
 
+  setArena(on: boolean): void {
+    if (on === this.arena) return
+    this.arena = on
+    const v = this.here
+    if (!v) return
+    if (on) this.clearStage(v)
+    else {
+      // The round is over and the player is still here: the map is itself again.
+      this.prepare(v)
+      this.placeGuards(v.def)
+      this.ctx.bus.emit('ui:objective', { text: this.objective(v) })
+    }
+  }
+
   travel(to: MapId): void {
     if (this.trip || to === this._current) return
     const ctx = this.ctx
@@ -191,7 +209,7 @@ export class Worlds implements IWorlds {
       v.chest?.update(dt, live)
     }
     if (this.trip) this.stepTrip(dt)
-    if (!playing || this.trip || !ctx.player.controlEnabled) return
+    if (!playing || this.trip || !ctx.player.controlEnabled || this.arena) return
     this.cooldown = Math.max(0, this.cooldown - dt)
     this.sealedT = Math.max(0, this.sealedT - dt)
     this.checkPortals()
@@ -235,6 +253,7 @@ export class Worlds implements IWorlds {
       }
       return
     }
+    if (this.arena) return
     if (v.boss.mode !== 'dead') mark(v.boss.pos.x, v.boss.pos.z, 'boss')
     mark(v.exit.x, v.exit.z, 'portal')
   }
@@ -326,8 +345,21 @@ export class Worlds implements IWorlds {
       this.announceUnlocks()
       return
     }
+    if (this.arena) {
+      this.clearStage(v)
+      return
+    }
     ctx.bus.emit('ui:objective', { text: this.objective(v) })
     this.placeGuards(v.def)
+  }
+
+  /** A round's stage: no guards, no boss (not recorded as beaten: it is back when the round lets go), no chest. */
+  private clearStage(v: Visit): void {
+    const ctx = this.ctx
+    ctx.factory.clear(MAP_GROUP)
+    v.boss.markDead()
+    v.chest?.hide()
+    ctx.game.setMusic('explore')
   }
 
   /** The map's factory mobs, fresh on every visit (Creative: only with its enemies switched on). */

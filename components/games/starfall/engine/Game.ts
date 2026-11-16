@@ -770,7 +770,7 @@ export class Game implements GameApi {
     const v = this.ctx.player.velocity
     this.ctx.character.startRagdoll({ x: v.x * 0.15, y: 2.5, z: v.z * 0.15 })
     this.ctx.player.controlEnabled = false
-    this.after(1.4, () => this.respawn())
+    this.after(this.ctx.net.modes.respawnDelay, () => this.respawn())
   }
 
   tryActivateBeacon(): void {
