@@ -47,6 +47,7 @@ interface FovKick {
 export class CameraRig implements ICameraRig {
   yaw = Math.PI
   pitch: number = C.defaultPitch
+  bodyScale = 1
 
   private _mode: Mode = 'title'
   private readonly pivot = new THREE.Vector3()
@@ -200,10 +201,9 @@ export class CameraRig implements ICameraRig {
     this.yaw = wrapAngle(this.yaw - lx)
     this.pitch = clamp(this.pitch + ly, C.pitchMin, C.pitchMax)
     if (s.zoom) this.zoom = clamp(this.zoom + s.zoom * C.zoomStep, C.zoomMin, C.zoomMax)
-    const move = this.ctx.weapons?.pose.move
-    // Bow drawn or building: over the shoulder, so the crosshair isn't on the hero.
-    this.aimW = damp(this.aimW, move === 'draw' || move === 'release' || this.ctx.build?.active ? 1 : 0, 7, dt)
-    this.boom = damp(this.boom, this.zoom * (1 - AIM_ZOOM * this.aimW), 10, dt)
+    // Aiming (a drawn bow, a star-tech weapon firing) or building: over the shoulder, so the crosshair isn't on the hero.
+    this.aimW = damp(this.aimW, this.ctx.weapons?.aiming || this.ctx.build?.active ? 1 : 0, 7, dt)
+    this.boom = damp(this.boom, this.zoom * this.bodyScale * (1 - AIM_ZOOM * this.aimW), 10, dt)
     this.assist(dt)
     this.updateCues(dt)
     this.followPivot(dt)
@@ -257,9 +257,9 @@ export class CameraRig implements ICameraRig {
     this.pivot.z += (p.z - this.pivot.z) * kH
     const falling = !pl.grounded && pl.velocity.y < -6
     const rate = pl.grounded ? C.vFollowGround : falling ? C.vFollowFall : C.vFollowAir
-    const drop = C.slideDrop * this.slideCue
-    const hy = p.y + C.pivotHeight - drop
-    this.pivot.y = clamp(damp(this.pivot.y, this.refY + C.pivotHeight - drop, rate, dt), hy - C.maxVLag, hy + C.maxVLag)
+    const lift = C.pivotHeight * this.bodyScale - C.slideDrop * this.slideCue
+    const hy = p.y + lift
+    this.pivot.y = clamp(damp(this.pivot.y, this.refY + lift, rate, dt), hy - C.maxVLag, hy + C.maxVLag)
   }
 
   /** Positions the camera on its boom around the pivot, pulled in by obstacles. */

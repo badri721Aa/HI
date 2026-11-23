@@ -3,19 +3,17 @@
  * In-play HUD: hearts (or the Creative badge), dash, online chip, objective, compass, boss bar, shards & sparks,
  * zone card, prompt, weapon hotbar or build bar, crosshairs, pointer-lock hint.
  */
-import { useEffect, useState, type ComponentType, type CSSProperties, type SVGProps } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { BLOCKS, type BlockDef } from '../engine/build/blocks'
-import type { WeaponId } from '../engine/events'
 import { HOTBAR, WEAPON_NAMES } from '../engine/gameplay/weapons/defs'
 import { Compass } from './Compass'
 import { playUi, useGameUi, useHud, useNet, useUi } from './context'
 import { KeyCap } from './controls'
 import { DamageNumbers } from './DamageNumbers'
-import {
-  BowIcon, DashIcon, FistIcon, FrostHammerIcon, HammerIcon, HeartIcon, InteractIcon, MouseIcon, PauseIcon, SparkIcon, StarbladeIcon, StarIcon, SwordIcon,
-} from './icons'
+import { DashIcon, HeartIcon, InteractIcon, MouseIcon, PauseIcon, SparkIcon, StarIcon } from './icons'
 import { NetChip } from './OnlineHud'
 import { cx, LABEL } from './theme'
+import { WEAPON_ICON } from './weaponIcons'
 import styles from './ui.module.css'
 
 /** Hotbar slot (weapons, blocks): clickable whenever the mouse is free, a 44 px target on touch. */
@@ -333,10 +331,6 @@ function BossBar() {
 }
 
 /* ── weapons ────────────────────────────────────────────────────── */
-
-const WEAPON_ICON: Record<WeaponId, ComponentType<SVGProps<SVGSVGElement>>> = {
-  fists: FistIcon, sword: SwordIcon, hammer: HammerIcon, bow: BowIcon, starblade: StarbladeIcon, frostHammer: FrostHammerIcon,
-}
 
 /** Owned weapons, bottom centre; the one in hand is lit. On touch the slots are the way to switch. */
 function Hotbar() {

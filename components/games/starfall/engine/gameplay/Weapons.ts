@@ -1,5 +1,6 @@
 /**
- * Weapons — the sword, hammer and bow, and the boss rewards (starblade, frost hammer).
+ * Weapons — the sword, hammer and bow, the boss rewards (starblade, frost hammer) and the star-tech
+ * pair (star blaster, comet launcher).
  *
  *   stands   each island weapon waits on a stand; walk into it or press E nearby to take it.
  *            Rewards arrive through grant() (the bosses' chests)
@@ -8,7 +9,9 @@
  *   hotbar   keys 1–6, the mouse wheel or the d-pad switch between owned weapons
  *   moves    sword: three-slash combo · hammer: wind-up and overhead slam with a shockwave ·
  *            bow: hold to draw, release to shoot toward the camera's aim point. The starblade
- *            is a stronger sword; the frost hammer's slam also freezes the gloomlings it hits
+ *            is a stronger sword; the frost hammer's slam also freezes the gloomlings it hits.
+ *            Star blaster: hold for a stream of light bolts · comet launcher: one slow, arcing
+ *            comet that bursts where it lands — both aimed like the bow
  *   hits     damage by weapon, knockback, ~60 ms hit-stop and a little shake; impact sparks,
  *            sounds and damage numbers react to 'enemy:hit' on the bus
  *
@@ -19,9 +22,13 @@ import { v3, type WeaponId } from '../events'
 import type { Ctx, IWeapons, WeaponHit, WeaponMove, WeaponPose } from '../types'
 import { WEAPON_STANDS } from '../world/level'
 import { Arrows } from './weapons/Arrows'
-import { ARROW, BOW, FROST_HAMMER, HAMMER, HOTBAR, KIND, STARBLADE, SWORD, WEAPON_NAMES } from './weapons/defs'
-import { WeaponKit, type HeldWeapon, type WeaponModel } from './weapons/models'
+import {
+  ARROW, BOW, COMET_LAUNCHER, FROST_HAMMER, HAMMER, HOTBAR, isStarWeapon, KIND, STAR_BLASTER, STARBLADE, SWORD, WEAPON_NAMES,
+  type StarWeapon,
+} from './weapons/defs'
+import { MUZZLE, WeaponKit, type HeldWeapon, type WeaponModel } from './weapons/models'
 import { standMaterials, standShape } from './weapons/stands'
+import { StarShots } from './weapons/StarShots'
 import { ARC_FROM, ARC_TO, SWING_ARC, SwingTrail } from './weapons/swing'
 import { glowTexture } from './parts/util'
 
@@ -31,6 +38,8 @@ const PROMPT_RADIUS = 2.4
 /** Melee moves turn toward the nearest gloomling within this range (m). */
 const LOCK_RANGE = 3.6
 const HIT_STOP = 0.06
+/** Shots fly toward whatever is under the crosshair within this range (m). */
+const AIM_RANGE = 120
 
 const NEXT_SLASH: Partial<Record<WeaponMove, WeaponMove>> = { slash1: 'slash2', slash2: 'slash3' }
 
@@ -49,6 +58,7 @@ interface Stand {
 
 export class Weapons implements IWeapons {
   readonly pose: WeaponPose = { weapon: 'fists', move: 'none', t: 0, charge: 0 }
+  handicap = 1
 
   private _owned: WeaponId[] = ['fists']
   private _equipped: WeaponId = 'fists'
@@ -60,6 +70,9 @@ export class Weapons implements IWeapons {
   private stands: Stand[] = []
   private glowMat: THREE.SpriteMaterial | null = null
   private arrows: Arrows | null = null
+  private shots: StarShots | null = null
+  /** A game mode handed out the loadout: nothing is saved and the stands are left alone. */
+  private lent = false
   private colliders: Array<{ dispose(): void }> = []
   private owned3D: Array<{ dispose(): void }> = []
   private prompted: Stand | null = null
@@ -76,6 +89,8 @@ export class Weapons implements IWeapons {
   private struck = false
   private charge = 0
   private rest = 0
+  /** Star blaster: seconds until the next bolt. */
+  private shotT = 0
 
   // scratch
   private readonly v = new THREE.Vector3()
@@ -103,6 +118,15 @@ export class Weapons implements IWeapons {
   }
 
   get moveScale(): number {
+    return this.handicap * this.moveSlow()
+  }
+
+  get aiming(): boolean {
+    const m = this.move
+    return m === 'draw' || m === 'release' || m === 'blast' || m === 'lob'
+  }
+
+  private moveSlow(): number {
     switch (this.move) {
       case 'none':
         return 1
@@ -112,6 +136,10 @@ export class Weapons implements IWeapons {
         return BOW.drawScale
       case 'release':
         return BOW.releaseScale
+      case 'blast':
+        return STAR_BLASTER.moveScale
+      case 'lob':
+        return COMET_LAUNCHER.moveScale
       default:
         return SWORD.moveScale
     }
@@ -122,7 +150,7 @@ export class Weapons implements IWeapons {
   init(): void {
     const ctx = this.ctx
     const kit = (this.kit = new WeaponKit(ctx.textures))
-    for (const id of ['sword', 'hammer', 'bow', 'starblade', 'frostHammer'] as const) {
+    for (const id of ['sword', 'hammer', 'bow', 'starblade', 'frostHammer', 'starBlaster', 'cometLauncher'] as const) {
       const m = kit.make(id)
       m.group.visible = false
       ctx.character.holdInHand(KIND[id] === 'bow' ? 'left' : 'right', m.group)
@@ -165,12 +193,15 @@ export class Weapons implements IWeapons {
 
     this.arrows = new Arrows(ctx, kit.arrowGeometry, kit.arrowMaterial)
     ctx.scene.add(this.arrows.mesh)
+    this.shots = new StarShots(ctx)
+    ctx.scene.add(this.shots.group)
     this.swing = new SwingTrail(ctx.fx)
     this.syncWithSave()
   }
 
   syncWithSave(): void {
     const save = this.ctx.game.save
+    this.lent = false
     this._owned = HOTBAR.filter(w => w === 'fists' || save.weapons.includes(w))
     for (const st of this.stands) {
       st.taken = this._owned.includes(st.weapon)
@@ -179,6 +210,7 @@ export class Weapons implements IWeapons {
     }
     this.cancelMove()
     this.arrows?.clear()
+    this.shots?.clear()
     this.setEquipped(this._owned.includes(save.weapon) ? save.weapon : 'fists')
     this.ctx.input.wheelCycles = this._owned.length > 1
     this.ctx.hud.set({ weapons: this._owned.slice() })
@@ -188,21 +220,25 @@ export class Weapons implements IWeapons {
     if (id === this._equipped || !this._owned.includes(id)) return
     this.cancelMove()
     this.setEquipped(id)
-    this.ctx.game.setWeapons(this._owned, id)
+    if (!this.lent) this.ctx.game.setWeapons(this._owned, id)
     this.ctx.bus.emit('weapon:equip', { weapon: id })
   }
 
-  lend(id: WeaponId | null): void {
-    if (id === null) {
+  lend(ids: WeaponId | readonly WeaponId[] | null): void {
+    if (ids === null) {
       this.syncWithSave()
       return
     }
-    this._owned = [id]
-    this.ctx.input.wheelCycles = false
-    this.ctx.hud.set({ weapons: [id] })
+    const list = typeof ids === 'string' ? [ids] : ids
+    if (!list.length) return
+    this.lent = true
+    this._owned = HOTBAR.filter(w => list.includes(w))
+    this.ctx.input.wheelCycles = this._owned.length > 1
+    this.ctx.hud.set({ weapons: this._owned.slice() })
     this.cancelMove()
-    this.setEquipped(id)
-    this.ctx.bus.emit('weapon:equip', { weapon: id })
+    this.setPrompt(null)
+    this.setEquipped(list[0])
+    this.ctx.bus.emit('weapon:equip', { weapon: list[0] })
   }
 
   grant(id: WeaponId): void {
@@ -230,6 +266,8 @@ export class Weapons implements IWeapons {
     this.glowMat = null
     this.arrows?.dispose()
     this.arrows = null
+    this.shots?.dispose()
+    this.shots = null
     this.kit?.dispose()
     this.kit = null
   }
@@ -243,6 +281,7 @@ export class Weapons implements IWeapons {
     const playing = ctx.game.phase === 'playing'
     this.updateStands(playing)
     this.arrows?.update(dt)
+    this.shots?.update(dt)
 
     const s = ctx.input.state
     // In build mode the number keys and the wheel pick blocks instead.
@@ -269,7 +308,14 @@ export class Weapons implements IWeapons {
     const drawing = this.move === 'draw'
     bow.setDraw?.(drawing ? this.charge * this.charge * (3 - 2 * this.charge) : 0)
     if (bow.arrow) bow.arrow.visible = drawing
-    ctx.hud.set({ aim: drawing ? Math.round(this.charge * 20) / 20 : -1 })
+    ctx.hud.set({ aim: drawing ? Math.round(this.charge * 20) / 20 : able && !stowed ? this.starAim() : -1 })
+  }
+
+  /** Crosshair for a star-tech weapon in hand: the dot, and a ring that fills as the launcher gets ready again (-1: neither is held). */
+  private starAim(): number {
+    if (this._equipped === 'starBlaster') return 0
+    if (this._equipped !== 'cometLauncher') return -1
+    return this.move === 'lob' ? Math.round(this.moveT * 20) / 20 : this.rest > 0 ? 0.95 : 1
   }
 
   private cycle(dir: number): void {
@@ -302,7 +348,7 @@ export class Weapons implements IWeapons {
     const ctx = this.ctx
     const p = ctx.player.position
     if (this.glowMat) this.glowMat.opacity = 0.4 + 0.14 * Math.sin(ctx.clock.t * 2.2)
-    const can = playing && ctx.player.controlEnabled && !ctx.character.ragdolling
+    const can = playing && !this.lent && ctx.player.controlEnabled && !ctx.character.ragdolling
     let near: Stand | null = null
     let nearD = PROMPT_RADIUS
     for (const st of this.stands) {
@@ -351,6 +397,12 @@ export class Weapons implements IWeapons {
   /** Own `id` (in hotbar order), put it in hand and save. */
   private add(id: WeaponId): void {
     const ctx = this.ctx
+    if (this.lent) {
+      // A borrowed loadout is in hand: the weapon is kept for when it is given back.
+      const save = ctx.game.save
+      if (!save.weapons.includes(id)) ctx.game.setWeapons([...save.weapons, id], save.weapon)
+      return
+    }
     this._owned = HOTBAR.filter(w => w === id || this._owned.includes(w))
     ctx.input.wheelCycles = true
     ctx.hud.set({ weapons: this._owned.slice() })
@@ -369,6 +421,10 @@ export class Weapons implements IWeapons {
     if (kind === 'fists') return
     if (kind === 'bow') {
       this.updateBow(dt)
+      return
+    }
+    if (isStarWeapon(this._equipped)) {
+      this.updateStar(dt, this._equipped)
       return
     }
     if (this.move === 'none') {
@@ -521,6 +577,70 @@ export class Weapons implements IWeapons {
     this.move = 'release'
     this.moveT = 0
     this.charge = 0
+  }
+
+  /** Star-tech: the blaster streams bolts while the button is held; the launcher lobs one comet per press (or hold). */
+  private updateStar(dt: number, id: StarWeapon): void {
+    const held = this.ctx.input.state.attackHeld
+    if (id === 'starBlaster') {
+      if (this.move !== 'blast') {
+        if (!held || this.rest > 0) return
+        this.move = 'blast'
+        this.moveT = 0
+        this.shotT = STAR_BLASTER.lead
+      }
+      this._aimYaw = this.cameraYaw()
+      this.moveT += dt / STAR_BLASTER.hold
+      this.shotT -= dt
+      if (held && this.shotT <= 0) {
+        this.shotT = STAR_BLASTER.interval
+        this.moveT = 0
+        this.shootStar(id)
+      } else if (!held && this.moveT >= 1) this.cancelMove()
+      return
+    }
+    if (this.move !== 'lob') {
+      if (!held || this.rest > 0) return
+      this.move = 'lob'
+      this.moveT = 0
+      this.struck = false
+    }
+    this._aimYaw = this.cameraYaw()
+    this.moveT += dt / COMET_LAUNCHER.time
+    if (!this.struck && this.moveT >= COMET_LAUNCHER.fireAt) {
+      this.struck = true
+      this.shootStar(id)
+    }
+    if (this.moveT >= 1) {
+      this.cancelMove()
+      this.rest = COMET_LAUNCHER.rest
+    }
+  }
+
+  /** A shot leaves the muzzle toward whatever is under the screen centre: a bolt flies straight, a comet on an arc. */
+  private shootStar(id: StarWeapon): void {
+    const ctx = this.ctx
+    const model = this.held.get(id)!
+    const m = MUZZLE[id]
+    model.group.updateWorldMatrix(true, false)
+    const from = this.v.set(0, m.y, m.z).applyMatrix4(model.group.matrixWorld)
+    const cam = ctx.camera
+    const dir = cam.getWorldDirection(this.w)
+    const o = cam.position
+    const hit = ctx.collision.raycast(o.x, o.y, o.z, dir.x, dir.y, dir.z, AIM_RANGE)
+    let tx = hit ? hit.x : o.x + dir.x * AIM_RANGE
+    let ty = hit ? hit.y : o.y + dir.y * AIM_RANGE
+    let tz = hit ? hit.z : o.z + dir.z * AIM_RANGE
+    // Something between the camera and the muzzle (the ground at the camera's feet, a post beside it): shoot where the camera looks.
+    if ((tx - from.x) * dir.x + (ty - from.y) * dir.y + (tz - from.z) * dir.z < 1.5) {
+      tx = from.x + dir.x * AIM_RANGE
+      ty = from.y + dir.y * AIM_RANGE
+      tz = from.z + dir.z * AIM_RANGE
+    }
+    if (id === 'starBlaster') this.w.set(tx - from.x, ty - from.y, tz - from.z).normalize().multiplyScalar(STAR_BLASTER.speed)
+    else aimArc(from, tx, ty, tz, COMET_LAUNCHER.speed, COMET_LAUNCHER.gravity, this.w)
+    this.shots?.fire(id, from, this.w)
+    ctx.bus.emit('weapon:fire', { pos: v3(from), charge: 0, vel: v3(this.w), weapon: id })
   }
 
   private cameraYaw(): number {

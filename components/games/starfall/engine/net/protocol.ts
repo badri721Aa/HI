@@ -49,7 +49,7 @@ export const FLAG_ACTIVE = 8
 export const FLAG_WALL_RIGHT = 16
 
 /** Weapon wire codes (append new weapons at the end). */
-const WEAPONS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
+const WEAPONS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer', 'starBlaster', 'cometLauncher']
 
 export function weaponCode(w: WeaponId): number {
   return Math.max(0, WEAPONS.indexOf(w))

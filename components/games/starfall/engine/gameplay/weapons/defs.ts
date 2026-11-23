@@ -4,19 +4,26 @@
  */
 import type { WeaponId } from '../../events'
 
-/** Hotbar order: keys 1–6. */
-export const HOTBAR: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
+/** Hotbar order: keys 1–8. */
+export const HOTBAR: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer', 'starBlaster', 'cometLauncher']
 
 export const WEAPON_NAMES: Record<WeaponId, string> = {
   fists: 'Fists', sword: 'Sword', hammer: 'Hammer', bow: 'Bow', starblade: 'Starblade', frostHammer: 'Frost Hammer',
+  starBlaster: 'Star Blaster', cometLauncher: 'Comet Launcher',
 }
 
 /** The move set (and hand poses, grip, sounds) a weapon uses: reward weapons are variants. */
-export type WeaponKind = 'fists' | 'sword' | 'hammer' | 'bow'
+export type WeaponKind = 'fists' | 'sword' | 'hammer' | 'bow' | 'blaster' | 'launcher'
 
 export const KIND: Record<WeaponId, WeaponKind> = {
   fists: 'fists', sword: 'sword', hammer: 'hammer', bow: 'bow', starblade: 'sword', frostHammer: 'hammer',
+  starBlaster: 'blaster', cometLauncher: 'launcher',
 }
+
+/** The star-tech weapons: aimed with the crosshair, they shoot bolts of starlight instead of swinging. */
+export type StarWeapon = 'starBlaster' | 'cometLauncher'
+
+export const isStarWeapon = (w: WeaponId): w is StarWeapon => w === 'starBlaster' || w === 'cometLauncher'
 
 /** Fast three-slash combo; pressing attack during a slash chains the next. */
 export const SWORD = {
@@ -82,4 +89,37 @@ export const ARROW = {
   stuckLife: 10,
   flightLife: 6,
   max: 24,
+}
+
+/** Star-tech: hold the trigger for a stream of quick, light bolts that fly dead straight. */
+export const STAR_BLASTER = {
+  /** Seconds between bolts, and from the press to the first one (the arm comes up). */
+  interval: 0.2,
+  lead: 0.07,
+  /** The aim is held this long after the last bolt (s). */
+  hold: 0.5,
+  speed: 52,
+  damage: 11,
+  knock: 3,
+  lift: 2,
+  /** A bolt strikes whatever comes this close to it (m) and fizzles out after this long (s). */
+  radius: 0.3,
+  life: 1.25,
+  moveScale: 0.8,
+}
+
+/** Star-tech: one slow comet on an arc; it bursts where it lands and throws everything around it. */
+export const COMET_LAUNCHER = {
+  /** The whole shot (s), and the point in it (0..1) where the comet leaves the tube. */
+  time: 0.85,
+  fireAt: 0.16,
+  rest: 0.2,
+  speed: 25,
+  gravity: 16,
+  /** The enemy the comet itself strikes takes this; the burst is for everything else in reach. */
+  damage: 40,
+  radius: 0.45,
+  blast: { radius: 3.2, damage: 34, knock: 13, lift: 9 },
+  life: 5,
+  moveScale: 0.35,
 }

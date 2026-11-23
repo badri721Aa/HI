@@ -11,7 +11,10 @@ import type { WeaponId } from '../engine/events'
 import type { Action } from '../engine/input'
 import { SLIDE } from '../engine/player/control/tuning'
 import { useGameUi, useHud, useUi } from './context'
-import { BowIcon, CubeIcon, DashIcon, FrostHammerIcon, HammerIcon, InteractIcon, JumpIcon, RefreshIcon, RollIcon, SpinIcon, StarbladeIcon, SwordIcon } from './icons'
+import {
+  BowIcon, CometLauncherIcon, CubeIcon, DashIcon, FrostHammerIcon, HammerIcon, InteractIcon, JumpIcon, RefreshIcon, RollIcon, SpinIcon, StarBlasterIcon,
+  StarbladeIcon, SwordIcon,
+} from './icons'
 import { cx } from './theme'
 
 /** The attack button shows what it does: the fists' spin or the weapon in hand. */
@@ -22,6 +25,8 @@ const ATTACK: Record<WeaponId, { label: string; Icon: ComponentType<SVGProps<SVG
   bow: { label: 'Shoot', Icon: BowIcon },
   starblade: { label: 'Slash', Icon: StarbladeIcon },
   frostHammer: { label: 'Slam', Icon: FrostHammerIcon },
+  starBlaster: { label: 'Fire', Icon: StarBlasterIcon },
+  cometLauncher: { label: 'Launch', Icon: CometLauncherIcon },
 }
 
 export function TouchControls() {

@@ -299,6 +299,8 @@ export interface ICameraRig extends System {
   shake(intensity: number, duration: number): void
   /** Briefly pull the field of view (e.g. dash) — additive degrees. */
   kickFov(deg: number, duration: number): void
+  /** The hero's size against the usual (game modes: the Juggernaut is bigger): the pivot rises and the boom lengthens with it. */
+  bodyScale: number
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -437,8 +439,8 @@ export interface WeaponHit {
   freeze?: number
 }
 
-/** Arm moves the animator layers over the body for the held weapon. */
-export type WeaponMove = 'none' | 'slash1' | 'slash2' | 'slash3' | 'slam' | 'draw' | 'release'
+/** Arm moves the animator layers over the body for the held weapon ('blast' / 'lob': the star-tech shots). */
+export type WeaponMove = 'none' | 'slash1' | 'slash2' | 'slash3' | 'slam' | 'draw' | 'release' | 'blast' | 'lob'
 
 export interface WeaponPose {
   weapon: WeaponId
@@ -460,10 +462,17 @@ export interface IWeapons extends System {
   readonly moveScale: number
   /** Heading the hero should turn to (aiming, a locked-on swing), or null. */
   readonly aimYaw: number | null
+  /** Aiming with the crosshair right now (a drawn bow, a star-tech weapon firing): the camera moves over the shoulder. */
+  readonly aiming: boolean
+  /** Game modes: scales the hero's ground speed while a role demands it (the Juggernaut is heavy). 1 = normal. */
+  handicap: number
   readonly pose: WeaponPose
   equip(id: WeaponId): void
-  /** Game modes: put `id` in hand as the only weapon, without saving (null gives the saved loadout back). */
-  lend(id: WeaponId | null): void
+  /**
+   * Game modes: hand out a loadout without saving it — one weapon, or several (the first goes in
+   * hand). The stands are left alone meanwhile; null gives the saved loadout back.
+   */
+  lend(ids: WeaponId | readonly WeaponId[] | null): void
   /** A reward: own `id` (saved), put it in hand and announce it. */
   grant(id: WeaponId): void
   /** Re-sync owned weapons and pickups with ctx.game.save (new game / continue). */
@@ -486,6 +495,11 @@ export interface IWorlds extends System {
   spawnPoint(): { x: number; y: number; z: number; yaw: number } | null
   /** Fade out, build the map (leaving the last one, which is freed), move the player to its entrance and fade back in. */
   travel(to: MapId): void
+  /**
+   * A game-mode round has the player: portal arches are inert, and a portal map is only a stage —
+   * its boss and guards stay out, its checkpoints and objective are off. Off again restores the map.
+   */
+  setArena(on: boolean): void
   /** The nearest open portal arch in the current map (its middle) → out; false when there is none. */
   nearestPortal(p: V3, out: V3): boolean
   /** Compass markers: awake portals on the island; the boss and the way home elsewhere. */
@@ -671,17 +685,24 @@ export interface INetwork extends System {
    * whose body it overlaps is sent a hit (they validate and apply it). Returns how many were hit.
    */
   strike(blow: WeaponHit, power: number): number
+  /** With pvp on: is another player's body within `radius` of `p`? (A comet bursts on the first one it meets.) */
+  near(p: V3, radius: number): boolean
   /** Game modes in the current room. */
   readonly modes: IModes
 }
 
-/** net/modes/Modes.ts — rounds of Tag, Knockout, Race, King of the Hill and Hide and Seek, refereed by the room host. */
+/**
+ * net/modes/Modes.ts — rounds of Tag, Knockout, Race, King of the Hill, Hide and Seek, Infection,
+ * Juggernaut Chaos and Gun Game, refereed by the room host.
+ */
 export interface IModes {
   readonly view: ModeView
   /** We are playing in a round (its countdown or live part). */
   readonly active: boolean
-  /** Host only: start a round (false when not the host, a round is running or too few players). */
-  start(mode: ModeId): boolean
+  /** How long the hero lies limp before the respawn fade (s): longer after a knockout in a round with round health. */
+  readonly respawnDelay: number
+  /** Host only: start a round (false when not the host, a round is running or too few players). Arena modes are played on `map`. */
+  start(mode: ModeId, map?: MapId): boolean
   /** Host only: end the running round now. */
   stop(): void
   /** Not the host: ask the host for a mode (shows them a toast); false when rate-limited. */

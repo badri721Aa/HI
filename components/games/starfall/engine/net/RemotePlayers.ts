@@ -19,6 +19,7 @@ import type { Ctx, GestureName, MotionState, WeaponId } from '../types'
 import { Arrows } from '../gameplay/weapons/Arrows'
 import { KIND } from '../gameplay/weapons/defs'
 import { WeaponKit, type HeldWeapon, type WeaponModel } from '../gameplay/weapons/models'
+import { StarShots } from '../gameplay/weapons/StarShots'
 import { Animator, type GroundSample } from '../player/Animator'
 import { createGrip } from '../player/anim/grip'
 import { Face } from '../player/Face'
@@ -108,6 +109,8 @@ class Avatar implements MoveBody {
   turnRate = 0
   /** Uniform model scale; the animator's squash and stretch is applied on top of it. */
   private scale = 1
+  /** The whole body's size as drawn, easing toward the peer's `scale`. */
+  private size = 1
   /** 0..1 how far the body has gone limp onto the ground. */
   limp = 0
   readonly hit = {} as GroundHit
@@ -122,8 +125,9 @@ class Avatar implements MoveBody {
     blobMat: THREE.Material,
     private weaponKit: () => WeaponKit,
     arrows: () => Arrows,
+    shots: () => StarShots,
   ) {
-    this.moves = new RemoteMoves(ctx, arrows)
+    this.moves = new RemoteMoves(ctx, arrows, shots)
     const anisotropy = Math.min(4, ctx.renderer.capabilities.getMaxAnisotropy())
     this.root.name = `remote-${peer.id}`
     this.root.add(this.pivot)
@@ -261,6 +265,12 @@ class Avatar implements MoveBody {
     const puppet = this.updatePuppet(now) ? this.puppet : null
     root.position.copy(puppet ? puppet.root : p.position)
     root.rotation.y = puppet ? puppet.yaw : p.yaw
+    // Game modes resize a player (the Juggernaut); a streamed ragdoll keeps its natural size.
+    const size = puppet ? 1 : p.scale
+    if (this.size !== size) {
+      this.size = Math.abs(size - this.size) < 0.004 || puppet ? size : this.size + (size - this.size) * (1 - Math.exp(-5 * dt))
+      root.scale.setScalar(this.size)
+    }
     const raw = Math.atan2(Math.sin(p.yaw - this.prevYaw), Math.cos(p.yaw - this.prevYaw)) / Math.max(dt, 1e-3)
     this.prevYaw = p.yaw
     this.turnRate += (THREE.MathUtils.clamp(raw, -12, 12) - this.turnRate) * (1 - Math.exp(-10 * dt))
@@ -461,6 +471,15 @@ export class RemotePlayers {
     }
     return this.arrows
   }
+  /** Everyone's star bolts and comets, cosmetic likewise. */
+  private shots: StarShots | null = null
+  private cosmeticShots = (): StarShots => {
+    if (!this.shots) {
+      this.shots = new StarShots(this.ctx, true)
+      this.ctx.scene.add(this.shots.group)
+    }
+    return this.shots
+  }
 
   constructor(private ctx: Ctx) {}
 
@@ -542,12 +561,13 @@ export class RemotePlayers {
       if (!av) {
         if (!peer.ready || !this.settled) continue
         const blob = this.blobParts()
-        av = new Avatar(this.ctx, peer, this.template, blob.geo, blob.mat, this.weaponKit, this.cosmeticArrows)
+        av = new Avatar(this.ctx, peer, this.template, blob.geo, blob.mat, this.weaponKit, this.cosmeticArrows, this.cosmeticShots)
         this.avatars.set(peer.id, av)
       }
       av.update(dt, now, camera, this.frustum)
     }
     this.arrows?.update(dt)
+    this.shots?.update(dt)
   }
 
   /** A player started a move `age` seconds ago. */
@@ -589,6 +609,7 @@ export class RemotePlayers {
     for (const av of this.avatars.values()) av.dispose()
     this.avatars.clear()
     this.arrows?.clear()
+    this.shots?.clear()
   }
 
   dispose(): void {
@@ -599,6 +620,8 @@ export class RemotePlayers {
     this.template = null
     this.arrows?.dispose()
     this.arrows = null
+    this.shots?.dispose()
+    this.shots = null
     this.kit?.dispose()
     this.kit = null
     this.blob?.geo.dispose()
