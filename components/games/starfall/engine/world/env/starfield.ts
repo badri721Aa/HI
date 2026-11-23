@@ -2,7 +2,7 @@
  * The star field: every star in the night sky as one instanced draw call at infinity.
  *
  * Stars are generated once from a fixed seed: a realistic spread of brightness (each magnitude
- * fainter is about three times as common), a handful of colour temperatures, and a distribution
+ * fainter is nearly three times as common), a handful of colour temperatures, and a distribution
  * that thickens toward the Milky Way — following the same star clouds and dust lanes that are
  * baked into the texture the dome uses for the band's glow. A few hand-placed bright stars and
  * three small invented constellations (the Falling Star, the Lantern, the Crown) give the sky
@@ -24,7 +24,9 @@ const TOTAL = STAR_COUNTS.ultra
 
 /** Faintest magnitude generated, and the brightest a random star may be (the named ones go beyond). */
 const MAG_FAINT = 6.6
-const MAG_BRIGHT = 1.7
+const MAG_BRIGHT = 1.4
+/** Magnitudes over which the star count grows tenfold (the real sky: about 2; a little more keeps the middle rich). */
+const MAG_DECADE = 2.3
 /** Share of random stars that belong to the Milky Way, for the brightest and the faintest. */
 const BAND_SHARE: [number, number] = [0.3, 0.68]
 
@@ -32,11 +34,11 @@ const MILKY_W = 640
 const MILKY_H = 160
 
 type Tint = readonly [number, number, number]
-const BLUE: Tint = [0.7, 0.81, 1]
+const BLUE: Tint = [0.62, 0.77, 1]
 const WHITE: Tint = [0.92, 0.95, 1]
-const YELLOW: Tint = [1, 0.95, 0.83]
-const ORANGE: Tint = [1, 0.82, 0.62]
-const RED: Tint = [1, 0.68, 0.52]
+const YELLOW: Tint = [1, 0.93, 0.77]
+const ORANGE: Tint = [1, 0.77, 0.52]
+const RED: Tint = [1, 0.62, 0.44]
 
 /** Hand-placed stars: bearing, elevation (degrees), magnitude, tint, and whether it twinkles (planets don't). */
 const NAMED: ReadonlyArray<readonly [number, number, number, Tint, boolean]> = [
@@ -242,8 +244,8 @@ function generateStars(): Float32Array {
   }
 
   while (n < TOTAL) {
-    // Each magnitude fainter is ~3.2x as common.
-    const mag = Math.max(MAG_BRIGHT, MAG_FAINT + Math.log10(1 - rnd()) * 2)
+    // Each magnitude fainter is ~2.7x as common.
+    const mag = Math.max(MAG_BRIGHT, MAG_FAINT + Math.log10(1 - rnd()) * MAG_DECADE)
     const faint = smooth(2, 6, mag)
     let placed = false
     if (rnd() < BAND_SHARE[0] + (BAND_SHARE[1] - BAND_SHARE[0]) * faint) {
@@ -287,7 +289,7 @@ function buildAttributes(): { dir: Float32Array; color: Float32Array; star: Floa
     const mag = raw[k + 3]
     dir.set(raw.subarray(k, k + 3), i * 3)
     // Faint stars read as nearly white to the eye; the bright ones keep their colour.
-    const wash = 0.4 * smooth(1.5, 5.5, mag)
+    const wash = 0.3 * smooth(1.5, 5.5, mag)
     color[i * 4] = raw[k + 4] + (0.94 - raw[k + 4]) * wash
     color[i * 4 + 1] = raw[k + 5] + (0.95 - raw[k + 5]) * wash
     color[i * 4 + 2] = raw[k + 6] + (1 - raw[k + 6]) * wash
@@ -352,11 +354,11 @@ void main() {
   float amp = aStar.x;
   // Low stars are dimmed and reddened by the air.
   vec3 air = mix( vec3( 0.85, 0.68, 0.52 ), vec3( 1.0 ), smoothstep( 0.03, 0.3, h ) );
-  vColor = aColor.rgb * air * ( amp * 2.0 * alpha * max( twinkle, 0.0 ) );
+  vColor = aColor.rgb * air * ( amp * 2.2 * alpha * max( twinkle, 0.0 ) );
 
   float glow = smoothstep( 0.5, 1.3, amp );
-  float core = ( 0.62 + 0.5 * min( amp, 1.2 ) ) * uView.z;
-  float size = ( 1.6 + 2.4 * min( amp, 1.2 ) + 6.0 * glow ) * uView.z;
+  float core = ( 0.78 + 0.5 * min( amp, 1.2 ) ) * uView.z;
+  float size = ( 2.0 + 2.4 * min( amp, 1.2 ) + 6.0 * glow ) * uView.z;
   vShape = vec3( size, 1.0 / ( core * core ), glow );
   vUv = position.xy;
   vec4 p = skyClip( d );
