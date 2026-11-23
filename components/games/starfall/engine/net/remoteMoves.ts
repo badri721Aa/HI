@@ -3,7 +3,9 @@
  * the same weapon clip their own Animator plays, with the same timing as Weapons, skipped ahead
  * by how old the news is; the effects match too — swing arcs, the slam's shockwave and debris,
  * the bow string pulled back and a cosmetic arrow, the fist spin's trail, the dash's afterimage —
- * and the sounds play where it happens ('net:action'). Allocation-free per frame.
+ * and the sounds play where it happens ('net:action'). Rolls, slides and wall-runs are posed from
+ * the state stream; their announcements are passed on as 'net:action' for effects and sound.
+ * Allocation-free per frame.
  */
 import * as THREE from 'three'
 import type { GroundHit } from '../collision'
@@ -110,6 +112,15 @@ export class RemoteMoves {
         this.dashT = skip
         this.ghostLive = false
         this.emit('dash', m.weapon, pos, 0, 0, this.a.set(m.vx, 0, m.vz))
+        break
+      case 'roll':
+      case 'slide':
+      case 'wallRun':
+        // Where it began (for a wall-run: where the feet meet the wall), with the heading or the wall's normal.
+        this.emit(m.action, m.weapon, this.b.set(m.x, m.y, m.z), m.combo, 0, this.a.set(m.vx, 0, m.vz))
+        break
+      case 'wallJump':
+        this.emit('wallJump', m.weapon, this.b.set(m.x, m.y, m.z))
         break
     }
   }

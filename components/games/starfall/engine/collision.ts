@@ -386,9 +386,9 @@ export class CollisionWorld {
 
   /**
    * Ray against terrain and colliders. Direction need not be normalised;
-   * `t` is in units of the direction's length.
+   * `t` is in units of the direction's length. With `out`, the hit is written there (no allocation).
    */
-  raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxT: number, ignoreTerrain = false): RayHit | null {
+  raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxT: number, ignoreTerrain = false, out?: RayHit): RayHit | null {
     let bestT = maxT
     let bestC: Collider | null = null
     const len = Math.hypot(dx, dz)
@@ -425,7 +425,13 @@ export class CollisionWorld {
       }
     }
     if (bestT >= maxT) return null
-    return { t: bestT, x: ox + dx * bestT, y: oy + dy * bestT, z: oz + dz * bestT, collider: bestC }
+    const hit = out ?? ({} as RayHit)
+    hit.t = bestT
+    hit.x = ox + dx * bestT
+    hit.y = oy + dy * bestT
+    hit.z = oz + dz * bestT
+    hit.collider = bestC
+    return hit
   }
 
   private rayBox(c: Collider, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): number {

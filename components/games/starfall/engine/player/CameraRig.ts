@@ -9,6 +9,9 @@
  *  title    — a slow, low cinematic drift around the hero for the menus.
  *  scripted — hands-off: cutscenes drive ctx.camera (shake still layers on top, safely).
  *
+ * A slide widens the view a touch and sinks it with the hero; a wall-run widens it and, with camera
+ * shake on, rolls it a few degrees away from the wall. Both ease in and out (CAM.cueRate).
+ *
  * Sprint FOV, FOV kicks and noise shake are applied last. Switching into follow/title glides
  * from wherever the camera was; snapBehind() cuts instantly.
  */
@@ -61,6 +64,10 @@ export class CameraRig implements ICameraRig {
   private moveT = 0
 
   private sprintFov = 0
+  /** Slide and wall-run cues (0..1, eased), and where the wall is in the view (-1 = on its right … 1 = on its left). */
+  private slideCue = 0
+  private wallCue = 0
+  private wallView = 0
   private readonly kicks: FovKick[] = [0, 1, 2, 3].map(() => ({ amp: 0, dur: 1, t: 1 }))
   private shakeAmp = 0
   private shakeDur = 0
@@ -148,7 +155,7 @@ export class CameraRig implements ICameraRig {
     this.boom = this.zoom
     this.pull = 0
     this.lookIdle = 0
-    this.sprintFov = 0
+    this.sprintFov = this.slideCue = this.wallCue = 0
     this.blend = this.blendK = 1
     this.resetPivot()
     if (this._mode !== 'follow') return
@@ -198,8 +205,21 @@ export class CameraRig implements ICameraRig {
     this.aimW = damp(this.aimW, move === 'draw' || move === 'release' || this.ctx.build?.active ? 1 : 0, 7, dt)
     this.boom = damp(this.boom, this.zoom * (1 - AIM_ZOOM * this.aimW), 10, dt)
     this.assist(dt)
+    this.updateCues(dt)
     this.followPivot(dt)
     this.placeOrbit(dt, false)
+    // Wall-run: the horizon leans away from the wall (placeOrbit re-aims the camera every frame, so this never builds up).
+    if (this.wallCue > 0.001 && this.ctx.settings.cameraShake) this.ctx.camera.rotateZ(-C.wallTilt * this.wallCue * this.wallView)
+  }
+
+  /** Eases the slide and wall-run cues toward what the hero is doing. */
+  private updateCues(dt: number): void {
+    const pl = this.ctx.player
+    this.slideCue = damp(this.slideCue, pl.state === 'slide' ? 1 : 0, C.cueRate, dt)
+    const n = pl.wallNormal
+    this.wallCue = damp(this.wallCue, n ? 1 : 0, C.cueRate, dt)
+    // The camera's right is (-cos yaw, sin yaw): a normal pointing that way has the wall on the view's left.
+    if (n) this.wallView = damp(this.wallView, clamp(n.z * Math.sin(this.yaw) - n.x * Math.cos(this.yaw), -1, 1), C.cueRate * 2, dt)
   }
 
   /** After a while without look input, ease the view toward the running direction. */
@@ -237,8 +257,9 @@ export class CameraRig implements ICameraRig {
     this.pivot.z += (p.z - this.pivot.z) * kH
     const falling = !pl.grounded && pl.velocity.y < -6
     const rate = pl.grounded ? C.vFollowGround : falling ? C.vFollowFall : C.vFollowAir
-    const hy = p.y + C.pivotHeight
-    this.pivot.y = clamp(damp(this.pivot.y, this.refY + C.pivotHeight, rate, dt), hy - C.maxVLag, hy + C.maxVLag)
+    const drop = C.slideDrop * this.slideCue
+    const hy = p.y + C.pivotHeight - drop
+    this.pivot.y = clamp(damp(this.pivot.y, this.refY + C.pivotHeight - drop, rate, dt), hy - C.maxVLag, hy + C.maxVLag)
   }
 
   /** Positions the camera on its boom around the pivot, pulled in by obstacles. */
@@ -465,7 +486,7 @@ export class CameraRig implements ICameraRig {
     if (this._mode === 'follow') {
       const sp = this.ctx.player.motion.speed
       this.sprintFov = damp(this.sprintFov, smoothstep(MOVE.runSpeed + 0.4, MOVE.sprintSpeed, sp) * C.sprintFov, 2.5, dt)
-      fov += this.sprintFov
+      fov += this.sprintFov + C.slideFov * this.slideCue + C.wallFov * this.wallCue
     } else {
       fov += C.titleFovOffset
     }

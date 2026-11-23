@@ -5,11 +5,13 @@
  *   ground layer   idle (breathing, weight shift, glances) ↔ walk/run/sprint gait by speed
  *   air layer      jump / somersault / fall / bounce, cross-faded on change
  *   actions        dash, spin attack, death (blended) · hurt, landing (additive)
+ *   moves          dodge-roll (a tucked tumble), sprint slide, wall-run (anim/moves.ts)
  *   weapon         carrying arm + keyed sword / hammer / bow moves over the upper body
  *   gestures       keyframed overlays for gameplay & cutscenes
  *   override       a pose from outside (ragdoll, getting up) replaces all of the above
  *   solve         feet planted by IK on the real ground, hips height limiter,
- *                  head stabilisation + look-at, then written to the bones.
+ *                  head stabilisation + look-at (waist, chest, neck and head share the turn),
+ *                  then written to the bones.
  *
  * Feet are IK targets: during a stride they travel back exactly as fast as the
  * body moves; when standing they stay put in the world and take small
@@ -18,14 +20,16 @@
 import * as THREE from 'three'
 import type { V3 } from '../events'
 import type { GestureName, MotionState, PlayerState, WeaponMove, WeaponPose } from '../types'
-import { applyWade, footAt, gaitFor, swingSignal, WALK, type FootSample, type GaitParams } from './anim/Gait'
+import { applyWade, footAt, gaitFor, RUN, swingSignal, WALK, type FootSample, type GaitParams } from './anim/Gait'
 import { GESTURES, type GestureDef } from './anim/gestures'
 import { DEG, TAU, clamp, clamp01, damp, easeOut, envelope, lerp, noise1, ramp, smooth, wrap01, wrapAngle } from './anim/math'
 import { J, Pose, PoseBuilder } from './anim/Pose'
+import * as MOVES from './anim/moves'
 import * as POSES from './anim/poses'
 import type { Rig } from './anim/Rig'
 import { KIND } from '../gameplay/weapons/defs'
 import { CARRY, WEAPON_CLIPS } from './anim/weaponPoses'
+import { ROLL } from './control/tuning'
 
 export interface GroundSample {
   y: number
@@ -43,6 +47,7 @@ const AIR_STATES = new Set<PlayerState>(['jump', 'doubleJump', 'fall', 'bounce']
 const UPPER = [J.spine, J.chest, J.neck, J.head, J.shoulderL, J.upperArmL, J.forearmL, J.handL, J.shoulderR, J.upperArmR, J.forearmR, J.handR]
 const SPINE_CHAIN = [J.hips, J.spine, J.chest, J.neck, J.head]
 const NECK_HEAD = [J.neck, J.head]
+const CHEST_ONLY = [J.chest]
 const ARM_L = [J.shoulderL, J.upperArmL, J.forearmL, J.handL]
 const ARM_R = [J.shoulderR, J.upperArmR, J.forearmR, J.handR]
 /** How much of the gait's arm swing the carrying arm gives up. */
@@ -69,8 +74,20 @@ const STRETCH_STEP = 1 / 240
 /** Downward kick (1/s) a full-strength landing gives the stretch spring: about 9 % squash. */
 const LAND_SQUASH = 3.4
 
+/** Look-at: how far the eyes may lead the body (rad), and the share of the turn each part takes. */
+const LOOK_YAW_MAX = 1.2
+const LOOK_PITCH_DOWN = 0.5
+const LOOK_PITCH_UP = 0.6
+const LOOK_WAIST = 0.08
+const LOOK_CHEST = 0.18
+const LOOK_CHEST_PITCH = 0.2
+const LOOK_HEAD = 0.9
+/** The stride's style (lean, arm swing, bounce) follows the speed this fast (1/s): walk, run and sprint melt into each other. */
+const GAIT_RATE = 7
+
 const UP = new THREE.Vector3(0, 1, 0)
 const AX_X = new THREE.Vector3(1, 0, 0)
+const AX_Z = new THREE.Vector3(0, 0, 1)
 
 interface Plant {
   /** World position of the planted sole point (y unused — the ground decides). */
@@ -143,6 +160,10 @@ export class Animator {
   private pHurt: Pose
   private pLand: Pose
   private pDead: Pose
+  private pRollDive: Pose
+  private pRollTuck: Pose
+  private pSlide: Pose
+  private pWallReach: Pose
   private gestureKeys = new Map<GestureName, { keys: Pose[]; times: number[] }>()
   private carry = new Map<string, Pose>()
   private clips = new Map<WeaponMove, { keys: Pose[]; times: number[] }>()
@@ -178,6 +199,8 @@ export class Animator {
   private speed = 0
   private prevSpeed = 0
   private seenSpeed = 0
+  /** Speed the stride's style is taken from (trails `speed`, so gaits blend rather than switch). */
+  private gaitSpeed = 0
   private accel = 0
   private moveW = 0
   private groundW = 1
@@ -210,6 +233,18 @@ export class Animator {
   private landAmp = 0
   private deadW = 0
 
+  // roll, slide, wall-run
+  /** Seconds into the roll's tumble, or -1. */
+  private rollT = -1
+  /** How tightly the body is tucked (the carried weapon is pulled in with it). */
+  private tuckW = 0
+  private slideW = 0
+  private slideBank = 0
+  private wallW = 0
+  /** The side the wall is (or was last) on: -1 his left, 1 his right. */
+  private wallSide = 1
+  private readonly wallQ = new THREE.Quaternion()
+
   // feet
   private plants: Plant[] = [0, 1].map(() => ({
     pos: new THREE.Vector3(), yaw: 0, stepT: -1, from: new THREE.Vector3(), to: new THREE.Vector3(), fromYaw: 0, toYaw: 0,
@@ -229,6 +264,9 @@ export class Animator {
   private lookW = 0
   private lookYaw = 0
   private lookPitch = 0
+  /** First stage of the look smoothing (the head eases into a turn instead of snapping off the mark). */
+  private lookYawLead = 0
+  private lookPitchLead = 0
   private idleT = 0
   private glanceT = -1
   private glanceNext = 5
@@ -263,6 +301,10 @@ export class Animator {
     this.pHurt = b.compile(POSES.HURT)
     this.pLand = b.compile(POSES.LAND)
     this.pDead = b.compile(POSES.DEAD)
+    this.pRollDive = b.compile({ ...POSES.IDLE, ...MOVES.ROLL_DIVE })
+    this.pRollTuck = b.compile(MOVES.ROLL_TUCK)
+    this.pSlide = b.compile(MOVES.SLIDE)
+    this.pWallReach = b.compile(MOVES.WALL_REACH)
     for (const name of Object.keys(GESTURES) as GestureName[]) {
       const def = GESTURES[name]
       this.gestureKeys.set(name, { keys: def.keys.map(([, s]) => b.compile(s)), times: def.keys.map(([t]) => t) })
@@ -400,6 +442,7 @@ export class Animator {
       this.applySkid(out)
       this.buildAir(dt)
       out.blend(this.air, 1 - this.groundW)
+      this.applyMoves(dt, out)
       this.applyActions(dt, out)
       this.applyWeapon(dt, out)
       this.applyGesture(dt, out)
@@ -472,6 +515,17 @@ export class Animator {
       case 'hurt':
         this.hurtT = 0
         break
+      case 'roll':
+        this.rollT = 0
+        this.kickStretch(0.93, 0.6)
+        break
+      case 'slide':
+        // Dropping onto the hip: a soft squash.
+        this.stretchV -= 1.3
+        break
+      case 'wallRun':
+        this.wallSide = (this.m.wallSide ?? 0) < 0 ? -1 : 1
+        break
     }
   }
 
@@ -532,7 +586,8 @@ export class Animator {
     const bankTarget = clamp(-this.yawRate * this.speed * 0.03, -0.3, 0.3) * this.groundW * smooth(this.moveW)
     this.bank = damp(this.bank, bankTarget, 7, dt)
 
-    const groundTarget = m.grounded && !AIR_STATES.has(m.state) ? 1 : 0
+    // On a wall the feet are running too (the gait goes on, tilted onto it).
+    const groundTarget = (m.grounded && !AIR_STATES.has(m.state)) || m.state === 'wallRun' ? 1 : 0
     this.groundW = damp(this.groundW, groundTarget, groundTarget > this.groundW ? 18 : 24, dt)
     if (teleported) this.groundW = groundTarget
 
@@ -548,14 +603,17 @@ export class Animator {
     const walk = m.walkSpeed || 2.2
     const run = m.runSpeed || 5.6
     const sprint = m.sprintSpeed || 8.6
-    // Cadence follows the raw speed so steps stay in time with the controller's footstep sounds.
-    if (this.groundW > 0.3) {
-      gaitFor(this.g, target, walk, run, sprint)
-      applyWade(this.g, this.wadeW)
-      this.phase = wrap01(this.phase + (target * dt) / (2 * this.g.step))
-    }
-    gaitFor(this.g, this.speed, walk, run, sprint)
+    // Cadence follows the raw speed so steps stay in time with the controller's footstep sounds
+    // (on a wall: a run's stride, as the controller counts them there).
+    gaitFor(this.g, target, walk, run, sprint)
     applyWade(this.g, this.wadeW)
+    const step = m.state === 'wallRun' ? RUN.step : this.g.step
+    if (this.groundW > 0.3) this.phase = wrap01(this.phase + (target * dt) / (2 * step))
+    // The style trails behind; the stride length does not, so planted feet never slip while it catches up.
+    this.gaitSpeed = teleported ? target : damp(this.gaitSpeed, Math.max(0, target), GAIT_RATE, dt)
+    gaitFor(this.g, this.gaitSpeed, walk, run, sprint)
+    applyWade(this.g, this.wadeW)
+    this.g.step = step
   }
 
   /* ── ground layer ────────────────────────────────────────── */
@@ -774,6 +832,56 @@ export class Animator {
     }
   }
 
+  /* ── roll, slide, wall-run ───────────────────────────────── */
+
+  /**
+   * The three traversal moves, as poses; solve() then turns the whole body for them (the roll's
+   * tumble, the slide along its slope, the lean off the wall).
+   */
+  private applyMoves(dt: number, out: Pose): void {
+    const s = this.state
+    const b = this.b
+
+    this.tuckW = 0
+    if (this.rollT >= 0) {
+      // Cut short (a jump out of it, a hit, a ledge): the turn is finished quickly rather than dropped.
+      this.rollT += dt * (s === 'roll' ? 1 : 2.4)
+      const f = this.rollT / ROLL.time
+      if (f >= 1) this.rollT = -1
+      else {
+        this.tuckW = MOVES.rollTuck(f)
+        out.blend(this.pRollDive, MOVES.rollDive(f))
+        out.blend(this.pRollTuck, this.tuckW)
+      }
+    }
+
+    const slideTarget = s === 'slide' ? 1 : 0
+    this.slideW = damp(this.slideW, slideTarget, slideTarget ? 16 : 9, dt)
+    if (this.slideW > 0.002) {
+      const w = smooth(this.slideW)
+      out.blend(this.pSlide, w)
+      // Alive on the ground: a little rattle, and the free arm rides the turns.
+      const t = this.t
+      out.pos.y += 0.012 * w * noise1(t * 11, 5)
+      b.add(out, J.chest, 1.5 * w * noise1(t * 7, 6), 0, 0)
+      b.add(out, J.upperArmR, 6 * w * noise1(t * 5, 7), 0, 5 * w * noise1(t * 4, 8))
+      this.slideBank = damp(this.slideBank, clamp(-this.yawRate * 0.16, -0.3, 0.3), 8, dt)
+    } else this.slideBank = 0
+
+    const wallTarget = s === 'wallRun' ? 1 : 0
+    this.wallW = damp(this.wallW, wallTarget, wallTarget ? 15 : 10, dt)
+    if (this.wallW > 0.002) {
+      const w = smooth(this.wallW)
+      const left = this.wallSide < 0
+      // The near arm reaches for the wall, the far one swings wide; the chest opens toward the wall.
+      out.blendJoints(this.pWallReach, 0.85 * w, left ? ARM_L : ARM_R)
+      out.curl[left ? 0 : 1] = lerp(out.curl[left ? 0 : 1], this.pWallReach.curl[0], w)
+      b.add(out, left ? J.upperArmR : J.upperArmL, 0, 0, 16 * w)
+      b.add(out, J.chest, 0, (left ? 9 : -9) * w, 0)
+      b.add(out, J.hips, 5 * w, 0, 0)
+    }
+  }
+
   /* ── weapon ──────────────────────────────────────────────── */
 
   /** The weapon arm holds its weapon; a move in progress takes over the upper body. */
@@ -789,7 +897,8 @@ export class Animator {
     this.carryW = damp(this.carryW, carry ? 1 : 0, 8, dt)
     if (this.carryW > 0.002 && this.lastCarry) {
       const side = this.carrySide
-      out.blendJoints(this.lastCarry, CARRY_W * this.carryW, side ? ARM_R : ARM_L)
+      // Tucked into a roll, the weapon arm comes in with the rest of the body.
+      out.blendJoints(this.lastCarry, CARRY_W * this.carryW * (1 - 0.75 * this.tuckW), side ? ARM_R : ARM_L)
       out.curl[side] = lerp(out.curl[side], 1, this.carryW)
     }
 
@@ -806,9 +915,9 @@ export class Animator {
 
   /** Overridden: whatever the body was in the middle of (flips, spins, gestures, looks) is dropped. */
   private dropActions(): void {
-    this.flipT = this.spinT = this.hurtT = this.landT = -1
+    this.flipT = this.spinT = this.hurtT = this.landT = this.rollT = -1
     this.spin = 0
-    this.dashW = this.deadW = this.lookW = this.swingW = 0
+    this.dashW = this.deadW = this.lookW = this.swingW = this.slideW = this.wallW = this.tuckW = 0
     if (this.gesture) this.finishGesture()
     this.snapT = 1
   }
@@ -932,7 +1041,8 @@ export class Animator {
       // Ground under the foot.
       let rel = 0
       _v2.set(0, 1, 0)
-      if (this.probe(root.x + c * x + s * z, root.z - s * x + c * z, root.y, this.hit)) {
+      // (On a wall there is no ground to find: the stride runs on the flat and is leant onto the wall.)
+      if (this.wallW < 0.5 && this.probe(root.x + c * x + s * z, root.z - s * x + c * z, root.y, this.hit)) {
         rel = clamp(this.hit.y - root.y, -0.32, 0.32)
         _v2.set(c * this.hit.nx - s * this.hit.nz, this.hit.ny, s * this.hit.nx + c * this.hit.nz)
         // Limit the tilt to something an ankle can do.
@@ -1023,12 +1133,39 @@ export class Animator {
       _q1.setFromAxisAngle(AX_X, TAU * (f * f * (3 - 2 * f)))
       rig.pivotHips(out, _q1, FLIP_PIVOT)
     }
+    if (this.rollT >= 0) {
+      // The tumble: once round, about the middle of the tucked ball.
+      _q1.setFromAxisAngle(AX_X, MOVES.rollTurn(this.rollT / ROLL.time))
+      rig.pivotHips(out, _q1, MOVES.ROLL_PIVOT)
+    }
+    if (this.slideW > 0.002) {
+      // The slide lies along the ground under it, and banks into its turns.
+      const w = smooth(this.slideW)
+      _q1.setFromAxisAngle(AX_X, -Math.asin(clamp(this.slope, -0.7, 0.7)) * w)
+      _q1.multiply(_q2.setFromAxisAngle(AX_Z, this.slideBank * w))
+      rig.pivotHips(out, _q1, MOVES.SLIDE_PIVOT)
+    }
+    const wall = this.wallW > 0.002
+    if (wall) {
+      // Leant away from the wall, feet on it.
+      this.wallQ.setFromAxisAngle(AX_Z, -this.wallSide * MOVES.WALL_LEAN * smooth(this.wallW))
+      rig.pivotHips(out, this.wallQ, MOVES.WALL_PIVOT)
+    }
     const ik = clamp01(out.ik)
     rig.hipsPos.copy(rig.hipsRest).add(out.pos)
     rig.hipsPos.y += this.hipsGround * ik
     rig.accumulate(out, SPINE_CHAIN)
 
-    for (let i = 0; i < 2; i++) this.footPose(i as 0 | 1, this.targets[i])
+    for (let i = 0; i < 2; i++) {
+      const tg = this.targets[i]
+      this.footPose(i as 0 | 1, tg)
+      if (wall) {
+        // The stride leans with the body.
+        tg.ankle.sub(MOVES.WALL_PIVOT).applyQuaternion(this.wallQ).add(MOVES.WALL_PIVOT)
+        tg.footQ.premultiply(this.wallQ)
+        tg.toeQ.premultiply(this.wallQ)
+      }
+    }
 
     // Hips height limiter: never ask a leg to reach further than it can.
     if (ik > 0.01) {
@@ -1095,10 +1232,14 @@ export class Animator {
       const cz = s * dx + c * dz
       const yaw = Math.atan2(cx, cz)
       const pitch = Math.atan2(dy, Math.hypot(cx, cz))
-      // Fade out for targets far behind rather than breaking the neck.
+      // Fade out for targets far behind rather than breaking the neck; tumbling and dashing, he looks where he goes.
       wTarget = 1 - ramp(115 * DEG, 160 * DEG, Math.abs(yaw))
-      this.lookYaw = lerp(this.lookYaw, clamp(yaw, -1.25, 1.25), 1 - Math.exp(-8 * dt))
-      this.lookPitch = lerp(this.lookPitch, clamp(pitch, -0.6, 0.7), 1 - Math.exp(-8 * dt))
+      if (this.rollT >= 0 || this.state === 'dash' || this.state === 'dead') wTarget = 0
+      // Two stages: the turn eases in and settles without overshoot.
+      this.lookYawLead = damp(this.lookYawLead, clamp(yaw, -LOOK_YAW_MAX, LOOK_YAW_MAX), 12, dt)
+      this.lookPitchLead = damp(this.lookPitchLead, clamp(pitch, -LOOK_PITCH_DOWN, LOOK_PITCH_UP), 12, dt)
+      this.lookYaw = damp(this.lookYaw, this.lookYawLead, 9, dt)
+      this.lookPitch = damp(this.lookPitch, this.lookPitchLead, 9, dt)
     }
     this.lookW = damp(this.lookW, wTarget, 5, dt)
   }
@@ -1111,8 +1252,12 @@ export class Animator {
     const w = Math.max(clamp01(out.stab), lw)
     if (w < 0.001) return
     if (lw > 0.001) {
-      // The chest takes a share of big look turns.
-      _q1.setFromAxisAngle(UP, this.lookYaw * 0.22 * lw).multiply(C[J.chest])
+      // The upper spine takes a share of the turn: a little at the waist, more (and some of the tilt) at the chest.
+      _q1.setFromAxisAngle(UP, this.lookYaw * LOOK_WAIST * lw).multiply(C[J.spine])
+      rig.setWorld(out, J.spine, _q1)
+      rig.accumulate(out, CHEST_ONLY)
+      _e.set(-this.lookPitch * LOOK_CHEST_PITCH * lw, this.lookYaw * LOOK_CHEST * lw, 0, 'YXZ')
+      _q1.setFromEuler(_e).multiply(C[J.chest])
       rig.setWorld(out, J.chest, _q1)
       rig.accumulate(out, NECK_HEAD)
     }
@@ -1120,7 +1265,7 @@ export class Animator {
     const desired = _q2.multiplyQuaternions(out.q[J.neck], out.q[J.head])
     if (lw > 0.001) {
       // …turned toward the look target.
-      _e.set(-this.lookPitch * lw, this.lookYaw * lw * 0.78, 0, 'YXZ')
+      _e.set(-this.lookPitch * lw, this.lookYaw * lw * LOOK_HEAD, 0, 'YXZ')
       desired.premultiply(_q1.setFromEuler(_e))
     }
     const target = _q3.copy(C[J.head]).slerp(desired, w)

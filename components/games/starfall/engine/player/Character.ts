@@ -19,6 +19,7 @@ import { Face, faceCentre } from './Face'
 import { Rig } from './anim/Rig'
 import { dampAngle, wrapAngle } from './anim/math'
 import { HeroRagdoll } from './ragdoll/HeroRagdoll'
+import { LookDirector } from './LookDirector'
 
 const HERO_URL = '/games/starfall/hero.glb'
 const HERO_HEIGHT = 1.62
@@ -67,6 +68,9 @@ export class Character implements ICharacter {
   private up = new THREE.Vector3(0, 1, 0)
   private normal = new THREE.Vector3()
   private headLocal = new THREE.Vector3()
+  /** Chooses what he looks at during play; a cutscene's own look-at (`scripted`) overrides it. */
+  private director: LookDirector
+  private scripted = false
   /** The model's bytes, requested as soon as the game is created so they download while the island builds. */
   private heroBytes: Promise<ArrayBuffer | Error>
 
@@ -75,6 +79,7 @@ export class Character implements ICharacter {
     this.root.add(this.pivot)
     this.pivot.add(this.model)
     this.heroBytes = loadBytes(HERO_URL)
+    this.director = new LookDirector(ctx)
   }
 
   async init(): Promise<void> {
@@ -248,6 +253,7 @@ export class Character implements ICharacter {
       const setOff = this.ctx.game.phase === 'playing' && p.controlEnabled && busy(p.motion)
       if (setOff && this.animator.gesturing) this.animator.interruptGesture()
       if (this.ctx.weapons) this.animator.setWeapon(this.ctx.weapons.pose)
+      if (!this.scripted) this.animator.lookAt(this.director.update(dt))
       this.animator.update(dt, this.root.position, this.yaw)
       this.pivot.rotation.y = this.animator.spin
       this.applyStretch(this.animator.stretch)
@@ -389,6 +395,7 @@ export class Character implements ICharacter {
   }
 
   lookAt(target: V3 | null): void {
+    this.scripted = target !== null
     this.animator?.lookAt(target)
   }
 
@@ -409,6 +416,7 @@ export class Character implements ICharacter {
     this.animator?.stopGesture()
     for (const off of this.off) off()
     this.off = []
+    this.director.dispose()
     this.root.removeFromParent()
     this.blob?.removeFromParent()
     this.face?.dispose()

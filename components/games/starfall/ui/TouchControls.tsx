@@ -3,13 +3,15 @@
  * On-screen controls for touch: the floating move stick (drawn from
  * input.touchStick — the engine owns the touch itself), and the action
  * buttons, which drive game.setVirtualButton(). In build mode the same
- * buttons place, break and turn blocks.
+ * buttons place, break and turn blocks. The Roll button dodge-rolls, or
+ * drops into a slide when pressed at a sprint.
  */
 import { useEffect, useEffectEvent, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import type { WeaponId } from '../engine/events'
 import type { Action } from '../engine/input'
+import { SLIDE } from '../engine/player/control/tuning'
 import { useGameUi, useHud, useUi } from './context'
-import { BowIcon, CubeIcon, DashIcon, FrostHammerIcon, HammerIcon, InteractIcon, JumpIcon, RefreshIcon, SpinIcon, StarbladeIcon, SwordIcon } from './icons'
+import { BowIcon, CubeIcon, DashIcon, FrostHammerIcon, HammerIcon, InteractIcon, JumpIcon, RefreshIcon, RollIcon, SpinIcon, StarbladeIcon, SwordIcon } from './icons'
 import { cx } from './theme'
 
 /** The attack button shows what it does: the fists' spin or the weapon in hand. */
@@ -23,7 +25,7 @@ const ATTACK: Record<WeaponId, { label: string; Icon: ComponentType<SVGProps<SVG
 }
 
 export function TouchControls() {
-  const { touch } = useGameUi()
+  const { touch, game } = useGameUi()
   const phase = useUi(s => s.phase)
   const hasPrompt = useUi(s => !!s.prompt)
   const attack = ATTACK[useHud(h => h.weapon)]
@@ -54,6 +56,14 @@ export function TouchControls() {
             </>
           )}
           <TouchButton action="build" label={building ? 'Done' : 'Build'} Icon={CubeIcon} className="bottom-[184px] right-[122px] h-[46px] w-[46px]" highlight={building} />
+          <TouchButton
+            action="roll"
+            // At a sprint the same button is the low button: it slides.
+            pick={() => (game.ctx.player && game.ctx.player.grounded && game.ctx.player.motion.speed >= SLIDE.enterSpeed ? 'low' : 'roll')}
+            label="Roll"
+            Icon={RollIcon}
+            className="bottom-[190px] right-[66px] h-[46px] w-[46px]"
+          />
         </div>
       )}
     </div>
@@ -68,8 +78,11 @@ function TouchButton({
   big,
   highlight,
   charge,
+  pick,
 }: {
   action: Action
+  /** Chooses the action at the moment of the press (default: `action`). */
+  pick?: () => Action
   label: string
   Icon: ComponentType<SVGProps<SVGSVGElement>>
   className: string
@@ -81,12 +94,14 @@ function TouchButton({
   const { game } = useGameUi()
   const [down, setDown] = useState(false)
   const held = useRef(false)
+  /** The action the current press went to. */
+  const pressed = useRef<Action>(action)
 
   const release = () => {
     if (!held.current) return
     held.current = false
     setDown(false)
-    game.setVirtualButton(action, false)
+    game.setVirtualButton(pressed.current, false)
   }
   // Never leave an action held when the buttons go away (pause, cutscene).
   const releaseOnUnmount = useEffectEvent(release)
@@ -101,7 +116,8 @@ function TouchButton({
         e.currentTarget.setPointerCapture(e.pointerId)
         held.current = true
         setDown(true)
-        game.setVirtualButton(action, true)
+        pressed.current = pick ? pick() : action
+        game.setVirtualButton(pressed.current, true)
       }}
       onPointerUp={release}
       onPointerCancel={release}

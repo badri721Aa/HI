@@ -5,7 +5,7 @@
  */
 
 export type Device = 'kbm' | 'pad' | 'touch'
-export type Action = 'jump' | 'dash' | 'attack' | 'interact' | 'pause' | 'map' | 'sprint' | 'skip' | 'ragdoll' | 'build'
+export type Action = 'jump' | 'dash' | 'attack' | 'interact' | 'pause' | 'map' | 'sprint' | 'skip' | 'ragdoll' | 'build' | 'roll' | 'low'
 
 export interface InputState {
   /** Movement intent, x = right, y = forward. Length ≤ 1. */
@@ -44,6 +44,9 @@ export interface InputState {
   place: boolean
   remove: boolean
   rotate: boolean
+  /** Dodge-roll (V / pad LT / the touch button) and the low button (C / pad L3): at a sprint it drops into a slide. Edge-triggered. */
+  roll: boolean
+  low: boolean
 }
 
 const KEYMAP: Record<string, Action> = {
@@ -59,6 +62,8 @@ const KEYMAP: Record<string, Action> = {
   KeyB: 'build',
   ShiftLeft: 'sprint',
   ShiftRight: 'sprint',
+  KeyV: 'roll',
+  KeyC: 'low',
 }
 
 const SLOT_KEYS: Record<string, number> = {
@@ -82,7 +87,7 @@ function emptyState(): InputState {
     moveX: 0, moveY: 0, lookX: 0, lookY: 0, zoom: 0, slot: -1, cycle: 0,
     jumpHeld: false, attackHeld: false, sprint: false, skipHeld: false, descend: false, boost: false,
     jump: false, dash: false, attack: false, interact: false, pause: false, map: false, ragdoll: false,
-    build: false, place: false, remove: false, rotate: false,
+    build: false, place: false, remove: false, rotate: false, roll: false, low: false,
   }
 }
 
@@ -334,11 +339,13 @@ export class Input {
       if (edge(8)) this.edges.add('map')
       if (edge(11)) this.edges.add('ragdoll')
       if (edge(4)) this.edges.add('build')
+      if (edge(6)) this.edges.add('roll')
+      if (edge(10)) this.edges.add('low')
       if (edge(14)) cycle = -1
       if (edge(15)) cycle = 1
       if (btn(0)) { jumpHeld = true; skipHeld = true }
       if (btn(2)) attackHeld = true
-      if (btn(5) || btn(10) || btn(7)) sprint = boost = true
+      if (btn(5) || btn(7)) sprint = boost = true
       if (btn(1)) descend = true
       if (btn(12)) zoom -= 4 * dt
       if (btn(13)) zoom += 4 * dt
@@ -380,6 +387,8 @@ export class Input {
     s.place = build && e.has('attack')
     s.remove = build && e.has('dash')
     s.rotate = build && e.has('ragdoll')
+    s.roll = on && e.has('roll')
+    s.low = on && e.has('low')
     e.clear()
   }
 

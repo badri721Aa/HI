@@ -106,6 +106,17 @@ export function DashIcon(p: IconProps) {
   )
 }
 
+/** A tumbling figure: the dodge-roll (and, at a sprint, the slide). */
+export function RollIcon(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M17.2 8.2a6 6 0 1 1-4.6-2.1" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      <path d="M9.6 3.4l3.2 2.7-2.9 2.9" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 20h16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function SpinIcon(p: IconProps) {
   return (
     <svg {...base(p)}>

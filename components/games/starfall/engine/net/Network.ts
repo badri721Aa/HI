@@ -28,7 +28,7 @@ import {
   PROFILE_KEY, PUBLIC_ROOMS, RELAY_DELIVERIES, RELAY_RATE_ACTIVE, RELAY_RATE_IDLE, SUPABASE_KEY, SUPABASE_URL,
 } from './config'
 import {
-  ACTION_BYTES, Bucket, FLAG_ACTIVE, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, STATE_BYTES, defaultColor, defaultName,
+  ACTION_BYTES, Bucket, FLAG_ACTIVE, FLAG_AWAY, FLAG_GROUNDED, FLAG_RAGDOLL, FLAG_WALL_RIGHT, STATE_BYTES, defaultColor, defaultName,
   encodeAction, encodeState, isEmote, makeAction, makeSnapshot, normalizeRoomCode, randomId, sanitizeChat,
   sanitizeColor, sanitizeName, stateCode, toBase64, toRelay, weaponCode, type ActionName, type MemberInfo,
 } from './protocol'
@@ -206,6 +206,12 @@ export class Network implements INetwork {
       bus.on('weapon:fire', e => this.sendAction('release', held(), e.pos, 0, e.charge, e.vel)),
       bus.on('player:attack', e => this.sendAction('spin', held(), e.pos)),
       bus.on('player:dash', e => this.sendAction('dash', held(), e.pos, 0, 0, e.dir)),
+      bus.on('player:roll', e => this.sendAction('roll', held(), e.pos, 0, 0, e.dir)),
+      bus.on('player:slide', e => this.sendAction('slide', held(), e.pos, 0, 0, e.dir)),
+      bus.on('player:wallRun', e => this.sendAction('wallRun', held(), e.pos, e.side > 0 ? 1 : 0, 0, e.normal)),
+      bus.on('player:jump', e => {
+        if (e.from === 'wall') this.sendAction('wallJump', held(), e.pos)
+      }),
       bus.on('player:land', e => this.ragdoll.noteImpact(e.impact)),
     )
     window.addEventListener('offline', this.onOffline)
@@ -604,7 +610,8 @@ export class Network implements INetwork {
     this.lastY = pos.y
     this.lastZ = pos.z
     const moving = v.x * v.x + v.z * v.z > 0.01 || Math.abs(v.y) > 0.05 || !p.grounded || dx * dx + dy * dy + dz * dz > 1e-6
-    const baseFlags = (p.grounded || ragdoll ? FLAG_GROUNDED : 0) | (ragdoll ? FLAG_RAGDOLL : 0) | (away ? FLAG_AWAY : 0)
+    const wallRight = !ragdoll && p.state === 'wallRun' && (p.motion?.wallSide ?? 0) > 0
+    const baseFlags = (p.grounded || ragdoll ? FLAG_GROUNDED : 0) | (ragdoll ? FLAG_RAGDOLL : 0) | (away ? FLAG_AWAY : 0) | (wallRight ? FLAG_WALL_RIGHT : 0)
     const turned = Math.abs(Math.atan2(Math.sin(s.yaw - this.lastYaw), Math.cos(s.yaw - this.lastYaw))) > 0.02
     if (moving || turned || s.draw >= 0 || s.state !== this.lastState || baseFlags !== this.lastFlags || s.weapon !== this.lastWeapon || s.map !== this.lastMap) this.lastChange = now
     this.lastWeapon = s.weapon

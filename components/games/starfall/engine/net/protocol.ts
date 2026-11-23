@@ -4,7 +4,7 @@
  *
  * Peer-to-peer state packets are a fixed 40-byte binary layout:
  *
- *   0 u8 kind (1)   1 u8 state   2 u8 flags   3 u8 wading·255
+ *   0 u8 kind (1)   1 u8 state   2 u8 flags (FLAG_*)   3 u8 wading·255
  *   4 f32 t (sender clock, s)   8..19 f32 x y z   20 f32 yaw
  *   24..35 f32 vx vy vz   36 i8 slope·127   37 u8 weapon in hand   38 u8 map
  *   39 u8 bow draw (0 = not drawing, else 1 + charge·254)
@@ -26,6 +26,8 @@ import { CHAT_MAX, NAME_MAX, SHIRT_COLORS } from './config'
 const STATES: readonly PlayerState[] = [
   'idle', 'move', 'jump', 'doubleJump', 'fall', 'land', 'dash',
   'attack', 'hurt', 'dead', 'wade', 'bounce', 'cutscene', 'ragdoll',
+  // Older clients don't know these three: they show them as 'idle' at the replicated position.
+  'roll', 'slide', 'wallRun',
 ]
 
 const STATE_CODE = new Map<PlayerState, number>(STATES.map((s, i) => [s, i]))
@@ -43,6 +45,8 @@ export const FLAG_RAGDOLL = 2
 /** The player is in a menu (title / paused): name tag dims. */
 export const FLAG_AWAY = 4
 export const FLAG_ACTIVE = 8
+/** Wall-running with the wall on the player's right (clear: on the left). Only read in state 'wallRun'. */
+export const FLAG_WALL_RIGHT = 16
 
 /** Weapon wire codes (append new weapons at the end). */
 const WEAPONS: readonly WeaponId[] = ['fists', 'sword', 'hammer', 'bow', 'starblade', 'frostHammer']
@@ -351,8 +355,12 @@ export function decodeRagdoll(view: DataView, out: RagdollFrame): boolean {
 
 /* ── actions ─────────────────────────────────────────────── */
 
-/** Order is the wire code (append new actions at the end). */
-export const ACTIONS = ['slash', 'slam', 'draw', 'release', 'spin', 'dash'] as const
+/**
+ * Order is the wire code (append new actions at the end; a client that doesn't know a code drops
+ * the packet). 'roll' and 'slide' carry the heading, 'wallRun' the wall's normal (and combo 1 with
+ * the wall on the right), 'wallJump' is the kick off a wall.
+ */
+export const ACTIONS = ['slash', 'slam', 'draw', 'release', 'spin', 'dash', 'roll', 'slide', 'wallRun', 'wallJump'] as const
 export type ActionName = (typeof ACTIONS)[number]
 
 /**
@@ -360,7 +368,8 @@ export type ActionName = (typeof ACTIONS)[number]
  *
  *   0 u8 kind (5)   1 u8 action   2 u8 weapon   3 u8 combo (0..2)   4 u16 seq   6 u8 charge·255   7 reserved
  *   8 f32 t   12..23 f32 x y z (where: the player, or the bow for a release)
- *   24..29 i16 vx vy vz ·100 (the arrow's launch velocity, or the dash direction)   30 i16 yaw·10⁴
+ *   24..29 i16 vx vy vz ·100 (the arrow's launch velocity, or the direction of a dash, roll or slide, or a wall's normal)
+ *   30 i16 yaw·10⁴
  */
 export const ACTION_BYTES = 32
 const LIMIT_ARROW = 80

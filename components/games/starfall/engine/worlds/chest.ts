@@ -151,6 +151,6 @@ export class Chest {
   private setPrompt(on: boolean): void {
     if (on === this.prompted) return
     this.prompted = on
-    this.ctx.bus.emit('ui:prompt', on ? { key: this.ctx.input.interactKey, label: 'Open the chest' } : null)
+    this.ctx.bus.emit('ui:prompt', on ? { key: this.ctx.input.interactKey, label: 'Open the chest', at: { x: this.x, y: this.y + 0.5, z: this.z } } : null)
   }
 }
