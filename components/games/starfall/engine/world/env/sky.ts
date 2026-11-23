@@ -104,7 +104,7 @@ void main() {
       float gx = dot( d, uGalCore );
       float lon = atan( dot( d, uGalSide ), abs( gx ) < 1e-4 ? 1e-4 : gx );
       vec4 mw = texture2D( tMilkyWay, vec2( lon * 0.15915494 + 0.5, gs * ${glsl(0.5 / GALAXY_SPAN)} + 0.5 ) );
-      col += mix( vec3( 0.42, 0.52, 0.86 ), vec3( 1.0, 0.8, 0.6 ), mw.g ) * ( mw.r * mw.r * 0.13 * uMilkyWay * faint );
+      col += mix( vec3( 0.5, 0.6, 0.92 ), vec3( 1.0, 0.84, 0.66 ), mw.g ) * ( mw.r * mw.r * 0.1 * uMilkyWay * faint );
     }
 
     // Aurora: a curtain with a crisp lower edge that fades upward, slowly drifting.

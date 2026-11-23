@@ -19,7 +19,7 @@ import type { QualityLevel } from '../../settings'
 import { GALAXY_CORE, GALAXY_POLE, GALAXY_SIDE, GALAXY_SPAN, SKY_CLIP_GLSL, SKY_CLOUDS_GLSL, sharedUniforms, skyDir, type SkyShared } from './skyShared'
 
 /** Stars drawn per quality level (of the brightest-first list). */
-export const STAR_COUNTS: Record<QualityLevel, number> = { low: 1500, medium: 3200, high: 5000, ultra: 6500 }
+export const STAR_COUNTS: Record<QualityLevel, number> = { low: 1600, medium: 3600, high: 5600, ultra: 8000 }
 const TOTAL = STAR_COUNTS.ultra
 
 /** Faintest magnitude generated, and the brightest a random star may be (the named ones go beyond). */
@@ -156,18 +156,25 @@ function galaxy(lon: number, s: number): number {
   const cx = Math.cos(lon)
   const cy = Math.sin(lon)
   const b = bulge(lon)
-  const width = 0.085 + 0.08 * b + 0.02 * cx
-  const band = Math.exp(-(s * s) / (width * width))
+  // The band's centre line wanders a little, so it never reads as a ruled stripe.
+  const mid = (fbm(cx * 1.3 + 3.1, cy * 1.3 + 8.4, 0.3, 2) - 0.5) * 0.09
+  const width = 0.07 + 0.06 * b + 0.015 * cx
+  const t = (s - mid) / width
+  const band = Math.exp(-t * t)
   if (band < 0.004) return 0
-  const clouds = fbm(cx * 2.2 + 7.1, cy * 2.2 + 3.3, s * 5.5, 4)
-  let g = band * (0.32 + 0.52 * b + 0.16 * (0.5 + 0.5 * cx)) * (0.4 + 1.2 * clouds)
+  // Star clouds: bright knots over a mottled haze, with dim gaps between them.
+  const haze = fbm(cx * 1.7 + 0.9, cy * 1.7 + 6.1, s * 4, 3)
+  const clouds = smooth(0.36, 0.7, fbm(cx * 2.6 + 7.1, cy * 2.6 + 3.3, s * 7, 5))
+  let g = band * (0.2 + 0.5 * b + 0.12 * (0.5 + 0.5 * cx)) * (0.5 * haze + 1.5 * clouds)
 
-  const weave = (fbm(cx * 1.6 + 1.7, cy * 1.6 + 9.2, 0.5, 3) - 0.5) * 0.1
-  const laneWidth = 0.014 + 0.034 * fbm(cx * 3.1 + 4.4, cy * 3.1 + 0.6, 2.2, 3)
-  const ls = (s - weave - 0.012) / laneWidth
-  const rift = Math.exp(-ls * ls) * (0.3 + 0.7 * Math.exp(-(lon * lon) / 2.6))
-  const wisps = smooth(0.5, 0.78, fbm(cx * 5.3 + 2.2, cy * 5.3 + 5.9, s * 14, 4))
-  g *= (1 - 0.88 * rift) * (1 - 0.5 * wisps)
+  // The great rift comes and goes along the band, weaving and changing width.
+  const weave = (fbm(cx * 1.9 + 1.7, cy * 1.9 + 9.2, 0.5, 3) - 0.5) * 0.24
+  const laneWidth = 0.01 + 0.05 * fbm(cx * 3.7 + 4.4, cy * 3.7 + 0.6, 2.2, 3)
+  const patches = smooth(0.38, 0.58, fbm(cx * 2.9 + 6.6, cy * 2.9 + 1.2, 4.1, 3))
+  const ls = (s - mid - weave) / laneWidth
+  const rift = Math.exp(-ls * ls) * patches * (0.45 + 0.55 * Math.exp(-(lon * lon) / 3))
+  const wisps = smooth(0.5, 0.75, fbm(cx * 6.3 + 2.2, cy * 6.3 + 5.9, s * 18, 4))
+  g *= (1 - 0.82 * rift) * (1 - 0.55 * wisps)
   return clamp01(g)
 }
 
@@ -323,7 +330,7 @@ void main() {
   // How dark the sky is toward this star: stars come out overhead and away from the sun first,
   // and the faint ones drown in the moon's glow (none shine through its disc).
   float dark = uStars * ( 1.0 - 0.85 * uSunDisc * smoothstep( -0.2, 0.9, dot( d, uSunDir ) ) );
-  dark *= mix( 1.0, smoothstep( 0.1, 0.7, h ), uSunDisc );
+  dark *= mix( 1.0, smoothstep( 0.05, 0.55, h ), uSunDisc );
   float md = dot( d, uMoonDir );
   float mg = max( md, 0.0 );
   mg *= mg; mg *= mg; mg *= mg; mg *= mg;
