@@ -86,8 +86,9 @@ const HEARTBEAT = 1
 const SUGGEST_GAP = 8
 /** Infection: one bite claim per this long (s). */
 const BITE_GAP = 0.5
-/** The Juggernaut tells the room its health at most this often (s). */
+/** The Juggernaut tells the room its health at most this often (s), and at least this often (a lost message heals itself). */
 const HP_GAP = 0.45
+const HP_BEAT = 2.5
 /** The hero grows into (and out of) the Juggernaut at this rate (1/s). */
 const GROW_RATE = 5
 /** The death path's own wait before the fade (s): normally, and when knocked out in a health round (≈ RESPAWN in all). */
@@ -597,7 +598,7 @@ export class Modes {
     h.update(dt, now)
     // Everyone watches the Juggernaut's bar.
     const hp = Math.round(h.hp)
-    if (jug && hp !== this.hpSent && now - this.hpSentAt >= HP_GAP) {
+    if (jug && now - this.hpSentAt >= (hp !== this.hpSent ? HP_GAP : HP_BEAT)) {
       this.hpSent = hp
       this.hpSentAt = now
       this.link.send({ k: 'hp', v: hp })

@@ -506,6 +506,7 @@ export class Referee {
   private toIdle(s: RoundState): void {
     s.seq++
     s.mode = null
+    s.map = 'isle'
     s.phase = 'idle'
     s.left = 0
     s.players = []
