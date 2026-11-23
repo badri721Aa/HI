@@ -5,11 +5,17 @@
  * chunked terrain mesh, the water depth texture and a baked soft terrain-shadow
  * texture. Each frame it only advances shader time, blends the time of day when
  * a transition is running, and keeps the texel-snapped shadow frustum on the player.
+ *
+ * The island's evening follows the story: it starts at golden dusk and deepens toward a starlit
+ * night with every star shard found (see EVENING in env/atmosphere.ts), read straight from the
+ * save so a continued game comes back at the right hour. Cutscenes that set the time of day
+ * themselves (the dusk opening, night → dawn at the Beacon) keep it until they end; a finished
+ * story stays at dawn, and the title screen shows the blue hour.
  */
 import * as THREE from 'three'
 import type { MapId, V3 } from '../events'
 import type { Ctx, IEnvironment, TimeOfDay } from '../types'
-import { Atmosphere, MAP_PRESETS, PRESETS } from './env/atmosphere'
+import { Atmosphere, BLUE_HOUR, EVENING, MAP_PRESETS, PRESETS } from './env/atmosphere'
 import { HeightGrid, SunShadowBaker } from './env/heightGrid'
 import { buildSeaStacks } from './env/seaStacks'
 import { Sky } from './env/sky'
@@ -20,8 +26,12 @@ import { buildWater, createWaterMaterial, type WaterUniforms } from './env/water
 const GRID_N = CHUNKS * 48 + 1
 /** Distance of the shadow camera from its focus, along the light. */
 const SHADOW_DIST = 170
-/** Seconds between environment-map refreshes while the time of day blends. */
-const ENV_REFRESH = 0.4
+/** Environment-map refreshes while the time of day blends: this many per blend, at least this far apart (s). */
+const ENV_REFRESHES = 12
+const ENV_REFRESH_MIN = 0.4
+/** Seconds the evening takes to deepen after a shard is found, and to settle behind the title screen. */
+const EVENING_BLEND = 14
+const TITLE_BLEND = 2.5
 
 const _x = new THREE.Vector3()
 const _y = new THREE.Vector3()
@@ -50,12 +60,15 @@ export class Environment implements IEnvironment {
   /** Live (blended) atmosphere and the endpoints of the running transition. */
   private atmo = new Atmosphere()
   private from = new Atmosphere()
-  private to: Atmosphere = PRESETS.dusk
+  private to: Atmosphere = EVENING[BLUE_HOUR]
   private blend = 1
   private blendDuration = 0
   private envTimer = 0
-  /** The island's time of day, and the map whose look is showing. */
-  private tod: TimeOfDay = 'dusk'
+  /** The look a cutscene asked for with setTimeOfDay; it holds until that cutscene ends. */
+  private scripted: Atmosphere | null = null
+  /** The menus were showing on the last update (a game starting from there cuts to its hour). */
+  private inMenu = true
+  /** The map whose look is showing. */
   private map: MapId = 'isle'
 
   private focus = new THREE.Vector3()
@@ -63,11 +76,12 @@ export class Environment implements IEnvironment {
   private shadowSize = 0
   private shadowRadius = 0
   private waterDetail = -1
+  private skyLevel = ''
   private ready = false
 
   constructor(private ctx: Ctx) {
     this.fog.color = this.fogColor
-    this.atmo.copy(PRESETS.dusk)
+    this.atmo.copy(this.to)
     this.sun.name = 'sun'
     this.sun.target.name = 'sun-target'
     this.hemi.name = 'sky-fill'
@@ -113,7 +127,7 @@ export class Environment implements IEnvironment {
     }
 
     this.sky = new Sky(textures, renderer)
-    this.add(this.sky.mesh)
+    this.add(this.sky.group)
 
     this.sun.castShadow = ctx.quality.shadows
     this.add(this.sun, this.sun.target, this.hemi)
@@ -130,7 +144,8 @@ export class Environment implements IEnvironment {
   update(dt: number): void {
     if (!this.ready) return
     this.uTime.value += dt
-    this.sky!.uniforms.uTime.value = this.uTime.value
+    this.sky!.update(dt, this.uTime.value, this.ctx.camera)
+    this.followStory()
 
     if (this.blend < 1) {
       this.blend = Math.min(1, this.blend + dt / this.blendDuration)
@@ -139,7 +154,7 @@ export class Environment implements IEnvironment {
       this.applyAtmosphere()
       this.envTimer -= dt
       if (this.envTimer <= 0 || this.blend >= 1) {
-        this.envTimer = ENV_REFRESH
+        this.envTimer = Math.max(ENV_REFRESH_MIN, this.blendDuration / ENV_REFRESHES)
         this.refreshEnvironment()
       }
     }
@@ -147,16 +162,49 @@ export class Environment implements IEnvironment {
     this.syncQuality()
   }
 
+  /** 0..1 how far the look leans from warm evening to cool moonlit night (the colour grade follows it). */
+  get night(): number {
+    return this.atmo.night
+  }
+
   setTimeOfDay(tod: TimeOfDay, seconds: number): void {
-    this.tod = tod
+    this.scripted = PRESETS[tod]
     // Away from the island the map keeps its own look; this applies on the way back.
     if (this.map !== 'isle') return
-    this.blendTo(PRESETS[tod], seconds)
+    this.blendTo(this.scripted, seconds)
   }
 
   setAtmosphere(map: MapId, seconds: number): void {
     this.map = map
-    this.blendTo(map === 'isle' ? PRESETS[this.tod] : MAP_PRESETS[map], seconds)
+    this.blendTo(map === 'isle' ? this.isleLook() : MAP_PRESETS[map], seconds)
+  }
+
+  /** The island's look right now: what a running cutscene set, else the hour the story has reached. */
+  private isleLook(): Atmosphere {
+    if (this.scripted) return this.scripted
+    const game = this.ctx.game
+    if (game.phase === 'title' || game.phase === 'loading') return EVENING[BLUE_HOUR]
+    const save = game.save
+    if (save.completed) return PRESETS.dawn
+    let shards = 0
+    for (let i = 0; i < save.shards.length; i++) if (save.shards[i]) shards++
+    // A Creative world is for stargazing too: it never starts earlier than the blue hour.
+    if (game.creative) shards = Math.max(shards, BLUE_HOUR)
+    return EVENING[Math.min(shards, EVENING.length - 1)]
+  }
+
+  /** Eases the island toward the hour the story has reached (cuts to it when a game starts). */
+  private followStory(): void {
+    const phase = this.ctx.game.phase
+    const menu = phase === 'title' || phase === 'loading'
+    const fromMenu = this.inMenu && !menu
+    this.inMenu = menu
+    // A cutscene that set the time of day keeps it until it is over.
+    if (this.scripted && phase === 'cutscene') return
+    this.scripted = null
+    if (this.map !== 'isle') return
+    const look = this.isleLook()
+    if (look !== this.to) this.blendTo(look, fromMenu ? 0 : menu ? TITLE_BLEND : EVENING_BLEND)
   }
 
   private blendTo(to: Atmosphere, seconds: number): void {
@@ -292,6 +340,10 @@ export class Environment implements IEnvironment {
       s.normalBias = 0.045
       s.radius = 2.5
       this.placeSun()
+    }
+    if (q.level !== this.skyLevel) {
+      this.skyLevel = q.level
+      this.sky?.setQuality(q.level)
     }
     if (this.waterMat && q.waterDetail !== this.waterDetail) {
       this.waterDetail = q.waterDetail

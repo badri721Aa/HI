@@ -4,10 +4,16 @@
  * Colours are authored as sRGB hex (THREE converts them to the linear working
  * space), directions point TOWARD the light. `lightDir` is the shadow-casting
  * light: the sun by day, the moon at night.
+ *
+ * The island's evening is a sequence of looks (`EVENING`): golden dusk, sunset, the blue hour and
+ * full moonlit night, with a mixed step between the keys. The story walks through them as shards
+ * are found; the finale turns the night to `PRESETS.dawn`. Night is lit to be played in: a cool
+ * moon bright enough to cast clear shadows, and enough sky fill that nothing sinks to black.
  */
 import * as THREE from 'three'
 import type { MapId } from '../../events'
 import type { TimeOfDay } from '../../types'
+import { skyDir } from './skyShared'
 
 export class Atmosphere {
   readonly lightDir = new THREE.Vector3()
@@ -20,7 +26,15 @@ export class Atmosphere {
   readonly sunColor = new THREE.Color()
   readonly moonDir = new THREE.Vector3()
   moon = 0
+  /** 0..1 how far the stars are out (the brightest show first). */
   stars = 0
+  /** Strength of the Milky Way's glow and of the aurora (both only show in a dark sky). */
+  milkyWay = 1
+  aurora = 0
+  /** 1 while the moon is the shadow-casting light, 0 for the sun. */
+  moonlit = 0
+  /** 0..1 how far the colour grade leans from warm evening to cool night. */
+  night = 0
   readonly zenith = new THREE.Color()
   readonly horizon = new THREE.Color()
   /** Warm glow around the sun. */
@@ -52,7 +66,7 @@ export class Atmosphere {
   lerpBetween(a: Atmosphere, b: Atmosphere, t: number): this {
     // When the light hands over between sun and moon, dim it through the middle
     // and swing it while it is dim, instead of sweeping a bright light overhead.
-    const handover = Math.abs(a.sunDisc - b.sunDisc) > 0.5
+    const handover = Math.abs(a.moonlit - b.moonlit) > 0.5
     const dirT = handover ? smooth(0.3, 0.7, t) : t
     lerpDir(this.lightDir, a.lightDir, b.lightDir, dirT)
     lerpDir(this.sunDir, a.sunDir, b.sunDir, t)
@@ -65,6 +79,10 @@ export class Atmosphere {
     this.sunDisc = mix(a.sunDisc, b.sunDisc, t)
     this.moon = mix(a.moon, b.moon, t)
     this.stars = mix(a.stars, b.stars, t)
+    this.milkyWay = mix(a.milkyWay, b.milkyWay, t)
+    this.aurora = mix(a.aurora, b.aurora, t)
+    this.moonlit = mix(a.moonlit, b.moonlit, t)
+    this.night = mix(a.night, b.night, t)
     this.cloudCover = mix(a.cloudCover, b.cloudCover, t)
     this.hemiIntensity = mix(a.hemiIntensity, b.hemiIntensity, t)
     this.envIntensity = mix(a.envIntensity, b.envIntensity, t)
@@ -125,14 +143,28 @@ interface PresetDef {
   /** Fog colour (defaults to the horizon) and distance scale. */
   fog?: string
   fogScale?: number
+  /** Milky Way and aurora strength (defaults 1 and 0). */
+  milkyWay?: number
+  aurora?: number
+  /** The light is the moon (default: whenever the sun disc is mostly hidden). */
+  moonlit?: boolean
+  /** Lean of the colour grade toward cool night (default 0). */
+  night?: number
 }
 
-/** The sun sets in the west-north-west; the moon rides high in the south-east. */
-const SUN_DUSK: [number, number, number] = [-0.8, 0.27, -0.52]
-const SUN_DAWN: [number, number, number] = [0.86, 0.2, -0.3]
-const MOON: [number, number, number] = [0.36, 0.62, 0.6]
+type Dir = [number, number, number]
+/** Direction toward a compass bearing (degrees clockwise from north) and elevation. */
+const at = (bearing: number, elevation: number): Dir => skyDir(bearing, elevation).toArray()
 
-const DEFS: Record<TimeOfDay, PresetDef> = {
+/**
+ * The sun sets in the west-north-west. The moon climbs in the south-east: behind a player heading
+ * north to the Beacon, so the way ahead is front-lit, and low enough to throw long, readable shadows.
+ */
+const SUN_DUSK: Dir = [-0.8, 0.27, -0.52]
+const SUN_DAWN: Dir = [0.86, 0.2, -0.3]
+const MOON: Dir = at(150, 33)
+
+const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
   dusk: {
     lightDir: SUN_DUSK,
     lightColor: '#ffc98a',
@@ -142,7 +174,8 @@ const DEFS: Record<TimeOfDay, PresetDef> = {
     sunColor: '#fff0d0',
     moonDir: [0.5, -0.3, 0.8],
     moon: 0,
-    stars: 0,
+    // The first stars are already out overhead.
+    stars: 0.3,
     zenith: '#3a63a6',
     horizon: '#f2c39a',
     halo: '#ff9a4a',
@@ -159,31 +192,94 @@ const DEFS: Record<TimeOfDay, PresetDef> = {
     waterDeep: '#155a78',
     caustics: 0.55,
   },
+  // The sun's disc on the horizon: long orange light, a deepening sky, the moon just up.
+  sunset: {
+    // The light stays a little above the disc so the island is not all one long shadow.
+    lightDir: at(302, 9.5),
+    lightColor: '#ffa76a',
+    lightIntensity: 2.3,
+    sunDir: at(302, 2.5),
+    sunDisc: 0.95,
+    sunColor: '#ffc890',
+    moonDir: at(128, 6),
+    moon: 0.5,
+    stars: 0.55,
+    zenith: '#27448c',
+    horizon: '#f0aa80',
+    halo: '#ff7e3c',
+    bounce: '#5c4638',
+    cloudLit: '#ffa785',
+    cloudShade: '#6a5278',
+    cloudCover: 0.52,
+    hemiSky: '#93a2dc',
+    hemiGround: '#6c5244',
+    hemiIntensity: 0.82,
+    envIntensity: 0.75,
+    exposure: 1.1,
+    waterShallow: '#3fb0ae',
+    waterDeep: '#134f72',
+    caustics: 0.35,
+    night: 0.15,
+  },
+  // The blue hour: an afterglow where the sun went down, the moon taking over, most stars out.
+  twilight: {
+    moonlit: true,
+    lightDir: at(143, 26),
+    lightColor: '#b2c2ff',
+    lightIntensity: 0.9,
+    sunDir: at(301, -7),
+    sunDisc: 0.45,
+    sunColor: '#ff9a60',
+    moonDir: at(140, 21),
+    moon: 0.9,
+    stars: 0.85,
+    aurora: 0.25,
+    zenith: '#0e1a48',
+    horizon: '#5a5486',
+    halo: '#ff8448',
+    bounce: '#1c1a2e',
+    cloudLit: '#75649a',
+    cloudShade: '#1c1e40',
+    cloudCover: 0.56,
+    hemiSky: '#6a7ec8',
+    hemiGround: '#2e2c44',
+    hemiIntensity: 1.0,
+    envIntensity: 0.95,
+    exposure: 1.32,
+    waterShallow: '#28768c',
+    waterDeep: '#0a2846',
+    caustics: 0.15,
+    night: 0.75,
+  },
+  // Full night: blue-silver moonlight, a clear sky, every star.
   night: {
+    moonlit: true,
     lightDir: MOON,
-    lightColor: '#9fb8ff',
-    lightIntensity: 0.75,
+    lightColor: '#b8caff',
+    lightIntensity: 1.25,
     sunDir: [-0.82, -0.32, -0.48],
     sunDisc: 0,
     sunColor: '#ffd0a0',
     moonDir: MOON,
     moon: 1,
     stars: 1,
-    zenith: '#050b1e',
-    horizon: '#1c2b4a',
+    aurora: 0.7,
+    zenith: '#0a1436',
+    horizon: '#22335e',
     halo: '#30406a',
-    bounce: '#0c1018',
-    cloudLit: '#2c3858',
-    cloudShade: '#10152a',
-    cloudCover: 0.56,
-    hemiSky: '#4a5f96',
-    hemiGround: '#1a1a24',
-    hemiIntensity: 0.7,
-    envIntensity: 0.9,
-    exposure: 1.35,
+    bounce: '#0e1220',
+    cloudLit: '#3c4a74',
+    cloudShade: '#0e142a',
+    cloudCover: 0.62,
+    hemiSky: '#6078bc',
+    hemiGround: '#25283c',
+    hemiIntensity: 1.0,
+    envIntensity: 1.0,
+    exposure: 1.45,
     waterShallow: '#1f6d78',
     waterDeep: '#061c33',
     caustics: 0.12,
+    night: 1,
   },
   dawn: {
     lightDir: SUN_DAWN,
@@ -193,8 +289,9 @@ const DEFS: Record<TimeOfDay, PresetDef> = {
     sunDisc: 1,
     sunColor: '#fff2e0',
     moonDir: [-0.4, 0.25, 0.85],
-    moon: 0.15,
-    stars: 0.04,
+    moon: 0.3,
+    // The last bright stars linger overhead.
+    stars: 0.3,
     zenith: '#4a6cb0',
     horizon: '#f6bfb2',
     halo: '#ff9a78',
@@ -210,6 +307,7 @@ const DEFS: Record<TimeOfDay, PresetDef> = {
     waterShallow: '#4cc0bb',
     waterDeep: '#17577a',
     caustics: 0.5,
+    night: 0.05,
   },
 }
 
@@ -242,6 +340,10 @@ function build(d: PresetDef): Atmosphere {
   a.exposure = d.exposure
   a.caustics = d.caustics
   a.fogScale = d.fogScale ?? 1
+  a.milkyWay = d.milkyWay ?? 1
+  a.aurora = d.aurora ?? 0
+  a.moonlit = (d.moonlit ?? d.sunDisc < 0.5) ? 1 : 0
+  a.night = d.night ?? 0
   return a
 }
 
@@ -250,6 +352,28 @@ export const PRESETS: Record<TimeOfDay, Atmosphere> = {
   night: build(DEFS.night),
   dawn: build(DEFS.dawn),
 }
+
+const SUNSET = build(DEFS.sunset)
+const TWILIGHT = build(DEFS.twilight)
+const between = (a: Atmosphere, b: Atmosphere, t: number) => new Atmosphere().lerpBetween(a, b, t)
+
+/**
+ * The island's evening by star shards found (0–7): dusk at the start, the sun gone by the third
+ * shard, starlit night from the fifth. The last steps are the very preset the finale asks for.
+ */
+export const EVENING: readonly Atmosphere[] = [
+  PRESETS.dusk,
+  between(PRESETS.dusk, SUNSET, 0.5),
+  SUNSET,
+  TWILIGHT,
+  between(TWILIGHT, PRESETS.night, 0.55),
+  PRESETS.night,
+  PRESETS.night,
+  PRESETS.night,
+]
+
+/** The blue hour: behind the title screen, and the earliest a Creative world gets. */
+export const BLUE_HOUR = 3
 
 /**
  * The portal maps' looks (a map can add its own backdrop on top, e.g. the Rift's void sphere).
@@ -384,7 +508,9 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     sunColor: '#ffd0a0',
     moonDir: [-0.35, 0.55, -0.76],
     moon: 0.8,
-    stars: 0.35,
+    // City glow: only the brighter stars make it through, and barely any Milky Way.
+    stars: 0.5,
+    milkyWay: 0.25,
     zenith: '#060818',
     horizon: '#3a1450',
     halo: '#7a2a8a',
@@ -412,7 +538,9 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     sunColor: '#ffffff',
     moonDir: [0.4, 0.4, -0.8],
     moon: 0,
+    // Cold points of light in the void, no galaxy behind them.
     stars: 0.8,
+    milkyWay: 0,
     zenith: '#010308',
     horizon: '#06242a',
     halo: '#0a4a50',

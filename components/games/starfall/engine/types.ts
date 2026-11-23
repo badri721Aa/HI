@@ -136,6 +136,8 @@ export interface IEnvironment extends System {
   setAtmosphere(map: MapId, seconds: number): void
   /** For effects that want to match the sky (e.g. fog-coloured particles). */
   readonly fogColor: THREE.Color
+  /** 0..1 how far the look leans from warm evening to cool moonlit night (the colour grade follows it). */
+  readonly night: number
 }
 
 /** world/Vegetation.ts — instanced trees, palms, pines, bushes, rocks, grass, flowers. */

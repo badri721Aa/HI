@@ -3,7 +3,8 @@
  *
  *   RenderPass (HDR half-float target, MSAA when ctx.quality.msaa > 0)
  *   → UnrealBloomPass (internally half resolution; subtle, only emissives and the sun bloom)
- *   → grade (warm lift/gamma/gain, saturation, vignette — in linear HDR)
+ *   → grade (lift/gamma/gain, saturation, vignette — in linear HDR; warm in the evening,
+ *     leaning cool and a touch less saturated under the moon, following ctx.env.night)
  *   → OutputPass (tone mapping + sRGB, using the renderer's live exposure)
  *   → FXAA (only without MSAA, medium quality and up)
  *
@@ -32,6 +33,27 @@ import { FrameProbe } from './frameProbe'
 const BLOOM = { strength: 0.5, radius: 0.6, threshold: 1.1, knee: 0.6 }
 
 /**
+ * The grade's two ends. Evening: a warm tilt. Night: neutral-cool with a little blue lifted into
+ * the darks (moonlit shadows stay readable instead of sinking to black) and no added saturation.
+ */
+const GRADE = {
+  evening: {
+    lift: new THREE.Vector3(0.006, 0.0045, 0.002),
+    gamma: new THREE.Vector3(1.03, 1.0, 0.97),
+    gain: new THREE.Vector3(1.03, 1.0, 0.96),
+    saturation: 1.05,
+    vignette: 0.24,
+  },
+  night: {
+    lift: new THREE.Vector3(0.002, 0.0035, 0.007),
+    gamma: new THREE.Vector3(0.985, 1.0, 1.02),
+    gain: new THREE.Vector3(0.97, 1.0, 1.035),
+    saturation: 1.0,
+    vignette: 0.28,
+  },
+}
+
+/**
  * Replaces NaN with 0 and clamps to [0, cap] (±Inf lands on 0 / cap). The NaN test reads the bits,
  * which no compiler may optimise away (isnan() can be under fast math), and the boolean mix() is
  * a select, so the NaN itself never enters any arithmetic.
@@ -50,11 +72,11 @@ const GradeShader = {
   name: 'StarfallGrade',
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
-    uLift: { value: new THREE.Vector3(0.006, 0.0045, 0.002) },
-    uGamma: { value: new THREE.Vector3(1.03, 1.0, 0.97) },
-    uGain: { value: new THREE.Vector3(1.03, 1.0, 0.96) },
-    uSaturation: { value: 1.05 },
-    uVignette: { value: 0.24 },
+    uLift: { value: GRADE.evening.lift.clone() },
+    uGamma: { value: GRADE.evening.gamma.clone() },
+    uGain: { value: GRADE.evening.gain.clone() },
+    uSaturation: { value: GRADE.evening.saturation },
+    uVignette: { value: GRADE.evening.vignette },
     uAspect: { value: 16 / 9 },
   },
   vertexShader: /* glsl */ `
@@ -77,7 +99,7 @@ const GradeShader = {
     void main() {
       vec4 tex = texture2D(tDiffuse, vUv);
       vec3 c = fxSane(tex.rgb, 65504.0);
-      // Lift only touches the darks; gain and gamma tilt the balance warm.
+      // Lift only touches the darks; gain and gamma tilt the balance (warm by evening, cool by night).
       c = c * uGain + uLift * (1.0 - smoothstep(0.0, 0.25, c));
       c = pow(c, 1.0 / uGamma);
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -132,6 +154,8 @@ export class PostFX implements IPostFX {
   private fxaa: FXAAPass | null = null
   /** MSAA sample count the current composer was built with. */
   private samples = -1
+  /** The ctx.env.night the grade's uniforms were last set for. */
+  private gradeNight = -1
   private width = 1
   private height = 1
   private pixelRatio = 1
@@ -190,6 +214,7 @@ export class PostFX implements IPostFX {
       renderer.render(scene, camera)
       return
     }
+    this.syncGrade()
     this.composer.render()
     this.check()
   }
@@ -245,6 +270,20 @@ export class PostFX implements IPostFX {
 
   /* ── internals ─────────────────────────────────────────────── */
 
+  /** Leans the grade between its evening and night ends with the environment (only when it moved). */
+  private syncGrade(): void {
+    const night = Math.min(1, Math.max(0, this.ctx.env?.night ?? 0))
+    if (Math.abs(night - this.gradeNight) < 0.004) return
+    this.gradeNight = night
+    const u = this.grade!.uniforms
+    const { evening, night: dark } = GRADE
+    u.uLift.value.lerpVectors(evening.lift, dark.lift, night)
+    u.uGamma.value.lerpVectors(evening.gamma, dark.gamma, night)
+    u.uGain.value.lerpVectors(evening.gain, dark.gain, night)
+    u.uSaturation.value = evening.saturation + (dark.saturation - evening.saturation) * night
+    u.uVignette.value = evening.vignette + (dark.vignette - evening.vignette) * night
+  }
+
   private buildComposer(samples: number): void {
     this.destroyComposer()
     const { renderer, scene, camera } = this.ctx
@@ -275,6 +314,7 @@ export class PostFX implements IPostFX {
     this.output = output
     this.fxaa = fxaa
     this.samples = samples
+    this.gradeNight = -1
     this.setSize(this.width, this.height, this.pixelRatio)
     // setSize found the buffers unusable and stepped down: this chain is already gone.
     if (this.composer !== composer) return
