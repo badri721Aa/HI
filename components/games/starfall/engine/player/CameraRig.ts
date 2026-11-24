@@ -10,7 +10,8 @@
  *  scripted — hands-off: cutscenes drive ctx.camera (shake still layers on top, safely).
  *
  * A slide widens the view a touch and sinks it with the hero; a wall-run widens it and, with camera
- * shake on, rolls it a few degrees away from the wall. Both ease in and out (CAM.cueRate).
+ * shake on, rolls it a few degrees away from the wall. Both ease in and out (CAM.cueRate). A hard
+ * landing dips the view a little and lets it float back (a soft spring; only with camera shake on).
  *
  * Sprint FOV, FOV kicks and noise shake are applied last. Switching into follow/title glides
  * from wherever the camera was; snapBehind() cuts instantly.
@@ -19,6 +20,7 @@ import * as THREE from 'three'
 import type { Ctx, ICameraRig } from '../types'
 import type { Collider } from '../collision'
 import { clamp, heightAt, lerp, noise2, smoothstep, waterLevelAt } from '../world/heightfield'
+import { Spring } from './anim/math'
 import { damp, wrapAngle } from './control/math'
 import { CAM as C, MOVE } from './control/tuning'
 
@@ -37,6 +39,14 @@ const SWING_NORM = Math.asin(SWING_K)
 /** Over-the-shoulder aim (bow): sideways offset (m) and how much the boom shortens. */
 const AIM_SIDE = 0.6
 const AIM_ZOOM = 0.45
+/** Landing dip: falls slower than DIP_FROM (m/s) don't move the view; DIP_FULL and faster sink it DIP_DEPTH (m). */
+const DIP_FROM = 9
+const DIP_FULL = 24
+const DIP_DEPTH = 0.16
+/** The dip's spring (rad/s, damping ratio: no bounce), and the share of a kick's speed it turns into travel. */
+const DIP_OMEGA = 9
+const DIP_ZETA = 0.9
+const DIP_PEAK = 0.394
 
 interface FovKick {
   amp: number
@@ -69,6 +79,8 @@ export class CameraRig implements ICameraRig {
   private slideCue = 0
   private wallCue = 0
   private wallView = 0
+  private readonly dip = new Spring()
+  private wasGrounded = true
   private readonly kicks: FovKick[] = [0, 1, 2, 3].map(() => ({ amp: 0, dur: 1, t: 1 }))
   private shakeAmp = 0
   private shakeDur = 0
@@ -157,6 +169,8 @@ export class CameraRig implements ICameraRig {
     this.pull = 0
     this.lookIdle = 0
     this.sprintFov = this.slideCue = this.wallCue = 0
+    this.dip.reset()
+    this.wasGrounded = true
     this.blend = this.blendK = 1
     this.resetPivot()
     if (this._mode !== 'follow') return
@@ -252,6 +266,14 @@ export class CameraRig implements ICameraRig {
     if (pl.grounded || pl.flying || p.y < this.refY) this.refY = p.y
     else if (p.y > this.refY + C.airRise) this.refY = p.y - C.airRise
 
+    // A hard landing: the view sinks with the knees and eases back up.
+    if (pl.grounded && !this.wasGrounded && this.ctx.settings.cameraShake) {
+      const hard = clamp((pl.motion.landImpact - DIP_FROM) / (DIP_FULL - DIP_FROM), 0, 1)
+      this.dip.v -= (hard * DIP_DEPTH * DIP_OMEGA) / DIP_PEAK
+    }
+    this.wasGrounded = pl.grounded
+    this.dip.step(0, DIP_OMEGA, DIP_ZETA, dt)
+
     const kH = 1 - Math.exp(-C.followRate * dt)
     this.pivot.x += (p.x - this.pivot.x) * kH
     this.pivot.z += (p.z - this.pivot.z) * kH
@@ -269,13 +291,14 @@ export class CameraRig implements ICameraRig {
     const dy = Math.sin(this.pitch)
     const dz = -Math.cos(this.yaw) * cp
     const pv = this.shoulder()
-    const need = this.boom - this.castBoom(pv.x, pv.y, pv.z, dx, dy, dz, this.boom)
+    const py = pv.y + clamp(this.dip.x, -DIP_DEPTH, 0.05)
+    const need = this.boom - this.castBoom(pv.x, py, pv.z, dx, dy, dz, this.boom)
     // Pull in at once (never see through a wall), ease back out once it clears.
     if (instant || need > this.pull) this.pull = need
     else this.pull = damp(this.pull, need, C.boomOutRate, dt)
     const reach = this.boom - this.pull
     const cam = this.ctx.camera
-    cam.position.set(pv.x + dx * reach, pv.y + dy * reach, pv.z + dz * reach)
+    cam.position.set(pv.x + dx * reach, py + dy * reach, pv.z + dz * reach)
     // Backed against a wall: rise a little (never into a ceiling) and aim a bit higher.
     let lift = (1 - smoothstep(C.minDist, C.closeFrom, reach)) * C.closeLift
     if (lift > 0.01) {
@@ -284,7 +307,7 @@ export class CameraRig implements ICameraRig {
       cam.position.y += lift
     }
     this.keepAboveGround(cam.position)
-    this.target.set(pv.x, pv.y + C.lookLift + lift * 0.6, pv.z)
+    this.target.set(pv.x, py + C.lookLift + lift * 0.6, pv.z)
     cam.lookAt(this.target)
   }
 

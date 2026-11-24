@@ -45,21 +45,21 @@ const KEYS: Array<keyof GaitParams> = [
 
 /** Step lengths match the controller's footstep events (walk 0.75, run 1.25, sprint 1.6 m). */
 export const WALK: GaitParams = {
-  step: 0.75, stance: 0.6, reach: 0.0, lift: 0.075, kick: 0.03, width: 0.095,
-  drop: -0.022, bob: 0.018, lean: 3, arm: 24, armOut: 4, elbow: 20, elbowSwing: 16,
-  pelvisYaw: 6, chestYaw: 8, pelvisRoll: 3.5, heel: -16, toeOff: 32, footYaw: -10, fist: 0.42,
+  step: 0.75, stance: 0.6, reach: 0.0, lift: 0.085, kick: 0.03, width: 0.095,
+  drop: -0.032, bob: 0.02, lean: 3.5, arm: 26, armOut: 4, elbow: 16, elbowSwing: 22,
+  pelvisYaw: 7, chestYaw: 9, pelvisRoll: 4.5, heel: -18, toeOff: 34, footYaw: -10, fist: 0.4,
 }
 
 export const RUN: GaitParams = {
-  step: 1.25, stance: 0.31, reach: -0.05, lift: 0.12, kick: 0.2, width: 0.07,
-  drop: -0.055, bob: -0.03, lean: 11, arm: 40, armOut: 9, elbow: 78, elbowSwing: 16,
-  pelvisYaw: 9, chestYaw: 12, pelvisRoll: 2.5, heel: -4, toeOff: 46, footYaw: -12, fist: 0.88,
+  step: 1.25, stance: 0.31, reach: -0.05, lift: 0.13, kick: 0.22, width: 0.07,
+  drop: -0.058, bob: -0.034, lean: 12, arm: 44, armOut: 9, elbow: 80, elbowSwing: 20,
+  pelvisYaw: 9, chestYaw: 13, pelvisRoll: 2.5, heel: -4, toeOff: 46, footYaw: -12, fist: 0.88,
 }
 
 export const SPRINT: GaitParams = {
-  step: 1.6, stance: 0.28, reach: -0.07, lift: 0.15, kick: 0.3, width: 0.06,
-  drop: -0.075, bob: -0.035, lean: 17, arm: 50, armOut: 10, elbow: 80, elbowSwing: 10,
-  pelvisYaw: 11, chestYaw: 14, pelvisRoll: 2, heel: 2, toeOff: 52, footYaw: -12, fist: 1,
+  step: 1.6, stance: 0.28, reach: -0.07, lift: 0.19, kick: 0.34, width: 0.06,
+  drop: -0.085, bob: -0.04, lean: 19, arm: 58, armOut: 10, elbow: 86, elbowSwing: 14,
+  pelvisYaw: 12, chestYaw: 16, pelvisRoll: 2, heel: 2, toeOff: 54, footYaw: -12, fist: 1,
 }
 
 export function blendGait(out: GaitParams, a: GaitParams, b: GaitParams, t: number): GaitParams {
@@ -115,7 +115,12 @@ export interface FootSample {
   pitch: number
   /** 1 while the foot is in the air. */
   swing: number
+  /** 0..1 through the stance or the swing it is in. */
+  t: number
 }
+
+/** How closely the swinging foot matches the ground's speed as it leaves and meets it (1 = exactly). */
+const GROUND_MATCH = 0.8
 
 /**
  * Foot target for one foot at its own phase `u` (0 = heel strike).
@@ -130,17 +135,21 @@ export function footAt(out: FootSample, g: GaitParams, u: number, side: 0 | 1): 
     const a = u / g.stance
     out.z = half - S * a + g.reach
     out.y = 0
+    out.t = a
     out.pitch = (g.heel * (1 - smooth(a / 0.22)) + g.toeOff * Math.pow(ramp(0.5, 1, a), 1.6)) * DEG
     out.swing = 0
   } else {
     // Swing: the foot lifts (kicking back when running), comes through and reaches for the next contact.
+    // It leaves and meets the ground moving back at close to the ground's speed, so it trails on a
+    // moment after toe-off and is already swinging back when it lands, never skidding forward.
     const b = (u - g.stance) / (1 - g.stance)
-    const kickDelay = clamp01(g.kick / 0.3) * 0.14
-    const travel = smooth((b - kickDelay) / (1 - kickDelay))
+    const m = (GROUND_MATCH * (1 - g.stance)) / g.stance
+    const travel = (3 + 3 * m) * b * b - (2 + 2 * m) * b * b * b - m * b
     out.z = -half + S * travel + g.reach
     const kick = g.kick * Math.pow(Math.sin(Math.PI * clamp01(b * 1.35)), 2)
-    out.y = g.lift * Math.pow(Math.sin(Math.PI * b), 0.9) + kick
+    out.y = g.lift * Math.pow(Math.max(0, Math.sin(Math.PI * b)), 0.9) + kick
     const toes = -14 * Math.sin(Math.PI * b)
+    out.t = b
     out.pitch = (g.toeOff * (1 - smooth(b / 0.4)) + toes + g.heel * ramp(0.7, 1, b)) * DEG
     out.swing = 1
   }

@@ -2,8 +2,11 @@
  * Procedural animator for the hero — there are no animation clips; every pose
  * is generated per frame from the MotionState:
  *
- *   ground layer   idle (breathing, weight shift, glances) ↔ walk/run/sprint gait by speed
- *   air layer      jump / somersault / fall / bounce, cross-faded on change
+ *   ground layer   idle (breathing, weight shifts, glances) ↔ walk/run/sprint gait by speed
+ *   weight         springs: the torso leans against acceleration and rocks back when it ends, the
+ *                  arms trail a beat behind, landings sink into the knees and bounce back
+ *   air layer      push-off → stretch → tuck → fall → reach for the ground, somersault, bounce,
+ *                  knocked back by a hit; cross-faded on change
  *   actions        dash, spin attack, death (blended) · hurt, landing (additive)
  *   moves          dodge-roll (a tucked tumble), sprint slide, wall-run (anim/moves.ts)
  *   weapon         carrying arm + keyed sword / hammer / bow moves over the upper body
@@ -13,16 +16,16 @@
  *                  head stabilisation + look-at (waist, chest, neck and head share the turn),
  *                  then written to the bones.
  *
- * Feet are IK targets: during a stride they travel back exactly as fast as the
- * body moves; when standing they stay put in the world and take small
- * corrective steps (after stopping or turning on the spot).
+ * Feet are IK targets. In a stride each foot is planted in the world where it comes down and
+ * stays there until it lifts (through turns and changes of pace too); standing, the feet stay put
+ * and take small corrective steps (after stopping or turning on the spot).
  */
 import * as THREE from 'three'
 import type { V3 } from '../events'
 import type { GestureName, MotionState, PlayerState, WeaponMove, WeaponPose } from '../types'
 import { applyWade, footAt, gaitFor, RUN, swingSignal, WALK, type FootSample, type GaitParams } from './anim/Gait'
 import { GESTURES, type GestureDef } from './anim/gestures'
-import { DEG, TAU, clamp, clamp01, damp, easeOut, envelope, lerp, noise1, ramp, smooth, wrap01, wrapAngle } from './anim/math'
+import { DEG, Spring, TAU, clamp, clamp01, damp, easeOut, envelope, lerp, noise1, ramp, smooth, wrap01, wrapAngle } from './anim/math'
 import { J, Pose, PoseBuilder } from './anim/Pose'
 import * as MOVES from './anim/moves'
 import * as POSES from './anim/poses'
@@ -41,9 +44,10 @@ export interface GroundSample {
 /** Walkable ground at (x, z) near height `nearY`; false when nothing is close below. */
 export type GroundProbe = (x: number, z: number, nearY: number, out: GroundSample) => boolean
 
-type AirKind = 'jump' | 'flip' | 'fall' | 'bounce'
+type AirKind = 'jump' | 'flip' | 'fall' | 'bounce' | 'hurt'
 
 const AIR_STATES = new Set<PlayerState>(['jump', 'doubleJump', 'fall', 'bounce'])
+/** What a weapon move poses: the upper body (the hips are added on top, the feet through their targets). */
 const UPPER = [J.spine, J.chest, J.neck, J.head, J.shoulderL, J.upperArmL, J.forearmL, J.handL, J.shoulderR, J.upperArmR, J.forearmR, J.handR]
 const SPINE_CHAIN = [J.hips, J.spine, J.chest, J.neck, J.head]
 const NECK_HEAD = [J.neck, J.head]
@@ -73,6 +77,22 @@ const STRETCH_C = 20
 const STRETCH_STEP = 1 / 240
 /** Downward kick (1/s) a full-strength landing gives the stretch spring: about 9 % squash. */
 const LAND_SQUASH = 3.4
+/** Landing: how far the hips sink at full strength (m), and the spring that sinks and lifts them (it overshoots once on the way up). */
+const LAND_DROP = 0.22
+const LAND_ZETA = 0.5
+/** Share of its starting speed a spring of LAND_ZETA turns into travel: the kick for a wanted depth is depth · ω / this. */
+const LAND_PEAK = 0.546
+/** A hard landing takes longer to come back up from (rad/s of the spring, by strength 0..1). */
+const landOmega = (amp: number): number => lerp(14, 10, amp)
+/** The legs start reaching for the ground this long before it arrives (s). */
+const REACH_AHEAD = 0.24
+/** Weight: lean of the torso per m/s² of acceleration (°), and of the trailing arms. */
+const LEAN_PER_ACCEL = 0.5
+const ARMS_PER_ACCEL = 0.85
+/** A planted foot may end up this far (m) outside the stride's own reach before it is dragged along. */
+const SLIP_MAX = 0.14
+/** A weapon move takes over from the one before it across this long (s): a combo flows instead of jumping. */
+const MOVE_FADE = 0.07
 
 /** Look-at: how far the eyes may lead the body (rad), and the share of the turn each part takes. */
 const LOOK_YAW_MAX = 1.2
@@ -99,6 +119,16 @@ interface Plant {
   to: THREE.Vector3
   fromYaw: number
   toYaw: number
+}
+
+/** One foot's place in the stride: where it is planted in the world, and how far that is from the stride's own line. */
+interface Stride {
+  down: boolean
+  pos: THREE.Vector3
+  yaw: number
+  offX: number
+  offZ: number
+  offYaw: number
 }
 
 interface FootTarget {
@@ -150,9 +180,14 @@ export class Animator {
 
   // compiled poses
   private pIdle: Pose
-  private pJumpUp: Pose
+  private pJumpPush: Pose
+  /** Rising stretch, lead knee left / right (he jumps off whichever foot is down). */
+  private pJumpUp: [Pose, Pose]
   private pJumpTuck: Pose
   private pFall: Pose
+  private pReach: Pose
+  private pHurtAir: Pose
+  private pHurtFold: Pose
   private pFlip: Pose
   private pStar: Pose
   private pDash: Pose
@@ -173,6 +208,10 @@ export class Animator {
   private lastCarry: Pose | null = null
   private swingW = 0
   private wpose = new Pose()
+  /** The move before this one, fading out under it. */
+  private wfrom = new Pose()
+  private wmove: WeaponMove = 'none'
+  private wfade = 1
 
   // working poses (re-filled every frame)
   private out = new Pose()
@@ -206,6 +245,16 @@ export class Animator {
   private groundW = 1
   private yawRate = 0
   private bank = 0
+  private readonly bankS = new Spring()
+  /** Acceleration along the heading (m/s², lightly smoothed) and the springs it drives: torso lean and arm lag (°). */
+  private push = 0
+  private readonly leanS = new Spring()
+  private readonly armS = new Spring()
+  /** Standing: which leg carries the weight (-1 right … 1 left), shifted now and then. */
+  private weightSide = 1
+  private weightT = 0
+  private weightNext = 4
+  private readonly weightS = new Spring(1)
   private wadeW = 0
   private slope = 0
   /** 1 while sprinting (lingers a moment after), and how hard he is braking out of it. */
@@ -214,7 +263,7 @@ export class Animator {
   private stretchV = 0
   private phase = 0
   private g: GaitParams = { ...WALK }
-  private foot: FootSample = { x: 0, y: 0, z: 0, pitch: 0, swing: 0 }
+  private foot: FootSample = { x: 0, y: 0, z: 0, pitch: 0, swing: 0, t: 0 }
 
   // air
   private airKind: AirKind = 'fall'
@@ -224,13 +273,19 @@ export class Animator {
   private wasGrounded = true
   private airTime = 0
   private minVy = 0
+  /** Which leg leads the jump (0 left, 1 right), and how ready the legs are for the ground coming up. */
+  private jumpLead = 0
+  private landIn = Infinity
+  private reachW = 0
 
   // actions
   private spinT = -1
   private dashW = 0
   private hurtT = -1
-  private landT = -1
+  /** Seconds since the last landing, and the spring that sinks into it (1 = a full-strength landing's depth). */
+  private landT = 1
   private landAmp = 0
+  private readonly crouchS = new Spring()
   private deadW = 0
 
   // roll, slide, wall-run
@@ -253,6 +308,10 @@ export class Animator {
     sole: new THREE.Vector3(), pitch: 0, yaw: 0, contact: 1, normal: new THREE.Vector3(0, 1, 0),
     ankle: new THREE.Vector3(), footQ: new THREE.Quaternion(), toeQ: new THREE.Quaternion(),
   }))
+  private strides: Stride[] = [0, 1].map(() => ({ down: false, pos: new THREE.Vector3(), yaw: 0, offX: 0, offZ: 0, offYaw: 0 }))
+  /** Last frame's pose offsets of the feet: a foot whose target moves lifts a little, so it steps instead of sliding. */
+  private offPrev = [new THREE.Vector3(), new THREE.Vector3()]
+  private stepLift = [0, 0]
   private footRel = [0, 0]
   private hipsGround = 0
   private stepWait = 0
@@ -291,9 +350,13 @@ export class Animator {
   ) {
     const b = (this.b = new PoseBuilder(rig.axes))
     this.pIdle = b.compile(POSES.IDLE)
-    this.pJumpUp = b.compile(POSES.JUMP_UP)
+    this.pJumpPush = b.compile(POSES.JUMP_PUSH)
+    this.pJumpUp = [b.compile(POSES.JUMP_UP), b.compile(POSES.mirror(POSES.JUMP_UP))]
     this.pJumpTuck = b.compile(POSES.JUMP_TUCK)
     this.pFall = b.compile(POSES.FALL)
+    this.pReach = b.compile(POSES.REACH)
+    this.pHurtAir = b.compile(POSES.HURT_AIR)
+    this.pHurtFold = b.compile(POSES.HURT_FOLD)
     this.pFlip = b.compile(POSES.FLIP_TUCK)
     this.pStar = b.compile(POSES.STAR)
     this.pDash = b.compile(POSES.DASH)
@@ -440,6 +503,7 @@ export class Animator {
       this.buildLoco()
       out.copy(this.idle).blend(this.loco, smooth(this.moveW))
       this.applySkid(out)
+      this.applyWeight(out)
       this.buildAir(dt)
       out.blend(this.air, 1 - this.groundW)
       this.applyMoves(dt, out)
@@ -479,6 +543,7 @@ export class Animator {
     // Air pose selection follows the state; other states keep whatever we were doing.
     let kind = this.airKind
     if (this.flipT >= 0) kind = 'flip'
+    else if (m.state === 'hurt') kind = 'hurt'
     else if (m.state === 'jump' || m.state === 'doubleJump') kind = 'jump'
     else if (m.state === 'bounce') kind = 'bounce'
     else if (m.state === 'fall') kind = 'fall'
@@ -498,6 +563,11 @@ export class Animator {
     this.stateT = 0
     switch (s) {
       case 'jump':
+        // He pushes off the foot that is down, and the other knee leads.
+        this.jumpLead = this.moveW > 0.3 && this.phase < 0.5 ? 1 : 0
+        this.airT = 0
+        this.kickStretch(0.92, 2.4)
+        break
       case 'bounce':
         this.airT = 0
         this.kickStretch(0.92, 2.4)
@@ -530,9 +600,10 @@ export class Animator {
   }
 
   private triggerLand(impact: number): void {
-    if (this.landT >= 0 && this.landT < 0.2) return
+    if (this.landT < 0.2) return
     this.landT = 0
-    this.landAmp = clamp((impact - 1.5) / 11, 0.12, 1)
+    this.landAmp = clamp((impact - 2) / 14, 0.1, 1)
+    this.crouchS.v += (this.landAmp * landOmega(this.landAmp)) / LAND_PEAK
     this.stretchV -= LAND_SQUASH * this.landAmp
   }
 
@@ -584,7 +655,8 @@ export class Animator {
     const yr = teleported ? 0 : wrapAngle(this.yaw - this.prevYaw) / dt
     this.yawRate = damp(this.yawRate, clamp(yr, -10, 10), 10, dt)
     const bankTarget = clamp(-this.yawRate * this.speed * 0.03, -0.3, 0.3) * this.groundW * smooth(this.moveW)
-    this.bank = damp(this.bank, bankTarget, 7, dt)
+    // Leaning into a turn carries a little past it and settles.
+    this.bank = clamp(this.bankS.step(bankTarget, 10, 0.62, dt), -0.4, 0.4)
 
     // On a wall the feet are running too (the gait goes on, tilted onto it).
     const groundTarget = (m.grounded && !AIR_STATES.has(m.state)) || m.state === 'wallRun' ? 1 : 0
@@ -596,6 +668,21 @@ export class Animator {
     this.fastW = damp(this.fastW, sprinting ? 1 : 0, sprinting ? 20 : 3.5, dt)
     const skidTarget = this.groundW * this.fastW * clamp01((-this.accel - 7) / 7)
     this.skidW = damp(this.skidW, skidTarget, skidTarget > this.skidW ? 18 : 5.5, dt)
+
+    // Weight: the torso leans against the acceleration and rocks back past upright when it ends;
+    // the arms trail a beat behind and swing through.
+    const pushRaw = teleported ? 0 : clamp((this.speed - this.prevSpeed) / dt, -26, 26) * this.groundW
+    this.push = damp(this.push, pushRaw, 12, dt)
+    if (teleported) {
+      this.leanS.reset()
+      this.armS.reset()
+      this.bankS.reset()
+      this.crouchS.reset()
+    } else {
+      this.leanS.step(this.push * LEAN_PER_ACCEL, 12, 0.42, dt)
+      this.armS.step(this.push * ARMS_PER_ACCEL, 7.5, 0.3, dt)
+    }
+    this.updateReach(dt)
 
     this.wadeW = damp(this.wadeW, Math.max(clamp01(m.wading * 1.4), m.state === 'wade' ? 0.8 : 0), 4, dt)
     this.slope = damp(this.slope, clamp(m.slope || 0, -1, 1), 5, dt)
@@ -610,10 +697,30 @@ export class Animator {
     const step = m.state === 'wallRun' ? RUN.step : this.g.step
     if (this.groundW > 0.3) this.phase = wrap01(this.phase + (target * dt) / (2 * step))
     // The style trails behind; the stride length does not, so planted feet never slip while it catches up.
+    // (Nor does the stance's share of the stride: with a walk's long stance, a sprint's step would ask for a split.)
+    const stance = this.g.stance
+    const reach = this.g.reach
     this.gaitSpeed = teleported ? target : damp(this.gaitSpeed, Math.max(0, target), GAIT_RATE, dt)
     gaitFor(this.g, this.gaitSpeed, walk, run, sprint)
     applyWade(this.g, this.wadeW)
     this.g.step = step
+    this.g.stance = stance
+    this.g.reach = reach
+  }
+
+  /** Falling: how soon the ground arrives (one probe ahead of the fall), so the legs can reach for it. */
+  private updateReach(dt: number): void {
+    const vy = this.m.vy
+    let target = 0
+    if (this.m.grounded || this.ovr || !(vy < -2)) this.landIn = Infinity
+    else {
+      this.landIn -= dt
+      if (this.probe(this.root.x, this.root.z, this.root.y + vy * REACH_AHEAD, this.hit)) {
+        this.landIn = Math.min(this.landIn, Math.max(0, this.root.y - this.hit.y) / -vy)
+      }
+      target = 1 - ramp(0.07, REACH_AHEAD, this.landIn)
+    }
+    this.reachW = damp(this.reachW, target, target > this.reachW ? 20 : 8, dt)
   }
 
   /* ── ground layer ────────────────────────────────────────── */
@@ -623,16 +730,35 @@ export class Animator {
     const b = this.b
     const t = this.t
     const calm = this.state === 'cutscene' ? 0.6 : 1
-    const sway = Math.sin((t * TAU) / 7.5) * calm
     const sway2 = Math.sin((t * TAU) / 3.3 + 1.3)
 
-    // Weight shift: hips drift over one foot, pelvis hikes on that side, spine counters.
-    p.pos.x += 0.016 * sway
-    b.add(p, J.hips, 0, 1.2 * sway, 1.6 * sway)
-    b.add(p, J.spine, 0, -0.6 * sway, -1.1 * sway)
-    b.add(p, J.chest, 0.5 * sway2, 0, -0.5 * sway)
-    b.add(p, J.upperArmL, 1.2 * sway2, 0, 0.6 * sway)
-    b.add(p, J.upperArmR, -1.0 * sway2, 0, -0.6 * sway)
+    // He stands on one leg more than the other, and now and then shifts to the other one (a spring:
+    // the hips swing across, carry a little past and settle). A slow drift keeps the held pose alive.
+    if (this.moveW < 0.05 && this.groundW > 0.9 && !this.gesture) {
+      this.weightT += dt
+      if (this.weightT > this.weightNext) {
+        this.weightT = 0
+        this.weightNext = 4.5 + this.rand() * 5.5
+        this.weightSide = -this.weightSide
+      }
+    }
+    const sway = (this.weightS.step(this.weightSide, 3.4, 0.55, dt) * 0.8 + 0.2 * Math.sin((t * TAU) / 7.5)) * calm
+    const left = Math.max(0, sway)
+    const right = Math.max(0, -sway)
+
+    // Hips over the standing foot, pelvis hiked on that side, spine and shoulders countering, the free leg easy.
+    p.pos.x += 0.024 * sway
+    p.pos.y -= 0.006 * Math.abs(sway)
+    b.add(p, J.hips, 0, 1.6 * sway, 2.6 * sway)
+    b.add(p, J.spine, 0, -0.8 * sway, -1.8 * sway)
+    b.add(p, J.chest, 0.5 * sway2, -0.6 * sway, -1.0 * sway)
+    b.add(p, J.neck, 0, 0, 0.5 * sway)
+    b.add(p, J.shoulderL, 0, 0, 1.4 * right - 0.8 * left)
+    b.add(p, J.shoulderR, 0, 0, 1.4 * left - 0.8 * right)
+    b.add(p, J.upperArmL, 1.2 * sway2 + 1.5 * right, 0, 0.8 * sway)
+    b.add(p, J.upperArmR, -1.0 * sway2 + 1.5 * left, 0, -0.8 * sway)
+    p.footPitch[0] += 0.1 * right
+    p.footPitch[1] += 0.1 * left
 
     // Head micro-motion and the occasional glance around.
     this.updateGlance(dt)
@@ -685,29 +811,33 @@ export class Animator {
     const ph = this.phase
     const run = clamp01((this.speed - (this.m.walkSpeed || 2)) / Math.max(0.1, (this.m.runSpeed || 5.6) - (this.m.walkSpeed || 2)))
     const arms = swingSignal(ph, 0.04) // +1 when the left foot is furthest forward
+    // Overlap: the chest turns a beat after the hips, the forearms and hands a beat after the upper arms.
+    const chest = swingSignal(ph, 0.07)
+    const fore = swingSignal(ph, 0.11)
     const roll = Math.cos(TAU * (ph - g.stance / 2)) // +1 at left mid-stance
     const bob = Math.cos(2 * TAU * (ph - g.stance / 2))
+    // Each footfall jolts down through the body a moment after the hips take it.
+    const jolt = Math.cos(2 * TAU * (ph - g.stance / 2 - 0.07))
 
-    const accelLean = clamp(this.accel * 1.1, -9, 9)
-    const slopeLean = this.slope * 14
-    const lean = g.lean + accelLean + slopeLean
+    const lean = g.lean + this.slope * 14
     const bankDeg = this.bank / DEG
 
-    p.pos.set(0.014 * roll * (1 - run) - Math.sin(this.bank) * 0.5, g.drop + g.bob * bob, -0.01 * accelLean / 9)
+    p.pos.set(0.016 * roll * (1 - run) - Math.sin(this.bank) * 0.5, g.drop + g.bob * bob, 0.012 * run * bob)
     b.set(p, J.hips, lean * 0.25, -g.pelvisYaw * arms, g.pelvisRoll * roll + bankDeg)
-    b.set(p, J.spine, lean * 0.4, g.chestYaw * 0.35 * arms, -g.pelvisRoll * 0.6 * roll)
-    b.set(p, J.chest, lean * 0.35, g.chestYaw * 0.65 * arms, -g.pelvisRoll * 0.3 * roll)
+    b.set(p, J.spine, lean * 0.4 + 1.2 * run * jolt, g.chestYaw * 0.35 * chest, -g.pelvisRoll * 0.6 * roll)
+    b.set(p, J.chest, lean * 0.35 + 1.4 * run * jolt, g.chestYaw * 0.65 * chest, -g.pelvisRoll * 0.3 * roll)
 
-    b.set(p, J.shoulderL, 0, 5 * arms * (g.arm / 40), -1)
-    b.set(p, J.shoulderR, 0, -5 * arms * (g.arm / 40), -1)
+    const reach = g.arm / 40
+    b.set(p, J.shoulderL, 0, 6 * arms * reach, -1 + 2.5 * run * jolt)
+    b.set(p, J.shoulderR, 0, -6 * arms * reach, -1 + 2.5 * run * jolt)
     const fwdL = Math.max(0, -arms)
     const fwdR = Math.max(0, arms)
     b.set(p, J.upperArmL, g.arm * arms - 4 * run, 8, g.armOut - 6 * fwdL)
     b.set(p, J.upperArmR, -g.arm * arms - 4 * run, 8, g.armOut - 6 * fwdR)
-    b.elbow(p, 0, g.elbow + g.elbowSwing * (0.5 - 0.5 * arms), 12 * run)
-    b.elbow(p, 1, g.elbow + g.elbowSwing * (0.5 + 0.5 * arms), 12 * run)
-    b.set(p, J.handL, -6, 0, 0)
-    b.set(p, J.handR, -6, 0, 0)
+    b.elbow(p, 0, g.elbow + g.elbowSwing * (0.5 - 0.5 * fore), 12 * run)
+    b.elbow(p, 1, g.elbow + g.elbowSwing * (0.5 + 0.5 * fore), 12 * run)
+    b.set(p, J.handL, -6 + 9 * fore, 0, 0)
+    b.set(p, J.handR, -6 - 9 * fore, 0, 0)
     p.curl[0] = p.curl[1] = g.fist
     p.stab = 0.75
     if (this.wadeW > 0.01) this.wadeArms(p, this.wadeW * 0.6)
@@ -729,6 +859,26 @@ export class Animator {
     b.addElbow(out, 1, 14 * w)
   }
 
+  /**
+   * Weight over whatever the legs are doing: the torso leans into a start and back against a stop,
+   * rocks past upright once and settles; the arms swing through a beat later.
+   */
+  private applyWeight(out: Pose): void {
+    const lean = clamp(this.leanS.x, -14, 14)
+    const arms = clamp(this.armS.x, -24, 24)
+    if (Math.abs(lean) + Math.abs(arms) < 0.03) return
+    const b = this.b
+    const open = Math.abs(arms)
+    out.pos.z -= 0.0015 * lean
+    b.add(out, J.hips, lean * 0.3, 0, 0)
+    b.add(out, J.spine, lean * 0.4, 0, 0)
+    b.add(out, J.chest, lean * 0.3, 0, 0)
+    b.add(out, J.upperArmL, arms, 0, open * 0.25)
+    b.add(out, J.upperArmR, arms * 0.85, 0, open * 0.3)
+    b.addElbow(out, 0, open * 0.5)
+    b.addElbow(out, 1, open * 0.4)
+  }
+
   /* ── air layer ───────────────────────────────────────────── */
 
   private buildAir(dt: number): void {
@@ -738,8 +888,14 @@ export class Animator {
     const falling = ramp(-0.5, -6, m.vy)
     switch (this.airKind) {
       case 'jump':
-        a.copy(this.pJumpUp).blend(this.pJumpTuck, ramp(0.05, 0.32, t))
-        if (falling > 0) a.blend(this.fallPose(this.tmp), falling * 0.85)
+        // Stretched long while rising fast, tucked over the top: by vertical speed, so a short hop tucks early.
+        a.copy(this.pJumpTuck).blend(this.pJumpUp[this.jumpLead], ramp(1.5, 7.5, m.vy))
+        // The very start is the push: legs still driving down, arms about to swing up.
+        if (t < 0.17) a.blend(this.pJumpPush, 1 - smooth(t / 0.17))
+        if (falling > 0) a.blend(this.fallPose(this.tmp), falling * 0.9)
+        break
+      case 'hurt':
+        a.copy(this.pHurtAir)
         break
       case 'bounce':
         a.copy(this.pStar).blend(this.pJumpTuck, ramp(0.22, 0.55, t))
@@ -782,6 +938,14 @@ export class Animator {
     b.add(p, J.upperArmR, 7 * amp * Math.cos(w * 1.3 + 2), 0, 11 * amp * Math.sin(w * 1.3 + 2))
     b.addElbow(p, 0, 10 * amp * Math.sin(w * 1.3 + 0.5))
     b.addElbow(p, 1, 10 * amp * Math.sin(w * 1.3 + 2.5))
+    // A long, fast fall drags the arms up.
+    const drag = ramp(-9, -24, this.m.vy)
+    if (drag > 0) {
+      b.add(p, J.upperArmL, -12 * drag, 0, 16 * drag)
+      b.add(p, J.upperArmR, -12 * drag, 0, 16 * drag)
+    }
+    // The ground is close: the flailing stops and the legs reach for it.
+    if (this.reachW > 0.002) p.blend(this.pReach, this.reachW)
     return p
   }
 
@@ -812,23 +976,25 @@ export class Animator {
     if (this.deadW > 0.002) out.blend(this.pDead, smooth(this.deadW))
 
     if (this.hurtT >= 0) {
+      // Two beats: the blow snaps him back, then (once his feet are under him) he folds around it and straightens up.
       this.hurtT += dt
-      const w = envelope(this.hurtT, 0.05, 0.14, 0.34)
-      this.addPose(out, this.pHurt, w)
+      const snap = envelope(this.hurtT, 0.04, 0.1, 0.2)
+      const fold = envelope(this.hurtT - 0.12, 0.14, 0.26, 0.36) * this.groundW
+      this.addPose(out, this.pHurt, snap)
+      this.addPose(out, this.pHurtFold, fold)
+      const w = Math.max(snap, fold)
       out.curl[0] = lerp(out.curl[0], this.pHurt.curl[0], w)
       out.curl[1] = lerp(out.curl[1], this.pHurt.curl[1], w)
-      if (this.hurtT > 0.55) this.hurtT = -1
+      if (this.hurtT > 0.76) this.hurtT = -1
     }
 
-    if (this.landT >= 0) {
-      this.landT += dt
-      const down = 0.07
-      const up = 0.2 + 0.22 * this.landAmp
-      const c = this.landT < down ? easeOut(this.landT / down) : 1 - smooth((this.landT - down) / up)
-      const w = c * this.landAmp * this.groundW
-      out.pos.y -= 0.17 * w
-      this.addPose(out, this.pLand, w)
-      if (this.landT > down + up) this.landT = -1
+    // Landing: the hips sink into the knees and spring back up, a little past standing, then settle.
+    this.landT += dt
+    const sink = clamp(this.crouchS.step(0, landOmega(this.landAmp), LAND_ZETA, dt), -0.3, 1.2) * this.groundW
+    if (Math.abs(sink) > 0.002) {
+      // Running through it, the stride takes up part of the drop.
+      out.pos.y -= LAND_DROP * sink * (1 - 0.3 * smooth(this.moveW))
+      this.addPose(out, this.pLand, Math.max(0, sink))
     }
   }
 
@@ -904,18 +1070,44 @@ export class Animator {
 
     const clip = w.move !== 'none' ? this.clips.get(w.move) : undefined
     this.swingW = damp(this.swingW, clip ? 1 : 0, clip ? 28 : 9, dt)
-    if (clip) sampleKeys(this.wpose, clip.keys, clip.times, clamp01(w.move === 'draw' ? w.charge : w.t))
-    if (this.swingW < 0.002) return
+    if (clip) {
+      // A move that follows straight on another (the combo, a release after the draw) takes over from its pose.
+      if (w.move !== this.wmove) {
+        this.wfade = this.wmove !== 'none' && this.swingW > 0.5 ? 0 : 1
+        if (this.wfade < 1) this.wfrom.copy(this.wpose)
+      }
+      sampleKeys(this.wpose, clip.keys, clip.times, clamp01(w.move === 'draw' ? w.charge : w.t))
+      if (this.wfade < 1) {
+        this.wfade = Math.min(1, this.wfade + dt / MOVE_FADE)
+        this.tmp.copy(this.wfrom).blend(this.wpose, smooth(this.wfade))
+        this.wpose.copy(this.tmp)
+      }
+    }
+    this.wmove = w.move
+    const sw = this.swingW
+    if (sw < 0.002) return
     const p = this.wpose
-    out.blendJoints(p, this.swingW, UPPER)
-    out.curl[0] = lerp(out.curl[0], p.curl[0], this.swingW)
-    out.curl[1] = lerp(out.curl[1], p.curl[1], this.swingW)
-    out.pos.y += p.pos.y * this.swingW * this.groundW
+    out.blendJoints(p, sw, UPPER)
+    out.curl[0] = lerp(out.curl[0], p.curl[0], sw)
+    out.curl[1] = lerp(out.curl[1], p.curl[1], sw)
+    // The hips wind up and drive the blow, on top of whatever the legs are doing…
+    out.q[J.hips].premultiply(_q1.identity().slerp(p.q[J.hips], sw))
+    out.pos.addScaledVector(p.pos, sw * this.groundW)
+    // …and standing, the feet step into a stance under it.
+    const stand = sw * this.groundW * (1 - smooth(this.moveW))
+    for (let i = 0; i < 2; i++) {
+      out.footOff[i].addScaledVector(p.footOff[i], stand)
+      out.footPitch[i] += p.footPitch[i] * stand
+    }
   }
 
   /** Overridden: whatever the body was in the middle of (flips, spins, gestures, looks) is dropped. */
   private dropActions(): void {
-    this.flipT = this.spinT = this.hurtT = this.landT = this.rollT = -1
+    this.flipT = this.spinT = this.hurtT = this.rollT = -1
+    this.crouchS.reset()
+    this.leanS.reset()
+    this.armS.reset()
+    this.wmove = 'none'
     this.spin = 0
     this.dashW = this.deadW = this.lookW = this.swingW = this.slideW = this.wallW = this.tuckW = 0
     if (this.gesture) this.finishGesture()
@@ -984,29 +1176,76 @@ export class Animator {
     const wGait = ramp(0, 0.5, this.moveW)
     const g = this.g
 
-    // Plants: follow the stride while moving, stay put when standing, re-plant when airborne.
+    // Standing plants: stay put, and step back under the body when left behind; re-planted when airborne.
     const standing = this.moveW < 0.25 && this.groundW > 0.95
-    if (teleported || this.groundW < 0.5) {
+    const reset = teleported || this.groundW < 0.5
+    if (reset) {
       for (let i = 0; i < 2; i++) this.plantAt(i, this.yaw, c, s)
-    } else if (!standing) {
-      this.stepWait = 0.03
-      if (wGait >= 1) {
-        for (let i = 0; i < 2; i++) {
-          footAt(this.foot, g, wrap01(this.phase + i * 0.5), i as 0 | 1)
-          this.toWorld(this.plants[i].pos, this.foot.x, this.foot.z, c, s)
-          this.plants[i].yaw = this.yaw
-          this.plants[i].stepT = -1
-        }
-      }
-    } else {
-      this.settleSteps(dt, c, s, !!this.gesture)
-    }
+    } else if (!standing) this.stepWait = 0.03
+    else this.settleSteps(dt, c, s, !!this.gesture)
 
     for (let i = 0; i < 2; i++) {
       const side = i as 0 | 1
       const pl = this.plants[i]
       const tg = this.targets[i]
+      const st = this.strides[i]
       footAt(this.foot, g, wrap01(this.phase + i * 0.5), side)
+
+      // The stride's foot: planted in the world from touch-down to toe-off, whatever the body does over it…
+      let gx = this.foot.x
+      let gz = this.foot.z
+      let gYaw = 0
+      if (reset || wGait <= 0) {
+        st.down = false
+        st.offX = st.offZ = st.offYaw = 0
+      } else if (this.foot.swing === 0) {
+        if (!st.down) {
+          st.down = true
+          // Setting off from a stand, it is the foot he is standing on, where it stands.
+          if (wGait < 1) {
+            st.pos.copy(pl.pos)
+            st.yaw = pl.yaw
+          } else {
+            this.toWorld(st.pos, gx, gz, c, s)
+            st.yaw = this.yaw
+          }
+        }
+        const sx = st.pos.x - root.x
+        const sz = st.pos.z - root.z
+        let fx = c * sx - s * sz
+        let fz = s * sx + c * sz
+        // It stays put as long as the leg can cover it: anywhere along the stride's own reach. Outside
+        // that (shoved, carried along, spun round) it is dragged after the body.
+        const span = g.stance * g.step + SLIP_MAX
+        const cx = clamp(fx, this.foot.x - SLIP_MAX, this.foot.x + SLIP_MAX)
+        const cz = clamp(fz, g.reach - span, g.reach + span)
+        if (cx !== fx || cz !== fz) {
+          fx = cx
+          fz = cz
+          this.toWorld(st.pos, fx, fz, c, s)
+        }
+        const ox = fx - gx
+        const oz = fz - gz
+        st.offX = ox
+        st.offZ = oz
+        st.offYaw = clamp(wrapAngle(st.yaw - this.yaw), -0.6, 0.6)
+        gx += ox
+        gz += oz
+        gYaw = st.offYaw
+      } else {
+        // …and the swing gathers up whatever the plant ended off by.
+        st.down = false
+        const k = 1 - smooth(this.foot.t / 0.5)
+        gx += st.offX * k
+        gz += st.offZ * k
+        gYaw = st.offYaw * k
+      }
+      // Stopping, the feet stay where the stride left them.
+      if (wGait >= 1 && !reset) {
+        this.toWorld(pl.pos, gx, gz, c, s)
+        pl.yaw = this.yaw + gYaw
+        pl.stepT = -1
+      }
 
       // Planted (or stepping) foot in character space.
       const dx = pl.pos.x - root.x
@@ -1028,12 +1267,17 @@ export class Animator {
       const plantYaw = pl.stepT >= 0 ? lerp(pl.fromYaw, pl.toYaw, smooth(pl.stepT)) : pl.yaw
       const sideSign = side === 0 ? 1 : -1
       const idleYaw = IDLE_FOOT_YAW * sideSign + wrapAngle(plantYaw - this.yaw)
-      const gaitYaw = g.footYaw * DEG * sideSign
+      const gaitYaw = g.footYaw * DEG * sideSign + gYaw
 
       const off = out.footOff[i]
-      const x = lerp(px, this.foot.x, wGait) + off.x * sideSign
-      const z = lerp(pz, this.foot.z, wGait) + off.z
-      const lift = lerp(py, this.foot.y, wGait) + off.y
+      // A foot its pose moves (a lunge, the step into a swing) lifts a little on the way instead of sliding.
+      const prev = this.offPrev[i]
+      const moved = teleported ? 0 : Math.hypot(off.x - prev.x, off.z - prev.z) / dt
+      prev.copy(off)
+      this.stepLift[i] = damp(this.stepLift[i], Math.min(0.05, moved * 0.035), 30, dt)
+      const x = lerp(px, gx, wGait) + off.x * sideSign
+      const z = lerp(pz, gz, wGait) + off.z
+      const lift = lerp(py, this.foot.y, wGait) + off.y + this.stepLift[i]
       tg.pitch = lerp(pPitch, this.foot.pitch, wGait) + out.footPitch[i]
       tg.yaw = lerp(idleYaw, gaitYaw, wGait)
       tg.contact = 1 - lerp(pl.stepT >= 0 ? 1 : 0, this.foot.swing, wGait) * ramp(0, 0.03, lift)
