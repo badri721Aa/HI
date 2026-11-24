@@ -202,8 +202,8 @@ const ISLE_AIR = { fogNear: 0.2, fogHeight: 0.014, fogBase: 3 }
 const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
   dusk: {
     ...ISLE_AIR,
-    // Away from the sun the haze is a cool mauve; the glow warms it toward the sun.
-    fog: '#c9a093',
+    // A peach haze a shade deeper than the horizon; the glow turns it gold toward the sun.
+    fog: '#dfa98b',
     fogGlow: 0.35,
     localLight: 0.6,
     lightDir: SUN_DUSK,
@@ -228,7 +228,7 @@ const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
     hemiGround: '#7a6448',
     hemiIntensity: 0.68,
     envIntensity: 0.64,
-    exposure: 0.96,
+    exposure: 1.0,
     waterShallow: '#46c2b6',
     waterDeep: '#155a78',
     caustics: 0.55,
@@ -236,7 +236,7 @@ const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
   // The sun's disc on the horizon: long orange light, a deepening sky, the moon just up.
   sunset: {
     ...ISLE_AIR,
-    fog: '#c98f80',
+    fog: '#d1917a',
     fogGlow: 0.6,
     localLight: 0.85,
     // The light stays a little above the disc so the island is not all one long shadow.
@@ -332,12 +332,14 @@ const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
   },
   dawn: {
     ...ISLE_AIR,
-    fog: '#dcb4b4',
+    fog: '#e6b8b0',
     fogGlow: 0.5,
     localLight: 0.35,
-    lightDir: SUN_DAWN,
-    lightColor: '#ffbfa0',
-    lightIntensity: 2.7,
+    // Like at sunset, the light stands a little above the disc: the low sun still rakes across
+    // the island, but open ground is properly lit instead of grazed.
+    lightDir: at(71, 21),
+    lightColor: '#ffc4a0',
+    lightIntensity: 3.0,
     sunDir: SUN_DAWN,
     sunDisc: 1,
     sunColor: '#fff2e0',
@@ -352,11 +354,11 @@ const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
     cloudLit: '#ffd3c4',
     cloudShade: '#9a7e9e',
     cloudCover: 0.53,
-    hemiSky: '#b4bfe8',
+    hemiSky: '#a9b8ee',
     hemiGround: '#76605a',
-    hemiIntensity: 0.8,
-    envIntensity: 0.75,
-    exposure: 1.05,
+    hemiIntensity: 0.7,
+    envIntensity: 0.68,
+    exposure: 1.02,
     waterShallow: '#4cc0bb',
     waterDeep: '#17577a',
     caustics: 0.5,
@@ -471,6 +473,8 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     caustics: 0,
     fog: '#2c1050',
     fogScale: 0.8,
+    // The dark maps take the cool night grade, not the warm evening one.
+    night: 0.8,
   },
   frost: {
     lightDir: [0.45, 0.5, -0.74],
@@ -592,6 +596,7 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     caustics: 0,
     fog: '#1e0c34',
     fogScale: 0.6,
+    night: 0.8,
   },
   glitch: {
     lightDir: [0.3, 0.85, 0.42],
@@ -625,6 +630,7 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     fogScale: 0.6,
     // A void has no weather: the same thin haze at every height.
     fogHeight: 0,
+    night: 1,
   },
 }
 

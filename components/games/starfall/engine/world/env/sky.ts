@@ -88,7 +88,7 @@ void main() {
   float sd = dot( d, uSunDir );
   float s = max( sd, 0.0 );
   float band = exp( - hp * 5.0 );
-  vec3 glow = uHalo * ( pow( s, 3.0 ) * 0.5 * band + pow( s, 18.0 ) * 0.4 + pow( s, 160.0 ) * 1.4 );
+  vec3 glow = uHalo * ( pow( s, 3.0 ) * 0.5 * band + pow( s, 18.0 ) * 0.4 + pow( s, 160.0 ) * 0.9 );
   col += glow * uSunDisc;
   // Opposite the sun the low sky picks up a faint pink "belt of Venus".
   col += uHalo * vec3( 0.55, 0.32, 0.45 ) * pow( max( - sd, 0.0 ), 2.0 ) * exp( - abs( h - 0.08 ) * 12.0 ) * 0.25 * uSunDisc;
@@ -140,7 +140,7 @@ void main() {
 
   // Sun disc.
   float disc = smoothstep( 0.99962, 0.99978, sd );
-  col += uSunColor * disc * mix( 18.0, 4.0, uEnvPass ) * uSunDisc;
+  col += uSunColor * disc * mix( 10.0, 4.0, uEnvPass ) * uSunDisc;
 
   // Clouds: lit warm toward the sun, silver-edged around the moon.
   if ( h > 0.0 ) {

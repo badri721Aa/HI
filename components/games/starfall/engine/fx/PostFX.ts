@@ -32,7 +32,7 @@ import type { Ctx, IPostFX } from '../types'
 import { FrameProbe } from './frameProbe'
 
 /** Only what is genuinely bright glows: the sun, flames, lantern glass, magic. Lit ground stays under the threshold. */
-const BLOOM = { strength: 0.42, radius: 0.6, threshold: 1.1, knee: 0.6 }
+const BLOOM = { strength: 0.38, radius: 0.6, threshold: 1.1, knee: 0.6 }
 
 /**
  * The grade's two ends. Evening: a warm tilt and a little extra contrast for depth. Night:
@@ -45,7 +45,7 @@ const GRADE = {
     gamma: new THREE.Vector3(1.03, 1.0, 0.97),
     gain: new THREE.Vector3(1.03, 1.0, 0.96),
     contrast: 1.07,
-    saturation: 1.03,
+    saturation: 1.08,
     vignette: 0.24,
   },
   night: {
