@@ -747,11 +747,11 @@ export class Animator {
     const right = Math.max(0, -sway)
 
     // Hips over the standing foot, pelvis hiked on that side, spine and shoulders countering, the free leg easy.
-    p.pos.x += 0.024 * sway
-    p.pos.y -= 0.006 * Math.abs(sway)
-    b.add(p, J.hips, 0, 1.6 * sway, 2.6 * sway)
-    b.add(p, J.spine, 0, -0.8 * sway, -1.8 * sway)
-    b.add(p, J.chest, 0.5 * sway2, -0.6 * sway, -1.0 * sway)
+    p.pos.x += 0.03 * sway
+    p.pos.y -= 0.008 * Math.abs(sway)
+    b.add(p, J.hips, 0, 2 * sway, 3.4 * sway)
+    b.add(p, J.spine, 0, -1 * sway, -2.3 * sway)
+    b.add(p, J.chest, 0.5 * sway2, -0.8 * sway, -1.3 * sway)
     b.add(p, J.neck, 0, 0, 0.5 * sway)
     b.add(p, J.shoulderL, 0, 0, 1.4 * right - 0.8 * left)
     b.add(p, J.shoulderR, 0, 0, 1.4 * left - 0.8 * right)
@@ -1277,7 +1277,8 @@ export class Animator {
       this.stepLift[i] = damp(this.stepLift[i], Math.min(0.05, moved * 0.035), 30, dt)
       const x = lerp(px, gx, wGait) + off.x * sideSign
       const z = lerp(pz, gz, wGait) + off.z
-      const lift = lerp(py, this.foot.y, wGait) + off.y + this.stepLift[i]
+      // (Sunk into a landing, the stride keeps its feet low: the knees are busy taking the weight.)
+      const lift = lerp(py, this.foot.y * (1 - 0.65 * clamp01(this.crouchS.x)), wGait) + off.y + this.stepLift[i]
       tg.pitch = lerp(pPitch, this.foot.pitch, wGait) + out.footPitch[i]
       tg.yaw = lerp(idleYaw, gaitYaw, wGait)
       tg.contact = 1 - lerp(pl.stepT >= 0 ? 1 : 0, this.foot.swing, wGait) * ramp(0, 0.03, lift)
@@ -1436,18 +1437,20 @@ export class Animator {
         const [thigh, shin, foot, toe] = LEG_JOINTS[i]
         const leg = rig.legs[i]
         const tg = this.targets[i]
-        // Knee direction: the bend of the authored FK leg (relative to its own hip→ankle line),
-        // carried over to the target line and biased forward over the toes.
+        // Knee direction: the bend of the authored FK leg (relative to its own hip→ankle line), biased
+        // forward over the toes, and carried over to the target line as a whole. (The bias turns with
+        // the leg: a foot far behind or in front of a low hip still leaves the knee a side to bend to.)
         const hip = _v1.copy(rig.offset[leg.hip]).applyQuaternion(C[J.hips]).add(rig.hipsPos)
         _q1.multiplyQuaternions(C[J.hips], out.q[thigh])
         const pole = _v2.copy(rig.offset[leg.knee]).applyQuaternion(_q1)
         _q1.multiply(out.q[shin])
         _v3.copy(rig.offset[leg.ankle]).applyQuaternion(_q1).add(pole).normalize()
         pole.addScaledVector(_v3, -pole.dot(_v3))
+        _v4.set(Math.sin(KNEE_OUT) * (side === 0 ? 1 : -1), 0, Math.cos(KNEE_OUT)).applyQuaternion(C[J.hips])
+        _v4.addScaledVector(_v3, -_v4.dot(_v3))
+        pole.addScaledVector(_v4, 0.04)
         _v4.subVectors(tg.ankle, hip).normalize()
         pole.applyQuaternion(_q1.setFromUnitVectors(_v3, _v4))
-        _v3.set(Math.sin(KNEE_OUT) * (side === 0 ? 1 : -1), 0, Math.cos(KNEE_OUT)).applyQuaternion(C[J.hips])
-        pole.addScaledVector(_v3, 0.04)
 
         rig.solveLeg(side, tg.ankle, pole, this.qThigh, this.qShin)
         // character-space → parent-relative offsets, blended with the authored FK legs.

@@ -14,6 +14,7 @@ import * as THREE from 'three'
 import type { V3 } from '../../events'
 import { KIND } from '../../gameplay/weapons/defs'
 import type { Ctx, WeaponHit } from '../../types'
+import { Spring } from '../../player/anim/math'
 import { Boss, type Arena } from './Boss'
 import { rockGeometry } from '../geo'
 import type { Hazards } from './hazards'
@@ -65,6 +66,9 @@ export class FrostGolem extends Boss {
   private readonly parts: Array<{ mesh: THREE.Mesh; parent: THREE.Object3D; pos: THREE.Vector3; rot: THREE.Euler; scale: THREE.Vector3 }> = []
   private crumbled = false
   private coreHit = 0
+  /** Struck: the torso rocks back and settles. */
+  private readonly recoil = new Spring()
+  private lastFlash = 0
   private readonly v = new THREE.Vector3()
   private readonly w = new THREE.Vector3()
   private readonly owned: Array<{ dispose(): void }> = []
@@ -412,14 +416,25 @@ export class FrostGolem extends Boss {
         break
     }
     const sleep = this.mode === 'sleep'
-    const legSwing = this.act === 'walk' ? stride * 0.35 : 0
-    const d = Math.min(1, dt * 10)
-    this.armL.rotation.x += (armL - this.armL.rotation.x) * d
-    this.armR.rotation.x += (armR - this.armR.rotation.x) * d
+    const walking = this.act === 'walk'
+    const legSwing = walking ? stride * 0.35 : 0
+    // A blow rocks the torso back; it swings forward past upright and settles.
+    if (this.flash > this.lastFlash && !sleep) this.recoil.v -= 2.6
+    this.lastFlash = this.flash
+    const rock = this.recoil.step(0, 9, 0.4, dt)
+    // Never frozen: it breathes (deep and slow asleep), and its weight rolls from foot to foot as it walks.
+    const breath = Math.sin(t * (sleep ? 0.9 : 1.7))
+    const d = 1 - Math.exp(-10 * dt)
+    this.armL.rotation.x += (armL + breath * 0.03 - this.armL.rotation.x) * d
+    this.armR.rotation.x += (armR - breath * 0.03 - this.armR.rotation.x) * d
     this.legL.rotation.x += (-legSwing - this.legL.rotation.x) * d
     this.legR.rotation.x += (legSwing + legR - this.legR.rotation.x) * d
-    this.torso.rotation.x += ((sleep ? 0.45 : lean) - this.torso.rotation.x) * d
-    this.hips.position.y = 2.1 - (sleep ? 0.35 : 0) + (this.act === 'walk' ? Math.abs(stride) * 0.08 : 0)
+    this.torso.rotation.x += ((sleep ? 0.45 : lean) + breath * 0.02 + rock - this.torso.rotation.x) * d
+    this.torso.rotation.z += ((walking ? -stride * 0.06 : 0) - this.torso.rotation.z) * d
+    this.torso.rotation.y += ((walking ? stride * 0.1 : 0) - this.torso.rotation.y) * d
+    const hipsY = 2.1 - (sleep ? 0.35 : 0) + (walking ? Math.abs(stride) * 0.08 : 0) + breath * (sleep ? 0.04 : 0.025)
+    this.hips.position.y += (hipsY - this.hips.position.y) * (1 - Math.exp(-16 * dt))
+    this.hips.rotation.z += ((walking ? stride * 0.05 : 0) - this.hips.rotation.z) * d
     this.root.position.set(this.pos.x, this.pos.y, this.pos.z)
     this.root.rotation.y = this.yaw
 

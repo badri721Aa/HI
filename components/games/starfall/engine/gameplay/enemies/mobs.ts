@@ -57,6 +57,7 @@ export class Rusher extends Mob {
         break
       case 'windup': {
         this.poise = true
+        this.coil(this.t / tn.windup)
         // Tracks the player for most of the wind-up, then commits to the line.
         if (this.t < tn.windup * 0.72) {
           this.facePlayer()
@@ -104,6 +105,7 @@ export class Rusher extends Mob {
         break
       case 'slash':
         this.facePlayer()
+        if (!this.struck) this.coil(this.t / tn.slashWindup)
         if (!this.struck && this.t >= tn.slashWindup) {
           this.struck = true
           this.cue('slash')
@@ -174,7 +176,7 @@ export class Rusher extends Mob {
   }
 
   protected decorate(tint: THREE.Vector4): void {
-    if (this.mode === 'windup' && this.state === 'hunt') tint.set(1, 0.35, 0.15, 0.25 + 0.25 * Math.sin(this.t * 22))
+    if (this.mode === 'windup' && this.state === 'hunt') tint.set(1, 0.35, 0.15, 0.25 + 0.25 * Math.sin(this.t * 17))
     else if (this.mode === 'charge') tint.set(1, 0.55, 0.2, 0.3)
   }
 }
@@ -212,6 +214,7 @@ export class ShieldBearer extends Mob {
         else if (this.t > 1.0) this.begin('advance')
         break
       case 'bash':
+        if (!this.struck) this.coil(this.t / tn.bashWindup)
         if (this.t < tn.bashWindup * 0.6) this.facePlayer()
         if (!this.struck && this.t >= tn.bashWindup) {
           this.struck = true
@@ -325,6 +328,8 @@ export class Bomber extends Mob {
     const tn = this.tn
     if (this.fuse >= 0) {
       this.fuse += dt
+      // Swelling as the fuse burns down.
+      this.coil(this.fuse / tn.fuse)
       this.facePlayer()
       if (this.fuse >= tn.fuse) this.explode()
       return
@@ -377,7 +382,8 @@ export class Bomber extends Mob {
   protected decorate(tint: THREE.Vector4): void {
     if (this.fuse < 0) return
     const u = this.fuse / this.tn.fuse
-    const blink = Math.sin(this.fuse * (8 + u * 30)) > 0 ? 1 : 0
+    // Quickening, but never faster than a slow strobe (under 3 per second).
+    const blink = Math.sin(this.fuse * (7 + u * 5)) > 0 ? 1 : 0
     tint.set(1, 0.15, 0.05, 0.15 + blink * 0.45 * (0.4 + u))
     const tip = this.model.bone('fuse-tip')
     if (tip) tip.scale.setScalar(1 + blink * 1.4)
@@ -503,6 +509,8 @@ export class Sniper extends Mob {
         this.muzzlePos(this.muzzle)
         this.host.projectiles.fire(this.tn.shot, this.muzzle.x, this.muzzle.y, this.muzzle.z, this.aim.x - this.muzzle.x, this.aim.y - this.muzzle.y, this.aim.z - this.muzzle.z)
         this.act('shoot', { once: true })
+        // The shot kicks it back.
+        this.jolt(this.muzzle.x - this.aim.x, this.muzzle.z - this.aim.z, 0.9)
         this.cue('snipe')
         this.ctx.fx.burst('hit', this.muzzle, { color: '#ff6a5a', scale: 0.6 })
         break
@@ -672,6 +680,7 @@ export class Healer extends Mob {
     this.cd = 3.6
     if (this.dist < 22) {
       this.act('castShoot', { once: true })
+      this.jolt(-this.dx, -this.dz, 0.5)
       const staff = this.staffTip(_b)
       this.host.projectiles.aimed('wisp', staff.x, staff.y, staff.z, 0.2)
       this.cue('volley')
@@ -802,6 +811,7 @@ export class TurretSpawner extends Mob {
       return
     }
     this.faceTo(this.spot.x, this.spot.z)
+    if (!this.thrown) this.coil(this.t / (tn.throwTime * 0.45))
     if (!this.thrown && this.t >= tn.throwTime * 0.45) {
       this.thrown = true
       const turret = this.host.deploy(this, this.spot.x, this.spot.y, this.spot.z)
@@ -937,6 +947,7 @@ export class Turret extends Mob {
     this.muzzle.z += Math.cos(this.headYaw) * 0.55
     this.muzzle.y += 0.05
     this.host.projectiles.aimed(this.tn.shot, this.muzzle.x, this.muzzle.y, this.muzzle.z, 0.15)
+    this.jolt(0, 0, 0.5)
     this.ctx.fx.burst('hit', this.muzzle, { color: this.def.color, scale: 0.4, count: 4 })
     this.cue('turretShot')
   }
