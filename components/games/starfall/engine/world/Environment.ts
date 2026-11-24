@@ -69,6 +69,8 @@ export class Environment implements IEnvironment {
   private geometries: THREE.BufferGeometry[] = []
   private envTex: THREE.Texture | null = null
   private lights: LocalLights
+  /** This environment still holds its share of the fog chunk patch (released once, in dispose). */
+  private air = true
 
   private uTime = { value: 0 }
   private terrainUniforms: TerrainUniforms | null = null
@@ -286,7 +288,8 @@ export class Environment implements IEnvironment {
     this.sun.dispose()
     this.hemi.dispose()
     this.lights.dispose()
-    uninstallAir()
+    if (this.air) uninstallAir()
+    this.air = false
     if (scene.environment === this.envTex) scene.environment = null
     if (scene.fog === this.fog) scene.fog = null
     this.envTex = null

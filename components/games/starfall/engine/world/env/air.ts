@@ -9,8 +9,8 @@
  * the Environment only writes 20 floats when the look changes. A material that never got the
  * uniform (all zeros) falls back to three's stock fog exactly.
  *
- * `installAir()` must run before the first shader compiles; `uninstallAir()` restores three as it
- * was (other pages on the site share this copy of three).
+ * `installAir()` must run before the first shader compiles; the matching `uninstallAir()` restores
+ * three as it was once the last user is gone (other pages on the site share this copy of three).
  */
 import * as THREE from 'three'
 
@@ -86,6 +86,8 @@ type ChunkName = 'fog_pars_vertex' | 'fog_vertex' | 'fog_pars_fragment' | 'fog_f
 const CHUNKS: ChunkName[] = ['fog_pars_vertex', 'fog_vertex', 'fog_pars_fragment', 'fog_fragment', 'lights_fragment_end']
 
 let stock: Record<ChunkName, string> | null = null
+/** Environments currently using the air (a remount can briefly have two). */
+let users = 0
 
 /** Every uniform set a fog-taking material is built from: the shared fog block and three's own shaders. */
 function uniformSets(): Array<Record<string, THREE.IUniform>> {
@@ -96,6 +98,7 @@ function uniformSets(): Array<Record<string, THREE.IUniform>> {
 
 /** Adds the air to three's fog. False (and nothing changed) if three's fog chunk is not the one this was written for. */
 export function installAir(): boolean {
+  users++
   if (stock) return true
   const chunk = THREE.ShaderChunk
   if (!chunk.fog_fragment.includes(FOG_MIX)) return false
@@ -117,6 +120,8 @@ export function installAir(): boolean {
 
 /** Puts three's chunks and uniform sets back, and clears the air for anything still drawing with it. */
 export function uninstallAir(): void {
+  users = Math.max(0, users - 1)
+  if (users > 0) return
   AIR.fill(0)
   if (!stock) return
   for (const name of CHUNKS) THREE.ShaderChunk[name] = stock[name]
