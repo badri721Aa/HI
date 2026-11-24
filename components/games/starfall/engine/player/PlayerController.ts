@@ -1528,6 +1528,8 @@ export class PlayerController implements IPlayerController {
     m.stateTime = this.stateTime
     // A limp body isn't walking (and shouldn't widen the camera's sprint FOV).
     m.speed = this._state === 'ragdoll' ? 0 : Math.hypot(v.x, v.z)
+    m.velX = this._state === 'ragdoll' ? 0 : v.x
+    m.velZ = this._state === 'ragdoll' ? 0 : v.z
     m.vy = v.y
     m.grounded = this._grounded
     m.turnRate = this.turnRate

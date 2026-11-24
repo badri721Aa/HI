@@ -173,19 +173,31 @@ export const DASH: PoseSpec = {
   stab: 0.9,
 }
 
-/** Spin attack: arms flung out, slight crouch. The spin itself rotates the whole body. */
-export const ATTACK: PoseSpec = {
-  pos: [0, -0.06, 0],
-  spine: [7, 0, 0],
-  chest: [2, 0, 0],
-  head: [-4, 0, 0],
-  shoulders: [0, 0, 4],
-  arms: [-8, 0, 84],
-  elbows: 10,
-  hands: [0, 0, 6],
-  curl: 0.95,
-  stab: 0.2,
-}
+/**
+ * Spin attack, keyed through the turn (0..1; the spin itself turns the whole body): coiled with
+ * the fists in → a backfist flung wide, the other arm tight to the chest → wrapping in as it stops.
+ * Like the weapon moves, the keys list what differs from standing.
+ */
+export const SPIN: Array<[number, PoseSpec]> = [
+  [0, {
+    ...IDLE, pos: [0, -0.07, 0], hips: [4, -6, 0], spine: [8, -10, 0], chest: [4, -18, 0], head: [-4, 0, 0],
+    armR: [-40, 0, 20], elbowR: 98, armL: [-24, 0, 26], elbowL: 82, curl: 1, stab: 0.2, footOffL: [0.03, 0, 0], footOffR: [0.03, 0, 0],
+  }],
+  [0.3, {
+    ...IDLE, pos: [0, -0.11, 0], hips: [6, 4, 0], spine: [9, 6, 3], chest: [3, 10, 2], head: [-5, 0, 0], shoulders: [0, 0, 5],
+    armR: [-14, 0, 92], elbowR: 6, handR: [0, 0, 6], armL: [-36, 0, 48], elbowL: 88, curl: 1, stab: 0.2,
+    footOffL: [0.07, 0, 0.04], footOffR: [0.07, 0, -0.04],
+  }],
+  [0.72, {
+    ...IDLE, pos: [0, -0.1, 0], hips: [6, 6, 0], spine: [8, 8, 3], chest: [3, 14, 2], head: [-5, 0, 0], shoulders: [0, 0, 5],
+    armR: [-6, -8, 86], elbowR: 14, handR: [0, 0, 6], armL: [-22, 0, 66], elbowL: 46, curl: 1, stab: 0.2,
+    footOffL: [0.07, 0, 0.04], footOffR: [0.07, 0, -0.04],
+  }],
+  [1, {
+    ...IDLE, pos: [0, -0.04, 0], hips: [2, 4, 0], spine: [5, 6, 0], chest: [2, 12, 0], head: [-2, 0, 0],
+    armR: [-34, 0, 26], elbowR: 74, armL: [-12, 0, 22], elbowL: 44, curl: 0.9, stab: 0.2, footOffL: [0.04, 0, 0.02], footOffR: [0.04, 0, -0.02],
+  }],
+]
 
 /** Additive flinch (hurt), first beat: the blow snaps the head and chest back and the shoulders up. */
 export const HURT: PoseSpec = {

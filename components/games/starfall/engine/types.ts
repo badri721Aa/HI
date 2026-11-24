@@ -187,6 +187,12 @@ export interface MotionState {
   slope: number
   /** Wall-running: the side the wall is on (-1 = his left, 1 = his right); 0 or absent otherwise. */
   wallSide?: number
+  /**
+   * His own horizontal velocity (m/s), without whatever carries him (a platform). Absent, the
+   * animator takes him to be moving along his heading at `speed`.
+   */
+  velX?: number
+  velZ?: number
 }
 
 /** Named one-shot / looping poses used by gameplay and cutscenes. */

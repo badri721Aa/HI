@@ -16,9 +16,10 @@
  *                  head stabilisation + look-at (waist, chest, neck and head share the turn),
  *                  then written to the bones.
  *
- * Feet are IK targets. In a stride each foot is planted in the world where it comes down and
- * stays there until it lifts (through turns and changes of pace too); standing, the feet stay put
- * and take small corrective steps (after stopping or turning on the spot).
+ * Feet are IK targets. In a stride each foot is planted where it comes down and stays there until
+ * it lifts (through turns and changes of pace too); standing, the feet stay put and take small
+ * corrective steps (after stopping or turning on the spot). "There" is the thing he stands on:
+ * whatever moves him that is not his own walking (a platform, a shove) carries the plants along.
  */
 import * as THREE from 'three'
 import type { V3 } from '../events'
@@ -191,7 +192,8 @@ export class Animator {
   private pFlip: Pose
   private pStar: Pose
   private pDash: Pose
-  private pAttack: Pose
+  private spinKeys: { keys: Pose[]; times: number[] }
+  private spose = new Pose()
   private pHurt: Pose
   private pLand: Pose
   private pDead: Pose
@@ -240,6 +242,8 @@ export class Animator {
   private seenSpeed = 0
   /** Speed the stride's style is taken from (trails `speed`, so gaits blend rather than switch). */
   private gaitSpeed = 0
+  /** His own walking speed along his heading this frame (what the stride's cadence is counted from). */
+  private ownSpeed = 0
   private accel = 0
   private moveW = 0
   private groundW = 1
@@ -360,7 +364,7 @@ export class Animator {
     this.pFlip = b.compile(POSES.FLIP_TUCK)
     this.pStar = b.compile(POSES.STAR)
     this.pDash = b.compile(POSES.DASH)
-    this.pAttack = b.compile(POSES.ATTACK)
+    this.spinKeys = { keys: POSES.SPIN.map(([, s]) => b.compile(s)), times: POSES.SPIN.map(([t]) => t) }
     this.pHurt = b.compile(POSES.HURT)
     this.pLand = b.compile(POSES.LAND)
     this.pDead = b.compile(POSES.DEAD)
@@ -692,6 +696,7 @@ export class Animator {
     const sprint = m.sprintSpeed || 8.6
     // Cadence follows the raw speed so steps stay in time with the controller's footstep sounds
     // (on a wall: a run's stride, as the controller counts them there).
+    this.ownSpeed = target
     gaitFor(this.g, target, walk, run, sprint)
     applyWade(this.g, this.wadeW)
     const step = m.state === 'wallRun' ? RUN.step : this.g.step
@@ -962,11 +967,8 @@ export class Animator {
     if (this.spinT >= 0) {
       this.spinT += dt
       const f = this.spinT / SPIN_TIME
-      const w = envelope(this.spinT, 0.05, SPIN_TIME * 0.8, 0.16)
-      out.blendJoints(this.pAttack, w, UPPER)
-      out.curl[0] = lerp(out.curl[0], this.pAttack.curl[0], w)
-      out.curl[1] = lerp(out.curl[1], this.pAttack.curl[1], w)
-      out.pos.y += this.pAttack.pos.y * w * this.groundW
+      sampleKeys(this.spose, this.spinKeys.keys, this.spinKeys.times, f)
+      this.layerMove(out, this.spose, envelope(this.spinT, 0.05, SPIN_TIME * 0.9, 0.2))
       if (f < 1) this.spin = TAU * easeOut(f)
       if (this.spinT > SPIN_TIME + 0.2) this.spinT = -1
     }
@@ -1084,17 +1086,19 @@ export class Animator {
       }
     }
     this.wmove = w.move
-    const sw = this.swingW
-    if (sw < 0.002) return
-    const p = this.wpose
-    out.blendJoints(p, sw, UPPER)
-    out.curl[0] = lerp(out.curl[0], p.curl[0], sw)
-    out.curl[1] = lerp(out.curl[1], p.curl[1], sw)
+    if (this.swingW >= 0.002) this.layerMove(out, this.wpose, this.swingW)
+  }
+
+  /** Lays a keyed move (a weapon clip, the spin) over the pose by weight `w`. */
+  private layerMove(out: Pose, p: Pose, w: number): void {
+    out.blendJoints(p, w, UPPER)
+    out.curl[0] = lerp(out.curl[0], p.curl[0], w)
+    out.curl[1] = lerp(out.curl[1], p.curl[1], w)
     // The hips wind up and drive the blow, on top of whatever the legs are doing…
-    out.q[J.hips].premultiply(_q1.identity().slerp(p.q[J.hips], sw))
-    out.pos.addScaledVector(p.pos, sw * this.groundW)
+    out.q[J.hips].premultiply(_q1.identity().slerp(p.q[J.hips], w))
+    out.pos.addScaledVector(p.pos, w * this.groundW)
     // …and standing, the feet step into a stance under it.
-    const stand = sw * this.groundW * (1 - smooth(this.moveW))
+    const stand = w * this.groundW * (1 - smooth(this.moveW))
     for (let i = 0; i < 2; i++) {
       out.footOff[i].addScaledVector(p.footOff[i], stand)
       out.footPitch[i] += p.footPitch[i] * stand
@@ -1181,8 +1185,29 @@ export class Animator {
     const reset = teleported || this.groundW < 0.5
     if (reset) {
       for (let i = 0; i < 2; i++) this.plantAt(i, this.yaw, c, s)
-    } else if (!standing) this.stepWait = 0.03
-    else this.settleSteps(dt, c, s, !!this.gesture)
+    } else {
+      // The root's movement beyond his own (a platform under him, a scripted shove) takes the planted
+      // feet with it: they stand on what he stands on. His own velocity when the owner reports it;
+      // otherwise (avatars of other players, cutscenes) along his heading at the stride's speed.
+      const scripted = this.m.state === 'cutscene'
+      const vx = scripted ? undefined : this.m.velX
+      const vz = scripted ? undefined : this.m.velZ
+      const cx = root.x - this.prevRoot.x - (vx ?? s * this.ownSpeed) * dt
+      const cz = root.z - this.prevRoot.z - (vz ?? c * this.ownSpeed) * dt
+      for (let i = 0; i < 2; i++) {
+        const pl = this.plants[i]
+        pl.pos.x += cx
+        pl.pos.z += cz
+        pl.from.x += cx
+        pl.from.z += cz
+        pl.to.x += cx
+        pl.to.z += cz
+        this.strides[i].pos.x += cx
+        this.strides[i].pos.z += cz
+      }
+      if (!standing) this.stepWait = 0.03
+      else this.settleSteps(dt, c, s, !!this.gesture)
+    }
 
     for (let i = 0; i < 2; i++) {
       const side = i as 0 | 1
