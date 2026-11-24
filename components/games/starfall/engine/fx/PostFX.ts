@@ -3,8 +3,9 @@
  *
  *   RenderPass (HDR half-float target, MSAA when ctx.quality.msaa > 0)
  *   → UnrealBloomPass (internally half resolution; subtle, only emissives and the sun bloom)
- *   → grade (lift/gamma/gain, saturation, vignette — in linear HDR; warm in the evening,
- *     leaning cool and a touch less saturated under the moon, following ctx.env.night)
+ *   → grade (lift/gamma/gain, a gentle contrast curve around mid grey, saturation, vignette — in
+ *     linear HDR; warm in the evening, leaning cool and a touch less saturated under the moon,
+ *     following ctx.env.night)
  *   → OutputPass (tone mapping + sRGB, using the renderer's live exposure)
  *   → FXAA (only without MSAA, medium quality and up)
  *
@@ -30,24 +31,28 @@ import { gpuName } from '../settings'
 import type { Ctx, IPostFX } from '../types'
 import { FrameProbe } from './frameProbe'
 
-const BLOOM = { strength: 0.5, radius: 0.6, threshold: 1.1, knee: 0.6 }
+/** Only what is genuinely bright glows: the sun, flames, lantern glass, magic. Lit ground stays under the threshold. */
+const BLOOM = { strength: 0.42, radius: 0.6, threshold: 1.1, knee: 0.6 }
 
 /**
- * The grade's two ends. Evening: a warm tilt. Night: neutral-cool with a little blue lifted into
- * the darks (moonlit shadows stay readable instead of sinking to black) and no added saturation.
+ * The grade's two ends. Evening: a warm tilt and a little extra contrast for depth. Night:
+ * neutral-cool with a little blue lifted into the darks (moonlit shadows stay readable instead of
+ * sinking to black), no added contrast or saturation.
  */
 const GRADE = {
   evening: {
     lift: new THREE.Vector3(0.006, 0.0045, 0.002),
     gamma: new THREE.Vector3(1.03, 1.0, 0.97),
     gain: new THREE.Vector3(1.03, 1.0, 0.96),
-    saturation: 1.05,
+    contrast: 1.07,
+    saturation: 1.03,
     vignette: 0.24,
   },
   night: {
     lift: new THREE.Vector3(0.002, 0.0035, 0.007),
     gamma: new THREE.Vector3(0.985, 1.0, 1.02),
     gain: new THREE.Vector3(0.97, 1.0, 1.035),
+    contrast: 1.0,
     saturation: 1.0,
     vignette: 0.28,
   },
@@ -75,6 +80,7 @@ const GradeShader = {
     uLift: { value: GRADE.evening.lift.clone() },
     uGamma: { value: GRADE.evening.gamma.clone() },
     uGain: { value: GRADE.evening.gain.clone() },
+    uContrast: { value: GRADE.evening.contrast },
     uSaturation: { value: GRADE.evening.saturation },
     uVignette: { value: GRADE.evening.vignette },
     uAspect: { value: 16 / 9 },
@@ -91,6 +97,7 @@ const GradeShader = {
     uniform vec3 uLift;
     uniform vec3 uGamma;
     uniform vec3 uGain;
+    uniform float uContrast;
     uniform float uSaturation;
     uniform float uVignette;
     uniform float uAspect;
@@ -102,6 +109,9 @@ const GradeShader = {
       // Lift only touches the darks; gain and gamma tilt the balance (warm by evening, cool by night).
       c = c * uGain + uLift * (1.0 - smoothstep(0.0, 0.25, c));
       c = pow(c, 1.0 / uGamma);
+      // Contrast pivots on mid grey (0.18), so black stays black and the tone curve still rolls
+      // the highlights off. The base is never negative: c was clamped above.
+      c = 0.18 * pow(c * 5.5555556, vec3(uContrast));
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c = max(mix(vec3(l), c, uSaturation), 0.0);
       vec2 d = (vUv - 0.5) * vec2(uAspect, 1.0) / (0.5 * sqrt(uAspect * uAspect + 1.0));
@@ -280,6 +290,7 @@ export class PostFX implements IPostFX {
     u.uLift.value.lerpVectors(evening.lift, dark.lift, night)
     u.uGamma.value.lerpVectors(evening.gamma, dark.gamma, night)
     u.uGain.value.lerpVectors(evening.gain, dark.gain, night)
+    u.uContrast.value = evening.contrast + (dark.contrast - evening.contrast) * night
     u.uSaturation.value = evening.saturation + (dark.saturation - evening.saturation) * night
     u.uVignette.value = evening.vignette + (dark.vignette - evening.vignette) * night
   }

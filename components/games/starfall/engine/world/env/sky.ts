@@ -16,6 +16,7 @@
 import * as THREE from 'three'
 import type { QualityLevel } from '../../settings'
 import type { TextureLib } from '../../textures'
+import { AIR, AIR_GLSL } from './air'
 import type { Atmosphere } from './atmosphere'
 import { ShootingStars } from './meteors'
 import { GALAXY_CORE, GALAXY_POLE, GALAXY_SIDE, GALAXY_SPAN, SKY_CLIP_GLSL, SKY_CLOUDS_GLSL, skyDir } from './skyShared'
@@ -70,6 +71,7 @@ varying vec3 vDir;
 #ifdef USE_FOG
   uniform vec3 fogColor;
 #endif
+${AIR_GLSL}
 
 #include <common>
 #include <dithering_pars_fragment>
@@ -86,7 +88,7 @@ void main() {
   float sd = dot( d, uSunDir );
   float s = max( sd, 0.0 );
   float band = exp( - hp * 5.0 );
-  vec3 glow = uHalo * ( pow( s, 3.0 ) * 0.6 * band + pow( s, 14.0 ) * 0.55 + pow( s, 160.0 ) * 1.6 );
+  vec3 glow = uHalo * ( pow( s, 3.0 ) * 0.5 * band + pow( s, 18.0 ) * 0.4 + pow( s, 160.0 ) * 1.4 );
   col += glow * uSunDisc;
   // Opposite the sun the low sky picks up a faint pink "belt of Venus".
   col += uHalo * vec3( 0.55, 0.32, 0.45 ) * pow( max( - sd, 0.0 ), 2.0 ) * exp( - abs( h - 0.08 ) * 12.0 ) * 0.25 * uSunDisc;
@@ -138,7 +140,7 @@ void main() {
 
   // Sun disc.
   float disc = smoothstep( 0.99962, 0.99978, sd );
-  col += uSunColor * disc * mix( 30.0, 4.0, uEnvPass ) * uSunDisc;
+  col += uSunColor * disc * mix( 18.0, 4.0, uEnvPass ) * uSunDisc;
 
   // Clouds: lit warm toward the sun, silver-edged around the moon.
   if ( h > 0.0 ) {
@@ -156,11 +158,12 @@ void main() {
   gl_FragColor = vec4( col, 1.0 );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
-  // Meet the fogged sea exactly: three mixes fog after tone mapping, so do the same
-  // in a band above the horizon (a little weaker toward the sun, which glows through).
+  // Meet the fogged sea exactly: three mixes fog after tone mapping, so do the same in a band
+  // above the horizon, with the same glow toward the sun and moon the haze has (env/air.ts).
+  // The band is a little weaker toward the sun, which shines through.
   #ifdef USE_FOG
     float skyFog = ( 1.0 - smoothstep( 0.0, 0.13, h ) ) * ( 1.0 - 0.55 * pow( s, 6.0 ) * uSunDisc );
-    gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, skyFog );
+    gl_FragColor.rgb = mix( gl_FragColor.rgb, starfallAirColor( fogColor, d ), skyFog );
   #endif
   #include <dithering_fragment>
 }
@@ -206,6 +209,8 @@ export class Sky {
     fogNear: { value: 1 },
     fogFar: { value: 1000 },
     fogDensity: { value: 0 },
+    /** The haze's glow (shared with every fogged material, see env/air.ts). */
+    starfallAir: { value: AIR },
   }
   private mesh: THREE.Mesh
   private geometry: THREE.SphereGeometry

@@ -13,6 +13,7 @@
 import * as THREE from 'three'
 import type { MapId } from '../../events'
 import type { TimeOfDay } from '../../types'
+import { MAPS } from '../../worlds/defs'
 import { skyDir } from './skyShared'
 
 export class Atmosphere {
@@ -57,6 +58,17 @@ export class Atmosphere {
   caustics = 0
   /** Multiplies the fog distances (< 1 = thicker fog). */
   fogScale = 1
+  /** The haze starts at this fraction of its end distance (lower = it reaches nearer). */
+  fogNear = 0.35
+  /** How fast the haze thins with height (per metre) above `fogBase` (world height, m). */
+  fogHeight = 0
+  fogBase = 0
+  /** Strength of the sun's glow in the haze (the halo colour, toward the sun). */
+  fogGlow = 0
+  /** 0..1 how much lanterns, windows and fires light their surroundings. */
+  localLight = 0
+  /** Strength of the sky-light rim on characters. */
+  rim = 0
 
   copy(a: Atmosphere): this {
     return this.lerpBetween(a, a, 0)
@@ -89,6 +101,12 @@ export class Atmosphere {
     this.exposure = mix(a.exposure, b.exposure, t)
     this.caustics = mix(a.caustics, b.caustics, t)
     this.fogScale = mix(a.fogScale, b.fogScale, t)
+    this.fogNear = mix(a.fogNear, b.fogNear, t)
+    this.fogHeight = mix(a.fogHeight, b.fogHeight, t)
+    this.fogBase = mix(a.fogBase, b.fogBase, t)
+    this.fogGlow = mix(a.fogGlow, b.fogGlow, t)
+    this.localLight = mix(a.localLight, b.localLight, t)
+    this.rim = mix(a.rim, b.rim, t)
     return this
   }
 }
@@ -150,6 +168,17 @@ interface PresetDef {
   moonlit?: boolean
   /** Lean of the colour grade toward cool night (default 0). */
   night?: number
+  /** Where the haze starts, as a fraction of its end distance (default 0.35). */
+  fogNear?: number
+  /** Haze falloff per metre of height, and the height above the floor it starts at (defaults 0.008, 6 m). */
+  fogHeight?: number
+  fogBase?: number
+  /** Strength of the sun's glow in the haze (default 0.2). */
+  fogGlow?: number
+  /** How much lanterns and fires light their surroundings (default 1). */
+  localLight?: number
+  /** Strength of the rim light on characters (default 0.38). */
+  rim?: number
 }
 
 type Dir = [number, number, number]
@@ -164,11 +193,22 @@ const SUN_DUSK: Dir = [-0.8, 0.27, -0.52]
 const SUN_DAWN: Dir = [0.86, 0.2, -0.3]
 const MOON: Dir = at(150, 33)
 
+/**
+ * The island's air: haze that begins well inside the view (hills layer behind hills) and thins
+ * above the treetops, so the Beacon's hill stands clear of it.
+ */
+const ISLE_AIR = { fogNear: 0.2, fogHeight: 0.014, fogBase: 3 }
+
 const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
   dusk: {
+    ...ISLE_AIR,
+    // Away from the sun the haze is a cool mauve; the glow warms it toward the sun.
+    fog: '#c9a093',
+    fogGlow: 0.35,
+    localLight: 0.6,
     lightDir: SUN_DUSK,
-    lightColor: '#ffc98a',
-    lightIntensity: 3.1,
+    lightColor: '#ffbe7a',
+    lightIntensity: 3.4,
     sunDir: SUN_DUSK,
     sunDisc: 1,
     sunColor: '#fff0d0',
@@ -177,23 +217,28 @@ const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
     // The first stars are already out overhead.
     stars: 0.5,
     zenith: '#3a63a6',
-    horizon: '#f2c39a',
+    horizon: '#f0b27a',
     halo: '#ff9a4a',
     bounce: '#6e5a44',
     cloudLit: '#ffc9a0',
     cloudShade: '#8f7290',
     cloudCover: 0.5,
-    hemiSky: '#a9c1e6',
+    // A cool sky fill against the warm sun: shaded sides stay blue-violet instead of grey.
+    hemiSky: '#9cb6ea',
     hemiGround: '#7a6448',
-    hemiIntensity: 0.75,
-    envIntensity: 0.7,
-    exposure: 1,
+    hemiIntensity: 0.68,
+    envIntensity: 0.64,
+    exposure: 0.96,
     waterShallow: '#46c2b6',
     waterDeep: '#155a78',
     caustics: 0.55,
   },
   // The sun's disc on the horizon: long orange light, a deepening sky, the moon just up.
   sunset: {
+    ...ISLE_AIR,
+    fog: '#c98f80',
+    fogGlow: 0.6,
+    localLight: 0.85,
     // The light stays a little above the disc so the island is not all one long shadow.
     lightDir: at(302, 9.5),
     lightColor: '#ffa76a',
@@ -223,6 +268,8 @@ const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
   },
   // The blue hour: an afterglow where the sun went down, the moon taking over, most stars out.
   twilight: {
+    ...ISLE_AIR,
+    fogGlow: 0.7,
     moonlit: true,
     lightDir: at(143, 26),
     lightColor: '#b2c2ff',
@@ -253,6 +300,7 @@ const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
   },
   // Full night: blue-silver moonlight, a clear sky, every star.
   night: {
+    ...ISLE_AIR,
     moonlit: true,
     lightDir: MOON,
     lightColor: '#b8caff',
@@ -283,6 +331,10 @@ const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
     night: 1,
   },
   dawn: {
+    ...ISLE_AIR,
+    fog: '#dcb4b4',
+    fogGlow: 0.5,
+    localLight: 0.35,
     lightDir: SUN_DAWN,
     lightColor: '#ffbfa0',
     lightIntensity: 2.7,
@@ -312,7 +364,8 @@ const DEFS: Record<TimeOfDay | 'sunset' | 'twilight', PresetDef> = {
   },
 }
 
-function build(d: PresetDef): Atmosphere {
+/** `floor`: height of the ground the look is for (the sea for the island, a portal map's main floor). */
+function build(d: PresetDef, floor = 0): Atmosphere {
   const a = new Atmosphere()
   a.lightDir.set(...d.lightDir).normalize()
   a.sunDir.set(...d.sunDir).normalize()
@@ -345,6 +398,12 @@ function build(d: PresetDef): Atmosphere {
   a.aurora = d.aurora ?? 0
   a.moonlit = (d.moonlit ?? d.sunDisc < 0.5) ? 1 : 0
   a.night = d.night ?? 0
+  a.fogNear = d.fogNear ?? 0.35
+  a.fogHeight = d.fogHeight ?? 0.008
+  a.fogBase = floor + (d.fogBase ?? 6)
+  a.fogGlow = d.fogGlow ?? 0.2
+  a.localLight = d.localLight ?? 1
+  a.rim = d.rim ?? 0.38
   return a
 }
 
@@ -440,6 +499,8 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     caustics: 0,
     fog: '#a9c4de',
     fogScale: 0.42,
+    fogGlow: 0.15,
+    localLight: 0.4,
   },
   volcanic: {
     // Dusk under ash: a low sun setting in the west through the smoke, a dark maroon sky, cool
@@ -499,6 +560,8 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     fog: '#d6e6f4',
     // Clear air: the cloud sea reaches further out (560 m) than the other maps' sheets.
     fogScale: 1,
+    fogGlow: 0.1,
+    localLight: 0.25,
   },
   neon: {
     lightDir: [-0.3, 0.8, 0.5],
@@ -560,14 +623,16 @@ const MAP_DEFS: Record<Exclude<MapId, 'isle'>, PresetDef> = {
     caustics: 0,
     fog: '#03141a',
     fogScale: 0.6,
+    // A void has no weather: the same thin haze at every height.
+    fogHeight: 0,
   },
 }
 
 export const MAP_PRESETS: Record<Exclude<MapId, 'isle'>, Atmosphere> = {
-  rift: build(MAP_DEFS.rift),
-  frost: build(MAP_DEFS.frost),
-  volcanic: build(MAP_DEFS.volcanic),
-  sky: build(MAP_DEFS.sky),
-  neon: build(MAP_DEFS.neon),
-  glitch: build(MAP_DEFS.glitch),
+  rift: build(MAP_DEFS.rift, MAPS.rift.center.y),
+  frost: build(MAP_DEFS.frost, MAPS.frost.center.y),
+  volcanic: build(MAP_DEFS.volcanic, MAPS.volcanic.center.y),
+  sky: build(MAP_DEFS.sky, MAPS.sky.center.y),
+  neon: build(MAP_DEFS.neon, MAPS.neon.center.y),
+  glitch: build(MAP_DEFS.glitch, MAPS.glitch.center.y),
 }

@@ -138,6 +138,24 @@ export interface IEnvironment extends System {
   readonly fogColor: THREE.Color
   /** 0..1 how far the look leans from warm evening to cool moonlit night (the colour grade follows it). */
   readonly night: number
+  /**
+   * Registers something that glows (a lantern, a lit window, a fire) at a world position. At dusk
+   * and night the few nearest the view cast real light. Remove it when its owner is disposed.
+   */
+  addLight(x: number, y: number, z: number, opts?: LightAnchorOpts): LightAnchor
+  removeLight(anchor: LightAnchor): void
+}
+
+/** A registered local light. `strength` may be changed at any time (0 = out, e.g. an unlit fire). */
+export interface LightAnchor {
+  strength: number
+}
+
+export interface LightAnchorOpts {
+  /** Light colour (default: warm lantern light). */
+  color?: THREE.ColorRepresentation
+  /** 1 = a lantern (default). */
+  strength?: number
 }
 
 /** world/Vegetation.ts — instanced trees, palms, pines, bushes, rocks, grass, flowers. */

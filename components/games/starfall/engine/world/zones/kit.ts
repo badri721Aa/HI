@@ -12,7 +12,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Collider } from '../../collision'
-import type { Ctx } from '../../types'
+import type { Ctx, LightAnchor } from '../../types'
 import type { TexName } from '../../textures'
 import type { Surface } from '../heightfield'
 import { heightAt } from '../heightfield'
@@ -96,12 +96,20 @@ export function worldCylinder(rTop: number, rBot: number, h: number, seg = 12, u
   return g
 }
 
+/** 'glow' pieces smaller than this (m) are sparkle, not a light source; pieces this close (m) share one light. */
+const GLOW_MIN = 0.12
+const GLOW_MERGE = 1.8
+const _size = new THREE.Vector3()
+const _centre = new THREE.Vector3()
+
 export class ZoneKit {
   readonly root = new THREE.Group()
   private mats = new Map<string, THREE.MeshStandardMaterial>()
   private batches = new Map<THREE.Material, { geos: THREE.BufferGeometry[]; cast: boolean; receive: boolean }>()
   private colliders: Collider[] = []
   private owned: Array<THREE.Material | THREE.BufferGeometry> = []
+  /** Local lights registered for this zone's warm 'glow' pieces (see glowLight). */
+  private glows: Array<{ x: number; y: number; z: number; anchor: LightAnchor }> = []
   private finalized = false
 
   constructor(readonly ctx: Ctx, readonly name: string) {
@@ -161,12 +169,35 @@ export class ZoneKit {
     // One geometry without normals would make the whole material batch fail to merge (and vanish).
     if (!g.attributes.normal) g.computeVertexNormals()
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((g.attributes.position.count) * 2), 2))
+    if (mat === 'glow') this.glowLight(g)
     const m = this.resolve(mat)
     let b = this.batches.get(m)
     if (!b) this.batches.set(m, (b = { geos: [], cast: false, receive: true }))
     b.geos.push(g)
     b.cast ||= opts.castShadow ?? true
     b.receive &&= opts.receiveShadow ?? true
+  }
+
+  /**
+   * A warm 'glow' piece (lantern glass, a lit window) also lights its surroundings at dusk and
+   * night: it registers a local light with the environment. Pieces close together share one.
+   */
+  private glowLight(g: THREE.BufferGeometry): void {
+    g.computeBoundingBox()
+    const box = g.boundingBox!
+    box.getSize(_size)
+    // The glowing face: the two larger sides of the piece.
+    const span = Math.sqrt((_size.x * _size.y * _size.z) / Math.max(1e-4, Math.min(_size.x, _size.y, _size.z)))
+    if (span < GLOW_MIN) return
+    box.getCenter(_centre)
+    const strength = Math.min(1, 0.7 + span)
+    for (const l of this.glows) {
+      if (Math.hypot(l.x - _centre.x, l.y - _centre.y, l.z - _centre.z) > GLOW_MERGE) continue
+      l.anchor.strength = Math.min(1.5, l.anchor.strength + strength * 0.4)
+      return
+    }
+    const anchor = this.ctx.env.addLight(_centre.x, _centre.y, _centre.z, { strength })
+    this.glows.push({ x: _centre.x, y: _centre.y, z: _centre.z, anchor })
   }
 
   /** Static box (bottom at y), optionally solid. Returns the collider if any. */
@@ -252,6 +283,8 @@ export class ZoneKit {
   dispose(): void {
     for (const c of this.colliders) this.ctx.collision.remove(c)
     this.colliders = []
+    for (const l of this.glows) this.ctx.env.removeLight(l.anchor)
+    this.glows = []
     const done = new Set<THREE.Material | THREE.BufferGeometry>(this.owned)
     for (const o of this.owned) o.dispose()
     this.root.traverse(o => {

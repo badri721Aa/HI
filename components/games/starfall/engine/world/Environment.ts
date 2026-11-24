@@ -11,12 +11,18 @@
  * save so a continued game comes back at the right hour. Cutscenes that set the time of day
  * themselves (the dusk opening, night → dawn at the Beacon) keep it until they end; a finished
  * story stays at dawn, and the title screen shows the blue hour.
+ *
+ * Light beyond the sun and sky: the haze's height falloff and glow and the characters' rim light
+ * live in three's fog chunk (env/air.ts), and lanterns, windows and fires registered with
+ * addLight() share a small pool of real point lights (env/localLights.ts).
  */
 import * as THREE from 'three'
 import type { MapId, V3 } from '../events'
-import type { Ctx, IEnvironment, TimeOfDay } from '../types'
+import type { Ctx, IEnvironment, LightAnchor, LightAnchorOpts, TimeOfDay } from '../types'
+import { AIR, installAir, uninstallAir } from './env/air'
 import { Atmosphere, BLUE_HOUR, EVENING, MAP_PRESETS, PRESETS } from './env/atmosphere'
 import { HeightGrid, SunShadowBaker } from './env/heightGrid'
+import { LocalLights } from './env/localLights'
 import { buildSeaStacks } from './env/seaStacks'
 import { Sky } from './env/sky'
 import { buildTerrain, CHUNKS, createTerrainMaterial, type TerrainUniforms } from './env/terrain'
@@ -32,10 +38,20 @@ const ENV_REFRESH_MIN = 0.4
 /** Seconds the evening takes to deepen after a shard is found, and to settle behind the title screen. */
 const EVENING_BLEND = 14
 const TITLE_BLEND = 2.5
+/** Shadow penumbra (m) by quality, and the filter radius range (shadow-map texels) it may ask for. */
+const SHADOW_SOFTNESS = { low: 0.14, medium: 0.14, high: 0.17, ultra: 0.17 }
+const SHADOW_RADIUS: [number, number] = [1.5, 4]
+/** The moon's own glow in the haze. */
+const MOON_HAZE = new THREE.Color(0.027, 0.034, 0.056)
+/** Local lights are chosen around a point this far ahead of the camera (m). */
+const LIGHT_FOCUS = 6
 
 const _x = new THREE.Vector3()
 const _y = new THREE.Vector3()
 const _up = new THREE.Vector3(0, 1, 0)
+const _glow = new THREE.Color()
+const _mixed = new THREE.Color()
+const _fogOut = new THREE.Color()
 
 export class Environment implements IEnvironment {
   readonly sun = new THREE.DirectionalLight(0xffffff, 3)
@@ -52,6 +68,7 @@ export class Environment implements IEnvironment {
   private objects: THREE.Object3D[] = []
   private geometries: THREE.BufferGeometry[] = []
   private envTex: THREE.Texture | null = null
+  private lights: LocalLights
 
   private uTime = { value: 0 }
   private terrainUniforms: TerrainUniforms | null = null
@@ -85,6 +102,10 @@ export class Environment implements IEnvironment {
     this.sun.name = 'sun'
     this.sun.target.name = 'sun-target'
     this.hemi.name = 'sky-fill'
+    // Before any shader compiles: the haze goes into three's fog chunk, and the light pool must
+    // be in the scene from the first frame.
+    installAir()
+    this.lights = new LocalLights(ctx.scene)
   }
 
   async init(): Promise<void> {
@@ -160,6 +181,18 @@ export class Environment implements IEnvironment {
     }
     this.baker!.update(dt)
     this.syncQuality()
+    this.applyAir()
+    const camera = this.ctx.camera
+    _y.copy(camera.position).addScaledVector(camera.getWorldDirection(_x), LIGHT_FOCUS)
+    this.lights.update(dt, this.uTime.value, _y, this.atmo.localLight)
+  }
+
+  addLight(x: number, y: number, z: number, opts?: LightAnchorOpts): LightAnchor {
+    return this.lights.add(x, y, z, opts)
+  }
+
+  removeLight(anchor: LightAnchor): void {
+    this.lights.remove(anchor)
   }
 
   /** 0..1 how far the look leans from warm evening to cool moonlit night (the colour grade follows it). */
@@ -252,6 +285,8 @@ export class Environment implements IEnvironment {
     this.sun.shadow.map?.dispose()
     this.sun.dispose()
     this.hemi.dispose()
+    this.lights.dispose()
+    uninstallAir()
     if (scene.environment === this.envTex) scene.environment = null
     if (scene.fog === this.fog) scene.fog = null
     this.envTex = null
@@ -288,6 +323,40 @@ export class Environment implements IEnvironment {
     this.placeSun()
   }
 
+  /**
+   * The haze's glow toward the sun and moon, its height falloff and the characters' rim light,
+   * for every fogged shader (env/air.ts). Runs each frame: 20 floats.
+   */
+  private applyAir(): void {
+    const a = this.atmo
+    // three mixes fog in after tone mapping: in display colours when drawing straight to the
+    // canvas ('low'), in linear light inside the post chain. The glows must be in the same space.
+    const direct = this.ctx.renderer.getRenderTarget() === null
+    if (direct) _fogOut.copyLinearToSRGB(this.fogColor)
+    this.writeGlow(4, _glow.copy(a.halo).multiplyScalar(a.fogGlow * a.sunDisc), direct)
+    this.writeGlow(12, _glow.copy(MOON_HAZE).multiplyScalar(a.moon * a.moonlit), direct)
+    AIR[0] = a.sunDir.x
+    AIR[1] = a.sunDir.y
+    AIR[2] = a.sunDir.z
+    AIR[3] = a.fogHeight
+    AIR[7] = a.fogBase
+    AIR[8] = a.moonDir.x
+    AIR[9] = a.moonDir.y
+    AIR[10] = a.moonDir.z
+    _mixed.copy(a.hemiSky).lerp(a.lightColor, 0.4).multiplyScalar(a.rim)
+    AIR[16] = _mixed.r
+    AIR[17] = _mixed.g
+    AIR[18] = _mixed.b
+  }
+
+  /** Stores a glow (linear) at AIR[at..at+2] as what it adds to the fog colour in the space fog is mixed in. */
+  private writeGlow(at: number, glow: THREE.Color, direct: boolean): void {
+    if (direct) glow.add(this.fogColor).convertLinearToSRGB().sub(_fogOut)
+    AIR[at] = glow.r
+    AIR[at + 1] = glow.g
+    AIR[at + 2] = glow.b
+  }
+
   private refreshEnvironment(): void {
     if (!this.sky) return
     this.envTex = this.sky.renderEnvironment()
@@ -317,10 +386,8 @@ export class Environment implements IEnvironment {
   private syncQuality(): void {
     const q = this.ctx.quality
     const far = Math.round(q.viewDistance * this.atmo.fogScale)
-    if (this.fog.far !== far) {
-      this.fog.far = far
-      this.fog.near = Math.round(far * 0.35)
-    }
+    this.fog.far = far
+    this.fog.near = Math.round(far * this.atmo.fogNear)
     if (q.shadowMapSize !== this.shadowSize || q.shadowRadius !== this.shadowRadius) {
       this.shadowSize = q.shadowMapSize
       this.shadowRadius = q.shadowRadius
@@ -336,14 +403,18 @@ export class Environment implements IEnvironment {
       cam.near = 1
       cam.far = SHADOW_DIST * 2
       cam.updateProjectionMatrix()
+      // The same soft edge in metres at every preset (sharper maps just resolve it better), and
+      // a normal offset that grows with the texel so coarse maps do not self-shadow.
+      const texel = (q.shadowRadius * 2) / q.shadowMapSize
       s.bias = -0.00025
-      s.normalBias = 0.045
-      s.radius = 2.5
+      s.normalBias = Math.min(0.07, Math.max(0.03, texel * 0.9))
+      s.radius = Math.min(SHADOW_RADIUS[1], Math.max(SHADOW_RADIUS[0], SHADOW_SOFTNESS[q.level] / texel))
       this.placeSun()
     }
     if (q.level !== this.skyLevel) {
       this.skyLevel = q.level
       this.sky?.setQuality(q.level)
+      this.lights.setQuality(q.level)
     }
     if (this.waterMat && q.waterDetail !== this.waterDetail) {
       this.waterDetail = q.waterDetail
