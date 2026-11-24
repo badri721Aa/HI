@@ -59,3 +59,34 @@ export const noise1 = (t: number, seed: number): number => {
   const u = f * f * (3 - 2 * f)
   return h(i) * (1 - u) + h(i + 1) * u
 }
+
+/** Springs are stepped in slices no longer than this, so they move the same at any frame rate. */
+const SPRING_STEP = 1 / 120
+
+/**
+ * A damped spring on one value: follows its target with weight, overshooting and settling when
+ * `zeta` < 1 (1 = critically damped). `omega` is its natural frequency (rad/s).
+ */
+export class Spring {
+  v = 0
+
+  constructor(public x = 0) {}
+
+  reset(x = 0): void {
+    this.x = x
+    this.v = 0
+  }
+
+  /** Advance by dt toward `target`; returns the new value. */
+  step(target: number, omega: number, zeta: number, dt: number): number {
+    if (!(dt > 0)) return this.x
+    const n = Math.min(8, Math.ceil(dt / SPRING_STEP))
+    const h = dt / n
+    for (let i = 0; i < n; i++) {
+      this.v += (omega * omega * (target - this.x) - 2 * zeta * omega * this.v) * h
+      this.x += this.v * h
+    }
+    if (!Number.isFinite(this.x + this.v)) this.reset(target)
+    return this.x
+  }
+}

@@ -10,7 +10,8 @@
  *               flinches, frost, the Healer's ward, the spin attack and stomps; damage numbers
  *               and sparks through 'enemy:hit'.
  *   looks       the dressed model, its puppet (locomotion picked from the speed unless an action
- *               plays), hurt flash, tints, a dissolve for deaths, LOD'd animation updates.
+ *               plays), body language over the clips (BodyMotion: lean, flinch, breath, wind-ups),
+ *               hurt flash, tints, a dissolve for deaths, LOD'd animation updates.
  *
  * Archetypes override think() (what to do while hunting) and optionally guard(), onDeath(),
  * draw() and decorate(); the numbers they use come from MOBS in defs.ts.
@@ -23,6 +24,7 @@ import { heightAt, waterLevelAt } from '../../world/heightfield'
 import { supportHeight } from '../parts/util'
 import type { Hazards } from '../../worlds/bosses/hazards'
 import type { Beams } from './Beams'
+import { BodyMotion } from './BodyMotion'
 import { MOBS, type AnimName, type MobDef, type MobLikeKind, type MobTunes } from './defs'
 import type { EnemyModel, PlayOpts } from './models'
 import type { Projectiles } from './Projectiles'
@@ -116,6 +118,7 @@ export abstract class Mob implements LiveEnemy {
   private readonly wander = new THREE.Vector3()
   private collider: Collider | null = null
   private untarget: (() => void) | null = null
+  private readonly body: BodyMotion
   private animAcc = 0
   private tint = new THREE.Vector4(1, 1, 1, 0)
   private spinCd = 0
@@ -151,6 +154,7 @@ export abstract class Mob implements LiveEnemy {
     model.root.rotation.y = this.yaw
     this.ctx.scene.add(model.root)
     const s = this.def.stats
+    this.body = new BodyMotion(model.body, s.mass, uid, s.walk <= 0)
     this.collider = this.ctx.collision.addCylinder({
       x: pos.x, y: pos.y, z: pos.z, r: s.radius * 0.9, h: s.height * 0.92, dynamic: true, surface: 'stone', tag: 'enemy',
       onLand: impact => this.stomped(impact),
@@ -247,6 +251,8 @@ export abstract class Mob implements LiveEnemy {
         this.model.skin.uDissolve.value = 0.9 * (1 - u)
         if (this.stateT >= SPAWN_TIME || (this.model.puppet.done && this.stateT > 0.6)) {
           this.model.skin.uDissolve.value = 0
+          // Up and ready: a last stretch that settles.
+          this.body.pop(0.8)
           this.setState(this.aggressive ? 'hunt' : 'guard')
           this.onReady?.()
         }
@@ -339,6 +345,16 @@ export abstract class Mob implements LiveEnemy {
 
   protected stopAct(): void {
     this.acting = false
+  }
+
+  /** Anticipation for this frame of a wind-up (0..1): the body sinks and leans back, then throws itself into the strike when this stops. */
+  protected coil(amount: number): void {
+    this.body.windup(amount)
+  }
+
+  /** A kick through the body along (dx, dz) (a shot's recoil, a shove). */
+  protected jolt(dx: number, dz: number, strength: number): void {
+    this.body.flinch(dx, dz, this.yaw, strength)
   }
 
   /** Steer toward (x, z) at `speed`, stopping within `stop` metres. */
@@ -568,6 +584,7 @@ export abstract class Mob implements LiveEnemy {
         pup.play(anim, { fade: 0.22, speed })
       }
     }
+    this.body.update(dt, this.vx, this.vz, this.yaw, this.frost > 0 || this.state === 'dying')
     if (this.frost > 0) {
       pup.setSpeed(0)
       this.wasFrozen = true
@@ -633,6 +650,7 @@ export abstract class Mob implements LiveEnemy {
     this.ctx.player.launch(STOMP_LAUNCH)
     this.ctx.bus.emit('enemy:stomp', { pos: { x: p.x, y: p.y, z: p.z } })
     this.applyDamage(STOMP_DAMAGE, p.x, p.z, 'fists', 0, 0)
+    this.body.pop(-1.3)
   }
 
   /** A weapon blow (the IEnemies target). */
@@ -686,6 +704,8 @@ export abstract class Mob implements LiveEnemy {
         this.airborne = true
       }
     }
+    // The blow rocks the body along it (less through a braced one).
+    this.body.flinch(kx, kz, this.yaw, killed ? 1.5 : this.poise ? 0.45 : 1)
     if (killed) {
       this.die(true)
       return

@@ -403,10 +403,17 @@ export interface Puppet {
   dispose(): void
 }
 
+/**
+ * Plays the model's clips through a mixer, always cross-fading: between clips, and (with a twin
+ * action on the same tracks) from a clip into its own restart, so a second flinch or a repeated
+ * strike never snaps back to its first frame.
+ */
 class ClipPuppet implements Puppet {
   current: AnimName = 'idle'
   private mixer: THREE.AnimationMixer
   private actions = new Map<string, THREE.AnimationAction>()
+  /** Twin actions (same tracks under another clip object), made the first time a clip restarts over itself. */
+  private twins = new Map<string, THREE.AnimationAction>()
   private action: THREE.AnimationAction | null = null
   private once = false
 
@@ -440,6 +447,17 @@ class ClipPuppet implements Puppet {
       this.actions.set(clip.name, next)
     }
     const fade = o.fade ?? 0.18
+    if (next === this.action && fade > 0 && next.time > 0.05) {
+      // Restarting what is playing: fade from it into its twin (or back, the next time).
+      let twin = this.twins.get(clip.name)
+      if (!twin) {
+        twin = this.mixer.clipAction(new THREE.AnimationClip(`${clip.name}#2`, clip.duration, clip.tracks))
+        this.twins.set(clip.name, twin)
+      }
+      this.actions.set(clip.name, twin)
+      this.twins.set(clip.name, next)
+      next = twin
+    }
     this.once = !!o.once
     next.reset()
     next.setLoop(o.once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity)
@@ -467,6 +485,7 @@ class ClipPuppet implements Puppet {
     this.mixer.stopAllAction()
     this.mixer.uncacheRoot(this.mixer.getRoot())
     this.actions.clear()
+    this.twins.clear()
   }
 
   private resolve(name: AnimName): THREE.AnimationClip | null {

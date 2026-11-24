@@ -3,6 +3,8 @@
  * windows, the HUD bar, resets and the defeat hand-off) and add what the four of them share:
  *
  *   model       a dressed glTF model (or its procedural stand-in) with its puppet
+ *   body        body language over the clips (BodyMotion): it leans into its own moves, coils
+ *               before every attack and lets go into it, rocks when struck, breathes at rest
  *   aura        a dynamic fresnel-flame shell over the body, coloured per phase, flaring on
  *               wind-ups and flickering gold while the boss is open to hits
  *   sigil       a rune circle under it on the floor
@@ -16,6 +18,7 @@
 import * as THREE from 'three'
 import type { FactoryBossKind, V3, WeaponId } from '../../events'
 import type { Beams } from '../../gameplay/enemies/Beams'
+import { BodyMotion } from '../../gameplay/enemies/BodyMotion'
 import { BOSSES, type AnimName, type BossDef, type ShotId } from '../../gameplay/enemies/defs'
 import { auraMaterial, sigilMaterial, type AuraUniforms } from '../../gameplay/enemies/materials'
 import type { EnemyModel, ModelLib, PlayOpts } from '../../gameplay/enemies/models'
@@ -48,6 +51,8 @@ export interface BossSnapshot {
 }
 
 const ENTRANCE = 1.6
+/** How heavy the body reads (a mob is about 1): blows rock it less. */
+const BODY_MASS = 5
 
 export abstract class ScriptedBoss extends Boss implements LiveEnemy {
   readonly boss = true
@@ -79,6 +84,8 @@ export abstract class ScriptedBoss extends Boss implements LiveEnemy {
   private readonly startSeed: number
   private contactCd = 0
   private readonly hit: V3 = { x: 0, y: 0, z: 0 }
+  private readonly motion: BodyMotion
+  private readonly prevPos = new THREE.Vector3()
 
   /** Call reset() once constructed (subclass fields must exist first). */
   constructor(ctx: Ctx, hazards: Hazards, arena: Arena, kit: BossKit, readonly kind: FactoryBossKind, readonly uid: number, seed: number) {
@@ -94,6 +101,7 @@ export abstract class ScriptedBoss extends Boss implements LiveEnemy {
     this.beams = kit.beams
     this.model = kit.lib.create(def.model, def.aura[0][1])
     this.root.add(this.model.root)
+    this.motion = new BodyMotion(this.model.body, BODY_MASS, uid)
     // Aura: an inflated additive copy of every body mesh, sharing its skeleton.
     this.auraU = this.buildAura()
     this.sigil = new THREE.Mesh(this.own(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), this.own(sigilMaterial(def.color, 0.35)))
@@ -127,7 +135,13 @@ export abstract class ScriptedBoss extends Boss implements LiveEnemy {
   // LiveEnemy.damage(amount) — the Boss base's damage(amount, at, weapon) handles both shapes.
   override damage(amount: number, at?: V3, weapon: WeaponId = 'fists'): void {
     const p = at ?? { x: this.pos.x, y: this.pos.y + this.def.height * 0.6, z: this.pos.z }
+    const before = this.hp
     super.damage(amount, p, weapon)
+    // The blow rocks the body away from whoever struck it.
+    if (this.hp < before) {
+      const from = this.ctx.player.position
+      this.motion.flinch(this.pos.x - from.x, this.pos.z - from.z, this.yaw, this.hp > 0 ? 1 : 1.6)
+    }
   }
 
   /** Fight state for a co-op host. */
@@ -166,6 +180,8 @@ export abstract class ScriptedBoss extends Boss implements LiveEnemy {
     this.projectiles.clear()
     this.model.skin.uDissolve.value = 0
     this.model.root.scale.setScalar(1)
+    this.motion.reset()
+    this.prevPos.copy(this.pos)
     this.play('idle', { fade: 0 })
     this.resetMoves?.()
   }
@@ -241,7 +257,20 @@ export abstract class ScriptedBoss extends Boss implements LiveEnemy {
       const u = Math.min(1, this.entranceT / ENTRANCE)
       this.model.skin.uDissolve.value = 1 - u
       this.model.root.scale.setScalar(0.65 + 0.35 * (1 - (1 - u) ** 3))
-      if (u >= 1) this.entranceT = -1
+      if (u >= 1) {
+        this.entranceT = -1
+        this.motion.pop(0.7)
+      }
+    }
+    if (dt > 0) {
+      // Every wind-up flares the aura: the body coils with it, and lets go as the attack comes.
+      const still = this.mode === 'dying' || this.mode === 'dead'
+      const jumped = this.pos.distanceToSquared(this.prevPos) > 9
+      const vx = jumped ? 0 : (this.pos.x - this.prevPos.x) / dt
+      const vz = jumped ? 0 : (this.pos.z - this.prevPos.z) / dt
+      if (this.mode === 'fight') this.motion.windup(Math.min(1, this.flare) * 0.85)
+      this.motion.update(dt, vx, vz, this.yaw, still)
+      this.prevPos.copy(this.pos)
     }
     const hoverBob = this.def.hover > 0 && this.mode !== 'dying' ? Math.sin(t * 1.7) * 0.18 : 0
     this.root.position.set(this.pos.x, this.pos.y + this.liftNow() + hoverBob, this.pos.z)

@@ -61,6 +61,10 @@ export class GloomKing extends Boss {
   // squash spring
   private sq = 0
   private sqv = 0
+  /** Eased lean of the body (rad) and the hurt flash seen last frame (a rise is a blow landing). */
+  private tiltX = 0
+  private tiltZ = 0
+  private lastFlash = 0
   private contactCd = 0
   private readonly state = { value: new THREE.Vector4(1, 0, 0, 0) }
   private readonly body: THREE.Mesh
@@ -413,8 +417,16 @@ export class GloomKing extends Boss {
   protected place(dt: number): void {
     // Squash & stretch spring with anticipation while crouching.
     const target = this.act === 'crouch' || this.act === 'windup' ? -0.22 : this.act === 'dazed' ? -0.08 : 0
-    this.sqv += (-(this.sq - target) * 120 - this.sqv * 9) * dt
-    this.sq = THREE.MathUtils.clamp(this.sq + this.sqv * dt, -0.45, 0.45)
+    // A blow landing jolts it flat for a moment.
+    if (this.flash > this.lastFlash && this.mode === 'fight') this.sqv -= 3.5
+    this.lastFlash = this.flash
+    // Small slices: the wobble is the same at any frame rate.
+    const steps = Math.max(1, Math.min(8, Math.ceil(dt * 120)))
+    const h = dt / steps
+    for (let i = 0; i < steps; i++) {
+      this.sqv += (-(this.sq - target) * 120 - this.sqv * 9) * h
+      this.sq = THREE.MathUtils.clamp(this.sq + this.sqv * h, -0.45, 0.45)
+    }
     const t = this.ctx.clock.t
     const breathe = this.mode === 'sleep' ? Math.sin(t * 1.4) * 0.03 : this.act === 'idle' ? Math.sin(t * 2.6) * 0.03 : 0
     const shake = this.act === 'windup' ? Math.sin(t * 60) * 0.08 : 0
@@ -424,7 +436,11 @@ export class GloomKing extends Boss {
     this.root.rotation.y = this.yaw
     if (this.mode !== 'dying') {
       this.root.scale.set(1, 1, 1)
-      this.body.rotation.set(this.act === 'dazed' ? -0.18 : this.act === 'charge' ? 0.22 : 0, 0, this.act === 'dazed' ? Math.sin(t * 3) * 0.08 : 0)
+      // Leans into the charge, slumps back when dazed: eased, never snapped.
+      const k = 1 - Math.exp(-9 * dt)
+      this.tiltX += ((this.act === 'dazed' ? -0.18 : this.act === 'charge' ? 0.22 : this.act === 'windup' ? -0.1 : 0) - this.tiltX) * k
+      this.tiltZ += ((this.act === 'dazed' ? Math.sin(t * 3) * 0.08 : 0) - this.tiltZ) * k
+      this.body.rotation.set(this.tiltX, 0, this.tiltZ)
     }
     this.body.scale.set(SCALE * sxz, SCALE * sy, SCALE * sxz)
     this.crown.position.set(0, HEIGHT * sy * 0.97, 0)
