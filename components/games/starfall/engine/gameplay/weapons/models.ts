@@ -1,0 +1,416 @@
+/**
+ * Procedural weapon models — sword, hammer, bow, the boss rewards (starblade, frost hammer), the
+ * star-tech pair (star blaster, comet launcher) and the arrow — built once and shared: every
+ * copy in a hand, on a stand or in flight reuses the same geometries and materials.
+ *
+ * Model frame (metres): the grip is at the origin, +Y runs out of the fist on the thumb side
+ * (blade, hammer head, upper bow limb, the barrel of a star-tech weapon above the hand), +Z is
+ * where the knuckles face (sword edge, hammer face, the bow's back, the way a barrel points).
+ * Arrows have their nock at the origin and point along +Z.
+ */
+import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import type { WeaponId } from '../../events'
+import type { TextureLib } from '../../textures'
+import type { StarWeapon } from './defs'
+
+export type HeldWeapon = Exclude<WeaponId, 'fists'>
+type MatName = 'steel' | 'iron' | 'brass' | 'leather' | 'wood' | 'bowWood' | 'starsteel' | 'gold' | 'gem' | 'ice' | 'plasma' | 'ember'
+
+/** Where a star-tech weapon's shots leave it, in its model frame (m): the middle of the muzzle. */
+export const MUZZLE: Record<StarWeapon, { y: number; z: number }> = {
+  starBlaster: { y: 0.085, z: 0.34 },
+  cometLauncher: { y: 0.12, z: 0.54 },
+}
+
+/** Bow limb tips (the string's ends) and how far the string comes back at full draw (m). */
+export const BOW_TIP = { y: 0.6, z: -0.085 }
+export const BOW_DRAW = 0.4
+export const ARROW_LEN = 0.72
+
+const TEXTURED = new Set<MatName>(['leather', 'wood', 'bowWood'])
+
+/** A copy of a weapon; the bow also has a string whose nock can be pulled back. */
+export interface WeaponModel {
+  group: THREE.Group
+  /** Bow only: the nocked arrow (hidden until drawing). */
+  arrow?: THREE.Mesh
+  /** Bow only: pull the string back, 0..1. */
+  setDraw?: (draw: number) => void
+}
+
+export class WeaponKit {
+  readonly arrowGeometry: THREE.BufferGeometry
+  readonly arrowMaterial: THREE.MeshStandardMaterial
+  private mats: Record<MatName, THREE.MeshStandardMaterial>
+  private stringMat = new THREE.LineBasicMaterial({ color: 0xefe6d2 })
+  private parts: Record<HeldWeapon, Array<[MatName, THREE.BufferGeometry]>>
+  private strings: THREE.BufferGeometry[] = []
+  /** Repeat-configured clones (they share the library's GPU images). */
+  private maps: THREE.Texture[]
+
+  constructor(textures: TextureLib) {
+    const wood = textures.get('planks_albedo', { repeat: [0.4, 1.6] })
+    const cloth = textures.get('cloth_albedo', { repeat: [2, 1] })
+    this.maps = [wood, cloth]
+    this.mats = {
+      steel: new THREE.MeshStandardMaterial({ color: 0xdfe4ea, metalness: 0.92, roughness: 0.24 }),
+      iron: new THREE.MeshStandardMaterial({ color: 0x5d636c, metalness: 0.85, roughness: 0.42 }),
+      brass: new THREE.MeshStandardMaterial({ color: 0xd9a548, metalness: 0.9, roughness: 0.3 }),
+      leather: new THREE.MeshStandardMaterial({ color: 0x7a4a2e, map: cloth, roughness: 0.82 }),
+      wood: new THREE.MeshStandardMaterial({ color: 0xb98a5c, map: wood, roughness: 0.7 }),
+      bowWood: new THREE.MeshStandardMaterial({ color: 0x9a6236, map: wood, roughness: 0.55 }),
+      // Reward weapons: a blade that glows with starlight, and a head of never-melting ice.
+      starsteel: new THREE.MeshStandardMaterial({ color: 0xe6f0ff, emissive: 0x6fa8ff, emissiveIntensity: 1.5, metalness: 0.55, roughness: 0.18 }),
+      gold: new THREE.MeshStandardMaterial({ color: 0xffcf5a, metalness: 1, roughness: 0.22 }),
+      gem: new THREE.MeshStandardMaterial({ color: 0xfff1c0, emissive: 0xffc14a, emissiveIntensity: 2.6, roughness: 0.2 }),
+      ice: new THREE.MeshStandardMaterial({ color: 0xc4ecff, emissive: 0x2f9be0, emissiveIntensity: 0.8, metalness: 0.05, roughness: 0.1 }),
+      // Star-tech: bottled starlight (the blaster's core) and a caged comet (the launcher's chamber).
+      plasma: new THREE.MeshStandardMaterial({ color: 0xdff2ff, emissive: 0x5fb4ff, emissiveIntensity: 2.4, roughness: 0.25 }),
+      ember: new THREE.MeshStandardMaterial({ color: 0xfff0d0, emissive: 0xff8a2a, emissiveIntensity: 2.4, roughness: 0.3 }),
+    }
+    this.arrowMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide })
+    this.arrowGeometry = arrowGeometry()
+    this.parts = {
+      sword: sword(), hammer: hammer(), bow: bow(), starblade: starblade(), frostHammer: frostHammer(),
+      starBlaster: starBlaster(), cometLauncher: cometLauncher(),
+    }
+  }
+
+  make(id: HeldWeapon): WeaponModel {
+    const group = new THREE.Group()
+    group.name = `weapon-${id}`
+    for (const [mat, geo] of this.parts[id]) {
+      const m = new THREE.Mesh(geo, this.mats[mat])
+      m.castShadow = true
+      group.add(m)
+    }
+    if (id !== 'bow') return { group }
+
+    // String: top tip → nock → bottom tip, one line per copy so each can be drawn.
+    const pos = new Float32Array([0, BOW_TIP.y, BOW_TIP.z, 0, 0, BOW_TIP.z, 0, -BOW_TIP.y, BOW_TIP.z])
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    this.strings.push(geo)
+    const string = new THREE.Line(geo, this.stringMat)
+    string.frustumCulled = false
+    const arrow = new THREE.Mesh(this.arrowGeometry, this.arrowMaterial)
+    arrow.visible = false
+    arrow.position.set(0.012, 0.02, BOW_TIP.z)
+    group.add(string, arrow)
+    const attr = geo.attributes.position as THREE.BufferAttribute
+    const setDraw = (draw: number) => {
+      const z = BOW_TIP.z - BOW_DRAW * draw
+      attr.setZ(1, z)
+      attr.needsUpdate = true
+      arrow.position.z = z
+    }
+    return { group, arrow, setDraw }
+  }
+
+  dispose(): void {
+    for (const list of Object.values(this.parts)) for (const [, geo] of list) geo.dispose()
+    for (const m of Object.values(this.mats)) m.dispose()
+    for (const g of this.strings) g.dispose()
+    for (const t of this.maps) t.dispose()
+    this.stringMat.dispose()
+    this.arrowGeometry.dispose()
+    this.arrowMaterial.dispose()
+  }
+}
+
+/* ── geometry helpers ───────────────────────────────────────────── */
+
+const _m = new THREE.Matrix4()
+const _q = new THREE.Quaternion()
+const _e = new THREE.Euler()
+const _s = new THREE.Vector3()
+const _p = new THREE.Vector3()
+
+function at(geo: THREE.BufferGeometry, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1): THREE.BufferGeometry {
+  return geo.applyMatrix4(_m.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, ry, rz)), _s.set(sx, sy, sz)))
+}
+
+/** Merges parts per material (non-indexed; uv kept only for textured materials). */
+function group(parts: Array<[MatName, THREE.BufferGeometry]>): Array<[MatName, THREE.BufferGeometry]> {
+  const by = new Map<MatName, THREE.BufferGeometry[]>()
+  for (const [mat, geo] of parts) {
+    const g = geo.index ? geo.toNonIndexed() : geo
+    if (g !== geo) geo.dispose()
+    if (!TEXTURED.has(mat)) g.deleteAttribute('uv')
+    else if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2))
+    if (!by.has(mat)) by.set(mat, [])
+    by.get(mat)!.push(g)
+  }
+  return [...by].map(([mat, list]) => {
+    const merged = list.length === 1 ? list[0] : mergeGeometries(list)!
+    if (list.length > 1) list.forEach(g => g.dispose())
+    return [mat, merged]
+  })
+}
+
+/**
+ * Lofts a faceted solid along +Y: each station is [y, half width along Z, half thickness along X]
+ * with a diamond cross-section (edges at ±Z) — a sword blade or a bevelled bar.
+ */
+function loftDiamond(stations: Array<[number, number, number]>): THREE.BufferGeometry {
+  const ring = (i: number, k: number): [number, number, number] => {
+    const [y, w, t] = stations[i]
+    const a = (k % 4) * (Math.PI / 2)
+    return [Math.cos(a) * t, y, Math.sin(a) * w]
+  }
+  const pos: number[] = []
+  for (let i = 0; i < stations.length - 1; i++) {
+    for (let k = 0; k < 4; k++) {
+      const a = ring(i, k)
+      const b = ring(i, k + 1)
+      const c = ring(i + 1, k + 1)
+      const d = ring(i + 1, k)
+      pos.push(...a, ...c, ...b, ...a, ...d, ...c)
+    }
+  }
+  // Base cap (hidden in the guard, but keeps the solid closed for shadows).
+  for (let k = 0; k < 4; k++) pos.push(0, stations[0][0], 0, ...ring(0, k), ...ring(0, k + 1))
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  geo.computeVertexNormals()
+  return geo
+}
+
+/* ── the weapons ────────────────────────────────────────────────── */
+
+function sword(): Array<[MatName, THREE.BufferGeometry]> {
+  const R = Math.PI / 2
+  return group([
+    ['steel', loftDiamond([[0.06, 0.033, 0.011], [0.18, 0.035, 0.01], [0.58, 0.029, 0.009], [0.71, 0.018, 0.007], [0.81, 0.0008, 0.0008]])],
+    // Fuller: a darker groove line down the middle of each face.
+    ['iron', at(new THREE.BoxGeometry(0.004, 0.44, 0.012), 0.009, 0.32, 0)],
+    ['iron', at(new THREE.BoxGeometry(0.004, 0.44, 0.012), -0.009, 0.32, 0)],
+    // Crossguard with swept tips and a centre boss.
+    ['brass', at(new THREE.BoxGeometry(0.042, 0.03, 0.2), 0, 0.045, 0)],
+    ['brass', at(new THREE.ConeGeometry(0.019, 0.07, 8), 0, 0.06, 0.125, -R + 0.5)],
+    ['brass', at(new THREE.ConeGeometry(0.019, 0.07, 8), 0, 0.06, -0.125, R - 0.5)],
+    ['brass', at(new THREE.SphereGeometry(0.026, 12, 8), 0, 0.045, 0, 0, 0, 0, 1.25, 0.9, 1)],
+    // Wrapped grip between two ferrules, and the pommel.
+    ['leather', at(new THREE.CylinderGeometry(0.018, 0.02, 0.16, 10), 0, -0.035, 0)],
+    ['brass', at(new THREE.CylinderGeometry(0.023, 0.023, 0.016, 12), 0, 0.03, 0)],
+    ['brass', at(new THREE.CylinderGeometry(0.023, 0.023, 0.016, 12), 0, -0.115, 0)],
+    ['brass', at(new THREE.SphereGeometry(0.031, 14, 10), 0, -0.145, 0, 0, 0, 0, 1, 0.85, 1)],
+  ])
+}
+
+function hammer(): Array<[MatName, THREE.BufferGeometry]> {
+  const R = Math.PI / 2
+  const headY = 0.6
+  return group([
+    ['wood', at(new THREE.CylinderGeometry(0.022, 0.026, 0.86, 10), 0, 0.2, 0)],
+    ['leather', at(new THREE.CylinderGeometry(0.029, 0.029, 0.2, 10), 0, -0.04, 0)],
+    ['iron', at(new THREE.CylinderGeometry(0.034, 0.03, 0.05, 10), 0, -0.24, 0)],
+    // Octagonal head along Z with bright striking faces and brass bands.
+    ['iron', at(new THREE.CylinderGeometry(0.088, 0.088, 0.3, 8), 0, headY, 0, R, 0, Math.PI / 8)],
+    ['steel', at(new THREE.CylinderGeometry(0.098, 0.092, 0.04, 8), 0, headY, 0.16, R, 0, Math.PI / 8)],
+    ['steel', at(new THREE.CylinderGeometry(0.092, 0.098, 0.04, 8), 0, headY, -0.16, R, 0, Math.PI / 8)],
+    ['brass', at(new THREE.CylinderGeometry(0.094, 0.094, 0.03, 8), 0, headY, 0.075, R, 0, Math.PI / 8)],
+    ['brass', at(new THREE.CylinderGeometry(0.094, 0.094, 0.03, 8), 0, headY, -0.075, R, 0, Math.PI / 8)],
+    ['brass', at(new THREE.CylinderGeometry(0.04, 0.034, 0.06, 10), 0, headY - 0.11, 0)],
+    ['iron', at(new THREE.ConeGeometry(0.032, 0.07, 8), 0, headY + 0.12, 0)],
+  ])
+}
+
+/** A longer, broader blade of glowing starsteel, a winged gold guard and star gems. */
+function starblade(): Array<[MatName, THREE.BufferGeometry]> {
+  const R = Math.PI / 2
+  return group([
+    ['starsteel', loftDiamond([[0.06, 0.04, 0.012], [0.2, 0.043, 0.011], [0.7, 0.034, 0.01], [0.86, 0.02, 0.008], [0.98, 0.0008, 0.0008]])],
+    // Bright core line down each face.
+    ['gem', at(new THREE.BoxGeometry(0.004, 0.62, 0.008), 0.0105, 0.42, 0)],
+    ['gem', at(new THREE.BoxGeometry(0.004, 0.62, 0.008), -0.0105, 0.42, 0)],
+    // Winged guard sweeping up toward the blade.
+    ['gold', at(new THREE.BoxGeometry(0.046, 0.034, 0.17), 0, 0.045, 0)],
+    ['gold', at(new THREE.ConeGeometry(0.022, 0.12, 6), 0, 0.085, 0.12, -R + 0.75)],
+    ['gold', at(new THREE.ConeGeometry(0.022, 0.12, 6), 0, 0.085, -0.12, R - 0.75)],
+    ['gem', at(new THREE.OctahedronGeometry(0.03, 0), 0, 0.05, 0, 0, 0, 0, 0.9, 1.3, 0.9)],
+    ['leather', at(new THREE.CylinderGeometry(0.018, 0.02, 0.17, 10), 0, -0.04, 0)],
+    ['gold', at(new THREE.CylinderGeometry(0.024, 0.024, 0.016, 12), 0, 0.03, 0)],
+    ['gold', at(new THREE.CylinderGeometry(0.024, 0.024, 0.016, 12), 0, -0.125, 0)],
+    ['gold', at(new THREE.SphereGeometry(0.03, 14, 10), 0, -0.152, 0, 0, 0, 0, 1, 0.85, 1)],
+    ['gem', at(new THREE.OctahedronGeometry(0.018, 0), 0, -0.175, 0)],
+  ])
+}
+
+/** The hammer's frame with a head of glowing blue ice crowned by crystal spikes. */
+function frostHammer(): Array<[MatName, THREE.BufferGeometry]> {
+  const R = Math.PI / 2
+  const headY = 0.62
+  return group([
+    ['wood', at(new THREE.CylinderGeometry(0.022, 0.026, 0.9, 10), 0, 0.21, 0)],
+    ['leather', at(new THREE.CylinderGeometry(0.029, 0.029, 0.2, 10), 0, -0.04, 0)],
+    ['steel', at(new THREE.CylinderGeometry(0.034, 0.03, 0.05, 10), 0, -0.24, 0)],
+    // Hexagonal ice block along Z, steel-capped, with three crystal spikes on top.
+    ['ice', at(new THREE.CylinderGeometry(0.11, 0.11, 0.32, 6), 0, headY, 0, R, 0, 0)],
+    ['steel', at(new THREE.CylinderGeometry(0.118, 0.112, 0.035, 6), 0, headY, 0.17, R, 0, 0)],
+    ['steel', at(new THREE.CylinderGeometry(0.112, 0.118, 0.035, 6), 0, headY, -0.17, R, 0, 0)],
+    ['steel', at(new THREE.CylinderGeometry(0.04, 0.034, 0.07, 10), 0, headY - 0.13, 0)],
+    ['ice', at(new THREE.ConeGeometry(0.035, 0.16, 5), 0, headY + 0.17, 0)],
+    ['ice', at(new THREE.ConeGeometry(0.025, 0.11, 5), 0, headY + 0.14, 0.08, 0.5)],
+    ['ice', at(new THREE.ConeGeometry(0.025, 0.11, 5), 0, headY + 0.14, -0.08, -0.5)],
+  ])
+}
+
+/**
+ * A hand cannon of brass and steel around a ball of bottled starlight: wrapped grip in the fist,
+ * the frame and finned barrel above it, lit power lines down the flanks and a lit bore.
+ */
+function starBlaster(): Array<[MatName, THREE.BufferGeometry]> {
+  const R = Math.PI / 2
+  const y = MUZZLE.starBlaster.y
+  const core = -0.045
+  const parts: Array<[MatName, THREE.BufferGeometry]> = [
+    ['leather', at(new THREE.CylinderGeometry(0.019, 0.022, 0.15, 10), 0, -0.03, 0)],
+    ['brass', at(new THREE.CylinderGeometry(0.026, 0.026, 0.014, 12), 0, -0.111, 0)],
+    ['brass', at(new THREE.CylinderGeometry(0.024, 0.024, 0.012, 12), 0, 0.046, 0)],
+    // Frame: an eight-sided steel body along the barrel, with the trigger and its guard beneath.
+    ['steel', at(new THREE.CylinderGeometry(0.034, 0.034, 0.2, 8), 0, y, 0.07, R, 0, Math.PI / 8)],
+    ['brass', at(new THREE.TorusGeometry(0.027, 0.0045, 6, 12, Math.PI), 0, 0.05, 0.062, 0, R, Math.PI)],
+    ['iron', at(new THREE.BoxGeometry(0.006, 0.024, 0.008), 0, 0.04, 0.05, 0.3)],
+    // The star core between two brass hoops, and the breech cap behind it.
+    ['plasma', at(new THREE.SphereGeometry(0.044, 18, 12), 0, y, core)],
+    ['brass', at(new THREE.TorusGeometry(0.045, 0.0055, 6, 22), 0, y, core, 0, R, 0)],
+    ['brass', at(new THREE.TorusGeometry(0.045, 0.0055, 6, 22), 0, y, core, R, 0, 0)],
+    ['brass', at(new THREE.CylinderGeometry(0.03, 0.02, 0.03, 8), 0, y, core - 0.052, R)],
+    ['gem', at(new THREE.OctahedronGeometry(0.013, 0), 0, y, core - 0.072)],
+    // Barrel: a slim iron tube, a brass muzzle ring and the lit bore.
+    ['iron', at(new THREE.CylinderGeometry(0.019, 0.022, 0.16, 10), 0, y, 0.245, R)],
+    ['brass', at(new THREE.CylinderGeometry(0.031, 0.026, 0.03, 10), 0, y, 0.322, R)],
+    ['plasma', at(new THREE.CylinderGeometry(0.018, 0.018, 0.006, 10), 0, y, MUZZLE.starBlaster.z - 0.002, R)],
+    // Power lines down both flanks and a sight blade.
+    ['plasma', at(new THREE.BoxGeometry(0.004, 0.009, 0.16), 0.0335, y, 0.07)],
+    ['plasma', at(new THREE.BoxGeometry(0.004, 0.009, 0.16), -0.0335, y, 0.07)],
+    ['brass', at(new THREE.BoxGeometry(0.005, 0.016, 0.028), 0, y + 0.04, 0.14)],
+  ]
+  // Two flat tail fins swept back and out from the core, like a comet's tail.
+  for (const side of [-1, 1]) {
+    const fin = at(new THREE.ConeGeometry(0.02, 0.1, 4), 0, 0, 0, -R)
+    parts.push(['brass', at(fin, side * 0.04, y, core - 0.02, 0, -side * 0.55, 0, 1, 0.3, 1)])
+  }
+  // Cooling fins round the barrel.
+  for (let i = 0; i < 3; i++) parts.push(['steel', at(new THREE.CylinderGeometry(0.03, 0.03, 0.006, 10), 0, y, 0.2 + i * 0.03, R)])
+  return group(parts)
+}
+
+/**
+ * A stout iron tube with a flared muzzle, carried by a trigger grip and a fore-grip: a caged,
+ * glowing comet chamber in its middle, brass bands, a vented breech with three fins.
+ */
+function cometLauncher(): Array<[MatName, THREE.BufferGeometry]> {
+  const R = Math.PI / 2
+  const y = MUZZLE.cometLauncher.y
+  const chamber = 0.13
+  const parts: Array<[MatName, THREE.BufferGeometry]> = [
+    // Trigger grip (in the fist) and the fore-grip for the other hand.
+    ['leather', at(new THREE.CylinderGeometry(0.02, 0.023, 0.15, 10), 0, -0.03, 0)],
+    ['brass', at(new THREE.CylinderGeometry(0.027, 0.027, 0.014, 12), 0, -0.111, 0)],
+    ['iron', at(new THREE.BoxGeometry(0.032, 0.03, 0.06), 0, 0.057, 0)],
+    ['leather', at(new THREE.CylinderGeometry(0.018, 0.02, 0.1, 10), 0, 0.012, 0.31)],
+    ['iron', at(new THREE.BoxGeometry(0.028, 0.02, 0.045), 0, 0.064, 0.31)],
+    // The tube, its flare and the lit bore.
+    ['iron', at(new THREE.CylinderGeometry(0.058, 0.058, 0.7, 14), 0, y, 0.11, R)],
+    ['iron', at(new THREE.CylinderGeometry(0.086, 0.06, 0.1, 14), 0, y, 0.49, R)],
+    ['brass', at(new THREE.TorusGeometry(0.086, 0.008, 6, 24), 0, y, MUZZLE.cometLauncher.z)],
+    ['ember', at(new THREE.CylinderGeometry(0.072, 0.072, 0.006, 14), 0, y, MUZZLE.cometLauncher.z - 0.012, R)],
+    ['brass', at(new THREE.CylinderGeometry(0.064, 0.064, 0.026, 14), 0, y, 0.4, R)],
+    ['brass', at(new THREE.CylinderGeometry(0.064, 0.064, 0.026, 14), 0, y, -0.17, R)],
+    // The comet chamber: a glowing core behind brass bars.
+    ['ember', at(new THREE.CylinderGeometry(0.067, 0.067, 0.17, 14), 0, y, chamber, R)],
+    ['brass', at(new THREE.CylinderGeometry(0.074, 0.074, 0.02, 14), 0, y, chamber + 0.095, R)],
+    ['brass', at(new THREE.CylinderGeometry(0.074, 0.074, 0.02, 14), 0, y, chamber - 0.095, R)],
+    // Breech: a tapered cap and its vent.
+    ['steel', at(new THREE.CylinderGeometry(0.062, 0.044, 0.07, 14), 0, y, -0.27, R)],
+    ['ember', at(new THREE.CylinderGeometry(0.03, 0.03, 0.006, 12), 0, y, -0.306, R)],
+    // A ring sight on a post.
+    ['brass', at(new THREE.TorusGeometry(0.017, 0.004, 6, 14), 0, y + 0.088, 0.33)],
+    ['brass', at(new THREE.BoxGeometry(0.006, 0.02, 0.006), 0, y + 0.064, 0.33)],
+  ]
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6
+    parts.push(['brass', at(new THREE.BoxGeometry(0.011, 0.009, 0.18), Math.sin(a) * 0.07, y + Math.cos(a) * 0.07, chamber, 0, 0, -a)])
+  }
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2
+    parts.push(['brass', at(new THREE.BoxGeometry(0.006, 0.06, 0.12), Math.sin(a) * 0.082, y + Math.cos(a) * 0.082, -0.2, 0, 0, -a)])
+  }
+  return group(parts)
+}
+
+/** Recurve limbs: a parabola toward the archer with tips flicking forward again. */
+function limbZ(y: number): number {
+  const u = Math.abs(y) / BOW_TIP.y
+  return -0.13 * u * u + 1.15 * Math.max(0, u - 0.8) ** 2
+}
+
+function bow(): Array<[MatName, THREE.BufferGeometry]> {
+  const pts: THREE.Vector3[] = []
+  for (let i = 0; i <= 24; i++) {
+    const y = -BOW_TIP.y + (i / 24) * BOW_TIP.y * 2
+    pts.push(new THREE.Vector3(0, y, limbZ(y)))
+  }
+  const curve = new THREE.CatmullRomCurve3(pts)
+  const segs = 48
+  const limbs = new THREE.TubeGeometry(curve, segs, 0.015, 6, false)
+  // Taper toward the tips, and make the limbs wider (X) than they are thick.
+  const pos = limbs.attributes.position as THREE.BufferAttribute
+  const c = new THREE.Vector3()
+  for (let i = 0; i <= segs; i++) {
+    curve.getPointAt(i / segs, c)
+    const k = 1.3 - 0.75 * Math.abs(i / segs - 0.5) * 2
+    for (let j = 0; j <= 6; j++) {
+      const v = i * 7 + j
+      pos.setXYZ(v, (pos.getX(v) - c.x) * k * 1.6, c.y + (pos.getY(v) - c.y) * k, c.z + (pos.getZ(v) - c.z) * k)
+    }
+  }
+  limbs.computeVertexNormals()
+  return group([
+    ['bowWood', limbs],
+    ['leather', at(new THREE.CylinderGeometry(0.024, 0.024, 0.15, 10), 0, 0, 0.004, 0, 0, 0, 1.2, 1, 1)],
+    ['brass', at(new THREE.CylinderGeometry(0.026, 0.026, 0.012, 10), 0, 0.08, 0.004, 0, 0, 0, 1.2, 1, 1)],
+    ['brass', at(new THREE.CylinderGeometry(0.026, 0.026, 0.012, 10), 0, -0.08, 0.004, 0, 0, 0, 1.2, 1, 1)],
+    ['brass', at(new THREE.SphereGeometry(0.014, 8, 6), 0, BOW_TIP.y, BOW_TIP.z)],
+    ['brass', at(new THREE.SphereGeometry(0.014, 8, 6), 0, -BOW_TIP.y, BOW_TIP.z)],
+  ])
+}
+
+/** Vertex-coloured arrow: wooden shaft, steel head, red and cream fletching. */
+function arrowGeometry(): THREE.BufferGeometry {
+  const R = Math.PI / 2
+  const tint = (geo: THREE.BufferGeometry, hex: number) => {
+    const g = geo.index ? geo.toNonIndexed() : geo
+    g.deleteAttribute('uv')
+    const col = new THREE.Color(hex)
+    const n = g.attributes.position.count
+    const a = new Float32Array(n * 3)
+    for (let i = 0; i < n; i++) col.toArray(a, i * 3)
+    g.setAttribute('color', new THREE.BufferAttribute(a, 3))
+    return g
+  }
+  const parts = [
+    tint(at(new THREE.CylinderGeometry(0.0055, 0.0055, 0.66, 6), 0, 0, 0.33, R), 0xb98a55),
+    tint(at(new THREE.ConeGeometry(0.017, 0.075, 4), 0, 0, ARROW_LEN - 0.0375, R, 0, 0, 1, 1, 0.45), 0xcfd4da),
+    tint(at(new THREE.CylinderGeometry(0.008, 0.008, 0.02, 6), 0, 0, 0.01, R), 0x2b2b2b),
+  ]
+  for (let k = 0; k < 3; k++) {
+    // A vane: a tapered quad in the plane through the shaft at angle a.
+    const a = (k / 3) * Math.PI * 2 + Math.PI / 2
+    const ca = Math.cos(a)
+    const sa = Math.sin(a)
+    const r0 = 0.005
+    const v = (r: number, z: number) => [ca * r, sa * r, z]
+    const quad = [...v(r0, 0.03), ...v(0.024, 0.05), ...v(0.024, 0.15), ...v(r0, 0.03), ...v(0.024, 0.15), ...v(r0, 0.17)]
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(quad, 3))
+    g.computeVertexNormals()
+    parts.push(tint(g, k === 0 ? 0xf3eee6 : 0xd9553e))
+  }
+  const merged = mergeGeometries(parts)!
+  parts.forEach(p => p.dispose())
+  return merged
+}

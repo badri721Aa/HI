@@ -1,0 +1,1010 @@
+/*
+ * Starfall Isle — UI motion and the few styles Tailwind can't express cleanly.
+ * Palette: ink #0B0F14 · amber #F5B455 · warm off-white #F3EEE6.
+ */
+
+.root {
+  --sf-ink: #0b0f14;
+  --sf-amber: #f5b455;
+  --sf-text: #f3eee6;
+  --sf-heart: #e8664f;
+  --sf-ease: cubic-bezier(0.22, 0.7, 0.2, 1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The site's global violet focus outline doesn't belong here; every control draws its own focus state. */
+.root :focus-visible {
+  outline: none;
+}
+
+/* Legible type straight over the 3D scene. */
+.hudText {
+  text-shadow: 0 1px 2px rgba(5, 7, 10, 0.6), 0 0 14px rgba(5, 7, 10, 0.28);
+}
+.hudIcon {
+  filter: drop-shadow(0 1px 1.5px rgba(5, 7, 10, 0.55));
+}
+
+/* ── generic presence (mounted → open → closed → unmounted) ─────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+.presence[data-state='open'] {
+  animation: fadeIn 260ms ease-out both;
+}
+.presence[data-state='closed'] {
+  animation: fadeOut 220ms ease-in both;
+  pointer-events: none;
+}
+
+/* Staggered entrance; set --d on the element for the delay. */
+.rise {
+  /* backwards, not both: once done the element's own transform (e.g. :focus) applies again */
+  animation: riseIn 520ms var(--sf-ease) backwards;
+  animation-delay: var(--d, 0ms);
+}
+.slide {
+  animation: slideIn 280ms var(--sf-ease) both;
+}
+
+/* ── backdrops ──────────────────────────────────────────────────────── */
+
+.titleScrim {
+  background:
+    linear-gradient(90deg, rgba(11, 15, 20, 0.86) 0%, rgba(11, 15, 20, 0.62) 28%, rgba(11, 15, 20, 0.18) 55%, rgba(11, 15, 20, 0) 72%),
+    linear-gradient(0deg, rgba(11, 15, 20, 0.7) 0%, rgba(11, 15, 20, 0) 38%);
+}
+.panelScrim {
+  background:
+    linear-gradient(90deg, rgba(11, 15, 20, 0.9) 0%, rgba(11, 15, 20, 0.78) 34%, rgba(11, 15, 20, 0.62) 100%);
+}
+.pauseScrim {
+  background:
+    /* keeps the run stats (bottom-right) legible over bright scenery */
+    radial-gradient(48% 42% at 100% 100%, rgba(11, 15, 20, 0.62) 0%, rgba(11, 15, 20, 0) 100%),
+    linear-gradient(90deg, rgba(11, 15, 20, 0.92) 0%, rgba(11, 15, 20, 0.74) 32%, rgba(11, 15, 20, 0.5) 70%, rgba(11, 15, 20, 0.42) 100%);
+}
+.topShade {
+  background: linear-gradient(180deg, rgba(8, 10, 14, 0.46) 0%, rgba(8, 10, 14, 0.16) 55%, rgba(8, 10, 14, 0) 100%);
+}
+
+/* ── surfaces ───────────────────────────────────────────────────────── */
+
+/* Menu panel: a lit top edge, a faint amber wash from the corner its accent starts in, and real depth below. */
+.panel {
+  border: 1px solid rgba(243, 238, 230, 0.11);
+  border-radius: 12px;
+  background:
+    radial-gradient(520px 220px at 0% 0%, rgba(245, 180, 85, 0.085) 0%, rgba(245, 180, 85, 0) 70%),
+    linear-gradient(180deg, rgba(24, 30, 40, 0.97) 0%, rgba(13, 17, 23, 0.97) 38%, rgba(10, 13, 18, 0.97) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(243, 238, 230, 0.09),
+    0 0 0 1px rgba(4, 6, 9, 0.55),
+    0 34px 90px -28px rgba(0, 0, 0, 0.85);
+}
+.panelAccent {
+  background: linear-gradient(90deg, var(--sf-amber) 0%, rgba(245, 180, 85, 0.5) 22%, rgba(245, 180, 85, 0) 62%);
+}
+
+/* A soft dark pad behind HUD groups and stats so they read over bright scenery. No backdrop blur: it is costly
+   over a WebGL canvas. The HUD's pads only exist on laptop-size screens and up, where the top row has the room. */
+.plate,
+.hudPlate {
+  border: 1px solid rgba(243, 238, 230, 0.1);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(15, 19, 26, 0.66) 0%, rgba(9, 12, 17, 0.5) 100%);
+  box-shadow: inset 0 1px 0 rgba(243, 238, 230, 0.07), 0 12px 30px -18px rgba(0, 0, 0, 0.85);
+}
+@media (max-width: 1023.98px) {
+  .hudPlate {
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+}
+.dashReady {
+  background: linear-gradient(90deg, #f5b455 0%, #ffd592 100%);
+  box-shadow: 0 0 8px rgba(245, 180, 85, 0.65);
+}
+
+/* ── loading ────────────────────────────────────────────────────────── */
+
+/* Dusk on the horizon (--hz) fading up into night. Everything animated here is opacity / transform
+   only, so it keeps moving on the compositor while the main thread is busy building the island. */
+.loading {
+  --hz: 66%;
+  --iw: clamp(320px, 50vw, 1000px);
+  background: #070a11;
+}
+.loadSky {
+  position: absolute;
+  inset: 0 0 calc(100% - var(--hz)) 0;
+  background:
+    radial-gradient(64% 60% at 72% 100%, rgba(244, 164, 96, 0.52) 0%, rgba(206, 106, 92, 0.26) 34%, rgba(92, 70, 128, 0.12) 62%, rgba(11, 15, 20, 0) 80%),
+    linear-gradient(180deg, #070a11 0%, #0b1120 34%, #151c36 62%, #2a2646 82%, #4d3350 94%, #7a4650 100%);
+}
+.loadSea {
+  position: absolute;
+  inset: var(--hz) 0 0 0;
+  background:
+    radial-gradient(40% 90% at 72% 0%, rgba(244, 164, 96, 0.24) 0%, rgba(11, 15, 20, 0) 70%),
+    linear-gradient(180deg, #33283c 0%, #151827 20%, #0a0d14 68%, #070a11 100%);
+}
+.loadSea::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 214, 170, 0) 20%, rgba(255, 214, 170, 0.4) 60%, rgba(255, 214, 170, 0.55) 72%, rgba(255, 214, 170, 0) 100%);
+}
+/* Keeps the text column readable where it crosses the horizon glow on narrow screens. */
+.loadShade {
+  background: linear-gradient(90deg, rgba(7, 10, 17, 0.55) 0%, rgba(7, 10, 17, 0.28) 34%, rgba(7, 10, 17, 0) 62%);
+}
+
+/* The far star field is one element (a box-shadow per star); only the bright few twinkle. */
+.starField {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  border-radius: 50%;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: var(--o, 0.5); transform: scale(1); }
+  50% { opacity: calc(var(--o, 0.5) * 0.25); transform: scale(0.7); }
+}
+.twinkle {
+  animation: twinkle var(--t, 5s) ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+@keyframes shootingStar {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--a)) scaleX(0.3); }
+  4% { opacity: 1; }
+  14% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--a)) scaleX(1); }
+  100% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--a)) scaleX(1); }
+}
+.shootingStar {
+  position: absolute;
+  width: 150px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(245, 180, 85, 0) 0%, rgba(245, 180, 85, 0.55) 70%, rgba(255, 240, 214, 0.98) 100%);
+  transform-origin: 100% 50%;
+  animation: shootingStar var(--t, 9s) ease-out infinite;
+  animation-delay: var(--d, 1.2s);
+  opacity: 0;
+}
+
+/* Island + its reflection share one box: the SVG's horizon (y = 260 of 400) sits on --hz. */
+.isle {
+  position: absolute;
+  right: clamp(-60px, 4vw, 120px);
+  top: calc(var(--hz) - var(--iw) * 0.3421);
+  width: var(--iw);
+  aspect-ratio: 760 / 400;
+}
+.beacon {
+  position: absolute;
+  left: 63.16%;
+  top: 5.25%;
+  opacity: var(--lit, 0.3);
+  transition: opacity 900ms ease-out;
+}
+@keyframes beaconPulse {
+  0%, 100% { opacity: 0.72; transform: translate(-50%, -50%) scale(0.92); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+}
+.beaconHalo {
+  position: absolute;
+  width: calc(var(--iw) * 0.36);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 236, 200, 0.95) 0%, rgba(245, 180, 85, 0.5) 9%, rgba(245, 180, 85, 0.14) 34%, rgba(245, 180, 85, 0) 66%);
+  transform: translate(-50%, -50%);
+  animation: beaconPulse 3.4s ease-in-out infinite;
+}
+.beaconFlare {
+  position: absolute;
+  width: calc(var(--iw) * 0.42);
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 226, 176, 0), rgba(255, 226, 176, 0.85) 50%, rgba(255, 226, 176, 0));
+  transform: translate(-50%, -50%);
+}
+.reflect {
+  position: absolute;
+  left: 63.16%;
+  top: 65.4%;
+  width: 9%;
+  height: 34%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(245, 180, 85, 0.55) 0%, rgba(245, 180, 85, 0.12) 60%, rgba(245, 180, 85, 0) 100%);
+  filter: blur(7px);
+  opacity: var(--lit, 0.3);
+  transition: opacity 900ms ease-out;
+}
+@keyframes shimmer {
+  0%, 100% { opacity: 0.12; transform: translateX(-50%) scaleX(0.55); }
+  50% { opacity: var(--o, 0.7); transform: translateX(-50%) scaleX(1); }
+}
+.shimmer {
+  position: absolute;
+  height: 1.5px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255, 222, 170, 0), rgba(255, 222, 170, 0.9) 50%, rgba(255, 222, 170, 0));
+  animation: shimmer var(--t, 3s) ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+  transform: translateX(-50%);
+  opacity: 0.12;
+}
+
+/* Wordmark entrance: letters rise one by one, the rule draws, the star lands last. */
+@keyframes letterIn {
+  from { opacity: 0; transform: translateY(0.22em); }
+  to { opacity: 1; transform: none; }
+}
+.letter {
+  display: inline-block;
+}
+.wordIn .letter {
+  animation: letterIn 700ms var(--sf-ease) both;
+  animation-delay: calc(120ms + var(--i) * 55ms);
+}
+@keyframes starLand {
+  0% { opacity: 0; transform: translate(0.5em, -0.5em) scale(0.2) rotate(-90deg); }
+  70% { opacity: 1; transform: scale(1.35) rotate(8deg); }
+  100% { opacity: 1; transform: none; }
+}
+.wordIn .wordStar {
+  animation: starLand 760ms var(--sf-ease) 700ms both;
+}
+@keyframes ruleDraw {
+  from { transform: scaleX(0); }
+  to { transform: none; }
+}
+.wordIn .wordRule {
+  transform-origin: 0 50%;
+  animation: ruleDraw 620ms var(--sf-ease) 520ms both;
+}
+.wordIn .wordSub {
+  animation: fadeIn 700ms ease-out 640ms both;
+}
+
+.shard {
+  color: rgba(243, 238, 230, 0.22);
+  transition: color 300ms ease-out;
+}
+.shard[data-lit='true'] {
+  color: var(--sf-amber);
+  filter: drop-shadow(0 0 5px rgba(245, 180, 85, 0.8));
+  animation: starFill 620ms var(--sf-ease) both;
+}
+.loadFill,
+.loadHead {
+  transition: transform 420ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.loadFill {
+  transform-origin: 0 50%;
+}
+@keyframes sheen {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(420%); }
+}
+.loadSheen {
+  animation: sheen 1.8s ease-in-out infinite;
+}
+@keyframes tipCycle {
+  0% { opacity: 0; transform: translateY(6px); }
+  8%, 92% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+.tip {
+  animation: tipCycle var(--t, 6000ms) var(--sf-ease) both;
+}
+
+/* ── buttons ────────────────────────────────────────────────────────── */
+
+/*
+ * One family: .btn (primary · secondary · danger), .menuRow, .card (large choice) and .chip (small
+ * utility). "Selected" is :focus — hovering a control focuses it (nav.ts hoverFocus), so the mouse
+ * and the keyboard share a single highlight and two controls never look selected at once.
+ */
+.btn,
+.chip,
+.menuRow,
+.card {
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
+    box-shadow 150ms ease-out,
+    opacity 150ms ease-out,
+    transform 130ms var(--sf-ease);
+}
+.btn:focus-visible,
+.chip:focus-visible,
+.card:focus-visible,
+.ring:focus-visible {
+  outline: 2px solid var(--sf-amber);
+  outline-offset: 2px;
+}
+.btn:active,
+.chip:active,
+.card:active {
+  transform: translateY(1px) scale(0.97);
+  transition-duration: 60ms;
+}
+
+.btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.btn[data-size='sm'] {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 11px;
+}
+.btn[data-variant='primary'] {
+  background: linear-gradient(180deg, #ffd592 0%, #f5b455 52%, #eaa341 100%);
+  color: var(--sf-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -2px 0 rgba(11, 15, 20, 0.18),
+    0 10px 24px -14px rgba(245, 180, 85, 0.9);
+}
+.btn[data-variant='primary']:focus {
+  background: linear-gradient(180deg, #ffe3b3 0%, #fac672 52%, #f0ad4c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -2px 0 rgba(11, 15, 20, 0.18),
+    0 0 0 3px rgba(245, 180, 85, 0.22),
+    0 14px 30px -12px rgba(245, 180, 85, 1);
+}
+.btn[data-variant='primary']:active {
+  background: linear-gradient(180deg, #e9a440 0%, #e6a23f 100%);
+  box-shadow: inset 0 2px 0 rgba(11, 15, 20, 0.22);
+}
+.btn[data-variant='secondary'] {
+  border-color: rgba(243, 238, 230, 0.26);
+  background: linear-gradient(180deg, rgba(243, 238, 230, 0.09) 0%, rgba(243, 238, 230, 0.03) 100%);
+  color: rgba(243, 238, 230, 0.9);
+  box-shadow: inset 0 1px 0 rgba(243, 238, 230, 0.08);
+}
+.btn[data-variant='secondary']:focus {
+  border-color: rgba(245, 180, 85, 0.8);
+  background: linear-gradient(180deg, rgba(245, 180, 85, 0.2) 0%, rgba(245, 180, 85, 0.08) 100%);
+  color: var(--sf-text);
+  box-shadow: inset 0 1px 0 rgba(243, 238, 230, 0.1), 0 0 0 3px rgba(245, 180, 85, 0.14);
+}
+.btn[data-variant='secondary']:active {
+  background: rgba(243, 238, 230, 0.2);
+}
+.btn[data-variant='danger'] {
+  border-color: rgba(232, 102, 79, 0.55);
+  background: rgba(232, 102, 79, 0.06);
+  color: #f3b3a6;
+}
+.btn[data-variant='danger']:focus {
+  border-color: var(--sf-heart);
+  background: rgba(232, 102, 79, 0.2);
+  color: #ffd9d0;
+}
+.btn[data-variant='danger']:active {
+  background: rgba(232, 102, 79, 0.3);
+}
+.btn[aria-disabled='true'] {
+  opacity: 0.38;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn[aria-disabled='true']:active {
+  transform: none;
+}
+.btn[data-loading='true'] {
+  cursor: progress;
+}
+@keyframes nope {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  60% { transform: translateX(3px); }
+  85% { transform: translateX(-1px); }
+}
+.nope {
+  animation: nope 260ms ease-out;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+/* Small utility button: Back, Refresh, Copy, the Arcade link. Not part of the arrow-key list, so it has a plain hover. */
+.chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px 0 8px;
+  border: 1px solid rgba(243, 238, 230, 0.16);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(243, 238, 230, 0.07) 0%, rgba(243, 238, 230, 0.02) 100%);
+  color: rgba(243, 238, 230, 0.66);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.chip:hover,
+.chip:focus {
+  border-color: rgba(243, 238, 230, 0.5);
+  background: rgba(243, 238, 230, 0.1);
+  color: var(--sf-text);
+}
+.chip[data-tone='good'] {
+  border-color: rgba(143, 203, 126, 0.6);
+  color: #bfe3b4;
+}
+
+/* Large choice (device picker). */
+.card {
+  border: 1px solid rgba(243, 238, 230, 0.14);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(243, 238, 230, 0.06) 0%, rgba(243, 238, 230, 0.02) 100%);
+  box-shadow: inset 0 1px 0 rgba(243, 238, 230, 0.06);
+}
+.card:focus {
+  border-color: rgba(243, 238, 230, 0.55);
+  background: rgba(243, 238, 230, 0.08);
+}
+.card[aria-checked='true'] {
+  border-color: var(--sf-amber);
+  background: rgba(245, 180, 85, 0.12);
+  box-shadow: inset 0 0 0 1px var(--sf-amber);
+}
+
+/* Touch: every control gets a 44 px target. */
+[data-touch='true'] .btn[data-size='sm'],
+[data-touch='true'] .chip {
+  height: 44px;
+  padding: 0 16px;
+}
+
+/* ── menus ──────────────────────────────────────────────────────────── */
+
+.menuRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: var(--row-h, 44px);
+  padding: 0 14px 0 18px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(243, 238, 230, 0.7);
+  text-align: left;
+}
+/* Marker: an amber bar that grows in on the selected row. */
+.menuRow::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 58%;
+  border-radius: 2px;
+  background: var(--sf-amber);
+  transform: translateY(-50%) scaleY(0);
+  transition: transform 160ms var(--sf-ease);
+}
+.menuRow:focus,
+.menuRow[data-current='true'] {
+  border-color: rgba(245, 180, 85, 0.3);
+  background: linear-gradient(90deg, rgba(245, 180, 85, 0.27) 0%, rgba(245, 180, 85, 0.11) 58%, rgba(245, 180, 85, 0.04) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 226, 170, 0.1), 0 10px 26px -18px rgba(245, 180, 85, 0.7);
+  color: var(--sf-text);
+}
+.menuRow .rowIcon {
+  color: rgba(243, 238, 230, 0.4);
+  transition: color 150ms ease-out, transform 160ms var(--sf-ease);
+}
+.menuRow:focus .rowIcon,
+.menuRow[data-current='true'] .rowIcon {
+  color: var(--sf-amber);
+  transform: scale(1.1);
+}
+.menuRow:focus::before,
+.menuRow[data-current='true']::before {
+  transform: translateY(-50%) scaleY(1);
+}
+.menuRow:focus-visible {
+  box-shadow: inset 0 0 0 1px rgba(245, 180, 85, 0.6);
+}
+.menuRow:active {
+  background: rgba(245, 180, 85, 0.3);
+  transform: scale(0.985);
+  transition-duration: 60ms;
+}
+.menuRow .rowLabel {
+  transition: transform 160ms var(--sf-ease);
+}
+.menuRow:focus .rowLabel,
+.menuRow[data-current='true'] .rowLabel {
+  transform: translateX(4px);
+}
+.menuRow .rowChevron {
+  margin-left: auto;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 150ms ease-out, transform 160ms var(--sf-ease);
+}
+.menuRow:focus .rowChevron,
+.menuRow[data-current='true'] .rowChevron {
+  opacity: 0.9;
+  transform: none;
+}
+/* A panel is open: its row stays selected; the others only brighten under the mouse. */
+.menuList[data-locked='true'] .menuRow:not([data-current='true']):hover {
+  color: var(--sf-text);
+}
+.menuList[data-locked='true'] .menuRow:not([data-current='true']):hover .rowIcon {
+  color: rgba(243, 238, 230, 0.75);
+}
+[data-touch='true'] .menuRow {
+  min-height: max(var(--row-h, 44px), 46px);
+}
+
+/* ── menus ──────────────────────────────────────────────────────────── */
+
+.menuItem {
+  position: relative;
+  transition: color 160ms ease-out, transform 200ms var(--sf-ease);
+}
+.menuItem::before {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 50%;
+  height: 1px;
+  width: 0;
+  background: var(--sf-amber);
+  transition: width 200ms var(--sf-ease);
+}
+.menuItem:focus {
+  outline: none;
+}
+.menuItem:focus,
+.menuItem[data-current='true'] {
+  transform: translateX(6px);
+}
+.menuItem:focus::before,
+.menuItem[data-current='true']::before {
+  width: 14px;
+}
+
+/* ── HUD ────────────────────────────────────────────────────────────── */
+
+@keyframes heartPop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+@keyframes heartLose {
+  0% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes rowShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(1px); }
+}
+.heartsHit {
+  animation: rowShake 360ms ease-out;
+}
+.heartLost {
+  animation: heartLose 420ms ease-out;
+}
+.heartGained,
+.pop {
+  animation: heartPop 420ms var(--sf-ease);
+}
+@keyframes lowPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+.heartLow {
+  animation: lowPulse 900ms ease-in-out infinite;
+}
+
+@keyframes starFill {
+  0% { transform: scale(0.4) rotate(-45deg); opacity: 0; }
+  60% { transform: scale(1.3) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.starFill {
+  animation: starFill 600ms var(--sf-ease) both;
+  animation-delay: var(--d, 0ms);
+}
+.starGlow {
+  filter: drop-shadow(0 0 4px rgba(245, 180, 85, 0.75)) drop-shadow(0 1px 1px rgba(5, 7, 10, 0.5));
+}
+
+@keyframes zoneCard {
+  0% { opacity: 0; letter-spacing: 0.32em; }
+  14% { opacity: 1; }
+  30% { letter-spacing: 0.18em; }
+  78% { opacity: 1; letter-spacing: 0.16em; }
+  100% { opacity: 0; letter-spacing: 0.15em; }
+}
+/* Small delay so a hitch on the first frames of play can't swallow the card. */
+.zoneCard {
+  animation: zoneCard 4200ms var(--sf-ease) 350ms both;
+}
+@keyframes ruleGrow {
+  0% { transform: scaleX(0); opacity: 0; }
+  20% { transform: scaleX(1); opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.zoneRuleL,
+.zoneRuleR {
+  animation: ruleGrow 4200ms var(--sf-ease) 350ms both;
+}
+.zoneRuleL { transform-origin: 100% 50%; }
+.zoneRuleR { transform-origin: 0% 50%; }
+
+.bossBar {
+  animation: riseIn 420ms var(--sf-ease) both;
+}
+.bossStunned {
+  animation: bossGlow 0.6s ease-in-out infinite alternate;
+}
+@keyframes bossGlow {
+  from { box-shadow: 0 0 4px rgba(245, 180, 85, 0.4); }
+  to { box-shadow: 0 0 14px rgba(245, 180, 85, 0.95); }
+}
+
+.objective[data-state='open'] {
+  animation: slideIn 420ms var(--sf-ease) both;
+}
+.objective[data-state='closed'] {
+  animation: fadeOut 700ms ease-in both;
+}
+
+.toast[data-state='open'] {
+  animation: slideIn 260ms var(--sf-ease) both;
+}
+.toast[data-state='closed'] {
+  animation: fadeOut 360ms ease-in both;
+}
+
+@keyframes bannerTitle {
+  from { opacity: 0; letter-spacing: 0.12em; transform: translateY(6px); }
+  to { opacity: 1; letter-spacing: 0.01em; transform: none; }
+}
+.bannerTitle {
+  animation: bannerTitle 900ms var(--sf-ease) both;
+  animation-delay: 120ms;
+}
+.banner[data-state='closed'] {
+  animation: fadeOut 600ms ease-in both;
+}
+
+/* Chat lines rise in; `backwards` so the fade-out (an opacity transition) isn't pinned by the fill. */
+.chatLine {
+  animation: riseIn 240ms var(--sf-ease) backwards;
+}
+
+@keyframes promptIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.prompt {
+  animation: promptIn 200ms var(--sf-ease) both;
+}
+
+@keyframes hintBreath {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+.hintBreath {
+  animation: hintBreath 2.4s ease-in-out infinite;
+}
+
+/* Full-screen damage tint; restarted by re-keying the element. */
+@keyframes damage {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.damage {
+  background: radial-gradient(ellipse at center, rgba(160, 24, 16, 0) 42%, rgba(160, 24, 16, 0.42) 78%, rgba(120, 10, 8, 0.7) 100%);
+  animation: damage 620ms ease-out both;
+}
+@keyframes lowHp {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.6; }
+}
+.lowHp {
+  background: radial-gradient(ellipse at center, rgba(160, 24, 16, 0) 55%, rgba(150, 20, 14, 0.38) 100%);
+  animation: lowHp 1.6s ease-in-out infinite;
+}
+
+/* ── dialog / cutscene ──────────────────────────────────────────────── */
+
+@keyframes caret {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(2px); opacity: 0.45; }
+}
+.caret {
+  animation: caret 1.1s ease-in-out infinite;
+}
+.dialog[data-state='open'] {
+  animation: riseIn 260ms var(--sf-ease) both;
+}
+.dialog[data-state='closed'] {
+  animation: fadeOut 180ms ease-in both;
+}
+
+.letterbox {
+  transition: transform 650ms var(--sf-ease);
+}
+.subtitle {
+  animation: riseIn 320ms var(--sf-ease) both;
+}
+
+/* ── settings controls ──────────────────────────────────────────────── */
+
+/* The row holding the selected control lights up, for mouse and keyboard alike. */
+.settingRow {
+  transition: background-color 150ms ease-out;
+}
+.settingRow:focus-within {
+  background: rgba(243, 238, 230, 0.045);
+}
+.sliderThumb {
+  transition: box-shadow 150ms ease-out, transform 130ms var(--sf-ease);
+}
+.slider:focus .sliderThumb {
+  box-shadow: 0 0 0 5px rgba(245, 180, 85, 0.24);
+}
+.slider:focus-visible .sliderThumb {
+  box-shadow: 0 0 0 2px var(--sf-ink), 0 0 0 4px var(--sf-amber);
+}
+.slider:active .sliderThumb {
+  transform: scale(1.18);
+}
+
+/* ── map ────────────────────────────────────────────────────────────── */
+
+.mapImage {
+  filter: saturate(0.85) contrast(1.04) brightness(0.96) sepia(0.12);
+}
+.mapFrame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 60px rgba(11, 15, 20, 0.55);
+}
+@keyframes markerPulse {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.markerPulse {
+  animation: markerPulse 1.8s ease-out infinite;
+}
+
+/* ── build bar: block icons ─────────────────────────────────────────── */
+
+/* An orthographic cube (top, front, side) painted with the block's textures. */
+.blockIcon {
+  position: relative;
+  width: 17px;
+  height: 17px;
+  transform-style: preserve-3d;
+  transform: rotateX(-30deg) rotateY(-45deg);
+}
+.blockIcon > i {
+  position: absolute;
+  inset: 0;
+  background: var(--side) center / cover;
+  background-color: var(--tint);
+  background-blend-mode: multiply;
+}
+.blockIcon > i[data-face='top'] {
+  background-image: var(--top);
+  transform: rotateX(90deg) translateZ(8.5px);
+}
+.blockIcon > i[data-face='front'] {
+  transform: translateZ(8.5px);
+  filter: brightness(0.8);
+}
+.blockIcon > i[data-face='side'] {
+  transform: rotateY(90deg) translateZ(8.5px);
+  filter: brightness(0.62);
+}
+.blockIcon[data-look='grass'] > i:not([data-face='top']) {
+  background-image: linear-gradient(to bottom, #6f8a43 0 24%, rgb(0 0 0 / 0.18) 24% 30%, transparent 30%), var(--side);
+  background-blend-mode: normal;
+}
+.blockIcon[data-look='glass'] > i {
+  background: rgb(190 225 236 / 0.3);
+  box-shadow: inset 0 0 0 1.5px rgb(246 250 252 / 0.85);
+}
+.blockIcon[data-look='lamp'] > i {
+  background-image: radial-gradient(circle, #fff4d4 0 20%, #f5b455 46%, transparent 48%), var(--side);
+  background-blend-mode: normal;
+}
+.blockIcon[data-look='lamp'] > i[data-face='front'] {
+  filter: brightness(1) drop-shadow(0 0 4px rgb(245 180 85 / 0.8));
+}
+.blockStairs {
+  width: 22px;
+  height: 22px;
+  background: var(--side) center / 44px;
+  background-color: var(--tint);
+  background-blend-mode: multiply;
+  clip-path: polygon(0 100%, 0 75%, 25% 75%, 25% 50%, 50% 50%, 50% 25%, 75% 25%, 75% 0, 100% 0, 100% 100%);
+}
+
+/* ── victory ────────────────────────────────────────────────────────── */
+
+@keyframes badge {
+  0% { opacity: 0; transform: scale(0.8); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.badge {
+  animation: badge 500ms var(--sf-ease) both;
+  animation-delay: 900ms;
+}
+
+/* Maintenance notice: slow ripples spreading from a resting star. */
+.ripple {
+  animation: ripple 4.8s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes ripple {
+  from {
+    transform: scale(0.3);
+    opacity: 0.75;
+  }
+  to {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+/* ── boot ident ───────────────────────────────────────────────────── */
+
+.splash[data-stage='out'],
+.splash[data-stage='skip'] {
+  animation: fadeOut 650ms ease-in forwards;
+  pointer-events: none;
+}
+.splashCard {
+  animation: splashIn 900ms var(--sf-ease) 150ms both;
+}
+@keyframes splashIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.splashStar {
+  animation: starLand 760ms var(--sf-ease) 520ms both;
+}
+.splashLabel {
+  animation: fadeIn 700ms ease-out 380ms both;
+}
+.splashRule {
+  transform-origin: 50% 50%;
+  animation: ruleDraw 700ms var(--sf-ease) 700ms both;
+}
+.splashHint {
+  animation: fadeIn 600ms ease-out 900ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splashCard,
+  .splashStar,
+  .splashLabel,
+  .splashRule,
+  .splashHint {
+    animation: fadeIn 400ms ease-out both !important;
+  }
+  .ripple,
+  .rise,
+  .slide,
+  .shootingStar,
+  .twinkle,
+  .shimmer,
+  .beaconHalo,
+  .loadSheen,
+  .wordIn .letter,
+  .wordIn .wordStar,
+  .wordIn .wordRule,
+  .wordIn .wordSub,
+  .shard[data-lit='true'],
+  .nope,
+  .heartLow,
+  .hintBreath,
+  .caret,
+  .markerPulse,
+  .lowHp {
+    animation: none !important;
+  }
+  /* Tips still change, with a plain fade. */
+  .tip {
+    animation-name: fadeIn;
+    animation-duration: 400ms;
+  }
+  .shimmer {
+    opacity: 0.4;
+  }
+  .letterbox,
+  .btn,
+  .chip,
+  .card,
+  .menuRow,
+  .menuRow::before,
+  .menuRow .rowLabel,
+  .menuRow .rowChevron,
+  .menuRow .rowIcon,
+  .sliderThumb,
+  .loadFill,
+  .loadHead {
+    transition: none !important;
+  }
+  .btn:active,
+  .chip:active,
+  .card:active,
+  .menuRow:active {
+    transform: none;
+  }
+}

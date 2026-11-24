@@ -1,0 +1,111 @@
+'use client'
+/** Controls reference for keyboard & mouse, gamepad and touch. */
+import { Fragment, useState, type ReactNode } from 'react'
+import { useGameUi } from './context'
+import { KeyCap, PanelHeader, Tabs } from './controls'
+import { BackHint } from './Panel'
+
+type Scheme = 'kbm' | 'pad' | 'touch'
+
+const SCHEMES: Array<{ value: Scheme; label: string }> = [
+  { value: 'kbm', label: 'Keyboard & mouse' },
+  { value: 'pad', label: 'Gamepad' },
+  { value: 'touch', label: 'Touch' },
+]
+
+const Or = () => <span className="px-1 text-[11px] text-[#F3EEE6]/30">or</span>
+const Note = ({ children }: { children: ReactNode }) => <span className="text-[12px] text-[#F3EEE6]/45">{children}</span>
+/** Round face-button cap for gamepads. */
+const Pad = ({ children, wide }: { children: ReactNode; wide?: boolean }) => (
+  <KeyCap shape={wide ? 'h-[22px] rounded-full px-2.5' : 'h-6 w-6 rounded-full'}>{children}</KeyCap>
+)
+
+const ROWS: Record<Scheme, Array<{ action: string; keys: ReactNode }>> = {
+  kbm: [
+    { action: 'Move', keys: <><KeyCap>W</KeyCap><KeyCap>A</KeyCap><KeyCap>S</KeyCap><KeyCap>D</KeyCap></> },
+    { action: 'Look around', keys: <Note>Mouse</Note> },
+    { action: 'Jump · double jump', keys: <><KeyCap>Space</KeyCap><Note>×2</Note></> },
+    { action: 'Sprint', keys: <><KeyCap>Shift</KeyCap><Note>hold</Note></> },
+    { action: 'Dash', keys: <><KeyCap>Q</KeyCap><Or /><Note>Right click</Note></> },
+    { action: 'Dodge-roll', keys: <KeyCap>V</KeyCap> },
+    { action: 'Slide', keys: <><KeyCap>C</KeyCap><Note>while sprinting</Note></> },
+    { action: 'Wall-run · kick off', keys: <><Note>Jump along a wall, then</Note><KeyCap>Space</KeyCap></> },
+    { action: 'Attack · hold to draw the bow', keys: <><KeyCap>F</KeyCap><Or /><Note>Left click</Note></> },
+    { action: 'Fists · sword · hammer · bow', keys: <><KeyCap>1</KeyCap><KeyCap>2</KeyCap><KeyCap>3</KeyCap><KeyCap>4</KeyCap><Or /><Note>Wheel</Note></> },
+    { action: 'Starblade · frost hammer (boss rewards)', keys: <><KeyCap>5</KeyCap><KeyCap>6</KeyCap></> },
+    { action: 'Star blaster · comet launcher (hold to fire)', keys: <><KeyCap>7</KeyCap><KeyCap>8</KeyCap></> },
+    { action: 'Interact · talk · pick up', keys: <KeyCap>E</KeyCap> },
+    { action: 'Camera zoom', keys: <><KeyCap>+</KeyCap><KeyCap>−</KeyCap><Or /><Note>Alt + wheel</Note></> },
+    { action: 'Map', keys: <KeyCap>M</KeyCap> },
+    { action: 'Pause', keys: <><KeyCap>Esc</KeyCap><Or /><KeyCap>P</KeyCap></> },
+    { action: 'Skip cutscene', keys: <><KeyCap>Space</KeyCap><Note>hold</Note></> },
+    { action: 'Ragdoll', keys: <KeyCap>R</KeyCap> },
+    { action: 'Emote · wave, cheer, point, shrug', keys: <><KeyCap>G</KeyCap><Note>cycles</Note></> },
+    { action: 'Chat', keys: <><KeyCap>Enter</KeyCap><Or /><KeyCap>T</KeyCap><Note>online</Note></> },
+    { action: 'Players in the room', keys: <><KeyCap>Tab</KeyCap><Note>hold · online</Note></> },
+    { action: 'Build mode', keys: <KeyCap>B</KeyCap> },
+    { action: 'Place · break a block', keys: <><Note>Left click</Note><Note>·</Note><Note>Right click</Note></> },
+    { action: 'Pick a block', keys: <><KeyCap>1</KeyCap><Note>…</Note><KeyCap>0</KeyCap><Or /><Note>Wheel</Note></> },
+    { action: 'Turn stairs', keys: <><KeyCap>R</KeyCap><Note>building</Note></> },
+    { action: 'Fly · land (Creative)', keys: <><KeyCap>Space</KeyCap><Note>×2</Note></> },
+    { action: 'Fly up · down', keys: <><KeyCap>Space</KeyCap><KeyCap>C</KeyCap><Or /><KeyCap>Shift</KeyCap></> },
+    { action: 'Fly fast', keys: <><KeyCap>Q</KeyCap><Note>hold</Note></> },
+  ],
+  pad: [
+    { action: 'Move', keys: <Pad wide>L stick</Pad> },
+    { action: 'Look around', keys: <Pad wide>R stick</Pad> },
+    { action: 'Jump · double jump', keys: <><Pad>A</Pad><Note>×2</Note></> },
+    { action: 'Sprint', keys: <><Pad wide>RB</Pad><Or /><Pad wide>RT</Pad></> },
+    { action: 'Dash', keys: <Pad>B</Pad> },
+    { action: 'Dodge-roll', keys: <Pad wide>LT</Pad> },
+    { action: 'Slide', keys: <><Pad wide>L3</Pad><Note>while sprinting</Note></> },
+    { action: 'Wall-run · kick off', keys: <><Note>Jump along a wall, then</Note><Pad>A</Pad></> },
+    { action: 'Attack · hold to draw the bow', keys: <Pad>X</Pad> },
+    { action: 'Switch weapon', keys: <Pad wide>D-pad ← →</Pad> },
+    { action: 'Interact · talk · pick up', keys: <Pad>Y</Pad> },
+    { action: 'Camera zoom', keys: <Pad wide>D-pad ↑ ↓</Pad> },
+    { action: 'Map', keys: <Pad wide>View</Pad> },
+    { action: 'Pause', keys: <Pad wide>Menu</Pad> },
+    { action: 'Skip cutscene', keys: <><Pad>A</Pad><Note>hold</Note></> },
+    { action: 'Ragdoll', keys: <Pad wide>R3</Pad> },
+    { action: 'Build mode', keys: <Pad wide>LB</Pad> },
+    { action: 'Place · break a block', keys: <><Pad>X</Pad><Pad>B</Pad></> },
+    { action: 'Pick a block · turn stairs', keys: <><Pad wide>D-pad ← →</Pad><Pad wide>R3</Pad></> },
+    { action: 'Fly (Creative) · up · down · fast', keys: <><Pad>A</Pad><Note>×2</Note><Pad>A</Pad><Pad>B</Pad><Pad wide>RB</Pad></> },
+  ],
+  touch: [
+    { action: 'Move', keys: <Note>Drag on the left side</Note> },
+    { action: 'Sprint', keys: <Note>Push the stick to its edge</Note> },
+    { action: 'Look around', keys: <Note>Drag on the right side</Note> },
+    { action: 'Jump · double jump', keys: <Note>Jump button, tap twice</Note> },
+    { action: 'Dash · attack · interact', keys: <Note>Buttons beside Jump</Note> },
+    { action: 'Dodge-roll · slide', keys: <Note>Roll button · it slides while sprinting</Note> },
+    { action: 'Wall-run · kick off', keys: <Note>Jump along a wall, then Jump again</Note> },
+    { action: 'Switch weapon', keys: <Note>Tap the hotbar</Note> },
+    { action: 'Pause', keys: <Note>Pause button, top left</Note> },
+    { action: 'Skip cutscene', keys: <Note>Skip button</Note> },
+    { action: 'Chat · emotes · players', keys: <Note>Buttons by the room chip, online</Note> },
+    { action: 'Build mode', keys: <Note>Build button, above the others</Note> },
+    { action: 'Place · break · turn a block', keys: <Note>Place, Break and Turn while building</Note> },
+    { action: 'Fly (Creative) · up · down', keys: <Note>Jump twice · hold Jump · hold Dash</Note> },
+  ],
+}
+
+export function ControlsPanel({ onBack }: { onBack: () => void }) {
+  const { game, touch } = useGameUi()
+  const [scheme, setScheme] = useState<Scheme>(() => (touch ? 'touch' : game.ctx.input?.device === 'pad' ? 'pad' : 'kbm'))
+  return (
+    <div>
+      <PanelHeader eyebrow="Reference" title="Controls" aside={<BackHint onBack={onBack} />} />
+      <Tabs label="Control scheme" value={scheme} options={SCHEMES} onChange={setScheme} />
+      <dl className="grid min-h-[300px] grid-cols-[1fr_auto] content-start">
+        {ROWS[scheme].map(({ action, keys }) => (
+          <Fragment key={action}>
+            <dt className="flex min-h-[40px] items-center border-b border-[#F3EEE6]/[0.07] text-[14px] text-[#F3EEE6]/80">{action}</dt>
+            <dd className="flex min-h-[40px] items-center justify-end gap-1.5 border-b border-[#F3EEE6]/[0.07] pl-6">{keys}</dd>
+          </Fragment>
+        ))}
+      </dl>
+    </div>
+  )
+}

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone game build output and copied assets.
+    "apps/starfall-web/dist/**",
+    "apps/starfall-web/public/**",
   ]),
 ]);
 

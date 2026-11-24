@@ -1,0 +1,52 @@
+'use client'
+/** Frame for the right-hand sub-panels of the title and pause menus. */
+import type { ReactNode, RefObject } from 'react'
+import { useGameUi } from './context'
+import { Chip, KeyCap } from './controls'
+import { BackIcon } from './icons'
+import { cx } from './theme'
+import styles from './ui.module.css'
+
+export function Panel({
+  children,
+  panelRef,
+  wide,
+  label,
+}: {
+  children: ReactNode
+  panelRef?: RefObject<HTMLElement | null>
+  wide?: boolean
+  label: string
+}) {
+  return (
+    <section
+      ref={panelRef}
+      aria-label={label}
+      tabIndex={-1}
+      className={cx(
+        styles.slide,
+        'outline-none',
+        styles.panel,
+        'relative flex max-h-full w-full flex-col overflow-hidden',
+        wide ? 'max-w-[860px]' : 'max-w-[640px]',
+      )}
+    >
+      <span aria-hidden className={cx(styles.panelAccent, 'absolute inset-x-0 top-0 h-[2px]')} />
+      <div className="min-h-0 flex-1 overflow-y-auto px-[clamp(18px,3vw,36px)] py-[clamp(18px,3.2vh,32px)] [scrollbar-color:rgba(243,238,230,0.2)_transparent] [scrollbar-width:thin]">
+        {children}
+      </div>
+    </section>
+  )
+}
+
+/** "Esc  Back" affordance in panel headers (a real button for mouse / touch). */
+export function BackHint({ onBack }: { onBack: () => void }) {
+  const { touch } = useGameUi()
+  return (
+    // The handler plays the back sound itself (the same one Esc triggers).
+    <Chip onClick={onBack} sound={null}>
+      {touch ? <BackIcon className="h-4 w-4" /> : <KeyCap>Esc</KeyCap>}
+      Back
+    </Chip>
+  )
+}

@@ -1,0 +1,238 @@
+import type { BlockMsg } from './build/blocks'
+import type { ModeCue, ModeView } from './net/modes/Modes'
+import type { Surface } from './world/heightfield'
+
+export interface V3 {
+  x: number
+  y: number
+  z: number
+}
+
+export type GamePhase =
+  | 'loading'
+  | 'title'
+  | 'playing'
+  | 'paused'
+  | 'cutscene'
+  | 'dialog'
+  | 'victory'
+
+export type ToastKind = 'shard' | 'checkpoint' | 'heart' | 'info' | 'warning' | 'reward'
+
+/** 'boss': the short boss introduction (arg = the boss's index in BOSS_IDS). */
+export type CutsceneName = 'intro' | 'shard' | 'beacon' | 'boss'
+
+export type MusicMood = 'title' | 'explore' | 'danger' | 'cutscene' | 'victory' | 'boss'
+
+/**
+ * Hotbar order: fists are always owned; sword, hammer and bow are found on the island,
+ * the starblade and the frost hammer are boss rewards; the star blaster and the comet launcher
+ * are star-tech (Creative's hotbar, and handed out by the online game modes).
+ */
+export type WeaponId = 'fists' | 'sword' | 'hammer' | 'bow' | 'starblade' | 'frostHammer' | 'starBlaster' | 'cometLauncher'
+
+/** The worlds: Starfall Isle plus the maps behind its portal arches (see worlds/defs). */
+export type MapId = 'isle' | 'rift' | 'frost' | 'volcanic' | 'sky' | 'neon' | 'glitch'
+
+/** Every map boss: the Gloom King and Frost Golem, and the Enemy Factory's four (each guards a map; Creative can summon them too). */
+export type BossId = 'gloomKing' | 'frostGolem' | 'ironTitan' | 'vortexWeaver' | 'plasmaOverlord' | 'voidStalker'
+
+/** Every enemy the Enemy Factory can spawn: six mob archetypes, the four factory bosses and the sentry turrets a Turret-Spawner deploys. */
+export type MobKind = 'rusher' | 'shieldBearer' | 'bomber' | 'sniper' | 'healer' | 'turretSpawner'
+export type FactoryBossKind = 'ironTitan' | 'vortexWeaver' | 'plasmaOverlord' | 'voidStalker'
+export type EnemyKind = MobKind | FactoryBossKind | 'turret'
+
+/**
+ * A sound (and Block D's animation/VFX) cue an enemy raises at a moment that matters: a wind-up,
+ * a telegraph, a shot, a block. Data-driven: the enemy definitions name the cues they use.
+ */
+export type EnemyCue =
+  | 'windup' | 'charge' | 'slash' | 'block' | 'guardBreak' | 'bash' | 'fuse' | 'explode'
+  | 'aim' | 'snipe' | 'heal' | 'buff' | 'blink' | 'deploy' | 'turretShot' | 'volley'
+  | 'beamCharge' | 'beam' | 'quake' | 'gust' | 'vortex' | 'teleport' | 'clone' | 'darkness'
+  | 'vent' | 'spawn'
+
+export interface VictoryStats {
+  time: number
+  bestTime: number | null
+  newBest: boolean
+  sparks: number
+  sparksTotal: number
+  deaths: number
+  enemies: number
+}
+
+/**
+ * Every event in the game. `ui:*` events drive the React layer;
+ * the rest let gameplay, audio and effects stay decoupled.
+ */
+export interface GameEventMap {
+  // ── engine → UI ─────────────────────────────────────────
+  'ui:load': { progress: number; label: string }
+  'ui:phase': { phase: GamePhase }
+  'ui:toast': { kind: ToastKind; title: string; body?: string }
+  /** One page of a dialog; null closes it. */
+  'ui:dialog': { title: string; text: string; page: number; pages: number } | null
+  'ui:subtitle': { speaker?: string; text: string } | null
+  'ui:letterbox': { on: boolean; skippable: boolean }
+  /** `at`: where the thing on offer is (the hero looks at it). */
+  'ui:prompt': { key: string; label: string; at?: V3 } | null
+  'ui:objective': { text: string }
+  /** 0 = clear, 1 = black. */
+  'ui:fade': { to: number; duration: number }
+  'ui:flash': { color: string; duration: number }
+  'ui:shardBanner': { index: number; name: string; collected: number; total: number }
+  'ui:victory': VictoryStats
+  'ui:error': { message: string }
+
+  // ── player ──────────────────────────────────────────────
+  /** `wall`: a step on the wall being run along (`pos` is on the wall). */
+  'player:footstep': { pos: V3; surface: Surface; sprint: boolean; wall?: boolean }
+  /** `from`: the long low leap out of a slide, or the kick off a wall-run (absent: a plain jump). */
+  'player:jump': { pos: V3; double: boolean; from?: 'slide' | 'wall' }
+  /** impact = downward speed in m/s at touchdown. */
+  'player:land': { pos: V3; impact: number; surface: Surface }
+  'player:dash': { pos: V3; dir: V3 }
+  'player:attack': { pos: V3 }
+  'player:hurt': { pos: V3; hp: number }
+  'player:died': { pos: V3; cause: 'water' | 'fall' | 'enemy' }
+  'player:respawn': { pos: V3 }
+  'player:splash': { pos: V3; big: boolean }
+  'player:bounce': { pos: V3 }
+  'player:wade': { pos: V3 }
+  /** The limp body slammed into something hard enough for a cartoon "boing" / "oof". */
+  'player:flop': { pos: V3; impact: number }
+  /** A dodge-roll began, heading `dir` (unit, in the ground plane). */
+  'player:roll': { pos: V3; dir: V3 }
+  /** A sprint slide began along `dir` / ended (`jumped`: with the leap out of it). */
+  'player:slide': { pos: V3; dir: V3; surface: Surface }
+  'player:slideEnd': { pos: V3; jumped: boolean }
+  /**
+   * A wall-run began / ended (`jumped`: with a kick off the wall). `pos` is where the feet meet the
+   * wall, `normal` points from the wall to the hero (unit, in the ground plane), and `side` is -1
+   * with the wall on his left, 1 with it on his right.
+   */
+  'player:wallRun': { pos: V3; normal: V3; side: number; surface: Surface }
+  'player:wallRunEnd': { pos: V3; jumped: boolean }
+
+  // ── world & gameplay ───────────────────────────────────
+  'collect:spark': { pos: V3; total: number; chain: number }
+  'collect:heart': { pos: V3 }
+  'collect:shard': { pos: V3; index: number; collected: number }
+  'enemy:alert': { pos: V3 }
+  'enemy:stomp': { pos: V3 }
+  'enemy:defeat': { pos: V3; big: boolean; kind?: EnemyKind }
+  /** A weapon blow landed (damage numbers, impact sound and sparks). */
+  'enemy:hit': { pos: V3; damage: number; killed: boolean; big: boolean; weapon: WeaponId }
+  'checkpoint': { id: string; pos: V3; first: boolean }
+  'beacon:activate': { pos: V3 }
+  'cutscene:start': { name: CutsceneName }
+  'cutscene:end': { name: CutsceneName; skipped: boolean }
+  'audio:music': { mood: MusicMood }
+
+  // ── worlds & bosses ────────────────────────────────────
+  /** The player stepped into a portal (the fade starts). */
+  'portal:enter': { pos: V3; to: MapId }
+  /** Arrived in another map (after the fade, before it clears). */
+  'world:travel': { from: MapId; to: MapId }
+  'boss:roar': { pos: V3; boss: BossId }
+  /** A boss slam / landing / stomp: a heavy thud and a shockwave. */
+  'boss:slam': { pos: V3; boss: BossId }
+  /** A telegraphed hazard went off (orb, boulder, ice spike). */
+  'boss:impact': { pos: V3; kind: 'orb' | 'boulder' | 'spike' }
+  /** A hazard's warning circle or lane appeared; it goes off in `delay` seconds (0 = when the boss commits). */
+  'boss:telegraph': { pos: V3; delay: number }
+  'boss:defeat': { pos: V3; boss: BossId }
+  /** A boss entered a new phase (it roars and its shield is up for a moment). */
+  'boss:phase': { pos: V3; boss: BossId; phase: number }
+
+  // ── enemy factory ──────────────────────────────────────
+  /** An enemy began to appear (its entrance plays now). */
+  'enemy:spawn': { pos: V3; kind: EnemyKind; id: number }
+  /** An enemy cue (see EnemyCue): the audio engine and effects react. */
+  'enemy:cue': { pos: V3; cue: EnemyCue; kind: EnemyKind }
+  'chest:open': { pos: V3 }
+
+  // ── building ───────────────────────────────────────────
+  'block:place': { pos: V3; surface: Surface }
+  'block:break': { pos: V3; surface: Surface }
+
+  // ── weapons ────────────────────────────────────────────
+  'weapon:pickup': { weapon: WeaponId; pos: V3 }
+  'weapon:equip': { weapon: WeaponId }
+  /** A sword slash (combo 0..2) or the hammer's wind-up. */
+  'weapon:swing': { weapon: WeaponId; pos: V3; combo: number }
+  /** The hammer hits the ground: shockwave. */
+  'weapon:slam': { pos: V3 }
+  'weapon:draw': { pos: V3 }
+  /** An arrow leaves the bow (or a shot its star-tech `weapon`); charge 0..1, launch velocity (m/s). */
+  'weapon:fire': { pos: V3; charge: number; vel?: V3; weapon?: WeaponId }
+  /** An arrow stuck in the ground or a prop. */
+  'arrow:stick': { pos: V3 }
+  /** A star bolt or a comet burst where it struck (ours or another player's): sound and sparks. */
+  'weapon:blast': { pos: V3; weapon: WeaponId }
+
+  // ── multiplayer ────────────────────────────────────────
+  'net:status': { status: 'offline' | 'connecting' | 'online' | 'error'; message?: string }
+  /** Room joined/left (null) or its player count changed. */
+  'net:room': { code: string; name: string; public: boolean; players: number; max: number } | null
+  'net:chat': { id: string; name: string; color: string; text: string; system?: boolean }
+  'net:peer': { id: string; name: string; joined: boolean }
+  /** Block edits from another player (validated). */
+  'net:blocks': { id: string } & BlockMsg
+  /**
+   * Another player's action reached its audible moment at `pos` (their copy plays the clip and
+   * effects), or a player-vs-player hit landed ('hit'). Audio and particles react.
+   */
+  'net:action': { action: NetFxAction; weapon: WeaponId; pos: V3; dir?: V3; combo?: number; charge?: number }
+  /**
+   * The server is being updated: everyone leaves their room and waits (`waiting` = players waiting,
+   * live). Turned off, the page reloads into the new version.
+   */
+  'net:maintenance': { on: boolean; message: string; waiting: number }
+
+  // ── game modes (online rooms) ──────────────────────────
+  /** The round as the UI shows it: phase, timer, scores, results. */
+  'mode:view': ModeView
+  /** A moment that deserves a sound (countdown tick, go, a tag, a KO, a ring, a point…). */
+  'mode:cue': { cue: ModeCue }
+}
+
+export type NetFxAction =
+  | 'swing' | 'slam' | 'draw' | 'fire' | 'spin' | 'dash' | 'flop' | 'hit'
+  /** Another player's roll, slide and wall-run starting, and their kick off a wall (`dir`: heading; the wall's normal for 'wallRun'). */
+  | 'roll' | 'slide' | 'wallRun' | 'wallJump'
+
+type Handler<T> = (payload: T) => void
+
+export class EventBus {
+  private map = new Map<keyof GameEventMap, Set<Handler<never>>>()
+
+  on<K extends keyof GameEventMap>(type: K, fn: Handler<GameEventMap[K]>): () => void {
+    let set = this.map.get(type)
+    if (!set) this.map.set(type, (set = new Set()))
+    set.add(fn as Handler<never>)
+    return () => set!.delete(fn as Handler<never>)
+  }
+
+  emit<K extends keyof GameEventMap>(type: K, payload: GameEventMap[K]): void {
+    const set = this.map.get(type)
+    if (!set) return
+    for (const fn of set) {
+      try {
+        ;(fn as Handler<GameEventMap[K]>)(payload)
+      } catch (err) {
+        console.error(`[starfall] handler for ${String(type)} failed`, err)
+      }
+    }
+  }
+
+  clear(): void {
+    this.map.clear()
+  }
+}
+
+/** Copies a vector-like into a plain object (event payloads must not alias live vectors). */
+export function v3(p: V3): V3 {
+  return { x: p.x, y: p.y, z: p.z }
+}
